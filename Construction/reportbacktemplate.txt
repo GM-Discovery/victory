@@ -1,0 +1,139 @@
+Kernel Report Back — [Kernel Name / Version]
+1. Status
+PASS / PARTIAL / FAIL
+
+Short reason (1–2 sentences)
+
+2. What Was Built
+
+List ONLY concrete deliverables:
+
+ Feature / component
+ Endpoint / system
+ UI element
+ Integration
+
+Example:
+
+- WebSocket session loop implemented
+- Actor → audience message propagation working
+- Basic role assignment functional
+3. Evidence (MANDATORY)
+
+Proof that it works.
+
+Include:
+
+commands run
+curl outputs
+logs
+screenshots (if applicable)
+browser behavior
+
+Example:
+
+curl -s http://localhost:8080/session/1
+
+Result:
+
+{ "status": "active", "users": 2 }
+
+No evidence = didn’t happen.
+
+4. How to Run (Operator Steps)
+
+Exact steps to reproduce from clean state.
+
+No assumptions.
+
+Example:
+
+git pull
+docker compose up -d --build
+open http://localhost:5173
+5. Operator Notes (CRITICAL)
+
+This is where your future sanity lives.
+
+Must include:
+
+environment variables required
+ports used
+volumes/data paths
+startup dependencies
+timing issues
+anything non-obvious
+
+Example:
+
+- Requires PORT 8080 open
+- Fails silently if REDIS_URL not set
+- First startup takes ~30s due to build
+6. Blockers & Workarounds
+
+This is the part you explicitly asked for.
+
+Format:
+
+BLOCKER:
+Description
+
+CAUSE:
+Root issue
+
+WORKAROUND:
+What was done
+
+OPERATOR ACTION REQUIRED:
+What YOU must do (if anything)
+
+Example:
+
+BLOCKER:
+Frontend changes not appearing
+
+CAUSE:
+Vite assets cached in container
+
+WORKAROUND:
+Rebuilt container manually
+
+OPERATOR ACTION REQUIRED:
+Run:
+docker compose up -d --build app
+
+This is where your “rebuild containers” lesson would live.
+
+7. Deviations from Kernel
+
+Did the builder change anything from the spec?
+
+Must be explicit.
+
+- Used polling instead of WebSockets temporarily
+- Limited audience size to 10 instead of 100
+
+This prevents silent drift.
+
+8. Known Issues
+
+Not blockers—just rough edges.
+
+- Reactions lag ~200ms
+- UI not styled
+- No reconnect logic
+9. Next Recommended Step
+
+Builder suggests what to do next.
+
+Not required to follow—but useful.
+
+- Add segmented audience views
+- Implement note card routing
+10. Files Changed / Created
+
+High-level, not a full diff.
+
+- /server/ws.go
+- /client/src/Stage.vue
+- docker-compose.yaml

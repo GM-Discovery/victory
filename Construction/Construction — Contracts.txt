@@ -1,0 +1,212 @@
+Construction — Contracts
+1) Action Contract (backend shape)
+
+Every action the system processes follows one envelope:
+
+{
+  "id": "uuid",
+  "type": "perform/speak | direct/reveal | create/element | react/emote | ...",
+  "actorId": "user_123",
+  "role": "director | cast | crew | audience | producer",
+  "sessionId": "sess_456",
+  "momentId": "m_789",
+  "target": { "kind": "element|surface|view|role", "id": "..." },
+  "payload": { /* type-specific data */ },
+  "scope": {
+    "surfaces": ["stage", "backstage", "overlay"],
+    "audienceSegments": ["all" | "group:A" | "seat:row3" | "user:42"]
+  },
+  "visibility": {
+    "toRoles": ["audience", "cast", "director"],
+    "privateTo": ["user_123"] 
+  },
+  "persistence": {
+    "record": true,
+    "promoteEligible": false
+  },
+  "ts": 1710000000000
+}
+
+Validation rules (server, Go)
+verify actor role
+verify allowed action in current projection state (rehearsal/live)
+verify target exists & is mutable
+clamp payload (size/type)
+assign canonical timestamp/order
+write to log (if record=true)
+broadcast to interested clients (WebSocket)
+
+2) View Contract (the “magic”)
+
+Each client computes its view from:
+
+View = f(MomentState, DirectorRules, Role, Segment, ClientState)
+DirectorRules (set via direct/* actions)
+
+Examples:
+
+  reveal(elementId, segments=all, surfaces=stage)
+  hide(elementId, segments=group:B)
+  spotlight(actorId)
+  route(surface=overlay, content=elementId, segments=seat:row3)
+  dim(stage) / blackout
+  handoff_control(to=actorId)
+  Client resolution (Vue)
+
+Each client maintains:
+
+interface ViewContext {
+  role: 'producer'|'director'|'cast'|'crew'|'audience'
+  segments: string[] // e.g. ['all','group:A','seat:row3']
+  surfaces: SurfaceState[]
+}
+
+Then filters:
+
+include actions where:
+  scope.audienceSegments intersects segments OR is all
+  visibility.toRoles includes role OR privateTo includes user
+
+Result
+  same moment → different projections
+  Director sets rules once → clients resolve locally
+
+3) Event Transport (WebSockets)
+Channels (per session)
+session:{id}:actions → broadcast validated actions
+session:{id}:presence → joins/leaves
+session:{id}:control → director overrides / sync points
+
+Flow
+client sends action → ws/send
+server validates → assigns momentId/ts
+server appends to stream (and DB if record)
+server broadcasts action
+clients update local state → recompute view
+
+Keep it event-driven, not “replace whole state.”
+
+4) Persistence Model (Postgres)
+
+You don’t record everything—so be explicit.
+
+Tables (minimal start)
+productions
+sessions
+users
+roles
+elements (library + production + session-created)
+actions (only where record=true)
+snapshots (optional checkpoints)
+Actions table (lean)
+actions(
+  id uuid pk,
+  session_id uuid,
+  moment_id bigint,
+  actor_id uuid,
+  type text,
+  payload jsonb,
+  scope jsonb,
+  visibility jsonb,
+  ts timestamptz
+)
+Elements
+elements(
+  id uuid,
+  owner_id uuid,
+  scope text, -- library | production | session
+  type text,
+  data jsonb,
+  created_at timestamptz
+)
+Promotion flow
+session-created → optional promote_to_library
+requires producer approval (action)
+
+5) Mode Rules (tighten)
+
+I chose projection-based modes. Add guardrails:
+
+Rehearsal (audience OFF)
+allow:
+create/update freely (within limits)
+role changes
+venue/layout edits
+heavy iteration
+record:
+minimal (configurable)
+Live (audience ON)
+restrict:
+structural changes (venue/layout)
+role reassignment (unless director override)
+allow:
+perform, direct, react
+controlled creation (if enabled)
+record:
+enabled per policy
+
+6) Reaction Contract
+
+Reactions are actions:
+
+{
+  "type": "react/emote",
+  "payload": { "kind": "applause|laugh|note", "value": 0.8, "text": "..." },
+  "visibility": { "toRoles": ["audience","director"], "privateTo": [] },
+  "persistence": { "record": true }
+}
+
+Default visibility (your rules):
+
+audience: sees most
+director: sees all (except producer private)
+producer: private by default unless in audience mode
+cast: gated by director setting
+
+7) Element Lifecycle (finalized)
+
+States:
+
+session → ephemeral by default
+production → saved for this production
+library → reusable (producer-approved)
+
+Constraints:
+
+size/type limits enforced server-side
+upload paths per producer (local-first acceptable)
+promotion requires direct/promote_element (producer)
+
+8) Canon Rule (enforced simply)
+No destructive edits to past recorded actions
+If you “change,” you append a new action that overrides going forward
+Optional: snapshots for fast load
+
+Implementation sketch (first cuts)
+Backend (Go)
+HTTP: auth, uploads, admin
+WS: /ws/session/{id}
+
+Packages:
+session (state, presence)
+actions (validation, routing)
+view (rule application helpers if needed server-side)
+store (Postgres)
+
+Keep server authoritative for:
+validation
+ordering
+permissions
+Frontend (Vue + TS)
+
+stores:
+sessionStore (actions stream)
+viewStore (derived view)
+
+components:
+StageSurface
+BackstagePanel
+DirectorConsole
+ActorTools
+AudienceView
+recompute view on each action (fast, incremental)

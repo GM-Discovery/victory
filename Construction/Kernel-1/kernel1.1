@@ -1,0 +1,275 @@
+Kernel 1.1 — First Production Slice
+Venue
+
+the-cave
+
+Capacity target
+~100 total connected participants
+includes:
+producer
+director
+cast
+crew
+audience
+
+That is a fine planning ceiling for the first slice.
+
+Not because it must scale there immediately, but because it keeps you from designing something absurdly tiny.
+
+Spatial structure
+1. Fire
+
+Primary focal element.
+
+This is the first required shared stage object.
+
+Purpose:
+
+common point of attention
+proves shared perception
+anchors storytelling
+2. Speaker position
+
+Area near/in front of the fire where storyteller/actor performs.
+
+3. Audience area
+
+Standing-room-oriented public view zone.
+
+Default:
+
+sees fire
+sees performer
+does not see backstage tools
+4. Backstage/tools area
+
+Visible to cast/crew/director as needed.
+Hidden from audience by default.
+
+This is where:
+
+controls live
+future set-building tools live
+notes/cues arrive
+hidden elements originate
+5. Producer box
+
+Not required for first build, but structurally valid.
+A privileged audience-facing view with optional oversight signals.
+
+First required views
+Audience view
+
+Sees:
+
+fire
+performer
+allowed reactions from others
+minimal interface
+
+Does not see:
+
+backstage
+director controls
+hidden tools
+Actor view
+
+Sees:
+
+fire
+audience
+some backstage/tool context
+own cues if enabled
+Director view
+
+Sees:
+
+everything relevant
+audience reactions
+backstage/tools
+reveal controls
+Producer view
+
+Initially can just inherit director or privileged audience view.
+No need to overbuild this first.
+
+First exchange model
+
+You answered the important thing:
+
+there must be an exchange
+
+So first build is not one-way broadcast.
+
+It must support:
+
+Outbound
+performer tells story
+fire is visible
+Inbound
+audience reacts
+
+That makes it theater, not slideshow.
+
+First audience reaction set
+
+This is already enough:
+
+clap
+boo
+cry
+smile
+laugh
+startle
+heart
+thumbs_up
+thumbs_down
+cheer
+standing_clap
+note_card
+
+That is a solid first reaction vocabulary.
+
+Important split
+
+These are not all the same type.
+
+Immediate reactions
+
+Fast, lightweight, ambient:
+
+clap
+boo
+smile
+laugh
+startle
+heart
+thumbs_up
+thumbs_down
+cheer
+standing_clap
+Routed reactions
+
+Need delivery logic:
+
+note_card
+
+That distinction matters.
+
+Note cards
+
+Good instinct.
+
+A note card should not behave like open chat.
+
+It should behave like:
+
+react/note_card
+
+With routing rules such as:
+
+to crew
+to director
+to cast
+maybe filtered by protocol
+
+That preserves focus.
+
+You are right that unrestricted audience comment can wreck attention.
+
+So:
+
+chat below can exist later
+note cards are the first audience voice tool
+
+That is cleaner and more theatrical anyway.
+
+What the-cave proves
+
+If the-cave works, then the system has proven:
+
+shared focal stage
+role-separated views
+basic reveal/hide boundaries
+performer-to-audience transmission
+audience-to-production feedback
+first real exchange
+
+That is enough to justify the rest.
+
+What not to build yet
+
+Do not build yet:
+
+cameras
+black box modularity
+marketplace
+grades/contact logs
+complicated producer admin suite
+dynamic automated segments
+full comment threads
+media broadcasting stack beyond what the first cave needs
+
+Those are all later layers.
+
+My read on your hosting thought
+
+You’re probably right that local/self-run instances matter early.
+
+So for the-cave, think:
+
+one producer-owned instance
+modest participant count
+one venue
+one live session
+constrained media expectations
+
+That is sane.
+
+What must be defined next
+
+To move forward cleanly, we need to specify the-cave in plain system terms.
+
+We need 5 things
+1. Surfaces
+
+What actual UI/display surfaces exist in the-cave?
+
+Minimum guess:
+
+main stage surface
+backstage/control surface
+audience reaction surface
+note-card inbox surface
+2. First element types
+
+Beyond fire, what can exist at launch?
+
+I would recommend:
+
+image
+text
+reaction token
+note card
+3. First live actions
+
+What actions are mandatory for the first demo?
+
+My candidate list:
+
+join_session
+assign_role
+place_element
+reveal_element
+speak
+react
+send_note_card
+4. First visibility rules
+
+Who sees what by default?
+
+5. First failure boundaries
+
+What are we explicitly refusing to support in the-cave v1?
+
+That helps protect scope.
