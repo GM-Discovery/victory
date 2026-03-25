@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"victory/backend/internal/actions"
 	"victory/backend/internal/world"
 )
 
@@ -56,7 +57,7 @@ func ServeCaveWS(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		go writePump(client)
-		readPump(hub, client)
+		readPump(hub, pool, client)
 	}
 }
 
@@ -70,7 +71,7 @@ func writePump(c *Client) {
 	}
 }
 
-func readPump(hub *Hub, c *Client) {
+func readPump(hub *Hub, pool *pgxpool.Pool, c *Client) {
 	defer func() {
 		hub.Remove(c)
 		_ = c.Conn.Close()
@@ -87,11 +88,62 @@ func readPump(hub *Hub, c *Client) {
 			continue
 		}
 
-		if kind, _ := payload["type"].(string); kind == "ping" {
+		switch payload["type"] {
+		case "ping":
 			_ = c.Conn.WriteJSON(map[string]any{
 				"type": "pong",
 				"ts":   time.Now().UTC().Format(time.RFC3339),
 			})
+
+		case "react/emote":
+			sessionID, _ := payload["session_id"].(string)
+			actorID, _ := payload["actor_id"].(string)
+			kind, _ := payload["kind"].(string)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			stored, err := actions.StoreReaction(ctx, pool, actions.ReactRequest{
+				SessionID: sessionID,
+				ActorID:   actorID,
+				Kind:      kind,
+			})
+			cancel()
+
+			if err != nil {
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": err.Error(),
+				})
+				continue
+			}
+
+			out, _ := json.Marshal(map[string]any{
+				"type": "action",
+				"data": stored,
+			})
+			hub.Broadcast(out)
+
+		case "perform/speak":
+			sessionID, _ := payload["session_id"].(string)
+			actorID, _ := payload["actor_id"].(string)
+			text, _ := payload["text"].(string)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			stored, err := actions.StoreSpeak(ctx, pool, sessionID, actorID, text)
+			cancel()
+
+			if err != nil {
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": err.Error(),
+				})
+				continue
+			}
+
+			out, _ := json.Marshal(map[string]any{
+				"type": "action",
+				"data": stored,
+			})
+			hub.Broadcast(out)
 		}
 	}
 }
