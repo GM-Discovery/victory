@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: victory-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: victory
+      POSTGRES_USER: victory
+      POSTGRES_PASSWORD: change_this_now
+    volumes:
+      - victory_postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    container_name: victory-backend
+    restart: unless-stopped
+    environment:
+      PORT: 8081
+      DATABASE_URL: postgres://victory:REDACTED@victory-postgres:5432/victory?sslmode=disable
+    depends_on:
+      - postgres
+    ports:
+      - "8081:8081"
+
+volumes:
+  victory_postgres_data:
