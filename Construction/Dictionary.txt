@@ -1,0 +1,264 @@
+=== CORE CONCEPT ===
+
+The system is a directed multi-perspective theater.
+One shared moment, multiple simultaneous views.
+
+Audience View OFF = Rehearsal
+Audience View ON = Live
+
+---
+
+=== OWNERSHIP / DEPLOYMENT ===
+
+Producer
+- Owner of the system instance (Location)
+- Controls billing, library, policies
+- May act as Director or Audience
+
+Location
+- A deployed instance of the software
+- Owned by a Producer
+- Contains Lots, Productions, Libraries, Users
+
+Lot
+- Collection of Venues within a Location
+- Organizational grouping of performance spaces
+
+Company
+- Collection of participants (Cast + Crew)
+- Associated with a Producer/Location
+
+---
+
+=== PERFORMANCE STRUCTURE ===
+
+Venue
+- Defines experience rules (space, audience, interaction)
+- Example: the-cave, black box, classroom
+
+Production
+- A configured show/event
+- Contains roles, assets, rules, and venue assignment
+
+Session
+- A live instance of a Production
+- Contains active participants and current moment flow
+
+Production Run
+- Repeated Sessions of the same Production
+
+---
+
+=== SPACE MODEL (the-cave v1) ===
+
+World
+- Bounded 3D space with a central plane
+
+Plane (Ground)
+- Primary interaction surface (y = 0)
+
+Stage
+- Shared focal area
+- Always visible to audience
+
+Audience Area
+- Viewing position facing stage
+- Default perspective for participants
+
+Backstage
+- Hidden system area
+- Used for tools, preparation, hidden elements
+
+Interface Layer (Overlay)
+- UI elements anchored in space (banners, indicators)
+
+---
+
+=== CORE ENTITIES ===
+
+Element
+- Any object that can exist in the system
+- Examples: fire, text, image, prop, reaction
+
+Library
+- Producer-owned reusable element collection
+
+Script / Ruleset / Module
+- Defines structured behavior for a Production
+- Can be rigid (script) or flexible (improv/game)
+
+---
+
+=== TIME MODEL ===
+
+Moment
+- Atomic unit of time + state
+- Contains all actions and visibility at an instant
+
+Past
+- Immutable (no retroactive contradiction)
+
+Present
+- Active manipulation
+
+Future
+- Undefined
+
+---
+
+=== VIEW MODEL ===
+
+View
+- A participant-specific projection of a Moment
+
+Surface
+- A display/control plane (stage, backstage, overlay)
+
+Segment
+- A grouping of participants (NOT a role)
+- Examples: front_row, late_entry, VIP
+
+Rule:
+- Same Moment → Different Views
+
+View = f(MomentState, DirectorRules, Role, Segment, ClientState)
+
+---
+
+=== ROLES ===
+
+Producer
+- System owner
+- Highest authority
+
+Director
+- Controls stage, visibility, and audience perception
+
+Cast (Actors)
+- Perform and manipulate elements
+
+Crew
+- Support roles (tools, operations, automation)
+
+Audience
+- Observes and reacts
+- No direct stage control by default
+
+---
+
+=== ACTION MODEL ===
+
+Action
+- Any intentional change in the system
+
+All actions follow a structured contract:
+(see Construction — Contracts) :contentReference[oaicite:1]{index=1}
+
+Core action families:
+
+create/*
+- create_element
+
+update/*
+- place_element
+- modify_element
+
+perform/*
+- speak
+- gesture
+- cue
+
+direct/*
+- reveal_element
+- hide_element
+- set_view
+- segment_audience
+
+react/*
+- emote (clap, laugh, etc.)
+- note_card
+
+system/*
+- join_session
+- assign_role
+- sync
+
+---
+
+=== SPEECH ===
+
+speak
+- A perform action
+- v1: text-based
+- later: voice-enabled
+
+---
+
+=== REACTION MODEL ===
+
+Reaction
+- A feedback signal attached to a moment
+
+Immediate:
+- clap, laugh, boo, etc.
+
+Routed:
+- note_card
+
+Visibility:
+- Role-dependent
+- Configurable
+
+Reactions may be recorded.
+
+---
+
+=== ELEMENT LIFECYCLE ===
+
+Element states:
+
+session
+- temporary, created during live interaction
+
+production
+- saved within a production
+
+library
+- reusable, producer-approved
+
+Promotion:
+- session → library requires producer approval
+
+---
+
+=== MODES ===
+
+Rehearsal
+- Audience View OFF
+- flexible, experimental
+
+Live
+- Audience View ON
+- performance constraints apply
+
+---
+
+=== CANON RULE ===
+
+- No destructive edits to past
+- Changes append forward
+- System truth accumulates
+
+---
+
+=== EXCHANGE MODEL ===
+
+The system must support:
+
+Outbound:
+- Actor → Audience (presentation)
+
+Inbound:
+- Audience → Production (reaction)
+
+This exchange is required for system validity.
