@@ -1,0 +1,122 @@
+Report-back draft
+Kernel Report Back — Kernel 1.2 / the-cave
+1. Status
+
+PASS
+
+Core proof completed: two distinct users joined the same live session with different roles, one user spoke, another reacted, and both actions were persisted in order.
+
+2. What Was Built
+Postgres-backed world foundation
+Seeded the-cave venue
+Seeded reusable first-fire element with cave placement
+Live session creation for the-cave
+Persistent user join by handle and display_name
+Role-aware join for cast and audience
+HTTP world snapshot endpoint
+WebSocket observer endpoint
+react/emote live action pipeline
+perform/speak live action pipeline
+Server-assigned moment_id ordering
+Action persistence to database
+Broadcast of live actions to connected observers
+3. Evidence
+
+Commands and results observed:
+
+GET /api/world/the-cave returned seeded venue/session/fire state
+POST /api/session/the-cave/join returned:
+actor1 as cast
+audience1 as audience
+WebSocket clients received:
+initial snapshot
+live react/emote
+live perform/speak
+Database query showed ordered actions:
+4 | 3d1b9a03-b818-44ec-a6cf-b0e2c4a4dcf9 | perform/speak | {"text": "Once, by this fire..."}
+5 | cb9012d4-b5b2-405b-aef2-31dbf30808dc | react/emote   | {"kind": "clap"}
+Participant query showed:
+actor1    | cast
+audience1 | audience
+grant     | audience
+4. How to Run
+
+From current dev mode:
+
+Start Postgres in Docker
+Stop Docker backend if using host-Go dev mode
+Run backend on host with localhost DB URL
+Join users through /api/session/the-cave/join
+Connect via wscat to /ws/the-cave
+Send perform/speak and react/emote
+5. Operator Notes
+Docker remains deployment/install truth
+Host-Go is currently the fast dev loop
+Postgres should stay internal/local-only
+Backend currently uses port 8081
+Session slug is hardwired to the-cave in current endpoints
+Elements belong to library layer; venue stores placement, not ownership
+Observation path was intentionally built before reaction and speech
+6. Blockers & Workarounds
+
+BLOCKER: Docker rebuild loop was slow for active coding
+CAUSE: Full image rebuild on each backend change
+WORKAROUND: Installed Go on host and ran backend directly against Docker Postgres
+OPERATOR ACTION REQUIRED: Use host-Go for active dev, Docker backend for install validation
+
+BLOCKER: Host-Go backend could not reach Postgres initially
+CAUSE: Docker hostname works in container network, not from host process
+WORKAROUND: Bound Postgres to localhost and used localhost DATABASE_URL
+OPERATOR ACTION REQUIRED: Run host backend with localhost DB URL during dev mode
+
+7. Deviations from Kernel
+No browser UI proof yet; proof was done through API/WebSocket terminals
+Actor role currently comes from join payload rather than a fuller permissions flow
+Speech currently renders as action payload only; no dedicated front-end presentation layer yet
+8. Known Issues
+Snapshot action order is descending in history replay
+No note-card flow yet
+No reveal/hide flow yet
+No dedicated actor/director tooling yet
+No polished browser-facing stage UI yet
+9. Next Recommended Step
+
+Build a minimal browser UI that:
+
+loads the cave snapshot
+shows fire and overlay text
+displays live reactions
+allows actor speak and audience react without raw WebSocket manual input
+10. Files Changed / Created
+
+High-level:
+
+backend/cmd/victory/main.go
+backend/internal/db/db.go
+backend/internal/world/snapshot.go
+backend/internal/identity/join.go
+backend/internal/network/hub.go
+backend/internal/network/ws.go
+backend/internal/actions/react.go
+database/migrations/001_init.sql
+database/migrations/002_seed_world.sql
+database/migrations/003_users_handle.sql
+database/migrations/004_seed_session.sql
+Operator log addendum
+
+Add this to the log:
+
+## 2026-03-25 — Kernel 1.2 functional proof completed
+
+- Added role-aware join support for `cast` and `audience`
+- Created distinct users `actor1` and `audience1`
+- Verified actor `perform/speak` persisted as moment 4
+- Verified audience `react/emote` persisted as moment 5
+- Verified participant roles in DB:
+  - actor1 = cast
+  - audience1 = audience
+- Kernel 1.2 can now support:
+  - shared venue perception
+  - actor speech
+  - audience reaction
+  - ordered append-only action history

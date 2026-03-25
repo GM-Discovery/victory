@@ -11,6 +11,7 @@ import (
 type JoinRequest struct {
 	Handle      string `json:"handle"`
 	DisplayName string `json:"display_name"`
+	Role        string `json:"role"`
 }
 
 type JoinResponse struct {
@@ -65,7 +66,7 @@ func JoinTheCave(ctx context.Context, pool *pgxpool.Pool, req JoinRequest) (*Joi
 		return nil, err
 	}
 
-	const role = "audience"
+	role := normalizeRole(req.Role)
 
 	_, err = tx.Exec(ctx, `
 		INSERT INTO session_participants (session_id, user_id, role)
@@ -104,4 +105,14 @@ func normalizeHandle(in string) string {
 	in = strings.TrimSpace(strings.ToLower(in))
 	in = strings.ReplaceAll(in, " ", "_")
 	return in
+}
+
+func normalizeRole(in string) string {
+	in = strings.TrimSpace(strings.ToLower(in))
+	switch in {
+	case "cast", "audience":
+		return in
+	default:
+		return "audience"
+	}
 }
