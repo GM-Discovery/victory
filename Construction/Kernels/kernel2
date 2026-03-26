@@ -1,0 +1,198 @@
+Kernel 2 — Identity, Invites, Role Authority, and Workshop Asset Floor
+Purpose
+
+Establish the first durable foundation for user identity, access control, producer/director authority, invite-driven role assignment, and workshop-based asset ingestion.
+
+This kernel is not about visual polish.
+It is about making the system trustworthy enough to build on.
+
+Scope
+
+Build the minimum viable system for:
+
+producer signup
+account login/re-entry
+password storage and session auth
+invite-based access and role assignment
+production-scoped director authority
+workshop asset upload and auto-clamping
+asset ownership metadata
+map visibility driven by role + grants
+Identity Rules
+Signup
+requires email
+requires handle
+requires password
+requires display name
+Login
+uses handle + password
+Recovery
+producer and users must have a path to regain access later
+preferred first implementation: email reset link
+Password Handling
+passwords must be hashed securely
+no raw password storage
+no role self-assignment through client payload
+Role Authority Rules
+Producer
+owns the Location
+controls venues, storage, and appointments
+may appoint one or more Directors
+may restrict Director access to venues
+Director
+authority is scoped to assigned Production
+may invite Cast/Crew to that Production
+may invite Audience to associated venues/sessions if allowed
+Cast / Crew
+may join assigned Productions
+may invite Audience if policy permits
+Audience
+may be admitted by invite/ticket/will-call flow
+does not gain direct production authority
+Invite Rules
+
+Invites are a general access mechanism, not a privileged admin-only feature.
+
+Each invite should carry:
+
+inviter identity
+target role
+optional production scope
+optional venue scope
+expiration
+single-use or limited-use behavior
+
+Examples:
+
+producer → director
+director → cast
+director → crew
+cast/crew → audience
+audience self-arrival via public venue access where allowed
+
+Will-call behavior:
+
+audience invite should automatically assign audience role on acceptance
+Map / Access Rules
+
+The landing map is a permission surface.
+
+Visibility should be determined by:
+
+role
+assigned venue access
+explicit grants
+
+Examples:
+
+public users see only limited map areas
+signed-in users see more
+audience+ may see museum/info-booth/public-facing areas
+cast/crew may see library, production houses, school, etc. as granted
+directors may see most venues by courtesy unless limited by producer
+production-specific grants allow entry to production venue(s)
+
+Fog of war is acceptable and encouraged.
+
+Workshop Rules
+
+The workshop is a special venue/environment for making things.
+
+Its first job is not beauty.
+Its first job is controlled asset ingestion.
+
+First supported workshop action
+upload image asset
+On upload, system must:
+validate file type
+validate size
+validate actual file signature if practical
+auto-clamp/resize
+assign ownership metadata
+store result on producer-owned server storage
+make asset available for later production use
+Initial allowed asset types
+png
+jpg
+jpeg
+webp
+Initial limits
+max file size: 10 MB
+max source dimensions: 4096 x 4096
+generate standard sizes:
+512
+1024
+2048
+Initial exclusions
+no svg
+no animated gifs
+no video yet
+no audio yet
+no arbitrary documents
+Asset Ownership Rules
+
+Assets do not automatically become producer property just because they are used.
+
+Initial ownership states:
+
+personal
+uploader-owned
+lent for use
+production_licensed
+usable for a given production
+library_owned
+copied/promoted to producer library with explicit permission
+
+System must record:
+
+uploader
+owner state
+storage path
+source file metadata
+derived sizes
+Storage Rules
+assets stored on producer’s own server instance
+file storage should be organized in per-producer paths
+metadata stored in DB
+served in controlled way, not blindly trusted
+Non-Goals
+
+Do not build in this kernel:
+
+stage rendering
+browser theater UI
+note-card flow
+speech overlay visuals
+black box venue tools
+marketplace
+LMS records
+multi-server competition logic
+advanced audience segmentation
+video/audio upload pipeline
+Success Criteria
+
+Kernel 2 passes when:
+
+a producer can sign up with email/handle/password
+that producer can log out and log back in with handle/password
+password storage is secure and not raw
+producer can create or issue an invite for a director
+director invite acceptance results in correct role assignment
+role is system-assigned, not client-asserted
+workshop accepts an image upload
+upload is auto-clamped into standard sizes
+asset ownership metadata is stored correctly
+uploaded asset is associated to producer storage and available for later production use
+map visibility changes correctly based on role + grants
+Required Report-Back Focus
+
+Builder must explicitly report:
+
+auth/session method used
+password hashing method
+invite token behavior
+storage paths used
+clamp/resize pipeline used
+file safety limits enforced
+operator steps for local dev vs install truth
+blockers and operator actions
