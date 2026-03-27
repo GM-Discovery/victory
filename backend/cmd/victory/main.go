@@ -6,17 +6,20 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	"victory/backend/internal/access"
 	"victory/backend/internal/db"
 	"victory/backend/internal/identity"
-	"victory/backend/internal/world"
 	"victory/backend/internal/network"
+	"victory/backend/internal/world"
 )
 
 func main() {
 	port := getenv("PORT", "8081")
 	databaseURL := getenv("DATABASE_URL", "postgres://victory:REDACTED@victory-postgres:5432/victory?sslmode=disable")
+	secureCookie := getenv("COOKIE_SECURE", "false") == "true"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -39,6 +42,55 @@ func main() {
 		})
 	})
 
+	mux.HandleFunc("/api/auth/signup", identity.HandleSignup(pool, secureCookie))
+	mux.HandleFunc("/api/auth/login", identity.HandleLogin(pool, secureCookie))
+	mux.HandleFunc("/api/auth/logout", identity.HandleLogout(pool, secureCookie))
+	mux.HandleFunc("/api/auth/password-reset/request", identity.HandleForgotPassword(pool))
+	mux.HandleFunc("/api/auth/password-reset/confirm", identity.HandleResetPassword(pool, secureCookie))
+	mux.HandleFunc("/api/invites", identity.HandleCreateInvite(pool))
+	mux.HandleFunc("/api/invites/accept", identity.HandleAcceptInvite(pool, secureCookie))
+
+	mux.HandleFunc("/api/map/visibility", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
+				"ok":    false,
+				"error": "method_not_allowed",
+			})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		sessionCookie := ""
+		if c, err := r.Cookie("victory_session"); err == nil {
+			sessionCookie = c.Value
+		}
+
+		userID := ""
+		if sessionCookie != "" {
+			resolvedUserID, err := access.CurrentUserIDFromRequest(ctx, pool, sessionCookie)
+			if err == nil {
+				userID = resolvedUserID
+			}
+		}
+
+		venues, err := access.ResolveVisibleVenues(ctx, pool, userID)
+		if err != nil {
+			log.Printf("map visibility failed: %v", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"ok":    false,
+				"error": "failed_to_resolve_visibility",
+			})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":   true,
+			"data": venues,
+		})
+	})
+
 	mux.HandleFunc("/api/world/the-cave", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
@@ -50,6 +102,38 @@ func main() {
 
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
+
+		sessionCookie := ""
+		if c, err := r.Cookie("victory_session"); err == nil {
+			sessionCookie = c.Value
+		}
+
+		userID, err := access.CurrentUserIDFromRequest(ctx, pool, sessionCookie)
+		if err != nil {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{
+				"ok":    false,
+				"error": "not_authenticated",
+			})
+			return
+		}
+
+		allowed, err := access.UserCanAccessVenueSlug(ctx, pool, userID, "the-cave")
+		if err != nil {
+			log.Printf("cave access check failed: %v", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"ok":    false,
+				"error": "access_check_failed",
+			})
+			return
+		}
+
+		if !allowed {
+			writeJSON(w, http.StatusForbidden, map[string]any{
+				"ok":    false,
+				"error": "forbidden",
+			})
+			return
+		}
 
 		snapshot, err := world.LoadCaveSnapshot(ctx, pool)
 		if err != nil {
@@ -88,7 +172,39 @@ func main() {
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-		resp, err := identity.JoinTheCave(ctx, pool, req)
+		sessionCookie := ""
+		if c, err := r.Cookie("victory_session"); err == nil {
+			sessionCookie = c.Value
+		}
+
+		userID, err := access.CurrentUserIDFromRequest(ctx, pool, sessionCookie)
+		if err != nil || strings.TrimSpace(userID) == "" {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{
+				"ok":    false,
+				"error": "ticket_or_auth_required",
+			})
+			return
+		}
+
+		allowed, err := access.UserCanAccessVenueSlug(ctx, pool, userID, "the-cave")
+		if err != nil {
+			log.Printf("cave join access check failed: %v", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"ok":    false,
+				"error": "access_check_failed",
+			})
+			return
+		}
+
+		if !allowed {
+			writeJSON(w, http.StatusForbidden, map[string]any{
+				"ok":    false,
+				"error": "forbidden",
+			})
+			return
+		}
+
+		resp, err := identity.JoinTheCave(ctx, pool, req, sessionCookie)
 		if err != nil {
 			log.Printf("join failed: %v", err)
 			writeJSON(w, http.StatusBadRequest, map[string]any{
@@ -104,7 +220,7 @@ func main() {
 		})
 	})
 
-mux.HandleFunc("/ws/the-cave", network.ServeCaveWS(hub, pool))
+	mux.HandleFunc("/ws/the-cave", network.ServeCaveWS(hub, pool))
 
 	server := &http.Server{
 		Addr:              ":" + port,
