@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"victory/backend/internal/access"
+	"victory/backend/internal/assets"
 	"victory/backend/internal/db"
 	"victory/backend/internal/identity"
 	"victory/backend/internal/network"
@@ -20,6 +21,7 @@ func main() {
 	port := getenv("PORT", "8081")
 	databaseURL := getenv("DATABASE_URL", "postgres://victory:REDACTED@victory-postgres:5432/victory?sslmode=disable")
 	secureCookie := getenv("COOKIE_SECURE", "false") == "true"
+	storageRoot := getenv("STORAGE_ROOT", "/opt/victory/storage")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -150,6 +152,9 @@ func main() {
 			"data": snapshot,
 		})
 	})
+
+	mux.HandleFunc("/api/workshop/assets", assets.HandleWorkshopUpload(pool, storageRoot))
+	mux.HandleFunc("/api/assets/", assets.HandleGetAssetMeta(pool))
 
 	mux.HandleFunc("/api/session/the-cave/join", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {

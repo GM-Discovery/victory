@@ -10,11 +10,10 @@ import (
 )
 
 type VisibleVenue struct {
-	Slug       string `json:"slug"`
-	Name       string `json:"name"`
-	IsPublic   bool   `json:"is_public"`
-	IsWorkshop bool   `json:"is_workshop"`
-	Reason     string `json:"reason"`
+	Slug           string `json:"slug"`
+	Name           string `json:"name"`
+	Kind           string `json:"kind"`
+	VisibleBecause string `json:"visible_because"`
 }
 
 func CurrentUserIDFromRequest(ctx context.Context, pool *pgxpool.Pool, rawCookie string) (string, error) {
@@ -34,10 +33,10 @@ func CurrentUserIDFromRequest(ctx context.Context, pool *pgxpool.Pool, rawCookie
 func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string) ([]VisibleVenue, error) {
 	if strings.TrimSpace(userID) == "" {
 		rows, err := pool.Query(ctx, `
-			SELECT slug, name, is_public, is_workshop
-			FROM venues
-			WHERE is_public = TRUE
-			ORDER BY slug
+			SELECT v.slug, v.name, v.kind, 'public'::text AS visible_because
+			FROM venues v
+			WHERE v.is_public = TRUE
+			ORDER BY v.slug
 		`)
 		if err != nil {
 			return nil, err
@@ -47,10 +46,9 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 		var out []VisibleVenue
 		for rows.Next() {
 			var v VisibleVenue
-			if err := rows.Scan(&v.Slug, &v.Name, &v.IsPublic, &v.IsWorkshop); err != nil {
+			if err := rows.Scan(&v.Slug, &v.Name, &v.Kind, &v.VisibleBecause); err != nil {
 				return nil, err
 			}
-			v.Reason = "public"
 			out = append(out, v)
 		}
 		return out, rows.Err()
@@ -58,13 +56,13 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 	rows, err := pool.Query(ctx, `
 		WITH visible AS (
-			SELECT v.slug, v.name, v.is_public, v.is_workshop, 'public'::text AS reason
+			SELECT v.id, v.slug, v.name, v.kind, 1 AS reason_rank, 'public'::text AS visible_because
 			FROM venues v
 			WHERE v.is_public = TRUE
 
 			UNION
 
-			SELECT v.slug, v.name, v.is_public, v.is_workshop, 'membership'::text AS reason
+			SELECT v.id, v.slug, v.name, v.kind, 2 AS reason_rank, 'venue_membership'::text AS visible_because
 			FROM venues v
 			JOIN memberships m ON m.venue_id = v.id
 			WHERE m.user_id = $1
@@ -72,7 +70,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.slug, v.name, v.is_public, v.is_workshop, 'grant'::text AS reason
+			SELECT v.id, v.slug, v.name, v.kind, 3 AS reason_rank, 'grant'::text AS visible_because
 			FROM venues v
 			JOIN access_grants ag ON ag.venue_id = v.id
 			WHERE ag.user_id = $1
@@ -81,7 +79,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.slug, v.name, v.is_public, v.is_workshop, 'location_role'::text AS reason
+			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'location_role'::text AS visible_because
 			FROM venues v
 			JOIN lots l ON l.id = v.lot_id
 			JOIN locations loc ON loc.id = l.location_id
@@ -92,7 +90,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.slug, v.name, v.is_public, v.is_workshop, 'production_role'::text AS reason
+			SELECT v.id, v.slug, v.name, v.kind, 5 AS reason_rank, 'production_role'::text AS visible_because
 			FROM venues v
 			JOIN lots l ON l.id = v.lot_id
 			JOIN locations loc ON loc.id = l.location_id
@@ -101,9 +99,21 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 			  AND m.active = TRUE
 			  AND m.production_id IS NOT NULL
 			  AND m.role IN ('director', 'cast', 'crew')
+		),
+		ranked AS (
+			SELECT
+				id,
+				slug,
+				name,
+				kind,
+				visible_because,
+				reason_rank,
+				ROW_NUMBER() OVER (PARTITION BY id ORDER BY reason_rank ASC) AS rn
+			FROM visible
 		)
-		SELECT DISTINCT slug, name, is_public, is_workshop, reason
-		FROM visible
+		SELECT slug, name, kind, visible_because
+		FROM ranked
+		WHERE rn = 1
 		ORDER BY slug
 	`, userID)
 	if err != nil {
@@ -114,7 +124,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 	var out []VisibleVenue
 	for rows.Next() {
 		var v VisibleVenue
-		if err := rows.Scan(&v.Slug, &v.Name, &v.IsPublic, &v.IsWorkshop, &v.Reason); err != nil {
+		if err := rows.Scan(&v.Slug, &v.Name, &v.Kind, &v.VisibleBecause); err != nil {
 			return nil, err
 		}
 		out = append(out, v)

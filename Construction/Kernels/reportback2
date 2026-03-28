@@ -1,0 +1,235 @@
+Kernel 2 — Mandatory Report Back
+Status
+
+PASS (core trust floor established)
+
+All required success criteria were met through live server verification.
+
+Auth / Session Method
+Session-based authentication using victory_session cookie
+Session lookup via server-side storage (auth.sessions)
+Session token is opaque and server-resolved (not client-trusted)
+Cookie:
+HttpOnly
+SameSite=Lax
+expiration enforced
+Auth required for:
+workshop upload
+asset metadata access
+invite creation
+protected venue access
+Password Hashing Method
+Algorithm: Argon2id
+Stored in: auth.password_credentials
+No plaintext password storage at any stage
+Password reset:
+token-based
+token not reused
+new password overwrites previous hash
+Invite Token Behavior
+Tokens are:
+randomly generated
+stored hashed (not plaintext)
+Invite carries:
+inviter identity
+target role
+optional production scope
+expiration
+max uses
+Acceptance results in:
+server-side membership creation
+role assigned by system, not client
+Verified:
+producer → director flow working
+correct role assignment persisted
+Role Authority Behavior
+Producer
+Owns location (lot)
+Can:
+invite directors
+upload assets
+access all venues
+Director
+Scoped to production
+Gains access via:
+memberships table (production + location)
+Verified:
+can access cave
+can read asset metadata after hardening
+Enforcement
+No role trust from client payload
+All authority derived from DB:
+memberships
+location_memberships (legacy/bootstrap)
+Access checks applied at:
+cave join endpoint
+asset metadata endpoint
+map visibility resolution
+Invite / Access Model
+Invite system is general-purpose (not admin-only)
+Supports:
+producer → director
+director → cast/crew (ready)
+audience flow (future ticketing layer)
+Access enforcement:
+venue visibility gated
+join endpoints gated
+metadata gated
+Map / Visibility Behavior
+Anonymous:
+sees only info-booth
+Authenticated:
+sees venues based on role + grants
+Response:
+deduplicated
+includes:
+slug
+name
+kind
+visible_because
+Verified:
+no duplicate venues
+no leakage of restricted venues
+Workshop Upload Pipeline
+Endpoint
+
+POST /api/workshop/assets
+
+Auth
+Requires valid session cookie
+Requires producer membership
+Validation
+Max size: 10 MB
+Allowed types:
+png
+jpeg
+webp
+Rejected:
+unsupported MIME types
+File sniffing used (not trusting client header)
+Decode
+PNG → standard lib
+JPEG → standard lib
+WEBP → golang.org/x/image/webp
+Dimension limits
+Max: 4096 x 4096
+Enforced before storage
+Clamp / Resize Pipeline
+Derivatives generated:
+512
+1024
+2048
+Scaling:
+x/image/draw (CatmullRom)
+Output format:
+JPEG (quality 85)
+Verified:
+all derivatives written
+correct dimensions preserved (no upscaling errors)
+Storage Paths
+
+Root:
+
+/opt/victory/storage
+
+Structure:
+
+producers/{producer_id}/assets/{asset_id}/
+  original/source.{ext}
+  derived/{size}.jpg
+Properties:
+per-producer isolation
+deterministic layout
+not publicly exposed directly
+File Safety Limits
+Max upload size enforced at request level
+MIME sniffing enforced
+decode required (invalid images rejected)
+dimension cap enforced
+no executable or arbitrary file types accepted
+no direct file serving (metadata only endpoint)
+Asset Ownership Model
+
+Stored per asset:
+
+producer_user_id
+uploader_user_id
+owner_user_id
+owner_state (initial: uploader_owned)
+
+Ownership is not auto-transferred to producer.
+
+Asset Metadata Access Control
+
+Endpoint:
+GET /api/assets/{id}
+
+Rules
+
+Allowed if:
+
+user is producer
+OR uploader
+OR owner
+OR has location/production membership (producer/director/cast/crew)
+
+Denied if:
+
+no session
+no authority
+Verified behavior
+producer → 200
+director → 200 (after fix)
+anonymous → 401
+Security improvement
+raw storage paths removed from response
+Operator Steps
+Local dev
+go run ./cmd/victory
+
+Env required:
+
+DATABASE_URL
+COOKIE_SECURE
+STORAGE_ROOT
+Container / install truth
+Dockerfile updated to Go 1.25
+docker-compose.yml includes:
+STORAGE_ROOT env
+
+volume mount:
+
+/opt/victory/storage:/opt/victory/storage
+Required filesystem setup
+mkdir -p /opt/victory/storage
+Blockers Encountered
+1. Go version mismatch
+Docker used Go 1.24
+go.mod required 1.25
+Fixed by upgrading Dockerfile base image
+2. Duplicate map rows
+caused by UNION + reason column
+fixed via window function + dedupe
+3. Asset decode failure
+invalid test image
+fixed by generating valid PNG
+4. Director access denied
+access check only used location_memberships
+fixed by including memberships table
+5. Debug auth shortcut
+replaced with real session lookup
+Operator Actions Taken
+updated Dockerfile to Go 1.25
+added storage volume to compose
+validated endpoints via curl
+verified DB state via psql
+verified filesystem output via find
+Final Assessment
+
+Kernel 2 establishes:
+
+identity
+authority
+access control
+invite system
+secure asset ingestion
