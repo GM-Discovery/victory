@@ -1,0 +1,8 @@
+victory.amurray.family {
+
+    reverse_proxy /api/* localhost:8081
+    reverse_proxy /ws/* localhost:8081
+
+    root * /opt/victory/frontend
+    file_server
+}

@@ -154,3 +154,5 @@ It should be updated whenever:
 - a new library is added
 - infrastructure changes
 - security-relevant components are introduced
+
+fire.jpg = tobias-rademacher-wnF27F85ZKw-unsplash

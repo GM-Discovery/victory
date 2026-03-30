@@ -107,7 +107,7 @@ func HandleSignup(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc {
 		if err == nil {
 			_, _ = tx.Exec(ctx, `
 				INSERT INTO location_memberships (location_id, user_id, role, granted_by_user_id, active)
-				VALUES ($1, $2, 'producer', $2, TRUE)
+				VALUES ($1, $2, 'audience', $2, TRUE)
 				ON CONFLICT (location_id, user_id, role) DO NOTHING
 			`, locationID, userID)
 		}

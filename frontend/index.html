@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Victory</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="app-shell map-shell">
+    <header class="app-header">
+      <div class="brand-row">
+        <div>
+          <h1>Victory Map</h1>
+          <p class="app-subtitle">Choose a visible venue.</p>
+        </div>
+
+        <a class="login-link" href="/login/">Log In</a>
+      </div>
+    </header>
+
+    <section class="map-stage" aria-label="Victory venue map">
+      <div id="status" class="status">Loading venues...</div>
+
+      <div class="map-layer">
+
+        <div id="venue-icons" class="venue-icons"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Audition Hall</title>
+  <style>
+    body {
+      margin: 0;
+      background: #14100c;
+      color: #f2e7d0;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .shell {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .panel {
+      background: #1f1812;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    h1, h2 {
+      margin-top: 0;
+    }
+
+    label {
+      display: block;
+      margin: 0 0 6px;
+      font-weight: 600;
+    }
+
+    input, select, textarea, button {
+      font: inherit;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: #2a2119;
+      color: white;
+      margin-bottom: 14px;
+    }
+
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    button {
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 8px;
+      background: #7a4c1f;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #955b24;
+    }
+
+    .status {
+      min-height: 1.2em;
+      color: #f3d18b;
+      margin-top: 10px;
+    }
+
+    .request-row {
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      margin-bottom: 10px;
+      background: #18120e;
+    }
+
+    .muted {
+      color: #cdbb9f;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="panel">
+      <h1>Audition Hall</h1>
+      <p class="muted">
+        Ticketing for events happens in ticket booth back on the main map. This space is for requesting access to participate in events as cast, crew, or director. If you're here, you likely already have an account and are signed in. If not, please create an account and sign in before requesting access.
+      </p>
+      <p><a href="/" style="color:#f3d18b;">Back to map</a></p>
+    </div>
+
+    <div class="panel">
+      <h2>Request Access</h2>
+      <form id="request-form">
+        <label for="requested-venue">Requested Venue</label>
+        <select id="requested-venue" required>
+          <option value="the-cave">The Cave</option>
+          <option value="workshop">Workshop</option>
+        </select>
+
+        <label for="requested-role">Requested Role</label>
+        <select id="requested-role" required>
+          <option value="audience">Audience</option>
+          <option value="cast">Cast</option>
+          <option value="crew">Crew</option>
+          <option value="director">Director</option>
+        </select>
+
+        <label for="request-note">Note</label>
+        <textarea id="request-note" placeholder="Why are you requesting access?"></textarea>
+
+        <button type="submit">Submit Request</button>
+      </form>
+
+      <div id="request-status" class="status"></div>
+    </div>
+
+    <div class="panel">
+      <h2>My Requests</h2>
+      <div id="my-requests">
+        <div class="muted">No requests loaded yet.</div>
+      </div>
+    </div>
+
+    <div id="director-panel" class="panel hidden">
+      <h2>Incoming Requests</h2>
+      <div id="incoming-requests">
+        <div class="muted">Director review tools will appear here.</div>
+      </div>
+    </div>
+
+    <div id="producer-panel" class="panel hidden">
+      <h2>Producer Controls</h2>
+      <div class="muted">Advanced grant controls will appear here.</div>
+    </div>
+  </div>
+
+  <script>
+    const requestForm = document.getElementById("request-form");
+    const requestStatus = document.getElementById("request-status");
+    const myRequests = document.getElementById("my-requests");
+
+    requestForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      requestStatus.textContent = "Submitting request...";
+
+      const requestedVenue = document.getElementById("requested-venue").value;
+      const requestedRole = document.getElementById("requested-role").value;
+      const note = document.getElementById("request-note").value.trim();
+
+      try {
+        const res = await fetch("/api/requests/create", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            venue_slug: requestedVenue,
+            requested_role: requestedRole,
+            note
+          })
+        });
+
+        if (!res.ok) {
+          throw new Error("Request failed");
+        }
+
+        requestStatus.textContent = "Request submitted.";
+        requestForm.reset();
+
+      } catch (err) {
+        requestStatus.textContent = err.message;
+      }
+    });
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+  </script>
+</body>
+</html>

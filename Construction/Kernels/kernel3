@@ -1,0 +1,117 @@
+Kernel 3 — What it actually is
+Name (clean)
+
+Kernel 3 — Frontend Shell, Cave View, and Policy-Driven Visibility
+
+What this kernel must prove
+
+Not beauty.
+
+Not flexibility.
+
+Just truth:
+
+1. Same session, different sight
+actor sees fire
+audience does not
+2. Policy changes reality
+toggle actors_can_reveal
+actor reveals fire
+audience now sees it
+3. System is no longer terminal-driven
+no wscat
+no curl for core interaction
+real browser client
+What the next agent must build
+1. Frontend shell (minimal)
+login-aware
+session-aware
+route to the-cave
+role-aware UI
+
+No styling obsession.
+
+2. Cave page
+Must include:
+Stage viewport (PixiJS inside)
+render a single image (fire asset)
+layered text overlay (speech)
+simple reaction indicator
+Controls (role-based)
+
+Actor / Director:
+
+speak input
+reveal fire toggle (respects policy)
+
+Audience:
+
+reaction buttons only
+no reveal control
+3. Policy hook (minimal)
+
+One production-level config:
+
+actors_can_reveal = true/false
+
+Behavior:
+
+if false → only director can reveal
+if true → actor can reveal
+
+No UI editor needed yet. Hardcode or simple config fetch is fine.
+
+4. Visibility system (first real proof)
+
+Backend already knows truth.
+
+Frontend must enforce:
+
+IF role == audience AND fire_visible == false
+  → do not render fire
+ELSE
+  → render fire
+
+That’s the entire illusion layer v1.
+
+5. Renderer usage (important constraint)
+
+Use PixiJS, but:
+
+no scene system
+no layout engine
+no drag/drop
+no complex abstraction
+
+Just:
+
+draw image
+draw text
+update on events
+What must NOT be built
+
+Keep the next agent from wandering.
+
+Do NOT build:
+
+drag-and-drop
+workshop UI polish
+map redesign
+multiple venues
+black box systems
+asset editor tools
+animation systems
+camera systems
+3D anything
+Success criteria (very clear)
+
+Kernel 3 passes when:
+
+Two users log in (actor + audience)
+Both enter the-cave
+Actor sees fire immediately
+Audience does not
+Actor clicks “Reveal Fire”
+Audience now sees the same fire
+Actor speaks → audience sees text
+Audience reacts → actor sees reaction

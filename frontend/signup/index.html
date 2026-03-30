@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sign Up — Victory</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #14100c;
+      color: #f3e7d1;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .panel {
+      width: min(460px, calc(100vw - 32px));
+      padding: 24px;
+      border-radius: 12px;
+      background: #1f1812;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+
+    p {
+      color: #d7c5a6;
+    }
+
+    .field {
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: #2a2119;
+      color: white;
+      font-size: 1rem;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 8px;
+      background: #7a4c1f;
+      color: white;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #955b24;
+    }
+
+    .status {
+      margin-top: 14px;
+      min-height: 1.2em;
+      color: #f3d18b;
+    }
+
+    .links {
+      margin-top: 16px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .links a {
+      color: #f3d18b;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h1>Create Account</h1>
+    <p>Enter your details to join.</p>
+
+    <form id="signup-form">
+      <div class="field">
+        <label for="handle">Handle</label>
+        <input id="handle" name="handle" type="text" required />
+      </div>
+
+      <div class="field">
+        <label for="display_name">Display Name</label>
+        <input id="display_name" name="display_name" type="text" required />
+      </div>
+
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" required />
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required />
+      </div>
+
+      <button type="submit">Create Account</button>
+    </form>
+
+    <div id="status" class="status"></div>
+
+    <div class="links">
+      <a href="/login/">Already have an account?</a>
+      <a href="/">Back to map</a>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("signup-form");
+    const statusEl = document.getElementById("status");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      statusEl.textContent = "Creating account...";
+
+      const handle = document.getElementById("handle").value.trim();
+      const display_name = document.getElementById("display_name").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      try {
+        const response = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            handle,
+            display_name,
+            email,
+            password
+          })
+        });
+
+        const text = await response.text();
+
+        let payload = {};
+        try {
+          payload = text ? JSON.parse(text) : {};
+        } catch (err) {
+          throw new Error(`Invalid JSON response: ${text}`);
+        }
+
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error || `Signup failed (HTTP ${response.status})`);
+        }
+
+        statusEl.textContent = "Account created. Redirecting...";
+        window.location.href = "/";
+      } catch (error) {
+        statusEl.textContent = error.message || String(error);
+      }
+    });
+  </script>
+</body>
+</html>

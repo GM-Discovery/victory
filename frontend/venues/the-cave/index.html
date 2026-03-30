@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>The Cave</title>
+  <style>
+    body {
+      margin: 0;
+      background: #0f0d0a;
+      color: white;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding: 20px 24px 0;
+    }
+
+    .status-line {
+      font-size: 0.95rem;
+      color: #c7bba5;
+      margin-top: 6px;
+    }
+
+    .stage {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      background:
+        radial-gradient(circle at center, rgba(70, 45, 20, 0.22), transparent 55%),
+        linear-gradient(to bottom, #1b1712, #0b0907);
+      min-height: 320px;
+    }
+
+    #speech {
+      position: absolute;
+      top: 24px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 1.2rem;
+      color: #f2dfb8;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+      padding: 0 16px;
+    }
+
+    #fire {
+      width: 128px;
+      height: auto;
+      image-rendering: pixelated;
+    }
+
+    .chat-panel {
+      border-top: 1px solid rgba(255,255,255,0.1);
+      background: #16120f;
+      padding: 16px 20px 20px;
+    }
+
+    .chat-panel h2 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+      color: #ead7b2;
+    }
+
+    #chat-log {
+      height: 220px;
+      overflow-y: auto;
+      background: #0d0b09;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .chat-message {
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+
+    .chat-time {
+      color: #b9a78a;
+      margin-right: 8px;
+      font-size: 0.9rem;
+    }
+
+    .chat-text {
+      color: #f5efe4;
+    }
+
+    .chat-controls {
+      display: flex;
+      gap: 10px;
+    }
+
+    #chat-input {
+      flex: 1;
+      padding: 10px 12px;
+      font-size: 1rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: #221c17;
+      color: white;
+    }
+
+    #chat-send {
+      padding: 10px 14px;
+      font-size: 1rem;
+      border: 0;
+      border-radius: 8px;
+      background: #7a4c1f;
+      color: white;
+      cursor: pointer;
+    }
+
+    #chat-send:hover {
+      background: #955b24;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="header">
+      <h1>The Cave</h1>
+      <div id="connection-status" class="status-line">Connecting...</div>
+    </div>
+
+    <div class="stage">
+      <div id="speech"></div>
+      <img id="fire" src="/assets/fire.jpg" alt="Fire" />
+    </div>
+
+    <div class="chat-panel">
+      <h2>Chat</h2>
+      <div id="chat-log"></div>
+
+      <div class="chat-controls">
+        <input id="chat-input" type="text" placeholder="Type a message..." />
+        <button id="chat-send" type="button">Send</button>
+      </div>
+    </div>
+  </div>
+
+    <script>
+    const chatLog = document.getElementById("chat-log");
+    const chatInput = document.getElementById("chat-input");
+    const chatSend = document.getElementById("chat-send");
+    const connectionStatus = document.getElementById("connection-status");
+    const speechEl = document.getElementById("speech");
+
+    let ws = null;
+
+    function formatTime(date = new Date()) {
+        return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }
+
+    function addChatMessage(text, time = formatTime(), source = "local") {
+        const row = document.createElement("div");
+        row.className = "chat-message";
+        row.dataset.source = source;
+        row.innerHTML = `
+        <span class="chat-time">[${escapeHtml(time)}]</span>
+        <span class="chat-text">${escapeHtml(text)}</span>
+        `;
+        chatLog.appendChild(row);
+        chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function connectWS() {
+        const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+        ws = new WebSocket(`${protocol}//${location.host}/ws/the-cave`);
+
+        connectionStatus.textContent = "Connecting...";
+
+        ws.addEventListener("open", () => {
+        connectionStatus.textContent = "Connected";
+        });
+
+        ws.addEventListener("close", () => {
+        connectionStatus.textContent = "Disconnected";
+        });
+
+        ws.addEventListener("error", () => {
+        connectionStatus.textContent = "Connection error";
+        });
+
+        ws.addEventListener("message", (event) => {
+        let msg;
+
+        try {
+            msg = JSON.parse(event.data);
+        } catch (err) {
+            console.log("Non-JSON websocket message:", event.data);
+            return;
+        }
+
+        console.log("WS message:", msg);
+
+        // Temporary guessable handling:
+        // If backend later sends a structured action, we adapt.
+        if (msg.type === "perform/speak" && msg.payload?.text) {
+            addChatMessage(msg.payload.text, formatTime(), "remote");
+            speechEl.textContent = msg.payload.text;
+            return;
+        }
+
+        // If backend sends snapshots/history arrays later, we can handle them here.
+        });
+    }
+
+    function sendChat() {
+        const text = chatInput.value.trim();
+        if (!text) return;
+
+        // Always show local append for immediate responsiveness
+        addChatMessage(text);
+        speechEl.textContent = text;
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            type: "perform/speak",
+            payload: { text }
+        }));
+        } else {
+        addChatMessage("(not connected: message only shown locally)", formatTime(), "system");
+        }
+
+        chatInput.value = "";
+        chatInput.focus();
+    }
+
+    chatSend.addEventListener("click", sendChat);
+
+    chatInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+        event.preventDefault();
+        sendChat();
+        }
+    });
+
+    connectWS();
+    </script>
+</body>
+</html>

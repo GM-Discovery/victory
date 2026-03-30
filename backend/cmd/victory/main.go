@@ -51,6 +51,7 @@ func main() {
 	mux.HandleFunc("/api/auth/password-reset/confirm", identity.HandleResetPassword(pool, secureCookie))
 	mux.HandleFunc("/api/invites", identity.HandleCreateInvite(pool))
 	mux.HandleFunc("/api/invites/accept", identity.HandleAcceptInvite(pool, secureCookie))
+	mux.HandleFunc("/api/requests/create", identity.HandleCreatePermissionRequest(pool))
 
 	mux.HandleFunc("/api/map/visibility", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
