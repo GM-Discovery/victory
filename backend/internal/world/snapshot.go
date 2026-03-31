@@ -55,11 +55,11 @@ type Action struct {
 	Timestamp  string         `json:"ts"`
 }
 
-func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool) (*Snapshot, error) {
+func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string) (*Snapshot, error) {
 	var snap Snapshot
 	snap.Elements = []PlacedElement{}
 	snap.Actions = []Action{}
-	
+
 	var venueConfig []byte
 	var startedAt time.Time
 
@@ -209,6 +209,33 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool) (*Snapshot, error
 		return nil, err
 	}
 
+	actorFireVisible := deriveLayerVisibility(snap.Actions, "first-fire", "actor", false)
+	audienceFireVisible := deriveLayerVisibility(snap.Actions, "first-fire", "audience", false)
+
+	filtered := make([]PlacedElement, 0, len(snap.Elements))
+	for _, el := range snap.Elements {
+		if el.Slug == "first-fire" {
+			switch normalizeRole(viewerRole) {
+			case "producer", "director":
+				filtered = append(filtered, el)
+			case "actor", "cast", "crew":
+				if actorFireVisible {
+					filtered = append(filtered, el)
+				}
+			case "audience":
+				if audienceFireVisible {
+					filtered = append(filtered, el)
+				}
+			default:
+				// unknown role gets no hidden element by default
+			}
+			continue
+		}
+
+		filtered = append(filtered, el)
+	}
+	snap.Elements = filtered
+
 	return &snap, nil
 }
 
@@ -222,4 +249,63 @@ func decodeJSONMap(raw []byte) map[string]any {
 		return map[string]any{}
 	}
 	return out
+}
+
+func normalizeRole(role string) string {
+	switch role {
+	case "producer":
+		return "producer"
+	case "director":
+		return "director"
+	case "actor":
+		return "actor"
+	case "cast":
+		return "cast"
+	case "crew":
+		return "crew"
+	case "audience":
+		return "audience"
+	default:
+		return role
+	}
+}
+
+func actionTargetElementSlug(a Action) string {
+	if slug, ok := a.Target["element_slug"].(string); ok {
+		return slug
+	}
+	if slug, ok := a.Target["slug"].(string); ok {
+		return slug
+	}
+	return ""
+}
+
+func actionTargetLayer(a Action) string {
+	if layer, ok := a.Target["layer"].(string); ok {
+		return layer
+	}
+	if layer, ok := a.Payload["layer"].(string); ok {
+		return layer
+	}
+	return ""
+}
+
+func deriveLayerVisibility(actions []Action, elementSlug string, layer string, defaultVisible bool) bool {
+	for _, a := range actions {
+		if actionTargetElementSlug(a) != elementSlug {
+			continue
+		}
+		if actionTargetLayer(a) != layer {
+			continue
+		}
+
+		switch a.Type {
+		case "direct/reveal_element":
+			return true
+		case "direct/hide_element":
+			return false
+		}
+	}
+
+	return defaultVisible
 }

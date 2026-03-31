@@ -134,8 +134,7 @@
 
     <div class="stage">
       <div id="speech"></div>
-      <img id="fire" src="/assets/fire.jpg" alt="Fire" />
-    </div>
+      <img id="fire" src="/assets/fire.jpg" alt="Fire" hidden />    </div>
 
     <div class="chat-panel">
       <h2>Chat</h2>
@@ -154,17 +153,18 @@
     const chatSend = document.getElementById("chat-send");
     const connectionStatus = document.getElementById("connection-status");
     const speechEl = document.getElementById("speech");
+    const fireEl = document.getElementById("fire");
 
     let ws = null;
     let currentSessionId = null;
     let currentActorId = null;
 
     function formatTime(date = new Date()) {
-      return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     }
 
     function escapeHtml(value) {
-      return String(value)
+        return String(value)
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
@@ -173,114 +173,160 @@
     }
 
     function addChatMessage(text, time = formatTime(), source = "local") {
-      const row = document.createElement("div");
-      row.className = "chat-message";
-      row.dataset.source = source;
-      row.innerHTML = `
+        const row = document.createElement("div");
+        row.className = "chat-message";
+        row.dataset.source = source;
+        row.innerHTML = `
         <span class="chat-time">[${escapeHtml(time)}]</span>
         <span class="chat-text">${escapeHtml(text)}</span>
-      `;
-      chatLog.appendChild(row);
-      chatLog.scrollTop = chatLog.scrollHeight;
+        `;
+        chatLog.appendChild(row);
+        chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    function setConnectionStatus(text) {
+        connectionStatus.textContent = text;
+    }
+
+    function applySnapshot(snapshot) {
+        const elements = Array.isArray(snapshot?.elements) ? snapshot.elements : [];
+        const actions = Array.isArray(snapshot?.actions) ? snapshot.actions : [];
+
+        const hasFire = elements.some((el) => el && el.slug === "first-fire");
+        fireEl.hidden = !hasFire;
+
+        const latestSpeech = actions.find((a) => a?.type === "perform/speak");
+        const latestSpeechText =
+        latestSpeech?.payload?.text ||
+        latestSpeech?.text ||
+        "";
+
+        speechEl.textContent = latestSpeechText || "";
+    }
+
+    async function refreshSnapshot() {
+        try {
+        const response = await fetch("/api/world/the-cave", {
+            method: "GET",
+            credentials: "include",
+        });
+
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok || !payload?.data) return;
+
+        applySnapshot(payload.data);
+        } catch (err) {
+        console.error("refreshSnapshot failed", err);
+        }
     }
 
     async function joinCave() {
-      connectionStatus.textContent = "Joining cave...";
+        setConnectionStatus("Joining cave...");
 
-      const response = await fetch("/api/session/the-cave/join", {
+        const response = await fetch("/api/session/the-cave/join", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+            "Content-Type": "application/json"
         },
         credentials: "include",
         body: JSON.stringify({
-          handle: "web",
-          display_name: "Web user"
+            handle: "web",
+            display_name: "Web user"
         })
-      });
+        });
 
-      const text = await response.text();
-      const payload = text ? JSON.parse(text) : {};
+        const text = await response.text();
+        const payload = text ? JSON.parse(text) : {};
 
-      console.log("join payload", payload);
+        console.log("join payload", payload);
 
-      if (!response.ok || !payload.ok) {
+        if (!response.ok || !payload.ok) {
         throw new Error(payload.error || `Join failed (HTTP ${response.status})`);
-      }
+        }
 
-      const data = payload.data || {};
+        const data = payload.data || {};
 
-      currentSessionId =
+        currentSessionId =
         data.session_id ||
         data.session?.id ||
         data.sessionId ||
         null;
 
-      currentActorId =
+        currentActorId =
         data.actor_id ||
         data.participant?.actor_id ||
         data.participant?.user_id ||
         data.user_id ||
         null;
 
-      if (!currentSessionId || !currentActorId) {
+        if (!currentSessionId || !currentActorId) {
         throw new Error("Join succeeded but missing session_id / actor_id. Check console.");
-      }
+        }
     }
 
     function connectWS() {
-      const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${protocol}//${location.host}/ws/the-cave`);
+        const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+        ws = new WebSocket(`${protocol}//${location.host}/ws/the-cave`);
 
-      connectionStatus.textContent = "Connecting...";
+        setConnectionStatus("Connecting...");
 
-      ws.addEventListener("open", () => {
-        connectionStatus.textContent = "Connected";
-      });
+        ws.addEventListener("open", () => {
+        setConnectionStatus("Connected");
+        });
 
-      ws.addEventListener("close", () => {
-        connectionStatus.textContent = "Disconnected";
-      });
+        ws.addEventListener("close", () => {
+        setConnectionStatus("Disconnected");
+        });
 
-      ws.addEventListener("error", () => {
-        connectionStatus.textContent = "Connection error";
-      });
+        ws.addEventListener("error", () => {
+        setConnectionStatus("Connection error");
+        });
 
-      ws.addEventListener("message", (event) => {
+        ws.addEventListener("message", async (event) => {
         let msg;
 
         try {
-          msg = JSON.parse(event.data);
+            msg = JSON.parse(event.data);
         } catch (err) {
-          console.log("Non-JSON websocket message:", event.data);
-          return;
+            console.log("Non-JSON websocket message:", event.data);
+            return;
         }
 
         console.log("WS message:", msg);
 
-        if (msg.type === "snapshot") {
-          return;
+        if (msg.type === "snapshot" && msg.data) {
+            applySnapshot(msg.data);
+            return;
         }
 
         if (msg.type === "action" && msg.data) {
-          const action = msg.data;
-          const actionType = action.type || action.action_type || "";
-          const actionText =
+            const action = msg.data;
+            const actionType = action.type || "";
+            const actionText =
             action.payload?.text ||
             action.text ||
             "";
 
-          if (actionType === "perform/speak" && actionText) {
+            if (actionType === "perform/speak" && actionText) {
             addChatMessage(actionText, formatTime(), "remote");
             speechEl.textContent = actionText;
             return;
-          }
+            }
+
+            const target = action.target || {};
+            if (
+            (actionType === "direct/reveal_element" || actionType === "direct/hide_element") &&
+            target.element_slug === "first-fire"
+            ) {
+            await refreshSnapshot();
+            return;
+            }
         }
 
         if (msg.type === "error") {
-          console.error("WS error:", msg.error);
+            console.error("WS error:", msg.error);
         }
-      });
+        });
     }
 
     function sendChat() {
@@ -288,14 +334,14 @@
         if (!text) return;
 
         if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
+        ws.send(JSON.stringify({
             type: "perform/speak",
             session_id: currentSessionId,
             actor_id: currentActorId,
             text
-            }));
+        }));
         } else {
-            addChatMessage("(not connected: message only shown locally)", formatTime(), "system");
+        addChatMessage("(not connected: message only shown locally)", formatTime(), "system");
         }
 
         chatInput.value = "";
@@ -303,22 +349,26 @@
     }
 
     async function startCave() {
-      try {
+        try {
+        fireEl.hidden = true;
+        speechEl.textContent = "";
+
         await joinCave();
+        await refreshSnapshot();
         connectWS();
-      } catch (err) {
-        connectionStatus.textContent = err.message || String(err);
+        } catch (err) {
+        setConnectionStatus(err.message || String(err));
         console.error(err);
-      }
+        }
     }
 
     chatSend.addEventListener("click", sendChat);
 
     chatInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
+        if (event.key === "Enter") {
         event.preventDefault();
         sendChat();
-      }
+        }
     });
 
     startCave();

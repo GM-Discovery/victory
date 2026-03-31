@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"victory/backend/internal/access"
 	"victory/backend/internal/actions"
 	"victory/backend/internal/world"
 )
@@ -33,7 +35,41 @@ func ServeCaveWS(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 		hub.Add(client)
 
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-		snapshot, err := world.LoadCaveSnapshot(ctx, pool)
+
+		sessionCookie := ""
+		if c, err := r.Cookie("victory_session"); err == nil {
+			sessionCookie = c.Value
+		}
+
+		userID, err := access.CurrentUserIDFromRequest(ctx, pool, sessionCookie)
+		if err != nil {
+			cancel()
+			log.Printf("ws current user failed: %v", err)
+			_ = conn.WriteJSON(map[string]any{
+				"type":  "error",
+				"error": "not_authenticated",
+			})
+			_ = conn.Close()
+			hub.Remove(client)
+			return
+		}
+
+		viewerRole, err := lookupVenueRole(ctx, pool, userID, "the-cave")
+		if err != nil {
+			cancel()
+			log.Printf("WS DEBUG role lookup failed user=%s err=%v", userID, err)
+			_ = conn.WriteJSON(map[string]any{
+				"type":  "error",
+				"error": "viewer_role_lookup_failed",
+			})
+			_ = conn.Close()
+			hub.Remove(client)
+			return
+		}
+
+		log.Printf("WS DEBUG connected user=%s role=%s", userID, viewerRole)
+
+		snapshot, err := world.LoadCaveSnapshot(ctx, pool, viewerRole)
 		cancel()
 		if err != nil {
 			log.Printf("ws snapshot failed: %v", err)
@@ -146,4 +182,38 @@ func readPump(hub *Hub, pool *pgxpool.Pool, c *Client) {
 			hub.Broadcast(out)
 		}
 	}
+}
+
+func lookupVenueRole(ctx context.Context, pool *pgxpool.Pool, userID string, venueSlug string) (string, error) {
+	var role string
+
+	err := pool.QueryRow(ctx, `
+		SELECT lower(role_text) FROM (
+			-- exact venue membership first
+			SELECT m.role::text AS role_text, 1 AS priority
+			FROM memberships m
+			JOIN venues v ON v.id = m.venue_id
+			WHERE m.user_id = $1
+			  AND v.slug = $2
+
+			UNION ALL
+
+			-- fallback: global producer membership
+			SELECT m.role::text AS role_text, 2 AS priority
+			FROM memberships m
+			WHERE m.user_id = $1
+			  AND m.venue_id IS NULL
+			  AND m.role::text = 'producer'
+		) ranked
+		ORDER BY priority
+		LIMIT 1
+	`, userID, venueSlug).Scan(&role)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "none", nil
+		}
+		return "", err
+	}
+
+	return role, nil
 }
