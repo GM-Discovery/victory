@@ -300,9 +300,9 @@ func deriveLayerVisibility(actions []Action, elementSlug string, layer string, d
 		}
 
 		switch a.Type {
-		case "direct/reveal_element":
+		case "act/reveal_element":
 			return true
-		case "direct/hide_element":
+		case "act/hide_element":
 			return false
 		}
 	}

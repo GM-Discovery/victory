@@ -1,0 +1,193 @@
+## Mandatory Feedback Report Back — Kernel 4
+
+### Reveal, Role-Filtered Cave UI, and First Illusion Layer
+
+---
+
+### Status
+
+**PASS (core objective met)** — The system now supports role-dependent perception within a shared session, with live mutation and persistence.
+
+Evidence:
+
+* Producer sees `first-fire` by default
+* Audience does not see `first-fire` by default
+* `act/reveal_element` causes fire to appear for audience in real time
+* `act/hide_element` removes fire for audience in real time
+* Behavior persists across refresh/rejoin via action-derived snapshot
+* Websocket actions are bound to authenticated user (no client spoofing)
+
+---
+
+### What was built
+
+#### 1) Role-filtered snapshot projection
+
+* `LoadCaveSnapshot(ctx, pool, viewerRole)` now produces **role-scoped world views**
+* Element visibility is derived via action replay (`deriveLayerVisibility`)
+* Audience receives filtered `elements[]` (fire excluded unless revealed)
+
+#### 2) Action-driven illusion layer
+
+New action family:
+
+* `act/reveal_element`
+* `act/hide_element`
+
+Characteristics:
+
+* Stored in `actions` table with `target.layer` and `payload.visible`
+* Ordered by `moment_id`
+* Snapshot derives visibility from latest relevant action
+
+This establishes:
+
+> **truth = action log → projection**, not static state
+
+#### 3) Live update loop
+
+* Websocket receives `"action"` messages
+* Client reacts to reveal/hide by calling `refreshSnapshot()`
+* Audience perception updates without reload
+
+#### 4) Persistence model
+
+* No client-local toggles
+* State is reconstructed from:
+
+  * `venue_layout_elements`
+  * `actions` history
+* Rejoin produces correct visibility automatically
+
+---
+
+### Security / Integrity hardening
+
+#### 1) Actor identity binding
+
+* `Client.UserID` attached on websocket connect
+* All action handlers now use `c.UserID`
+* Client-provided `actor_id` ignored
+
+Effect:
+
+* Prevents impersonation via websocket payload
+
+#### 2) Session membership enforcement
+
+* `StoreReveal`, `StoreSpeak`, `StoreReaction` verify:
+
+  * user is joined to session
+* Rejects unauthenticated or non-participant actions
+
+#### 3) Websocket origin restriction
+
+* `CheckOrigin` limited to same-host (http/https)
+
+#### 4) Debug cleanup
+
+* Removed temporary WS debug logging
+* Reduced noise / leakage in production logs
+
+---
+
+### What was broken (and fixed)
+
+1. **Static frontend leak**
+
+   * Fire rendered via hardcoded `<img>`
+   * Fixed by driving visibility from snapshot
+
+2. **Frontend not reacting to new action types**
+
+   * Still listening for `direct/*`
+   * Updated to `act/*`
+
+3. **Hide not appearing to work**
+
+   * Initially only reveal actions stored
+   * Verified via DB inspection
+   * Confirmed correct after proper action send
+
+4. **Auth regression**
+
+   * After removing payload actor_id, actions failed
+   * Root cause: `Client.UserID` never assigned
+   * Fixed by binding user on websocket connect
+
+---
+
+### Architectural outcome
+
+This kernel establishes:
+
+* **Single shared session**
+* **Multiple concurrent perceptions**
+* **Server-authoritative truth**
+* **Time-based reveal/hide of elements**
+* **Replayable state via action log**
+
+This is the first working instance of:
+
+> **Controlled, role-dependent reality in a shared space**
+
+---
+
+### Intentional omissions (deferred)
+
+Not implemented in this kernel by design:
+
+* UI controls for reveal/hide (devtools used instead)
+* `actors_can_reveal` policy toggle
+* Role-based permission enforcement beyond session membership
+* Actor-layer reveal/hide testing
+* Tooling panels / extension UI
+* Generalized element system (kept to `first-fire`)
+
+Reason:
+
+* Maintain kernel focus on illusion layer, not tooling or policy
+
+---
+
+### Risks / limitations
+
+* Any session participant can currently issue reveal/hide actions
+* No permission lattice or delegation model yet
+* Only one element (`first-fire`) is supported
+* Client still performs snapshot refresh instead of diff-based updates
+
+These are acceptable within kernel scope.
+
+---
+
+### Next kernels
+
+#### Kernel 5 — Tooling Layer
+
+* Object tools (reveal, hide, transform, etc.)
+* Extension panels / display layer
+* UI-driven action dispatch (no devtools dependency)
+
+#### Kernel 6 — Permission Lattice
+
+* Producer-owned permission matrix
+* Director delegation
+* Actor baseline permissions
+* Audience control surface
+* Persistent policy model
+
+---
+
+### Conclusion
+
+Kernel 4 successfully delivers:
+
+* Role-filtered perception
+* Live reveal/hide mutation
+* Persistent, server-derived truth
+* Basic security against client spoofing
+
+The illusion system is now operational and stable enough to support tooling and policy layers.
+
+**Kernel 4 closed.**

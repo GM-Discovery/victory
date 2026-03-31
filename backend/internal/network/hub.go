@@ -8,8 +8,9 @@ import (
 )
 
 type Client struct {
-	Conn *websocket.Conn
-	Send chan []byte
+	Conn   *websocket.Conn
+	Send   chan []byte
+	UserID string
 }
 
 type Hub struct {

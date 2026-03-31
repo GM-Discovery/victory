@@ -30,6 +30,181 @@ Company
 
 ---
 
+=== TOOLING ===
+
+Tooling
+- Reusable controls and inspection mechanisms that invoke or observe system actions
+- Tooling may be used for development, operations, production, or audience interaction
+- Tooling is not limited to debug use
+
+Dev Tooling
+- Controls used during construction and testing
+- Examples:
+  - trigger action manually
+  - inspect snapshot
+  - replay action history
+  - simulate role behavior
+  - stress test reactions
+
+Operator Tooling
+- Controls used to run, inspect, diagnose, and recover the system
+- Examples:
+  - inspect active sessions
+  - inspect memberships
+  - inspect storage state
+  - verify invite flow
+  - reset or revoke access
+  - view service health
+
+Production Tooling
+- Controls used by producer, director, cast, or crew during setup, rehearsal, or live use
+- Examples:
+  - reveal
+  - hide
+  - speak
+  - cue
+  - assign
+  - load asset
+  - toggle production policy
+
+Audience Tooling
+- Narrow, safe controls available to audience participants
+- Examples:
+  - react
+  - send note card
+  - vote when invited
+  - choose prompted options
+
+Trigger
+- A UI control, command, hotkey, macro, or programmatic mechanism that invokes an action
+- Different triggers may invoke the same underlying action
+
+Control Overlay
+- A role-specific interface layer placed over or alongside a rendered view
+- Used to expose controls or feedback without changing the underlying stage content
+
+Stage Overlay
+- A visual layer presented as part of the staged experience
+- Examples:
+  - banner
+  - subtitle
+  - cue marker
+  - reaction indicator
+
+Inspection
+- Reading derived or stored system truth without mutating it
+- Examples:
+  - current visibility state
+  - current participants
+  - action history
+  - policy state
+
+Diagnostic
+- A tooling function intended to identify failure, drift, or mismatch
+- Examples:
+  - connection test
+  - permission check
+  - stale session check
+  - asset presence verification
+
+Stress Test
+- A high-load or repeated-action test used to measure behavior under pressure
+- A stress test may be composed of the same smaller actions used in ordinary UI controls
+
+Action UI Layer
+- The first user-facing layer that exposes existing system actions through actual interface controls
+- Distinct from backend action contract
+- Should reuse the same underlying action model
+
+Policy
+- A configurable rule that governs what roles may do in a location, production, venue, or session
+- Producer sets ceilings
+- Director may set production defaults within those ceilings
+
+Policy Toggle
+- A discrete on/off policy switch
+- Example:
+  - actors_can_reveal
+
+Permission Lattice
+- The structured system that determines who may invoke which actions, against what targets, in which contexts
+- More precise than simple role hierarchy
+
+Role Gating
+- Showing or hiding controls in the interface based on role
+- UI convenience only unless backed by server enforcement
+
+Authority Enforcement
+- Server-side validation that determines whether an action is actually allowed
+- The client may suggest an action; the server decides whether it is valid
+
+Projection
+- The role- and context-specific view produced from shared truth
+- Projection is rendered, not stored as the only source of truth
+
+Illusion Layer
+- The part of the system that causes different viewers to perceive different realities from the same shared session
+- Built from projection + rendering + action timing
+
+Hub
+- A venue or location on the map with higher navigational or symbolic importance
+- Example:
+  - Victory Theater as a map hub
+
+Map Interface System
+- The frontend navigation layer that renders visible venues spatially based on backend visibility rules
+
+Spatial Venue Rendering
+- Rendering venues as positioned nodes/icons on the map, where placement carries meaning
+
+Venue Metadata
+- Render-related information about a venue
+- Examples:
+  - slug
+  - icon
+  - position
+  - priority
+  - public/private state
+
+Grant
+- An explicit server-recognized permission or membership assignment that allows access to a venue, production, or function
+
+Admission
+- The act of allowing a participant into a venue, production, or session
+- May happen through invite, public access, ticketing, or future will-call logic
+
+Ticket
+- A future access artifact that grants audience-level admission to a session or venue without broader authority
+
+Will Call
+- A future audience access mechanism where admission is granted from a prepared list or invite state at entry time
+
+Workshop
+- A special venue/environment where assets, props, sets, and reusable production materials are made or prepared
+
+Asset Ingestion
+- The controlled process of uploading, validating, clamping, storing, and registering an asset for future use
+
+Ownership State
+- The rights/status attached to an asset
+- Initial examples:
+  - personal
+  - production_licensed
+  - library_owned
+
+
+Panel — a bounded UI region that groups controls or information
+Tray — a compact control region, often temporary or retractable
+Console — a role-specific control surface, usually director/operator facing
+Presence — who is currently connected, where, and in what role
+Attribution — displaying who performed an action
+Delegation — granting a narrower authority from a higher authority
+Ceiling — highest allowed permission boundary set by producer/operator
+Default — normal allowed behavior unless overridden by production/session policy
+Override — a temporary or higher-authority change that supersedes default behavior
+Admission Policy — rules governing who may enter which venue/session and how
+
+
 === PERFORMANCE STRUCTURE ===
 
 Venue

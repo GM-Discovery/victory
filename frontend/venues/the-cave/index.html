@@ -300,27 +300,24 @@
         }
 
         if (msg.type === "action" && msg.data) {
-            const action = msg.data;
-            const actionType = action.type || "";
-            const actionText =
-            action.payload?.text ||
-            action.text ||
-            "";
+        const action = msg.data;
+        const actionType = action.type || "";
+        const actionText = action.payload?.text || action.text || "";
+        const target = action.target || {};
 
-            if (actionType === "perform/speak" && actionText) {
+        if (actionType === "perform/speak" && actionText) {
             addChatMessage(actionText, formatTime(), "remote");
             speechEl.textContent = actionText;
             return;
-            }
+        }
 
-            const target = action.target || {};
-            if (
-            (actionType === "direct/reveal_element" || actionType === "direct/hide_element") &&
+        if (
+            (actionType === "act/reveal_element" || actionType === "act/hide_element") &&
             target.element_slug === "first-fire"
-            ) {
+        ) {
             await refreshSnapshot();
             return;
-            }
+          }
         }
 
         if (msg.type === "error") {

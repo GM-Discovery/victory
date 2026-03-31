@@ -17,7 +17,17 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return false
+		}
+
+		expectedHTTP := "http://" + r.Host
+		expectedHTTPS := "https://" + r.Host
+
+		return origin == expectedHTTP || origin == expectedHTTPS
+	},
 }
 
 func ServeCaveWS(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
@@ -54,10 +64,12 @@ func ServeCaveWS(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		client.UserID = userID
+
 		viewerRole, err := lookupVenueRole(ctx, pool, userID, "the-cave")
 		if err != nil {
 			cancel()
-			log.Printf("WS DEBUG role lookup failed user=%s err=%v", userID, err)
+			log.Printf("ws viewer role lookup failed: %v", err)
 			_ = conn.WriteJSON(map[string]any{
 				"type":  "error",
 				"error": "viewer_role_lookup_failed",
@@ -66,8 +78,6 @@ func ServeCaveWS(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 			hub.Remove(client)
 			return
 		}
-
-		log.Printf("WS DEBUG connected user=%s role=%s", userID, viewerRole)
 
 		snapshot, err := world.LoadCaveSnapshot(ctx, pool, viewerRole)
 		cancel()
@@ -132,54 +142,92 @@ func readPump(hub *Hub, pool *pgxpool.Pool, c *Client) {
 			})
 
 		case "react/emote":
-			sessionID, _ := payload["session_id"].(string)
-			actorID, _ := payload["actor_id"].(string)
-			kind, _ := payload["kind"].(string)
+			{
+				sessionID, _ := payload["session_id"].(string)
+				actorID := c.UserID
+				kind, _ := payload["kind"].(string)
 
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			stored, err := actions.StoreReaction(ctx, pool, actions.ReactRequest{
-				SessionID: sessionID,
-				ActorID:   actorID,
-				Kind:      kind,
-			})
-			cancel()
-
-			if err != nil {
-				_ = c.Conn.WriteJSON(map[string]any{
-					"type":  "error",
-					"error": err.Error(),
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				storedAction, err := actions.StoreReaction(ctx, pool, actions.ReactRequest{
+					SessionID: sessionID,
+					ActorID:   actorID,
+					Kind:      kind,
 				})
-				continue
-			}
+				cancel()
 
-			out, _ := json.Marshal(map[string]any{
-				"type": "action",
-				"data": stored,
-			})
-			hub.Broadcast(out)
+				if err != nil {
+					_ = c.Conn.WriteJSON(map[string]any{
+						"type":  "error",
+						"error": err.Error(),
+					})
+					continue
+				}
+
+				msgOut, _ := json.Marshal(map[string]any{
+					"type": "action",
+					"data": storedAction,
+				})
+				hub.Broadcast(msgOut)
+			}
 
 		case "perform/speak":
-			sessionID, _ := payload["session_id"].(string)
-			actorID, _ := payload["actor_id"].(string)
-			text, _ := payload["text"].(string)
+			{
+				sessionID, _ := payload["session_id"].(string)
+				actorID := c.UserID
+				text, _ := payload["text"].(string)
 
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			stored, err := actions.StoreSpeak(ctx, pool, sessionID, actorID, text)
-			cancel()
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				storedAction, err := actions.StoreSpeak(ctx, pool, sessionID, actorID, text)
+				cancel()
 
-			if err != nil {
-				_ = c.Conn.WriteJSON(map[string]any{
-					"type":  "error",
-					"error": err.Error(),
+				if err != nil {
+					_ = c.Conn.WriteJSON(map[string]any{
+						"type":  "error",
+						"error": err.Error(),
+					})
+					continue
+				}
+
+				msgOut, _ := json.Marshal(map[string]any{
+					"type": "action",
+					"data": storedAction,
 				})
-				continue
+				hub.Broadcast(msgOut)
 			}
 
-			out, _ := json.Marshal(map[string]any{
-				"type": "action",
-				"data": stored,
-			})
-			hub.Broadcast(out)
+		case "act/reveal_element", "act/hide_element":
+			{
+				sessionID, _ := payload["session_id"].(string)
+				actorID := c.UserID
+				elementSlug, _ := payload["element_slug"].(string)
+				layer, _ := payload["layer"].(string)
+
+				visible := payload["type"] == "act/reveal_element"
+
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				storedAction, err := actions.StoreReveal(ctx, pool, actions.RevealRequest{
+					SessionID:   sessionID,
+					ActorID:     actorID,
+					ElementSlug: elementSlug,
+					Layer:       layer,
+					Visible:     visible,
+				})
+				cancel()
+
+				if err != nil {
+					_ = c.Conn.WriteJSON(map[string]any{
+						"type":  "error",
+						"error": err.Error(),
+					})
+					continue
+				}
+
+				msgOut, _ := json.Marshal(map[string]any{
+					"type": "action",
+					"data": storedAction,
+				})
+				hub.Broadcast(msgOut)
+			}
 		}
 	}
 }
