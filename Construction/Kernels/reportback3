@@ -1,0 +1,202 @@
+Mandatory Reportback — Kernel 3 (Victory Map + Cave Session + Access Flow)
+Status
+
+PARTIAL PASS (Strong)
+Core system is functional and demonstrably real.
+Shared session behavior is proven.
+Differential visibility / reveal layer not yet implemented.
+
+Objective
+
+Establish a browser-based front door with:
+
+authenticated access
+map-driven venue navigation
+controlled permissions model
+a live, shared cave session proving real-time interaction
+What Was Achieved
+1. Front Door & Map
+Map page loads via Caddy-served frontend
+/api/map/visibility drives venue rendering
+Signed-in vs public visibility is differentiated
+Venue navigation routes correctly to pages
+2. Authentication & Identity
+Signup and login functional
+Session cookie (victory_session) resolves user identity
+Auth errors corrected (handle vs email, password hash issues)
+3. Permission Model (Floor + Grants)
+Default signup role corrected from producer → audience
+Broad audience visibility removed from location-level access
+Venue access now requires:
+public flag OR
+explicit venue membership OR
+higher role
+Manual DB grant confirmed working:
+inserting memberships row enables access
+4. Audition Hall (Access Intake)
+New venue created and surfaced
+Page implemented with:
+request form
+persistent request storage
+request history reload
+Backend:
+permission_requests table created
+/api/requests/create implemented
+/api/requests/mine implemented
+Frontend:
+requests submit and persist
+reload correctly displays prior requests
+5. Cave Venue (Core Kernel Target)
+Entry
+/venues/the-cave/ page loads
+join endpoint wired (/api/session/the-cave/join)
+display_name requirement fixed
+Session
+WebSocket connection established
+session_id and actor_id captured from join
+Interaction
+perform/speak wired end-to-end
+backend broadcast confirmed
+second browser receives messages
+Bug Fix
+duplicate message issue resolved
+removed local echo
+rely on backend broadcast only
+Visual
+fire asset renders in cave
+chat panel displays messages
+Proof Achieved
+Shared Session Proof (PASS)
+
+Two separate clients:
+
+Client A sends message
+Client B receives message in real time
+
+This confirms:
+
+the cave is a shared state environment, not local simulation
+
+What Was Broken and Fixed
+Critical Failures Encountered
+Port conflict (8081)
+host + docker backend both running
+resolved by standardizing runtime
+Authentication failure
+incorrect credential expectations
+resolved via correct handle + Argon2 hash
+Over-permission at signup
+all users created as producer
+fixed to audience
+Visibility query regression
+venue_membership logic removed
+restored to re-enable granted access
+Cave join failure
+missing display_name
+patched frontend request
+WebSocket contract mismatch
+frontend sent payload.text
+backend expected top-level text, session_id, actor_id
+aligned contracts
+Duplicate chat messages
+local echo + broadcast duplication
+removed local echo
+Current System State
+Working
+login / signup
+map visibility
+venue routing
+permission request intake
+cave session join
+real-time chat across clients
+Stable
+backend container
+websocket handling
+session resolution
+DB writes and reads
+Not Yet Implemented
+1. Differential Visibility (Core Kernel Gap)
+
+Missing:
+
+actor sees fire
+audience does not
+reveal action changes audience visibility
+
+This is the remaining core kernel requirement.
+
+2. Audition Hall Approval Loop
+
+Missing:
+
+director review UI
+producer controls
+approval endpoints
+automatic membership grants
+3. Identity in Cave
+
+Missing:
+
+display of speaker identity
+actor attribution in chat
+presence indicators
+4. Map Consistency
+visibility logic now correct but fragile
+needs hardening against future regressions
+Design Decisions Confirmed
+Permission Model
+audience = floor (correct)
+no implicit access beyond public
+explicit venue membership = correct grant mechanism
+Access Flow
+user signs up
+user sees limited map
+user requests access via Audition Hall
+approval (future) grants membership
+
+This is coherent and scalable.
+
+Deferred / Future Features
+Director approval UI
+Producer control panel
+Automated grant application
+Event ticketing / will-call access (session-based grants)
+Reveal system (actor-controlled perception)
+Role-based UI differentiation inside venues
+Assessment
+
+This kernel moved from:
+
+disconnected scaffolding
+
+to:
+
+a functioning system with:
+
+identity
+access control
+persistent requests
+shared real-time interaction
+
+The remaining gap is not infrastructure, but game logic (perception / reveal).
+
+Final Verdict
+
+Kernel 3: PASS (Functional Core Achieved, Illusion Layer Pending)
+
+Shared environment proven ✔️
+Access model grounded ✔️
+Front door coherent ✔️
+Reveal / differential perception ❌ (next kernel)
+Next Kernel Recommendation
+
+Focus exclusively on:
+
+Differential visibility + reveal mechanics
+
+Specifically:
+
+actor-only visibility
+audience-hidden elements
+reveal action propagation
+per-role rendering differences

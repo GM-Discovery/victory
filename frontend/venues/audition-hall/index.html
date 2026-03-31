@@ -153,6 +153,47 @@
     const requestStatus = document.getElementById("request-status");
     const myRequests = document.getElementById("my-requests");
 
+    async function loadMyRequests() {
+      myRequests.innerHTML = `<div class="muted">Loading requests...</div>`;
+
+      try {
+        const res = await fetch("/api/requests/mine", {
+          credentials: "include"
+        });
+
+        const text = await res.text();
+        const payload = text ? JSON.parse(text) : {};
+
+        if (!res.ok || !payload.ok) {
+          throw new Error(payload.error || `Failed to load requests (HTTP ${res.status})`);
+        }
+
+        const rows = Array.isArray(payload.data) ? payload.data : [];
+
+        if (rows.length === 0) {
+          myRequests.innerHTML = `<div class="muted">No requests yet.</div>`;
+          return;
+        }
+
+        myRequests.innerHTML = "";
+
+        for (const row of rows) {
+          const item = document.createElement("div");
+          item.className = "request-row";
+          item.innerHTML = `
+            <div><strong>Venue:</strong> ${escapeHtml(row.venue_slug)}</div>
+            <div><strong>Role:</strong> ${escapeHtml(row.requested_role)}</div>
+            <div><strong>Status:</strong> ${escapeHtml(row.status)}</div>
+            <div><strong>Submitted:</strong> ${escapeHtml(row.created_at)}</div>
+            <div><strong>Note:</strong> ${escapeHtml(row.note || "(none)")}</div>
+          `;
+          myRequests.appendChild(item);
+        }
+      } catch (err) {
+        myRequests.innerHTML = `<div class="muted">${escapeHtml(err.message || String(err))}</div>`;
+      }
+    }
+
     requestForm.addEventListener("submit", async (event) => {
       event.preventDefault();
 
@@ -176,15 +217,18 @@
           })
         });
 
-        if (!res.ok) {
-          throw new Error("Request failed");
+        const text = await res.text();
+        const payload = text ? JSON.parse(text) : {};
+
+        if (!res.ok || !payload.ok) {
+          throw new Error(payload.error || `Request failed (HTTP ${res.status})`);
         }
 
         requestStatus.textContent = "Request submitted.";
         requestForm.reset();
-
+        await loadMyRequests();
       } catch (err) {
-        requestStatus.textContent = err.message;
+        requestStatus.textContent = err.message || String(err);
       }
     });
 
@@ -196,6 +240,8 @@
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#39;");
     }
+
+    loadMyRequests();
   </script>
 </body>
 </html>

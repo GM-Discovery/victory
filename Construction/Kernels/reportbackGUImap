@@ -1,0 +1,122 @@
+REPORTBACK — Map GUI Integration (Frontend Layer)
+Status
+
+PASS (functional integration achieved)
+
+Map-based landing page successfully replaces card UI
+Dynamic venue rendering via /api/map/visibility confirmed
+Backend-driven visibility model remains intact
+No regression to existing endpoints
+What Was Built
+1. Map-Based Landing Interface
+Full-screen background (mapbackground.png)
+Absolute-positioned venue icons
+Removal of card-based UI layer
+Direct click → venue routing
+2. Dynamic Venue Rendering
+Frontend consumes /api/map/visibility
+Icons rendered per venue slug
+Fallback positioning system implemented
+Label formatting normalized (slug → Title Case)
+3. Icon System
+Per-venue icon mapping introduced:
+info-booth
+audition-hall
+the-cave
+workshop
+victory-theater
+construction
+Default fallback icon established
+4. Victory Theater Emphasis Layer
+Special class: venue-pin--theater
+~180% scale vs standard nodes
+Glow + pulse animation
+Increased label spacing
+Establishes visual “hub” hierarchy
+5. Backend Alignment
+Discovered visibility source:
+backend/internal/access/visibility.go
+DB-driven via venues.is_public
+Inserted new venues via Postgres:
+victory-theater
+construction
+Resolved lot_id constraint via reuse
+6. Session Awareness (UI)
+Added /api/session/me endpoint
+Frontend replaces:
+Log In → Hello {display_name}
+Uses existing session resolution logic
+What Was NOT Changed
+No modification to visibility logic structure
+No change to permission model
+No change to federation / exchange behavior
+No schema changes (only data inserts)
+Issues Encountered
+1. Missing Venues (Root Cause)
+Frontend assumed visibility
+Backend required DB presence + is_public = TRUE
+
+Resolution: Insert into venues table
+
+2. Postgres Access Failure
+Attempted login as postgres
+Container configured with POSTGRES_USER=victory
+
+Resolution: connect via correct role
+
+3. lot_id Constraint Failure
+venues.lot_id is NOT NULL
+
+Resolution: reuse existing lot_id
+
+4. Slug Mismatch
+infobooth vs info-booth
+
+Impact:
+
+broke positioning
+broke icon mapping
+
+Resolution: normalize slug usage
+
+5. CSS Structural Issues
+duplicate rules
+broken @keyframes nesting
+hover scale < base scale
+
+Resolution: full stylesheet rewrite
+
+Operator Notes
+The system is now DB-driven for visibility, not config-driven
+Slug is the single source of truth across:
+routing
+icons
+positioning
+visibility
+Frontend is now render-only, not authoritative
+Map UI introduces:
+spatial semantics (position = meaning)
+visual hierarchy (hub vs node)
+future affordances (fog, discovery, etc.)
+Architectural Impact
+Positive
+Clean separation:
+DB → visibility → API → UI
+No duplication of venue definitions
+Extensible via DB only
+Risk
+Parallel frontend iteration occurred outside kernel pipeline
+Styling + UX decisions not yet formalized in kernel spec
+Recommendation
+
+Accept Map GUI as:
+
+"Frontend Navigation Layer v1"
+
+Backfill into kernel as:
+“Map Interface System”
+“Spatial Venue Rendering”
+Future kernel tasks:
+standardize venue metadata (icon, position, priority)
+formalize /api/session/me
+define hub semantics (Victory Theater role)

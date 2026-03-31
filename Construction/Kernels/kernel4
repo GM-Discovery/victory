@@ -1,0 +1,195 @@
+Kernel 4 — Reveal, Role-Filtered Cave UI, and First Illusion Layer
+Purpose
+
+Complete the first true theater trick in browser UI:
+
+same cave session
+different users see different things
+controls differ by role
+reveal changes audience perception in real time
+
+This kernel is about illusion, not infrastructure.
+
+Scope
+
+Build only what is required to prove:
+
+fire is visible to producer/director/actor by default
+fire is hidden from audience by default
+reveal/hide changes audience view live
+cave UI differs by role
+actor speech and audience reaction continue working
+Assumptions
+
+Already exists:
+
+browser map
+venue icons on map
+venue routing
+cave page
+audition hall page
+signup/login/session auth
+role and venue access floor
+workshop asset upload floor
+shared cave chat/session proof
+
+This kernel should not rebuild those.
+
+Required behavior
+Default visibility
+
+For first-fire in the-cave:
+
+Producer: visible
+Director: visible
+Actor/Cast: visible
+Audience: hidden
+Reveal behavior
+
+A reveal action changes audience visibility forward in time.
+
+Hide behavior
+
+A hide action can conceal it again during the same session.
+
+Policy toggle
+
+Production-level boolean:
+
+actors_can_reveal
+
+Rules:
+
+false → only director (and producer) can reveal/hide
+true → actor may reveal/hide too
+
+First implementation may be a simple backend/config value. No policy editor required.
+
+Cave UI by role
+Audience UI
+
+Show:
+
+stage viewport
+speech display
+reaction controls
+
+Do not show:
+
+reveal/hide controls
+backstage state
+hidden element indicators
+Actor UI
+
+Show:
+
+stage viewport
+speak controls
+reveal/hide controls only if policy allows
+minimal awareness of hidden/visible fire state
+Director UI
+
+Show:
+
+stage viewport
+speak controls if permitted
+reveal/hide controls
+current fire visibility state
+current actors_can_reveal state (read-only is acceptable)
+Producer UI
+
+For now:
+
+may inherit director UI
+Rendering requirements
+
+Use the existing frontend shell and cave page.
+
+Inside cave:
+
+render actual fire asset
+render speech overlay/text
+render reactions
+do not render fire for audience until revealed
+
+No drag/drop.
+No layout editor.
+No animation system required beyond simple show/hide.
+
+Actions required
+
+At minimum:
+
+perform/speak
+react/emote
+direct/reveal_element
+direct/hide_element
+
+If you prefer narrower naming for this kernel, that is acceptable, but the behavior must be equivalent.
+
+Persistence expectations
+
+Reveal/hide state must survive:
+
+browser refresh
+rejoin to current session
+
+This can be implemented through:
+
+persisted action replay
+persisted derived state
+or equivalent server-truth mechanism
+
+But it must not be client-local illusion only.
+
+Non-goals
+
+Do not build in Kernel 4:
+
+note cards
+audition approval loop
+producer control panels
+workshop UI improvements
+drag/drop positioning
+black box venue logic
+dynamic audience segments
+comments
+ticketing / will-call
+map redesign
+3D surfaces
+Success criteria
+
+Kernel 4 passes when:
+
+actor and audience both enter the-cave
+actor sees fire immediately
+audience does not
+actor or director reveals fire
+audience sees fire in real time
+actor or director hides fire
+audience loses fire again in real time
+actor speech still works
+audience reaction still works
+cave controls visibly differ by role
+Recommended implementation stance
+
+Keep it narrow.
+
+Do not generalize the whole view engine yet.
+
+A valid first implementation is:
+
+one element: first-fire
+one boolean visibility state for audience
+role-based conditional rendering in cave UI
+one production policy boolean: actors_can_reveal
+
+That is enough to prove the illusion layer without overbuilding.
+
+Assumed current frontend baseline
+map GUI already exists
+venue pages are reachable from the map
+session-aware user greeting already exists
+cave session already supports shared real-time speech
+
+This prevents the next builder from wasting time rebuilding shell work.

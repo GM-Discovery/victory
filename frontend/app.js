@@ -32,12 +32,18 @@ async function loadVenues() {
       "workshop": { x: 62, y: 47 },
       "info-booth": { x: 50, y: 88 },
       "audition-hall": { x: 30, y: 27 },
-      "the-cave": { x: 70, y: 39 },
+      "the-cave": { x: 20, y: 17 },
+      "victory-theater": { x: 50, y: 70 },
+      "construction": { x: 37, y: 50 },
     };
 
     for (const venue of venues) {
       const pin = document.createElement("button");
       pin.className = "venue-pin";
+
+      if (venue.slug === "victory-theater") {
+        pin.classList.add("venue-pin--theater");
+      }
       pin.type = "button";
       pin.setAttribute(
         "aria-label",
@@ -57,6 +63,8 @@ async function loadVenues() {
         "audition-hall": "/assets/audition-hall.png",
         "the-cave": "/assets/cave.png",
         "workshop": "/assets/workshop.png",
+        "victory-theater": "/assets/victorytheater.png",
+        "construction": "/assets/construction.png",
       };
 
       icon.src = venue.icon_url || venueIcons[venue.slug] || "/assets/default.png";
@@ -80,6 +88,17 @@ async function loadVenues() {
           return;
         }
 
+        if (venue.slug === "victory-theater") {
+          window.location.href = "/venues/victory-theater/";
+          return;
+        }
+
+        if (venue.slug === "construction") {
+          window.location.href = "/venues/construction/";
+          return;
+        }
+
+
         alert(`Venue "${venue.name || venue.slug}" is not built yet.`);
       });
 
@@ -91,4 +110,37 @@ async function loadVenues() {
   }
 }
 
+async function loadAccountLink() {
+  const accountLink = document.getElementById("account-link");
+  if (!accountLink) return;
+
+  try {
+    const response = await fetch("/api/session/me", {
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      accountLink.textContent = "Log In";
+      accountLink.href = "/login/";
+      return;
+    }
+
+    const payload = await response.json();
+
+    if (payload && payload.signed_in) {
+      const displayName = payload.display_name || "Friend";
+      accountLink.textContent = `Hello ${displayName}`;
+      accountLink.href = "/account/";
+      return;
+    }
+
+    accountLink.textContent = "Log In";
+    accountLink.href = "/login/";
+  } catch (error) {
+    accountLink.textContent = "Log In";
+    accountLink.href = "/login/";
+  }
+}
+
+loadAccountLink();
 loadVenues();

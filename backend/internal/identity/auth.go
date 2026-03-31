@@ -419,3 +419,52 @@ func currentUserID(ctx context.Context, pool *pgxpool.Pool, r *http.Request) (st
 
 	return rec.UserID, nil
 }
+
+func HandleMe(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
+				"ok": false,
+				"error": "method_not_allowed",
+			})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		userID, err := currentUserID(ctx, pool, r)
+		if err != nil || strings.TrimSpace(userID) == "" {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"ok": true,
+				"signed_in": false,
+			})
+			return
+		}
+
+		var handle, displayName string
+		err = pool.QueryRow(ctx, `
+			SELECT handle, display_name
+			FROM users
+			WHERE id = $1
+			LIMIT 1
+		`, userID).Scan(&handle, &displayName)
+		if err != nil {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"ok": true,
+				"signed_in": false,
+			})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok": true,
+			"signed_in": true,
+			"data": map[string]any{
+				"user_id": userID,
+				"handle": handle,
+				"display_name": displayName,
+			},
+		})
+	}
+}

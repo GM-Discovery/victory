@@ -129,7 +129,7 @@
   <div class="shell">
     <div class="header">
       <h1>The Cave</h1>
-      <div id="connection-status" class="status-line">Connecting...</div>
+      <div id="connection-status" class="status-line">Starting...</div>
     </div>
 
     <div class="stage">
@@ -148,7 +148,7 @@
     </div>
   </div>
 
-    <script>
+  <script>
     const chatLog = document.getElementById("chat-log");
     const chatInput = document.getElementById("chat-input");
     const chatSend = document.getElementById("chat-send");
@@ -156,25 +156,15 @@
     const speechEl = document.getElementById("speech");
 
     let ws = null;
+    let currentSessionId = null;
+    let currentActorId = null;
 
     function formatTime(date = new Date()) {
-        return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    }
-
-    function addChatMessage(text, time = formatTime(), source = "local") {
-        const row = document.createElement("div");
-        row.className = "chat-message";
-        row.dataset.source = source;
-        row.innerHTML = `
-        <span class="chat-time">[${escapeHtml(time)}]</span>
-        <span class="chat-text">${escapeHtml(text)}</span>
-        `;
-        chatLog.appendChild(row);
-        chatLog.scrollTop = chatLog.scrollHeight;
+      return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     }
 
     function escapeHtml(value) {
-        return String(value)
+      return String(value)
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
@@ -182,79 +172,156 @@
         .replaceAll("'", "&#39;");
     }
 
+    function addChatMessage(text, time = formatTime(), source = "local") {
+      const row = document.createElement("div");
+      row.className = "chat-message";
+      row.dataset.source = source;
+      row.innerHTML = `
+        <span class="chat-time">[${escapeHtml(time)}]</span>
+        <span class="chat-text">${escapeHtml(text)}</span>
+      `;
+      chatLog.appendChild(row);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    async function joinCave() {
+      connectionStatus.textContent = "Joining cave...";
+
+      const response = await fetch("/api/session/the-cave/join", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          handle: "web",
+          display_name: "Web user"
+        })
+      });
+
+      const text = await response.text();
+      const payload = text ? JSON.parse(text) : {};
+
+      console.log("join payload", payload);
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || `Join failed (HTTP ${response.status})`);
+      }
+
+      const data = payload.data || {};
+
+      currentSessionId =
+        data.session_id ||
+        data.session?.id ||
+        data.sessionId ||
+        null;
+
+      currentActorId =
+        data.actor_id ||
+        data.participant?.actor_id ||
+        data.participant?.user_id ||
+        data.user_id ||
+        null;
+
+      if (!currentSessionId || !currentActorId) {
+        throw new Error("Join succeeded but missing session_id / actor_id. Check console.");
+      }
+    }
+
     function connectWS() {
-        const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-        ws = new WebSocket(`${protocol}//${location.host}/ws/the-cave`);
+      const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+      ws = new WebSocket(`${protocol}//${location.host}/ws/the-cave`);
 
-        connectionStatus.textContent = "Connecting...";
+      connectionStatus.textContent = "Connecting...";
 
-        ws.addEventListener("open", () => {
+      ws.addEventListener("open", () => {
         connectionStatus.textContent = "Connected";
-        });
+      });
 
-        ws.addEventListener("close", () => {
+      ws.addEventListener("close", () => {
         connectionStatus.textContent = "Disconnected";
-        });
+      });
 
-        ws.addEventListener("error", () => {
+      ws.addEventListener("error", () => {
         connectionStatus.textContent = "Connection error";
-        });
+      });
 
-        ws.addEventListener("message", (event) => {
+      ws.addEventListener("message", (event) => {
         let msg;
 
         try {
-            msg = JSON.parse(event.data);
+          msg = JSON.parse(event.data);
         } catch (err) {
-            console.log("Non-JSON websocket message:", event.data);
-            return;
+          console.log("Non-JSON websocket message:", event.data);
+          return;
         }
 
         console.log("WS message:", msg);
 
-        // Temporary guessable handling:
-        // If backend later sends a structured action, we adapt.
-        if (msg.type === "perform/speak" && msg.payload?.text) {
-            addChatMessage(msg.payload.text, formatTime(), "remote");
-            speechEl.textContent = msg.payload.text;
-            return;
+        if (msg.type === "snapshot") {
+          return;
         }
 
-        // If backend sends snapshots/history arrays later, we can handle them here.
-        });
+        if (msg.type === "action" && msg.data) {
+          const action = msg.data;
+          const actionType = action.type || action.action_type || "";
+          const actionText =
+            action.payload?.text ||
+            action.text ||
+            "";
+
+          if (actionType === "perform/speak" && actionText) {
+            addChatMessage(actionText, formatTime(), "remote");
+            speechEl.textContent = actionText;
+            return;
+          }
+        }
+
+        if (msg.type === "error") {
+          console.error("WS error:", msg.error);
+        }
+      });
     }
 
     function sendChat() {
         const text = chatInput.value.trim();
         if (!text) return;
 
-        // Always show local append for immediate responsiveness
-        addChatMessage(text);
-        speechEl.textContent = text;
-
         if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
+            ws.send(JSON.stringify({
             type: "perform/speak",
-            payload: { text }
-        }));
+            session_id: currentSessionId,
+            actor_id: currentActorId,
+            text
+            }));
         } else {
-        addChatMessage("(not connected: message only shown locally)", formatTime(), "system");
+            addChatMessage("(not connected: message only shown locally)", formatTime(), "system");
         }
 
         chatInput.value = "";
         chatInput.focus();
     }
 
+    async function startCave() {
+      try {
+        await joinCave();
+        connectWS();
+      } catch (err) {
+        connectionStatus.textContent = err.message || String(err);
+        console.error(err);
+      }
+    }
+
     chatSend.addEventListener("click", sendChat);
 
     chatInput.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
+      if (event.key === "Enter") {
         event.preventDefault();
         sendChat();
-        }
+      }
     });
 
-    connectWS();
-    </script>
+    startCave();
+  </script>
 </body>
 </html>
