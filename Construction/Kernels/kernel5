@@ -1,0 +1,228 @@
+Kernel 5 — Action UI Layer (First Production Tooling)
+Purpose
+
+Replace devtools/manual action firing with real, minimal UI controls that invoke the same underlying action system.
+
+This kernel is about:
+
+usable controls
+role-aware overlays
+action triggering from the GUI
+
+It is not about full permission lattice, editor systems, or generalized tooling panels.
+
+Core objective
+
+Make the cave usable without devtools.
+
+A person in the cave should be able to:
+
+speak
+react
+reveal
+hide
+
+through the actual interface.
+
+Assumed current state
+
+Already exists and should not be rebuilt:
+
+auth/session floor
+invite/role/access floor
+workshop asset upload floor
+map GUI
+venue routing
+cave page
+audition hall page
+shared real-time cave session
+role-filtered illusion layer for first-fire
+reveal/hide persistence via action-derived snapshot
+Scope
+
+Build the first role-aware control overlay for the-cave.
+
+Required UI controls
+Audience
+
+Must have:
+
+reaction controls
+
+Must not have:
+
+reveal/hide controls
+actor/director-only controls
+Actor
+
+Must have:
+
+speak input
+reveal/hide controls if currently allowed by temporary kernel rules
+Director
+
+Must have:
+
+speak input
+reveal/hide controls
+Producer
+
+May inherit director controls for now.
+
+Required behavior
+1. Speak from UI
+
+A user with speaking authority can enter speech in the cave UI and trigger the existing perform/speak action.
+
+2. React from UI
+
+Audience can trigger existing reaction actions from the cave UI.
+
+3. Reveal from UI
+
+Authorized role can trigger reveal through the cave UI.
+
+4. Hide from UI
+
+Authorized role can trigger hide through the cave UI.
+
+5. Stage remains role-filtered
+
+The UI controls must sit on top of the existing illusion system, not replace it.
+
+Tooling meaning in this kernel
+
+This kernel establishes the first production tooling, not dev-only tooling.
+
+That means:
+
+real controls
+role-aware overlay
+same backend action contracts
+no separate “debug-only reality”
+
+A button in the UI should call the same action system the devtools call.
+
+UI requirements
+Cave layout
+
+Keep current cave structure.
+
+Add only minimal role-aware overlays/controls.
+
+Control overlay
+
+A lightweight interface layer over or alongside the rendered cave view.
+
+Examples:
+
+reveal button
+hide button
+speak input
+reaction strip
+
+Do not overdesign it.
+
+Role gating
+
+UI should differ by role.
+
+This is UI gating only.
+Backend enforcement can remain limited in this kernel if needed, but the UI must not expose the wrong controls to the wrong roles.
+
+Temporary authority rule for this kernel
+
+Do not build the full policy system yet.
+
+Use a temporary simple rule:
+
+Director can reveal/hide
+Producer can reveal/hide
+Actor can reveal/hide only if current temporary implementation chooses to allow it
+Audience cannot reveal/hide
+
+If you want the actor to have reveal/hide in Kernel 5 for practical testing, that is acceptable.
+Formal policy control comes later.
+
+Non-goals
+
+Do not build in Kernel 5:
+
+full permission lattice
+policy editor
+per-production policy storage
+map work
+audition hall improvements
+workshop UI
+note cards
+chat redesign
+drag/drop
+multi-element tool systems
+generalized scene editor
+diagnostics dashboard
+operator panel
+Success criteria
+
+Kernel 5 passes when:
+
+audience can enter the-cave and react using visible UI controls
+actor can enter the-cave and speak using visible UI controls
+director can reveal/hide fire using visible UI controls
+audience never sees reveal/hide controls
+role-specific controls differ visibly in the cave UI
+all controls use the existing backend action path
+reveal/hide still affects audience perception in real time
+speech and reactions still work in real time
+Builder emphasis
+
+Tell the next agent:
+
+Do not build a tooling framework.
+Do not build a panel system.
+Do not build policy storage.
+Just expose the existing cave actions through minimal role-aware UI.
+
+Recommended implementation stance
+
+Use:
+
+small buttons
+one speak input
+one reaction strip
+one simple control overlay
+
+Do not build:
+
+selection systems
+macros
+hotkey systems
+reusable control libraries
+
+Those come later.
+
+What this kernel should prove
+
+That your system can move from:
+
+hidden backend truth
+devtools-driven actions
+
+to:
+
+actual production-facing controls
+inside a role-aware venue
+
+That is the first real step from infrastructure into usable software.
+
+What likely comes after
+
+Not part of Kernel 5, but likely next:
+
+Kernel 6 — Permission Lattice
+producer ceilings
+director defaults
+actor permissions
+invite authority matrix
+persistent policy model
+
+That can only be done cleanly after actual controls exist.

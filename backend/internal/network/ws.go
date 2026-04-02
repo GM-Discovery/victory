@@ -66,6 +66,30 @@ func ServeCaveWS(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 
 		client.UserID = userID
 
+		allowed, err := access.UserCanAccessVenueSlug(ctx, pool, userID, "the-cave")
+		if err != nil {
+			cancel()
+			log.Printf("ws venue access check failed: %v", err)
+			_ = conn.WriteJSON(map[string]any{
+				"type":  "error",
+				"error": "access_check_failed",
+			})
+			_ = conn.Close()
+			hub.Remove(client)
+			return
+		}
+
+		if !allowed {
+			cancel()
+			_ = conn.WriteJSON(map[string]any{
+				"type":  "error",
+				"error": "forbidden",
+			})
+			_ = conn.Close()
+			hub.Remove(client)
+			return
+		}
+
 		viewerRole, err := lookupVenueRole(ctx, pool, userID, "the-cave")
 		if err != nil {
 			cancel()
@@ -199,6 +223,7 @@ func readPump(hub *Hub, pool *pgxpool.Pool, c *Client) {
 			{
 				sessionID, _ := payload["session_id"].(string)
 				actorID := c.UserID
+				elementID, _ := payload["element_id"].(string)
 				elementSlug, _ := payload["element_slug"].(string)
 				layer, _ := payload["layer"].(string)
 
@@ -208,6 +233,7 @@ func readPump(hub *Hub, pool *pgxpool.Pool, c *Client) {
 				storedAction, err := actions.StoreReveal(ctx, pool, actions.RevealRequest{
 					SessionID:   sessionID,
 					ActorID:     actorID,
+					ElementID:   elementID,
 					ElementSlug: elementSlug,
 					Layer:       layer,
 					Visible:     visible,

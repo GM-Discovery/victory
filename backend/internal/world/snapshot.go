@@ -209,33 +209,31 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 		return nil, err
 	}
 
-	actorFireVisible := deriveLayerVisibility(snap.Actions, "first-fire", "actor", false)
-	audienceFireVisible := deriveLayerVisibility(snap.Actions, "first-fire", "audience", false)
-
+	layerVisibility := deriveElementLayerVisibility(snap.Actions)
+	
 	filtered := make([]PlacedElement, 0, len(snap.Elements))
 	for _, el := range snap.Elements {
-		if el.Slug == "first-fire" {
-			switch normalizeRole(viewerRole) {
-			case "producer", "director":
-				filtered = append(filtered, el)
-			case "actor", "cast", "crew":
-				if actorFireVisible {
-					filtered = append(filtered, el)
-				}
-			case "audience":
-				if audienceFireVisible {
-					filtered = append(filtered, el)
-				}
-			default:
-				// unknown role gets no hidden element by default
-			}
-			continue
-		}
+		switch normalizeRole(viewerRole) {
+		case "producer", "director":
+			filtered = append(filtered, el)
 
-		filtered = append(filtered, el)
+		case "actor", "crew", "cast":
+			if elementVisibilityForLayer(layerVisibility, el, "actor", false) {
+				filtered = append(filtered, el)
+			}
+
+		case "audience":
+			if elementVisibilityForLayer(layerVisibility, el, "audience", false) {
+				filtered = append(filtered, el)
+			}
+
+		default:
+			if elementVisibilityForLayer(layerVisibility, el, "audience", false) {
+				filtered = append(filtered, el)
+			}
+		}
 	}
 	snap.Elements = filtered
-
 	return &snap, nil
 }
 
@@ -290,22 +288,59 @@ func actionTargetLayer(a Action) string {
 	return ""
 }
 
-func deriveLayerVisibility(actions []Action, elementSlug string, layer string, defaultVisible bool) bool {
+func actionTargetElementID(a Action) string {
+	if id, ok := a.Target["element_id"].(string); ok {
+		return id
+	}
+	return ""
+}
+
+func deriveElementLayerVisibility(actions []Action) map[string]bool {
+	out := map[string]bool{}
+
 	for _, a := range actions {
-		if actionTargetElementSlug(a) != elementSlug {
+		layer := actionTargetLayer(a)
+		if layer == "" {
 			continue
 		}
-		if actionTargetLayer(a) != layer {
+
+		elementID := actionTargetElementID(a)
+		elementSlug := actionTargetElementSlug(a)
+
+		targetKey := ""
+		if elementID != "" {
+			targetKey = elementID + ":" + layer
+		} else if elementSlug != "" {
+			targetKey = "slug:" + elementSlug + ":" + layer
+		} else {
+			continue
+		}
+
+		if _, exists := out[targetKey]; exists {
 			continue
 		}
 
 		switch a.Type {
 		case "act/reveal_element":
-			return true
+			out[targetKey] = true
 		case "act/hide_element":
-			return false
+			out[targetKey] = false
 		}
 	}
 
+	return out
+}
+
+func elementVisibilityForLayer(visibility map[string]bool, el PlacedElement, layer string, defaultVisible bool) bool {
+	if el.ElementID != "" {
+		if v, ok := visibility[el.ElementID+":"+layer]; ok {
+			return v
+		}
+	}
+	if el.Slug != "" {
+		if v, ok := visibility["slug:"+el.Slug+":"+layer]; ok {
+			return v
+		}
+	}
 	return defaultVisible
 }

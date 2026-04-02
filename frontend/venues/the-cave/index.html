@@ -158,6 +158,7 @@
     let ws = null;
     let currentSessionId = null;
     let currentActorId = null;
+    let currentRole = "none";
 
     function formatTime(date = new Date()) {
         return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -246,6 +247,11 @@
 
         const data = payload.data || {};
 
+        currentRole =
+          data.role ||
+          data.participant?.role ||
+          "none";
+
         currentSessionId =
         data.session_id ||
         data.session?.id ||
@@ -262,6 +268,30 @@
         if (!currentSessionId || !currentActorId) {
         throw new Error("Join succeeded but missing session_id / actor_id. Check console.");
         }
+        
+        applyRoleUI();
+    }
+
+    function canSpeak(role) {
+        return ["producer", "director", "actor", "cast", "crew"].includes(role);
+    }
+
+    function canRevealHide(role) {
+        return ["producer", "director", "actor", "cast", "crew"].includes(role);
+    }
+
+    function applyRoleUI() {
+        const speakingAllowed = canSpeak(currentRole);
+        const revealHideAllowed = canRevealHide(currentRole);
+
+        chatInput.disabled = !speakingAllowed;
+        chatSend.disabled = !speakingAllowed;
+
+        const revealFireBtn = document.getElementById("reveal-fire");
+        const hideFireBtn = document.getElementById("hide-fire");
+
+        if (revealFireBtn) revealFireBtn.hidden = !revealHideAllowed;
+        if (hideFireBtn) hideFireBtn.hidden = !revealHideAllowed;
     }
 
     function connectWS() {
@@ -303,7 +333,6 @@
         const action = msg.data;
         const actionType = action.type || "";
         const actionText = action.payload?.text || action.text || "";
-        const target = action.target || {};
 
         if (actionType === "perform/speak" && actionText) {
             addChatMessage(actionText, formatTime(), "remote");
@@ -311,14 +340,11 @@
             return;
         }
 
-        if (
-            (actionType === "act/reveal_element" || actionType === "act/hide_element") &&
-            target.element_slug === "first-fire"
-        ) {
-            await refreshSnapshot();
-            return;
-          }
+                if (actionType === "act/reveal_element" || actionType === "act/hide_element") {
+          await refreshSnapshot();
+          return;
         }
+    }
 
         if (msg.type === "error") {
             console.error("WS error:", msg.error);
@@ -326,23 +352,50 @@
         });
     }
 
-    function sendChat() {
-        const text = chatInput.value.trim();
-        if (!text) return;
-
-        if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-            type: "perform/speak",
-            session_id: currentSessionId,
-            actor_id: currentActorId,
-            text
-        }));
-        } else {
-        addChatMessage("(not connected: message only shown locally)", formatTime(), "system");
+    function sendAction(type, extra = {}) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            addChatMessage("(not connected)", formatTime(), "system");
+            return false;
         }
 
-        chatInput.value = "";
-        chatInput.focus();
+    ws.send(JSON.stringify({
+      type,
+      session_id: currentSessionId,
+      actor_id: currentActorId,
+      ...extra
+      }));
+
+      return true;
+    }
+
+    function performSpeak(text) {
+      return sendAction("perform/speak", { text });
+    }
+
+    function performReveal(element) {
+      return sendAction("act/reveal_element", element);
+    }
+
+    function performHide(element) {
+      return sendAction("act/hide_element", element);
+    }
+
+    function performReaction(kind) {
+      return sendAction("react/emote", { kind });
+    }
+
+    function sendChat() {
+      const text = chatInput.value.trim();
+      if (!text) return;
+      if (text.length > 500) {
+        addChatMessage("(speech too long: max 500 characters)", formatTime(), "system");
+        return;
+      }
+
+      sendAction("perform/speak", { text });
+
+      chatInput.value = "";
+      chatInput.focus();
     }
 
     async function startCave() {
