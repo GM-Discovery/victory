@@ -137,8 +137,21 @@
       <img id="fire" src="/assets/fire.jpg" alt="Fire" hidden />    </div>
 
     <div class="chat-panel">
-      <h2>Chat</h2>
-      <div id="chat-log"></div>
+      <div id="tool-panel" class="tool-panel">
+        <div class="tool-row">
+          <strong>Selected:</strong>
+          <span id="selected-label">None</span>
+        </div>
+
+    <div class="tool-row">
+        <button id="reveal-selected" type="button" disabled>Reveal Selected</button>
+        <button id="hide-selected" type="button" disabled>Hide Selected</button>
+        <button id="clear-selection" type="button" disabled>Clear</button>
+      </div>
+    </div>
+
+    <h2>Chat</h2>
+    <div id="chat-log"></div>
 
       <div class="chat-controls">
         <input id="chat-input" type="text" placeholder="Type a message..." />
@@ -268,7 +281,7 @@
         if (!currentSessionId || !currentActorId) {
         throw new Error("Join succeeded but missing session_id / actor_id. Check console.");
         }
-        
+
         applyRoleUI();
     }
 

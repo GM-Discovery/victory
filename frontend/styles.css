@@ -101,6 +101,41 @@ body {
   font-size: 0.95rem;
 }
 
+.tool-panel {
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.tool-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.tool-row:last-child {
+  margin-bottom: 0;
+}
+
+.tool-row button {
+  padding: 8px 12px;
+  font-size: 0.95rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: #2a231d;
+  color: white;
+  cursor: pointer;
+}
+
+.tool-row button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .venue-icons {
   position: absolute;
   inset: 0;
