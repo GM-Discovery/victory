@@ -11,6 +11,8 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - victory_postgres_data:/var/lib/postgresql/data
+    networks:
+      - victory_internal
 
   backend:
     build:
@@ -23,10 +25,19 @@ services:
       STORAGE_ROOT: /opt/victory/storage
     depends_on:
       - postgres
-    ports:
-      - "8081:8081"
     volumes:
       - /opt/victory/storage:/opt/victory/storage
+    expose:
+      - "8081"
+    networks:
+      - victory_internal
+      - edge_net
 
 volumes:
   victory_postgres_data:
+
+networks:
+  edge_net:
+    external: true
+    name: edge_net
+  victory_internal:

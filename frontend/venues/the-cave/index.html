@@ -160,281 +160,378 @@
     </div>
   </div>
 
-  <script>
-    const chatLog = document.getElementById("chat-log");
-    const chatInput = document.getElementById("chat-input");
-    const chatSend = document.getElementById("chat-send");
-    const connectionStatus = document.getElementById("connection-status");
-    const speechEl = document.getElementById("speech");
-    const fireEl = document.getElementById("fire");
+<script>
+  const chatLog = document.getElementById("chat-log");
+  const chatInput = document.getElementById("chat-input");
+  const chatSend = document.getElementById("chat-send");
+  const connectionStatus = document.getElementById("connection-status");
+  const speechEl = document.getElementById("speech");
+  const fireEl = document.getElementById("fire");
 
-    let ws = null;
-    let currentSessionId = null;
-    let currentActorId = null;
-    let currentRole = "none";
+  const selectedLabel = document.getElementById("selected-label");
+  const revealSelectedBtn = document.getElementById("reveal-selected");
+  const hideSelectedBtn = document.getElementById("hide-selected");
+  const clearSelectionBtn = document.getElementById("clear-selection");
 
-    function formatTime(date = new Date()) {
-        return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  let ws = null;
+  let currentSessionId = null;
+  let currentActorId = null;
+  let currentRole = "none";
+  let selectedElement = null;
+
+  function formatTime(date = new Date()) {
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function addChatMessage(text, time = formatTime(), source = "local") {
+    const row = document.createElement("div");
+    row.className = "chat-message";
+    row.dataset.source = source;
+    row.innerHTML = `
+      <span class="chat-time">[${escapeHtml(time)}]</span>
+      <span class="chat-text">${escapeHtml(text)}</span>
+    `;
+    chatLog.appendChild(row);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  function setConnectionStatus(text) {
+    connectionStatus.textContent = text;
+  }
+
+  function canSpeak(role) {
+    return ["producer", "director", "actor", "cast", "crew"].includes(role);
+  }
+
+  function canRevealHide(role) {
+    return ["producer", "director", "actor", "cast", "crew"].includes(role);
+  }
+
+  function setSelectedElement(element) {
+    selectedElement = element || null;
+    updateSelectionUI();
+  }
+
+  function clearSelectedElement() {
+    selectedElement = null;
+    updateSelectionUI();
+  }
+
+  function updateSelectionUI() {
+    if (selectedLabel) {
+      selectedLabel.textContent = selectedElement?.name || selectedElement?.slug || "None";
     }
 
-    function escapeHtml(value) {
-        return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#39;");
+    const hasSelection = !!selectedElement;
+    const revealHideAllowed = canRevealHide(currentRole);
+
+    if (revealSelectedBtn) {
+      revealSelectedBtn.disabled = !hasSelection;
+      revealSelectedBtn.hidden = !revealHideAllowed;
     }
 
-    function addChatMessage(text, time = formatTime(), source = "local") {
-        const row = document.createElement("div");
-        row.className = "chat-message";
-        row.dataset.source = source;
-        row.innerHTML = `
-        <span class="chat-time">[${escapeHtml(time)}]</span>
-        <span class="chat-text">${escapeHtml(text)}</span>
-        `;
-        chatLog.appendChild(row);
-        chatLog.scrollTop = chatLog.scrollHeight;
+    if (hideSelectedBtn) {
+      hideSelectedBtn.disabled = !hasSelection;
+      hideSelectedBtn.hidden = !revealHideAllowed;
     }
 
-    function setConnectionStatus(text) {
-        connectionStatus.textContent = text;
+    if (clearSelectionBtn) {
+      clearSelectionBtn.disabled = !hasSelection;
+      clearSelectionBtn.hidden = !revealHideAllowed;
     }
+  }
 
-    function applySnapshot(snapshot) {
-        const elements = Array.isArray(snapshot?.elements) ? snapshot.elements : [];
-        const actions = Array.isArray(snapshot?.actions) ? snapshot.actions : [];
+  function applyRoleUI() {
+    const speakingAllowed = canSpeak(currentRole);
+    chatInput.disabled = !speakingAllowed;
+    chatSend.disabled = !speakingAllowed;
+    updateSelectionUI();
+  }
 
-        const hasFire = elements.some((el) => el && el.slug === "first-fire");
-        fireEl.hidden = !hasFire;
+  function applySnapshot(snapshot) {
+    const elements = Array.isArray(snapshot?.elements) ? snapshot.elements : [];
+    const actions = Array.isArray(snapshot?.actions) ? snapshot.actions : [];
 
-        const latestSpeech = actions.find((a) => a?.type === "perform/speak");
-        const latestSpeechText =
-        latestSpeech?.payload?.text ||
-        latestSpeech?.text ||
-        "";
+    const fireElement = elements.find((el) => el && el.slug === "first-fire");
+    fireEl.hidden = !fireElement;
+    fireEl.dataset.elementId = fireElement?.element_id || "";
+    fireEl.dataset.elementSlug = fireElement?.slug || "";
+    fireEl.dataset.elementName = fireElement?.name || "";
 
-        speechEl.textContent = latestSpeechText || "";
-    }
+    const latestSpeech = actions.find((a) => a?.type === "perform/speak");
+    const latestSpeechText =
+      latestSpeech?.payload?.text ||
+      latestSpeech?.text ||
+      "";
 
-    async function refreshSnapshot() {
-        try {
-        const response = await fetch("/api/world/the-cave", {
-            method: "GET",
-            credentials: "include",
+    speechEl.textContent = latestSpeechText || "";
+
+    if (selectedElement) {
+      const stillVisible = elements.find((el) =>
+        el &&
+        (
+          (selectedElement.element_id && el.element_id === selectedElement.element_id) ||
+          (selectedElement.slug && el.slug === selectedElement.slug)
+        )
+      );
+
+      if (!stillVisible) {
+        clearSelectedElement();
+      } else {
+        setSelectedElement({
+          element_id: stillVisible.element_id,
+          slug: stillVisible.slug,
+          name: stillVisible.name,
+          surface: stillVisible.surface,
+          element_type: stillVisible.element_type
         });
-
-        const payload = await response.json().catch(() => null);
-        if (!response.ok || !payload?.ok || !payload?.data) return;
-
-        applySnapshot(payload.data);
-        } catch (err) {
-        console.error("refreshSnapshot failed", err);
-        }
+      }
     }
+  }
 
-    async function joinCave() {
-        setConnectionStatus("Joining cave...");
-
-        const response = await fetch("/api/session/the-cave/join", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
+  async function refreshSnapshot() {
+    try {
+      const response = await fetch("/api/world/the-cave", {
+        method: "GET",
         credentials: "include",
-        body: JSON.stringify({
-            handle: "web",
-            display_name: "Web user"
-        })
-        });
+      });
 
-        const text = await response.text();
-        const payload = text ? JSON.parse(text) : {};
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok || !payload?.data) return;
 
-        console.log("join payload", payload);
+      applySnapshot(payload.data);
+    } catch (err) {
+      console.error("refreshSnapshot failed", err);
+    }
+  }
 
-        if (!response.ok || !payload.ok) {
-        throw new Error(payload.error || `Join failed (HTTP ${response.status})`);
-        }
+  async function joinCave() {
+    setConnectionStatus("Joining cave...");
 
-        const data = payload.data || {};
+    const response = await fetch("/api/session/the-cave/join", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        handle: "web",
+        display_name: "Web user"
+      })
+    });
 
-        currentRole =
-          data.role ||
-          data.participant?.role ||
-          "none";
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) : {};
 
-        currentSessionId =
-        data.session_id ||
-        data.session?.id ||
-        data.sessionId ||
-        null;
+    console.log("join payload", payload);
 
-        currentActorId =
-        data.actor_id ||
-        data.participant?.actor_id ||
-        data.participant?.user_id ||
-        data.user_id ||
-        null;
-
-        if (!currentSessionId || !currentActorId) {
-        throw new Error("Join succeeded but missing session_id / actor_id. Check console.");
-        }
-
-        applyRoleUI();
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || `Join failed (HTTP ${response.status})`);
     }
 
-    function canSpeak(role) {
-        return ["producer", "director", "actor", "cast", "crew"].includes(role);
+    const data = payload.data || {};
+
+    currentRole =
+      data.role ||
+      data.participant?.role ||
+      "none";
+
+    currentSessionId =
+      data.session_id ||
+      data.session?.id ||
+      data.sessionId ||
+      null;
+
+    currentActorId =
+      data.actor_id ||
+      data.participant?.actor_id ||
+      data.participant?.user_id ||
+      data.user_id ||
+      null;
+
+    if (!currentSessionId || !currentActorId) {
+      throw new Error("Join succeeded but missing session_id / actor_id. Check console.");
     }
 
-    function canRevealHide(role) {
-        return ["producer", "director", "actor", "cast", "crew"].includes(role);
-    }
+    applyRoleUI();
+  }
 
-    function applyRoleUI() {
-        const speakingAllowed = canSpeak(currentRole);
-        const revealHideAllowed = canRevealHide(currentRole);
+  function connectWS() {
+    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+    ws = new WebSocket(`${protocol}//${location.host}/ws/the-cave`);
 
-        chatInput.disabled = !speakingAllowed;
-        chatSend.disabled = !speakingAllowed;
+    setConnectionStatus("Connecting...");
 
-        const revealFireBtn = document.getElementById("reveal-fire");
-        const hideFireBtn = document.getElementById("hide-fire");
+    ws.addEventListener("open", () => {
+      setConnectionStatus("Connected");
+    });
 
-        if (revealFireBtn) revealFireBtn.hidden = !revealHideAllowed;
-        if (hideFireBtn) hideFireBtn.hidden = !revealHideAllowed;
-    }
+    ws.addEventListener("close", () => {
+      setConnectionStatus("Disconnected");
+    });
 
-    function connectWS() {
-        const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-        ws = new WebSocket(`${protocol}//${location.host}/ws/the-cave`);
+    ws.addEventListener("error", () => {
+      setConnectionStatus("Connection error");
+    });
 
-        setConnectionStatus("Connecting...");
+    ws.addEventListener("message", async (event) => {
+      let msg;
 
-        ws.addEventListener("open", () => {
-        setConnectionStatus("Connected");
-        });
+      try {
+        msg = JSON.parse(event.data);
+      } catch (err) {
+        console.log("Non-JSON websocket message:", event.data);
+        return;
+      }
 
-        ws.addEventListener("close", () => {
-        setConnectionStatus("Disconnected");
-        });
+      console.log("WS message:", msg);
 
-        ws.addEventListener("error", () => {
-        setConnectionStatus("Connection error");
-        });
+      if (msg.type === "snapshot" && msg.data) {
+        applySnapshot(msg.data);
+        return;
+      }
 
-        ws.addEventListener("message", async (event) => {
-        let msg;
-
-        try {
-            msg = JSON.parse(event.data);
-        } catch (err) {
-            console.log("Non-JSON websocket message:", event.data);
-            return;
-        }
-
-        console.log("WS message:", msg);
-
-        if (msg.type === "snapshot" && msg.data) {
-            applySnapshot(msg.data);
-            return;
-        }
-
-        if (msg.type === "action" && msg.data) {
+      if (msg.type === "action" && msg.data) {
         const action = msg.data;
         const actionType = action.type || "";
         const actionText = action.payload?.text || action.text || "";
 
         if (actionType === "perform/speak" && actionText) {
-            addChatMessage(actionText, formatTime(), "remote");
-            speechEl.textContent = actionText;
-            return;
+          addChatMessage(actionText, formatTime(), "remote");
+          speechEl.textContent = actionText;
+          return;
         }
 
-                if (actionType === "act/reveal_element" || actionType === "act/hide_element") {
+        if (actionType === "act/reveal_element" || actionType === "act/hide_element") {
           await refreshSnapshot();
           return;
         }
-    }
+      }
 
-        if (msg.type === "error") {
-            console.error("WS error:", msg.error);
-        }
-        });
-    }
+      if (msg.type === "error") {
+        console.error("WS error:", msg.error);
+      }
+    });
+  }
 
-    function sendAction(type, extra = {}) {
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
-            addChatMessage("(not connected)", formatTime(), "system");
-            return false;
-        }
+  function sendAction(type, extra = {}) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      addChatMessage("(not connected)", formatTime(), "system");
+      return false;
+    }
 
     ws.send(JSON.stringify({
       type,
       session_id: currentSessionId,
       actor_id: currentActorId,
       ...extra
-      }));
+    }));
 
-      return true;
+    return true;
+  }
+
+  function performSpeak(text) {
+    return sendAction("perform/speak", { text });
+  }
+
+  function performReveal(element) {
+    return sendAction("act/reveal_element", element);
+  }
+
+  function performHide(element) {
+    return sendAction("act/hide_element", element);
+  }
+
+  function sendChat() {
+    const text = chatInput.value.trim();
+    if (!text) return;
+
+    if (text.length > 500) {
+      addChatMessage("(speech too long: max 500 characters)", formatTime(), "system");
+      return;
     }
 
-    function performSpeak(text) {
-      return sendAction("perform/speak", { text });
+    performSpeak(text);
+
+    chatInput.value = "";
+    chatInput.focus();
+  }
+
+  async function startCave() {
+    try {
+      fireEl.hidden = true;
+      speechEl.textContent = "";
+      clearSelectedElement();
+      updateSelectionUI();
+
+      await joinCave();
+      connectWS();
+      await refreshSnapshot();
+    } catch (err) {
+      setConnectionStatus(err.message || String(err));
+      console.error(err);
     }
+  }
 
-    function performReveal(element) {
-      return sendAction("act/reveal_element", element);
+  chatSend.addEventListener("click", sendChat);
+
+  chatInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      sendChat();
     }
+  });
 
-    function performHide(element) {
-      return sendAction("act/hide_element", element);
-    }
+  fireEl.addEventListener("click", () => {
+    if (fireEl.hidden) return;
 
-    function performReaction(kind) {
-      return sendAction("react/emote", { kind });
-    }
+    const elementId = fireEl.dataset.elementId || "";
+    const elementSlug = fireEl.dataset.elementSlug || "";
+    const elementName = fireEl.dataset.elementName || "Selected element";
 
-    function sendChat() {
-      const text = chatInput.value.trim();
-      if (!text) return;
-      if (text.length > 500) {
-        addChatMessage("(speech too long: max 500 characters)", formatTime(), "system");
-        return;
-      }
+    if (!elementId && !elementSlug) return;
 
-      sendAction("perform/speak", { text });
-
-      chatInput.value = "";
-      chatInput.focus();
-    }
-
-    async function startCave() {
-        try {
-        fireEl.hidden = true;
-        speechEl.textContent = "";
-
-        await joinCave();
-        await refreshSnapshot();
-        connectWS();
-        } catch (err) {
-        setConnectionStatus(err.message || String(err));
-        console.error(err);
-        }
-    }
-
-    chatSend.addEventListener("click", sendChat);
-
-    chatInput.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
-        event.preventDefault();
-        sendChat();
-        }
+    setSelectedElement({
+      element_id: elementId,
+      slug: elementSlug,
+      name: elementName
     });
+  });
 
-    startCave();
-  </script>
+  revealSelectedBtn?.addEventListener("click", () => {
+    if (!selectedElement) return;
+
+    performReveal({
+      element_id: selectedElement.element_id || "",
+      element_slug: selectedElement.slug || "",
+      layer: "audience"
+    });
+  });
+
+  hideSelectedBtn?.addEventListener("click", () => {
+    if (!selectedElement) return;
+
+    performHide({
+      element_id: selectedElement.element_id || "",
+      element_slug: selectedElement.slug || "",
+      layer: "audience"
+    });
+  });
+
+  clearSelectionBtn?.addEventListener("click", () => {
+    clearSelectedElement();
+  });
+
+  startCave();
+</script>
 </body>
 </html>

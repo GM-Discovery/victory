@@ -1,3 +1,17 @@
+// ---
+// Value Function (Conceptual)
+//
+// V(person) ≈ (A × R × C) / P
+//
+// A = Agency (ability to act and be accountable)
+// R = Relational continuity (history + context across time)
+// C = Capacity for correction (ability to responsibly override)
+// P = Replaceability (→ 0 for true identity)
+//
+// As P → 0, value → ∞.
+//
+// A person is not a user account.
+// ---
 package main
 
 import (

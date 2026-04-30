@@ -1,0 +1,100 @@
+Kernel Report Back — Kernel 5 (Action UI Layer)
+1. Status
+
+PASS
+
+Core UI controls exist, are role-aware, and trigger the same backend action pipeline.
+
+2. What Was Built
+Selection system (selectedElement)
+Reveal/Hide UI targeting selected element
+Speak input routed through action system
+Role-aware UI gating (canSpeak, canRevealHide)
+WebSocket-driven real-time update loop
+Snapshot refresh on reveal/hide actions
+Removal of hardcoded element targeting
+3. Evidence
+
+Manual verified behavior:
+
+Producer:
+selects fire
+hides fire
+still sees fire
+Audience:
+does not see fire after hide
+regains visibility after reveal
+
+WebSocket confirms:
+
+"type": "act/reveal_element"
+"target": { "element_id": "...", "element_slug": "first-fire" }
+
+UI triggers action → server stores → broadcast → client refresh.
+
+4. How to Run
+docker compose up -d --build
+
+Open browser:
+
+http://<server>/venues/the-cave
+
+Steps:
+
+login as producer
+open cave
+click fire
+click “Hide Selected”
+open incognito → confirm hidden
+click “Reveal Selected” → confirm visible
+5. Operator Notes
+WebSocket endpoint: /ws/the-cave
+API endpoints:
+/api/session/the-cave/join
+/api/world/the-cave
+Requires valid session cookie (victory_session)
+Role derived server-side via memberships
+Snapshot is authoritative state; UI does not cache logic
+6. Blockers & Workarounds
+
+BLOCKER:
+Reveal/hide originally hardcoded to fire
+
+CAUSE:
+UI not target-aware
+
+WORKAROUND:
+Implemented selection system and dynamic payload
+
+BLOCKER:
+Map visibility leaking data
+
+CAUSE:
+Fallback logic in handler
+
+WORKAROUND:
+Moved to DB-driven visibility
+
+7. Deviations from Kernel
+Introduced selection model (not explicitly required)
+Deferred reaction UI (intentional)
+8. Known Issues
+Only single element selectable
+No generic renderer for elements yet
+No context menu tooling
+UI not yet modularized
+9. Next Recommended Step
+
+Kernel 6 — Permission Lattice + Tool Surface
+
+Specifically:
+
+formalize role authority matrix
+introduce reusable action overlay layer
+expand selection → multi-element support
+optionally add context menu
+10. Files Changed / Created
+cave index.html (UI + selection + action wiring)
+backend reveal/hide pipeline (earlier fixes)
+access/visibility logic
+map visibility endpoint
