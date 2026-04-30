@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>The Cave</title>
-  <link rel="stylesheet" href="/lib/forbidden.css" />
   <style>
     body {
       margin: 0;
@@ -127,6 +126,7 @@
   </style>
 </head>
 <body>
+
   <div id="forbidden-screen" class="forbidden-screen" hidden>
     <div class="forbidden-card">
       <img src="/assets/redirect.png" alt="Security redirect" />
@@ -170,7 +170,6 @@
     </div>
   </div>
 
-<script src="/lib/forbidden.js"></script>
 <script>
   const chatLog = document.getElementById("chat-log");
   const chatInput = document.getElementById("chat-input");
@@ -317,12 +316,6 @@
       });
 
       const payload = await response.json().catch(() => null);
-
-      if (isForbiddenAccessResponse(response, payload)) {
-        showForbiddenScreen();
-        return;
-      }
-
       if (!response.ok || !payload?.ok || !payload?.data) return;
 
       applySnapshot(payload.data);
@@ -346,17 +339,13 @@
       })
     });
 
-    const payload = await response.json().catch(() => null);
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) : {};
 
     console.log("join payload", payload);
 
-    if (isForbiddenAccessResponse(response, payload)) {
-      showForbiddenScreen();
-      return;
-    }
-
-    if (!response.ok || !payload?.ok) {
-      throw new Error(payload?.error || `Join failed (HTTP ${response.status})`);
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || `Join failed (HTTP ${response.status})`);
     }
 
     const data = payload.data || {};
@@ -439,11 +428,6 @@
       }
 
       if (msg.type === "error") {
-        if (isForbiddenAccessError(msg)) {
-          showForbiddenScreen();
-          return;
-        }
-
         console.error("WS error:", msg.error);
       }
     });
@@ -500,7 +484,6 @@
       updateSelectionUI();
 
       await joinCave();
-      if (!currentSessionId || !currentActorId) return;
       connectWS();
       await refreshSnapshot();
     } catch (err) {
