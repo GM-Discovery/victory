@@ -45,6 +45,47 @@ body {
   gap: 1rem;
 }
 
+.forbidden-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #d4bd8d;
+  color: #3b2a18;
+  padding: 24px;
+}
+
+.forbidden-card {
+  max-width: 760px;
+  text-align: center;
+}
+
+.forbidden-card img {
+  width: min(100%, 720px);
+  border-radius: 12px;
+  display: block;
+  margin: 0 auto 18px;
+}
+
+.forbidden-card h1 {
+  margin: 0 0 8px;
+}
+
+.forbidden-card p {
+  margin: 0 0 18px;
+  font-size: 1.1rem;
+}
+
+.back-map-button {
+  display: inline-block;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: #6b4a24;
+  color: #fff2d0;
+  text-decoration: none;
+  font-weight: bold;
+}
+
 .app-header h1 {
   margin: 0;
   font-size: 1.9rem;

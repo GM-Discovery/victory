@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Victory Theater</title>
+  <link rel="stylesheet" href="/lib/forbidden.css" />
+  <style>
+    body {
+      margin: 0;
+      background: #17120d;
+      color: #f3e6cf;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <main class="shell">
+    <div id="connection-status" hidden>Checking access...</div>
+  </main>
+
+  <script src="/lib/forbidden.js"></script>
+  <script>
+    showForbiddenScreen();
+  </script>
+</body>
+</html>

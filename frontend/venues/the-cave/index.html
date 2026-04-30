@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>The Cave</title>
+  <link rel="stylesheet" href="/lib/forbidden.css" />
   <style>
     body {
       margin: 0;
@@ -126,6 +127,15 @@
   </style>
 </head>
 <body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
   <div class="shell">
     <div class="header">
       <h1>The Cave</h1>
@@ -160,6 +170,7 @@
     </div>
   </div>
 
+<script src="/lib/forbidden.js"></script>
 <script>
   const chatLog = document.getElementById("chat-log");
   const chatInput = document.getElementById("chat-input");
@@ -306,6 +317,12 @@
       });
 
       const payload = await response.json().catch(() => null);
+
+      if (isForbiddenAccessResponse(response, payload)) {
+        showForbiddenScreen();
+        return;
+      }
+
       if (!response.ok || !payload?.ok || !payload?.data) return;
 
       applySnapshot(payload.data);
@@ -329,13 +346,17 @@
       })
     });
 
-    const text = await response.text();
-    const payload = text ? JSON.parse(text) : {};
+    const payload = await response.json().catch(() => null);
 
     console.log("join payload", payload);
 
-    if (!response.ok || !payload.ok) {
-      throw new Error(payload.error || `Join failed (HTTP ${response.status})`);
+    if (isForbiddenAccessResponse(response, payload)) {
+      showForbiddenScreen();
+      return;
+    }
+
+    if (!response.ok || !payload?.ok) {
+      throw new Error(payload?.error || `Join failed (HTTP ${response.status})`);
     }
 
     const data = payload.data || {};
@@ -418,6 +439,11 @@
       }
 
       if (msg.type === "error") {
+        if (isForbiddenAccessError(msg)) {
+          showForbiddenScreen();
+          return;
+        }
+
         console.error("WS error:", msg.error);
       }
     });
@@ -474,6 +500,7 @@
       updateSelectionUI();
 
       await joinCave();
+      if (!currentSessionId || !currentActorId) return;
       connectWS();
       await refreshSnapshot();
     } catch (err) {

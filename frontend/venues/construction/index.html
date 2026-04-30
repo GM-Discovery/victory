@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Construction Site</title>
+  <link rel="stylesheet" href="/lib/forbidden.css" />
+  <style>
+    body {
+      margin: 0;
+      background: #17120d;
+      color: #f3e6cf;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    .panel {
+      max-width: 960px;
+      width: 100%;
+      margin: 0 auto;
+      background: rgba(31, 24, 18, 0.96);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    .status-line {
+      margin-top: 8px;
+      color: #d9c39d;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <div class="panel">
+      <h1>Construction Site</h1>
+      <div id="connection-status" class="status-line">Checking access...</div>
+      <div id="construction-body" class="hidden">
+        <p>This venue is not finished yet.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script>
+    const connectionStatus = document.getElementById("connection-status");
+    const constructionBody = document.getElementById("construction-body");
+
+    async function bootstrapConstructionSite() {
+      try {
+        const response = await fetch("/api/world/construction-site", {
+          method: "GET",
+          credentials: "include",
+        });
+
+        const payload = await response.json().catch(() => null);
+
+        if (isForbiddenAccessResponse(response, payload)) {
+          showForbiddenScreen();
+          return;
+        }
+
+        if (!response.ok || !payload?.ok) {
+          showForbiddenScreen();
+          return;
+        }
+
+        if (connectionStatus) {
+          connectionStatus.textContent = "Access granted";
+        }
+
+        if (constructionBody) {
+          constructionBody.classList.remove("hidden");
+        }
+      } catch (err) {
+        console.error("construction bootstrap failed", err);
+        showForbiddenScreen();
+      }
+    }
+
+    bootstrapConstructionSite();
+  </script>
+</body>
+</html>
