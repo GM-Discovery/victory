@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Workshop</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <script>
+    (async () => {
+      const forbiddenScreen = document.getElementById("forbidden-screen");
+
+      try {
+      const response = await fetch("/api/session/me", {
+        credentials: "include",
+      });
+      const payload = await response.json().catch(() => null);
+      const role = String(payload?.data?.role || "").toLowerCase();
+      const performer = ["producer", "director", "cast", "crew"].includes(role);
+      if (!payload?.signed_in || !performer) {
+        if (forbiddenScreen) forbiddenScreen.hidden = false;
+        return;
+      }
+
+        window.location.replace("/venues/the-cave/?mode=workshop");
+      } catch (err) {
+        if (forbiddenScreen) forbiddenScreen.hidden = false;
+        console.error(err);
+      }
+    })();
+  </script>
+</body>
+</html>

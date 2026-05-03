@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -239,6 +240,10 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 			filtered = append(filtered, el)
 
 		case "actor", "crew", "cast":
+			if strings.TrimSpace(strings.ToLower(el.Surface)) == "stage" {
+				filtered = append(filtered, el)
+				continue
+			}
 			if elementVisibilityForLayer(layerVisibility, el, "actor", false) {
 				filtered = append(filtered, el)
 			}

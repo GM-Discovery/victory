@@ -291,6 +291,107 @@ func TestKernel12IndexCardActionAuthorityAndBroadcast(t *testing.T) {
 	t.Log("KERNEL12_PROOF PASS")
 }
 
+func TestKernel13WorkshopPlacementAuthorityAndBroadcast(t *testing.T) {
+	oldPlace := storePlaceElementFunc
+	defer func() {
+		storePlaceElementFunc = oldPlace
+	}()
+
+	var placeReq actions.PlaceElementRequest
+	storePlaceElementFunc = func(ctx context.Context, pool *pgxpool.Pool, req actions.PlaceElementRequest) (*actions.StoredAction, error) {
+		placeReq = req
+		return &actions.StoredAction{
+			ID:        "action-card-place",
+			SessionID: req.SessionID,
+			MomentID:  13,
+			ActorID:   req.ActorID,
+			Actor: map[string]any{
+				"user_id":      req.ActorID,
+				"handle":       "director",
+				"display_name": "Director One",
+				"role":         "director",
+				"persona":      nil,
+			},
+			Persona: nil,
+			Type:    "act/place_element",
+			Target: map[string]any{
+				"kind":         "index_card",
+				"element_id":   req.ElementID,
+				"element_slug": req.ElementSlug,
+				"venue_slug":   req.VenueSlug,
+				"layer":        req.Layer,
+				"x":            req.X,
+				"y":            req.Y,
+			},
+			Payload: map[string]any{
+				"venue_slug": req.VenueSlug,
+				"layer":      req.Layer,
+				"x":          req.X,
+				"y":          req.Y,
+				"order":      req.Order,
+			},
+		}, nil
+	}
+
+	hub := NewHub()
+	receiver := &Client{Send: make(chan []byte, 8)}
+	hub.Add(receiver)
+	defer hub.Remove(receiver)
+
+	manager := &Client{UserID: "user-director", SessionID: "session-kernel13"}
+	handleCavePayload(hub, nil, manager, map[string]any{
+		"type":         "act/place_element",
+		"session_id":   "session-kernel13",
+		"actor_id":     "spoofed-user-id",
+		"element_id":   "card-1",
+		"element_slug": "index-card-director",
+		"venue_slug":   "the-cave",
+		"layer":        "tray",
+		"x":            0,
+		"y":            0,
+	})
+	broadcast := recvJSON(t, receiver.Send)
+	if broadcast["type"] != "action" {
+		t.Fatalf("expected action broadcast, got %v", broadcast["type"])
+	}
+	assertPersonaNull(t, broadcast["data"])
+	assertActionActor(t, broadcast["data"], manager.UserID, "director")
+	if placeReq.ActorID != manager.UserID {
+		t.Fatalf("expected place actor id %q, got %q", manager.UserID, placeReq.ActorID)
+	}
+	if placeReq.VenueSlug != "the-cave" || placeReq.Layer != "tray" {
+		t.Fatalf("expected placement venue/layer to be the-cave tray, got %+v", placeReq)
+	}
+	t.Logf("WORKSHOP PLACE TRAY %s", testJSON(broadcast))
+
+	handleCavePayload(hub, nil, manager, map[string]any{
+		"type":         "act/place_element",
+		"session_id":   "session-kernel13",
+		"actor_id":     "spoofed-user-id",
+		"element_id":   "card-1",
+		"element_slug": "index-card-director",
+		"venue_slug":   "the-cave",
+		"layer":        "stage",
+		"x":            0,
+		"y":            0,
+	})
+	broadcast = recvJSON(t, receiver.Send)
+	if broadcast["type"] != "action" {
+		t.Fatalf("expected action broadcast, got %v", broadcast["type"])
+	}
+	assertPersonaNull(t, broadcast["data"])
+	assertActionActor(t, broadcast["data"], manager.UserID, "director")
+	if got := actionVenueSlug(t, broadcast["data"]); got != "the-cave" {
+		t.Fatalf("expected venue slug the-cave, got %q", got)
+	}
+	if got := actionLayer(t, broadcast["data"]); got != "stage" {
+		t.Fatalf("expected stage placement, got %q", got)
+	}
+	t.Logf("WORKSHOP PLACE STAGE %s", testJSON(broadcast))
+
+	t.Log("KERNEL13_PROOF PASS")
+}
+
 func recvJSON(t *testing.T, ch <-chan []byte) map[string]any {
 	t.Helper()
 
@@ -364,6 +465,36 @@ func actionKind(t *testing.T, action any) string {
 	m, _ := action.(map[string]any)
 	payload, _ := m["payload"].(map[string]any)
 	if got, _ := payload["kind"].(string); got != "" {
+		return got
+	}
+	return ""
+}
+
+func actionVenueSlug(t *testing.T, action any) string {
+	t.Helper()
+
+	m, _ := action.(map[string]any)
+	target, _ := m["target"].(map[string]any)
+	if got, _ := target["venue_slug"].(string); got != "" {
+		return got
+	}
+	payload, _ := m["payload"].(map[string]any)
+	if got, _ := payload["venue_slug"].(string); got != "" {
+		return got
+	}
+	return ""
+}
+
+func actionLayer(t *testing.T, action any) string {
+	t.Helper()
+
+	m, _ := action.(map[string]any)
+	target, _ := m["target"].(map[string]any)
+	if got, _ := target["layer"].(string); got != "" {
+		return got
+	}
+	payload, _ := m["payload"].(map[string]any)
+	if got, _ := payload["layer"].(string); got != "" {
 		return got
 	}
 	return ""

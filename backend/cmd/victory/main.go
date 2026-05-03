@@ -90,6 +90,7 @@ func main() {
 	mux.HandleFunc("POST /api/messages", messages.HandleMessages(pool))
 	mux.HandleFunc("GET /api/messages/{id}", messages.HandleMessageByID(pool))
 	mux.HandleFunc("POST /api/note-cards", messages.HandleNoteCards(pool))
+	mux.HandleFunc("/api/index-cards", network.HandleIndexCardSave(hub, pool))
 
 	mux.HandleFunc("/api/map/visibility", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -122,6 +123,65 @@ func main() {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{
 				"ok":    false,
 				"error": "failed_to_resolve_visibility",
+			})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":   true,
+			"data": venues,
+		})
+	})
+
+	mux.HandleFunc("/api/workshop/venues", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
+				"ok":    false,
+				"error": "method_not_allowed",
+			})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		sessionCookie := ""
+		if c, err := r.Cookie("victory_session"); err == nil {
+			sessionCookie = c.Value
+		}
+
+		userID, err := access.CurrentUserIDFromRequest(ctx, pool, sessionCookie)
+		if err != nil || strings.TrimSpace(userID) == "" {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{
+				"ok":    false,
+				"error": "not_authenticated",
+			})
+			return
+		}
+
+		locationRole, err := access.CurrentLocationRole(ctx, pool, userID)
+		if err != nil {
+			log.Printf("workshop venue role lookup failed: %v", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"ok":    false,
+				"error": "failed_to_resolve_role",
+			})
+			return
+		}
+		if !access.IsPerformerRole(locationRole) {
+			writeJSON(w, http.StatusForbidden, map[string]any{
+				"ok":    false,
+				"error": "forbidden",
+			})
+			return
+		}
+
+		venues, err := access.ResolveWorkshopVenues(ctx, pool, userID)
+		if err != nil {
+			log.Printf("workshop venues failed: %v", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"ok":    false,
+				"error": "failed_to_resolve_workshop_venues",
 			})
 			return
 		}

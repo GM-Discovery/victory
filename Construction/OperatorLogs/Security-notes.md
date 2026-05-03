@@ -424,6 +424,24 @@ This is not a complete security system. It is the first enforceable boundary.
 - No images
 - No separate card universe
 
+## 15. Kernel 13 Workshop Placement Boundaries
+
+### Authority
+- `act/place_element` is server-authoritative.
+- Producer and director may place index cards.
+- Audience cannot create, send, or place cards.
+- Client-provided authority and ownership claims are ignored.
+
+### Venue Validation
+- Target venues must have `config.index_cards_enabled = true`.
+- The server rejects disabled or unknown venues.
+- Placement is tied to the authenticated session participant and server-known venue access.
+
+### Visibility
+- Workshop is the source surface.
+- Venue tray/backstage remains hidden from audience until the existing reveal system exposes it.
+- Stage/worldspace uses the same reveal/hide spine.
+
 ---
 
 ## Status

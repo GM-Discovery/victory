@@ -236,3 +236,21 @@ Implement `perform/speak` using the same action pipeline:
 - Saves append action history and refresh the Cave snapshot
 - Card content is capped at 2000 characters total
 - Backend restart is required for the new action handlers to appear
+
+## 2026-05-03 — Workshop to Venue Placement v1
+
+### Backend
+- Added `act/place_element` for index card placement
+- Added `backend/internal/actions/place.go` for server-side placement persistence
+- Added `GET /api/workshop/venues` for enabled target venues
+- Venue enablement now keys off `venues.config.index_cards_enabled`
+
+### Frontend
+- Added Workshop mode to the Cave card surface
+- Added Send to Venue dropdown and tray/stage placement buttons
+- Added a Workshop redirect page from the map
+
+### Operational Notes
+- Workshop is the source surface for cards
+- Tray/backstage and stage are distinct placement surfaces
+- Backend restart is required for placement and venue-list changes

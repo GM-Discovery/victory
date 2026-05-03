@@ -151,6 +151,11 @@ async function loadVenues() {
           return;
         }
 
+        if (venue.slug === "workshop") {
+          window.location.href = "/venues/workshop/";
+          return;
+        }
+
         if (venue.slug === "greenroom") {
           window.location.href = "/venues/greenroom/";
           return;

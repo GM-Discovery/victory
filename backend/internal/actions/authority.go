@@ -13,6 +13,7 @@ type ActionTarget struct {
 	Kind        string
 	ElementID   string
 	ElementSlug string
+	VenueSlug   string
 	Layer       string
 }
 
@@ -57,12 +58,15 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 		return Decision{Allowed: false, Reason: "not_session_participant"}, nil
 	}
 	if actionType != "act/reveal_element" && actionType != "act/hide_element" {
-		if actionType != "create/index_card" && actionType != "update/index_card" {
+		if actionType != "create/index_card" && actionType != "update/index_card" && actionType != "act/place_element" {
 			return Decision{Allowed: false, Reason: "unknown_action"}, nil
 		}
 	}
 
-	if actionType == "create/index_card" || actionType == "update/index_card" {
+	if actionType == "create/index_card" || actionType == "update/index_card" || actionType == "act/place_element" {
+		if actionType == "act/place_element" {
+			return canActPlaceElement(ctx, q, userID, sessionID, target)
+		}
 		return canActIndexCardInCave(ctx, q, userID, sessionID, target, actionType)
 	}
 
@@ -177,6 +181,67 @@ func canActIndexCardInCave(ctx context.Context, q actionQuerier, userID, session
 		if strings.TrimSpace(target.ElementID) == "" && strings.TrimSpace(target.ElementSlug) == "" {
 			return Decision{Allowed: false, Reason: "unknown_target"}, nil
 		}
+	}
+
+	if actionType == "act/place_element" {
+		if strings.TrimSpace(target.ElementID) == "" && strings.TrimSpace(target.ElementSlug) == "" {
+			return Decision{Allowed: false, Reason: "unknown_target"}, nil
+		}
+	}
+
+	switch normalizeActionRole(participantRole) {
+	case "producer", "director":
+		return Decision{Allowed: true, Reason: "allowed"}, nil
+	default:
+		return Decision{Allowed: false, Reason: "insufficient_role"}, nil
+	}
+}
+
+func canActPlaceElement(ctx context.Context, q actionQuerier, userID, sessionID string, target ActionTarget) (Decision, error) {
+	if strings.TrimSpace(target.VenueSlug) == "" {
+		return Decision{Allowed: false, Reason: "unknown_target"}, nil
+	}
+	if strings.TrimSpace(target.ElementID) == "" && strings.TrimSpace(target.ElementSlug) == "" {
+		return Decision{Allowed: false, Reason: "unknown_target"}, nil
+	}
+	if strings.TrimSpace(target.Layer) == "" {
+		return Decision{Allowed: false, Reason: "unknown_target"}, nil
+	}
+
+	var participantRole string
+	err := q.QueryRow(ctx, `
+		SELECT sp.role::text
+		FROM session_participants sp
+		WHERE sp.session_id = $1
+		  AND sp.user_id = $2
+		LIMIT 1
+	`, sessionID, userID).Scan(&participantRole)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Decision{Allowed: false, Reason: "not_session_participant"}, nil
+		}
+		return Decision{}, err
+	}
+
+	var venueSlug string
+	var enabled bool
+	err = q.QueryRow(ctx, `
+		SELECT
+			v.slug,
+			COALESCE((v.config ->> 'index_cards_enabled')::boolean, FALSE)
+		FROM venues v
+		WHERE v.slug = $1
+		LIMIT 1
+	`, target.VenueSlug).Scan(&venueSlug, &enabled)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Decision{Allowed: false, Reason: "unknown_target"}, nil
+		}
+		return Decision{}, err
+	}
+
+	if !enabled {
+		return Decision{Allowed: false, Reason: "policy_denied"}, nil
 	}
 
 	switch normalizeActionRole(participantRole) {

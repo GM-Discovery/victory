@@ -514,3 +514,28 @@ VALUES (
 
 ### Restart
 - Backend restart is required after the schema/bootstrap and route changes.
+
+## Kernel 13 Workshop Placement
+
+### Placement Model
+- Workshop mode is the source surface for card creation.
+- `act/place_element` is the server-authoritative placement action.
+- Venue trays/backstage are distinct from stage/worldspace.
+- Placement uses `x = 0`, `y = 0` until drag/drop exists.
+
+### Venue Enablement
+- `venues.config.index_cards_enabled` controls whether a venue appears in the send-to-venue list.
+- `GET /api/workshop/venues` returns the enabled targets the current user can access.
+- The Cave is enabled for index card placement.
+
+### Routes
+- Workshop entry: `/venues/workshop/`
+- Workshop mode on the Cave shell: `/venues/the-cave/?mode=workshop`
+
+### Operator Flow
+- Open Workshop from the map.
+- Create or edit an index card.
+- Select a target venue from the enabled list.
+- Send to venue tray.
+- Place on stage.
+- Reveal to audience through the existing visibility system.

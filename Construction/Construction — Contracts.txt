@@ -354,3 +354,11 @@ Index cards
 - no drag/drop
 - no images
 - no rich text
+
+Kernel 13 additions
+
+Workshop placement
+- workshop mode is the source surface for index cards
+- `act/place_element` moves cards into enabled venues
+- tray/backstage and stage are distinct placement surfaces
+- `venues.config.index_cards_enabled` controls send-to-venue targets

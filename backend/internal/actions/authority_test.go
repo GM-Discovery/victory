@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -37,14 +38,24 @@ func (r fakeRow) Scan(dest ...any) error {
 }
 
 type fakeQuerier struct {
-	role string
+	role         string
+	venueSlug    string
+	venueEnabled bool
 }
 
 func (q fakeQuerier) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
 	_ = ctx
-	_ = sql
 	_ = args
-	return fakeRow{values: []any{"the-cave", q.role}}
+	switch {
+	case strings.Contains(sql, "COALESCE((v.config ->> 'index_cards_enabled')::boolean, FALSE)"):
+		return fakeRow{values: []any{q.venueSlug, q.venueEnabled}}
+	case strings.Contains(sql, "FROM session_participants sp") && strings.Contains(sql, "SELECT sp.role::text"):
+		return fakeRow{values: []any{q.role}}
+	case strings.Contains(sql, "SELECT EXISTS"):
+		return fakeRow{values: []any{true}}
+	default:
+		return fakeRow{values: []any{"the-cave", q.role, true, "venue-1", "user-1"}}
+	}
 }
 
 func TestCanRoleRevealHide(t *testing.T) {
@@ -143,6 +154,39 @@ func TestCanActIndexCardCreateUpdate(t *testing.T) {
 			}
 			if decision.Allowed != tt.want {
 				t.Fatalf("CanAct update/index_card allowed=%v, want %v", decision.Allowed, tt.want)
+			}
+		})
+	}
+}
+
+func TestCanActPlaceElement(t *testing.T) {
+	tests := []struct {
+		name         string
+		role         string
+		venueEnabled bool
+		want         bool
+	}{
+		{name: "producer allowed", role: "producer", venueEnabled: true, want: true},
+		{name: "director allowed", role: "director", venueEnabled: true, want: true},
+		{name: "cast denied", role: "cast", venueEnabled: true, want: false},
+		{name: "crew denied", role: "crew", venueEnabled: true, want: false},
+		{name: "audience denied", role: "audience", venueEnabled: true, want: false},
+		{name: "venue disabled", role: "producer", venueEnabled: false, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			decision, err := CanAct(context.Background(), fakeQuerier{role: tt.role, venueSlug: "the-cave", venueEnabled: tt.venueEnabled}, "user-1", "act/place_element", "session-1", ActionTarget{
+				Kind:      "index_card",
+				ElementID: "card-1",
+				VenueSlug: "the-cave",
+				Layer:     "tray",
+			})
+			if err != nil {
+				t.Fatalf("CanAct act/place_element returned error: %v", err)
+			}
+			if decision.Allowed != tt.want {
+				t.Fatalf("CanAct act/place_element allowed=%v, want %v", decision.Allowed, tt.want)
 			}
 		})
 	}

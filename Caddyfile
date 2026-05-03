@@ -1,5 +1,6 @@
 victory.amurray.family {
 
+    reverse_proxy /api/index-cards localhost:8081
     reverse_proxy /api/* localhost:8081
     reverse_proxy /ws/* localhost:8081
 

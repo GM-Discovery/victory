@@ -40,6 +40,13 @@
       min-height: 320px;
     }
 
+    .stage-card-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 4;
+    }
+
     #speech {
       position: absolute;
       top: 24px;
@@ -56,6 +63,8 @@
       width: 128px;
       height: auto;
       image-rendering: pixelated;
+      position: relative;
+      z-index: 3;
     }
 
     .chat-panel {
@@ -292,6 +301,57 @@
       border-top: 1px solid rgba(255,255,255,0.1);
     }
 
+    .index-card-surface-group {
+      display: grid;
+      gap: 16px;
+      margin-top: 12px;
+    }
+
+    .index-card-section {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .index-card-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .index-card-section h3 {
+      margin: 0;
+      color: #ead7b2;
+      font-size: 0.95rem;
+    }
+
+    .index-card-pager {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      color: #c7bba5;
+      font-size: 0.9rem;
+    }
+
+    .index-card-pager button {
+      padding: 6px 10px;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      color: #f5efe4;
+      cursor: pointer;
+    }
+
+    .index-card-pager button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
     .index-card-heading {
       display: flex;
       align-items: baseline;
@@ -393,9 +453,44 @@
       font-size: 0.95rem;
     }
 
-    .index-card-tray {
+    .index-card-surface-group .index-card-tray {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 12px;
+      align-items: flex-start;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 2px 2px 10px;
+      min-height: 188px;
+      max-height: 188px;
+      scroll-snap-type: x proximity;
+    }
+
+    .index-card-surface-group .index-card-tray .index-card-item {
+      flex: 0 0 auto;
+      scroll-snap-align: start;
+    }
+
+    .index-card-surface-group .index-card-tray::-webkit-scrollbar {
+      height: 10px;
+    }
+
+    .index-card-surface-group .index-card-tray::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.16);
+      border-radius: 999px;
+    }
+
+    .index-card-surface-group .index-card-tray::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .index-card-history .index-card-tray {
       display: grid;
-      gap: 10px;
+      gap: 8px;
+      overflow: visible;
+      max-height: none;
+      min-height: 0;
+      padding-bottom: 0;
     }
 
     .index-card-empty {
@@ -405,63 +500,116 @@
 
     .index-card-item {
       display: grid;
-      gap: 8px;
-      padding: 12px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.08);
-      background: rgba(255, 255, 255, 0.04);
+      gap: 10px;
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(73, 53, 29, 0.36);
+      background: var(--card-accent, #d9c7a6);
+      color: #3a2a18;
       position: relative;
+      width: min(240px, calc(100vw - 40px));
+      max-width: 240px;
+      min-height: 156px;
+      box-shadow:
+        0 10px 24px rgba(0, 0, 0, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55);
+      overflow: hidden;
+    }
+
+    .index-card-item::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 16px;
+      box-shadow: inset 0 0 0 1px rgba(90, 66, 35, 0.14), inset 0 0 28px rgba(255, 255, 255, 0.08);
+      pointer-events: none;
     }
 
     .index-card-item.is-selected {
-      border-color: rgba(240, 207, 137, 0.42);
-      box-shadow: 0 0 0 1px rgba(240, 207, 137, 0.18) inset;
-    }
-
-    .index-card-swatch {
-      width: 48px;
-      height: 12px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.16);
+      border-color: rgba(240, 207, 137, 0.72);
+      box-shadow:
+        0 0 0 1px rgba(240, 207, 137, 0.26) inset,
+        0 12px 28px rgba(0, 0, 0, 0.2);
     }
 
     .index-card-front {
       font-weight: 700;
-      color: #fff2d0;
+      color: #2f2112;
       line-height: 1.35;
-    }
-
-    .index-card-meta {
-      color: #b9a78a;
-      font-size: 0.9rem;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
+      font-size: 1.02rem;
     }
 
     .index-card-back {
-      color: #f5efe4;
+      color: #3c2b17;
       font-size: 0.95rem;
       line-height: 1.45;
-      padding-top: 6px;
-      border-top: 1px solid rgba(255,255,255,0.08);
+      padding-top: 10px;
+      border-top: 1px solid rgba(90, 66, 35, 0.18);
       white-space: pre-wrap;
+      min-height: 48px;
     }
 
-    .index-card-mini {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
+    .index-card-face {
+      display: grid;
+      gap: 10px;
+      padding: 0;
     }
 
-    .index-card-mini button {
-      padding: 6px 10px;
+    .index-card-face[hidden] {
+      display: none;
+    }
+
+    .index-card-item {
+      cursor: pointer;
+    }
+
+    .stage-card-overlay .index-card-item {
+      position: absolute;
+      pointer-events: auto;
+      transform: translate(-50%, -50%) rotate(var(--card-tilt, 0deg));
+      box-shadow:
+        0 18px 30px rgba(0, 0, 0, 0.24),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    }
+
+    .index-card-flip-button {
+      position: absolute;
+      right: 8px;
+      bottom: 8px;
+      width: 28px;
+      height: 28px;
       border: 0;
       border-radius: 999px;
-      background: rgba(255,255,255,0.08);
-      color: #fff2d0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(58, 42, 24, 0.16);
+      color: rgba(58, 42, 24, 0.9);
       cursor: pointer;
+      z-index: 2;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    }
+
+    .index-card-flip-button:hover {
+      background: rgba(58, 42, 24, 0.24);
+    }
+
+    .index-card-place-button {
+      position: absolute;
+      left: 8px;
+      top: 8px;
+      padding: 5px 8px;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(58, 42, 24, 0.14);
+      color: rgba(58, 42, 24, 0.92);
+      font-size: 0.72rem;
+      cursor: pointer;
+      z-index: 2;
+    }
+
+    .index-card-place-button:hover {
+      background: rgba(58, 42, 24, 0.22);
     }
 
     .index-card-history {
@@ -483,6 +631,53 @@
       color: #f5efe4;
       border: 1px solid rgba(255,255,255,0.06);
       font-size: 0.92rem;
+    }
+
+    .index-card-workshop-tools {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(79, 107, 56, 0.14);
+      border: 1px solid rgba(79, 107, 56, 0.32);
+    }
+
+    .index-card-workshop-tools[hidden] {
+      display: none;
+    }
+
+    .index-card-workshop-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    #workshop-venue-select,
+    .index-card-workshop-row button {
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: #221c17;
+      color: white;
+      font: inherit;
+    }
+
+    .index-card-workshop-row button {
+      cursor: pointer;
+      background: #4f6b38;
+      border: 0;
+    }
+
+    .index-card-workshop-row button:hover {
+      background: #618645;
+    }
+
+    .index-card-workshop-status {
+      color: #c7bba5;
+      min-height: 1.2em;
+      font-size: 0.95rem;
     }
 
     #chat-input {
@@ -529,6 +724,7 @@
 
     <div class="stage">
       <div id="speech"></div>
+      <div id="stage-card-overlay" class="stage-card-overlay" aria-hidden="true"></div>
       <img id="fire" src="/assets/fire.jpg" alt="Fire" hidden />    </div>
 
     <div class="chat-panel">
@@ -561,6 +757,15 @@
           <h2>Index Cards</h2>
           <div id="index-card-count" class="index-card-count">0 cards</div>
         </div>
+        <div id="index-card-workshop-tools" class="index-card-workshop-tools" hidden>
+          <strong>Send to Venue</strong>
+          <div class="index-card-workshop-row">
+            <select id="workshop-venue-select" aria-label="Target venue"></select>
+            <button id="workshop-send-tray" type="button">Send to Venue Tray</button>
+            <button id="workshop-place-stage" type="button">Place on Stage</button>
+          </div>
+          <div id="workshop-placement-status" class="index-card-workshop-status"></div>
+        </div>
         <div class="index-card-toolbar">
           <label>
             Color
@@ -574,8 +779,46 @@
           <textarea id="index-card-back" placeholder="Back text"></textarea>
           <div id="index-card-status" class="index-card-status"></div>
         </div>
-        <div id="index-card-tray" class="index-card-tray">
-          <div class="index-card-empty">No cards visible yet.</div>
+        <div class="index-card-surface-group">
+          <div id="index-card-workshop-section" class="index-card-section">
+            <div class="index-card-section-header">
+              <h3>Workshop Tray</h3>
+              <div class="index-card-pager">
+                <button type="button" data-tray-prev="workshop" aria-label="Previous workshop tray page">←</button>
+                <span data-tray-page-label="workshop">1 / 1</span>
+                <button type="button" data-tray-next="workshop" aria-label="Next workshop tray page">→</button>
+              </div>
+            </div>
+            <div id="index-card-workshop-tray" class="index-card-tray">
+              <div class="index-card-empty">No workshop cards yet.</div>
+            </div>
+          </div>
+          <div id="index-card-venue-section" class="index-card-section">
+            <div class="index-card-section-header">
+              <h3>Venue Tray / Backstage</h3>
+              <div class="index-card-pager">
+                <button type="button" data-tray-prev="venue" aria-label="Previous venue tray page">←</button>
+                <span data-tray-page-label="venue">1 / 1</span>
+                <button type="button" data-tray-next="venue" aria-label="Next venue tray page">→</button>
+              </div>
+            </div>
+            <div id="index-card-venue-tray" class="index-card-tray">
+              <div class="index-card-empty">No venue tray cards yet.</div>
+            </div>
+          </div>
+          <div id="index-card-stage-section" class="index-card-section">
+            <div class="index-card-section-header">
+              <h3>Stage / Worldspace</h3>
+              <div class="index-card-pager">
+                <button type="button" data-tray-prev="stage" aria-label="Previous stage page">←</button>
+                <span data-tray-page-label="stage">1 / 1</span>
+                <button type="button" data-tray-next="stage" aria-label="Next stage page">→</button>
+              </div>
+            </div>
+            <div id="index-card-stage" class="index-card-tray">
+              <div class="index-card-empty">No staged cards yet.</div>
+            </div>
+          </div>
         </div>
         <div class="index-card-history">
           <h3>Save History</h3>
@@ -633,7 +876,17 @@
   const noteCardClose = document.getElementById("note-card-close");
   const noteCardStatus = document.getElementById("note-card-status");
   const indexCardPanel = document.getElementById("index-card-panel");
-  const indexCardTray = document.getElementById("index-card-tray");
+  const indexCardWorkshopTools = document.getElementById("index-card-workshop-tools");
+  const workshopVenueSelect = document.getElementById("workshop-venue-select");
+  const workshopSendTray = document.getElementById("workshop-send-tray");
+  const workshopPlaceStage = document.getElementById("workshop-place-stage");
+  const workshopPlacementStatus = document.getElementById("workshop-placement-status");
+  const indexCardWorkshopTray = document.getElementById("index-card-workshop-tray");
+  const indexCardVenueTray = document.getElementById("index-card-venue-tray");
+  const indexCardStage = document.getElementById("index-card-stage");
+  const indexCardWorkshopSection = document.getElementById("index-card-workshop-section");
+  const indexCardVenueSection = document.getElementById("index-card-venue-section");
+  const indexCardStageSection = document.getElementById("index-card-stage-section");
   const indexCardHistory = document.getElementById("index-card-history");
   const indexCardFront = document.getElementById("index-card-front");
   const indexCardBack = document.getElementById("index-card-back");
@@ -645,9 +898,18 @@
   const selectionLayer = document.getElementById("selection-layer");
   const connectionStatus = document.getElementById("connection-status");
   const speechEl = document.getElementById("speech");
+  const stageCardOverlay = document.getElementById("stage-card-overlay");
   const fireEl = document.getElementById("fire");
   const presenceList = document.getElementById("presence-list");
   const presenceCount = document.getElementById("presence-count");
+  const isWorkshopMode = new URLSearchParams(window.location.search).get("mode") === "workshop";
+  if (isWorkshopMode) {
+    const headerTitle = document.querySelector(".header h1");
+    if (headerTitle) {
+      headerTitle.textContent = "Workshop";
+    }
+    document.title = "Workshop";
+  }
 
   const selectedLabel = document.getElementById("selected-label");
   const revealSelectedBtn = document.getElementById("reveal-selected");
@@ -663,6 +925,16 @@
   let presenceUsers = {};
   let latestSnapshotElements = [];
   let latestSnapshotActions = [];
+  let workshopVenues = [];
+  let pendingIndexCardSave = null;
+  let pendingIndexCardSaveTimer = null;
+  const indexCardFlipState = new Map();
+  const indexCardTrayPage = {
+    workshop: 0,
+    venue: 0,
+    stage: 0,
+  };
+  const INDEX_CARD_PAGE_SIZE = 8;
   const noteCardRoleOrder = {
     director: 0,
     cast: 1,
@@ -858,6 +1130,63 @@
     }
   }
 
+  function clearPendingIndexCardSave() {
+    pendingIndexCardSave = null;
+    if (pendingIndexCardSaveTimer) {
+      clearTimeout(pendingIndexCardSaveTimer);
+      pendingIndexCardSaveTimer = null;
+    }
+  }
+
+  function indexCardMatchesPendingSave(card, pending) {
+    if (!card || !pending) return false;
+
+    const front = indexCardTextFromData(card, "front_text");
+    const back = indexCardTextFromData(card, "back_text");
+    const color = indexCardColorFromData(card);
+
+    if (String(front) !== String(pending.front_text)) return false;
+    if (String(back) !== String(pending.back_text)) return false;
+    if (String(color).toLowerCase() !== String(pending.color).toLowerCase()) return false;
+
+    return true;
+  }
+
+  function finalizePendingIndexCardSave(savedCard) {
+    if (!pendingIndexCardSave) return;
+
+    clearPendingIndexCardSave();
+
+    if (savedCard) {
+      loadIndexCardEditor(savedCard);
+      setIndexCardStatus("Card saved.");
+      return;
+    }
+
+    setIndexCardStatus("Save not confirmed. Please try again.");
+  }
+
+  async function confirmPendingIndexCardSaveFromSnapshot() {
+    if (!pendingIndexCardSave) return;
+
+    await refreshSnapshot();
+    if (!pendingIndexCardSave) return;
+
+    const pending = pendingIndexCardSave;
+    const card = latestSnapshotElements.find((el) => {
+      if (!el || String(el.element_type || "").toLowerCase() !== "index_card") return false;
+      if (pending.type === "update/index_card") {
+        const pendingId = String(pending.element_id || "");
+        const pendingSlug = String(pending.element_slug || "");
+        if (pendingId && String(el.element_id || "") === pendingId) return true;
+        if (pendingSlug && String(el.slug || "") === pendingSlug) return true;
+      }
+      return indexCardMatchesPendingSave(el, pending);
+    });
+
+    finalizePendingIndexCardSave(card || null);
+  }
+
   function clearIndexCardEditor() {
     selectedIndexCard = null;
     selectedElement = null;
@@ -895,10 +1224,8 @@
     refreshIndexCardPanels();
   }
 
-  function renderIndexCardTray(elements) {
-    if (!indexCardTray) return;
-
-    const cards = (Array.isArray(elements) ? elements : [])
+  function sortIndexCards(elements) {
+    return (Array.isArray(elements) ? elements : [])
       .filter((el) => String(el?.element_type || "").toLowerCase() === "index_card")
       .sort((a, b) => {
         const updatedA = String(a?.data?.updated_at || a?.data?.created_at || "");
@@ -906,48 +1233,103 @@
         if (updatedA !== updatedB) return updatedB.localeCompare(updatedA);
         return String(a?.name || a?.slug || "").localeCompare(String(b?.name || b?.slug || ""));
       });
+  }
 
-    if (indexCardCount) {
-      indexCardCount.textContent = `${cards.length} card${cards.length === 1 ? "" : "s"}`;
+  function indexCardSurface(card) {
+    const surface = String(card?.surface || card?.data?.surface || "tray").trim().toLowerCase();
+    if (surface === "workshop") return "tray";
+    return surface;
+  }
+
+  function isIndexCardFlipped(cardId) {
+    return !!(cardId && indexCardFlipState.get(cardId));
+  }
+
+  function setIndexCardFlipped(cardId, flipped) {
+    if (!cardId) return;
+    if (flipped) {
+      indexCardFlipState.set(cardId, true);
+    } else {
+      indexCardFlipState.delete(cardId);
     }
+  }
+
+  function trayPageKey(container, fallback) {
+    if (container?.dataset?.trayKey) {
+      return container.dataset.trayKey;
+    }
+    if (fallback) return fallback;
+    return "tray";
+  }
+
+  function setTrayPage(trayKey, nextPage) {
+    indexCardTrayPage[trayKey] = Math.max(0, Number(nextPage) || 0);
+  }
+
+  function trayPageCount(cards) {
+    return Math.max(1, Math.ceil((Array.isArray(cards) ? cards.length : 0) / INDEX_CARD_PAGE_SIZE));
+  }
+
+  function updateTrayPager(trayKey, page, totalPages) {
+    const label = document.querySelector(`[data-tray-page-label="${trayKey}"]`);
+    const prev = document.querySelector(`[data-tray-prev="${trayKey}"]`);
+    const next = document.querySelector(`[data-tray-next="${trayKey}"]`);
+
+    if (label) {
+      label.textContent = `${page + 1} / ${totalPages}`;
+    }
+    if (prev) {
+      prev.disabled = page <= 0;
+    }
+    if (next) {
+      next.disabled = page + 1 >= totalPages;
+    }
+  }
+
+  function renderIndexCardSurface(container, cards, emptyText, trayKey = "tray") {
+    if (!container) return;
 
     if (cards.length === 0) {
-      indexCardTray.innerHTML = `<div class="index-card-empty">No cards visible yet.</div>`;
+      container.innerHTML = `<div class="index-card-empty">${escapeHtml(emptyText)}</div>`;
+      updateTrayPager(trayKey, 0, 1);
       return;
     }
 
-    indexCardTray.innerHTML = cards
+    const totalPages = trayPageCount(cards);
+    const currentPage = Math.min(indexCardTrayPage[trayKey] || 0, totalPages - 1);
+    setTrayPage(trayKey, currentPage);
+    updateTrayPager(trayKey, currentPage, totalPages);
+
+    const start = currentPage * INDEX_CARD_PAGE_SIZE;
+    const visibleCards = cards.slice(start, start + INDEX_CARD_PAGE_SIZE);
+
+    container.innerHTML = visibleCards
       .map((card) => {
         const front = escapeHtml(indexCardTextFromData(card, "front_text"));
         const back = escapeHtml(indexCardTextFromData(card, "back_text"));
         const color = escapeHtml(indexCardColorFromData(card));
-        const createdBy = escapeHtml(displayNameFromCard(card));
-        const createdRole = roleBadgeHtml(String(card?.data?.created_by_role || ""));
-        const updatedAt = escapeHtml(String(card?.data?.updated_at || card?.data?.created_at || ""));
         const selected = selectedIndexCard && selectedIndexCard.element_id === card.element_id ? " is-selected" : "";
+        const surfaceLabel = escapeHtml(indexCardSurface(card));
+        const flipped = isIndexCardFlipped(card.element_id);
         return `
-          <div class="index-card-item${selected}" data-card-id="${escapeHtml(card.element_id || "")}">
-            <div class="index-card-swatch" style="background:${color}"></div>
-            <div class="index-card-front">${front || "Untitled card"}</div>
-            <div class="index-card-meta">
-              <span>${escapeHtml(card.name || card.slug || "Index Card")}</span>
-              <span>by ${createdBy}</span>
-              ${createdRole}
-              ${updatedAt ? `<span>${updatedAt}</span>` : ""}
+          <div class="index-card-item${selected}" data-card-id="${escapeHtml(card.element_id || "")}" style="--card-accent:${color};">
+            <div class="index-card-face index-card-face--front" ${flipped ? "hidden" : ""}>
+              <div class="index-card-front">${front || "Untitled card"}</div>
             </div>
-            <div class="index-card-mini">
-              <button type="button" data-card-select="${escapeHtml(card.element_id || "")}">Select</button>
-              <button type="button" data-card-back="${escapeHtml(card.element_id || "")}">View Back</button>
+            <div class="index-card-face index-card-face--back" ${flipped ? "" : "hidden"}>
+              <div class="index-card-back">${back || "No back text yet."}</div>
             </div>
-            <div class="index-card-back" hidden>${back || "No back text yet."}</div>
+            <button type="button" class="index-card-flip-button" data-card-back="${escapeHtml(card.element_id || "")}" aria-label="${flipped ? "Show front" : "Show back"}">${flipped ? "↺" : "↩"}</button>
+            ${canManageIndexCards(currentRole) && surfaceLabel !== "stage" ? `<button type="button" class="index-card-place-button" data-card-stage="${escapeHtml(card.element_id || "")}">Place on Stage</button>` : ""}
           </div>
         `;
       })
       .join("");
 
-    for (const cardEl of indexCardTray.querySelectorAll("[data-card-select]")) {
-      cardEl.addEventListener("click", () => {
-        const cardId = cardEl.getAttribute("data-card-select");
+    for (const cardEl of container.querySelectorAll(".index-card-item")) {
+      cardEl.addEventListener("click", (event) => {
+        if (event.target.closest("button")) return;
+        const cardId = cardEl.getAttribute("data-card-id");
         const card = cards.find((item) => item.element_id === cardId);
         if (card) {
           loadIndexCardEditor(card);
@@ -955,14 +1337,100 @@
       });
     }
 
-    for (const flipButton of indexCardTray.querySelectorAll("[data-card-back]")) {
+    for (const flipButton of container.querySelectorAll("[data-card-back]")) {
       flipButton.addEventListener("click", () => {
         const cardId = flipButton.getAttribute("data-card-back");
-        const card = Array.from(indexCardTray.querySelectorAll(".index-card-item")).find((item) => item.dataset.cardId === cardId);
+        const card = Array.from(container.querySelectorAll(".index-card-item")).find((item) => item.dataset.cardId === cardId);
         if (!card) return;
-        const back = card.querySelector(".index-card-back");
-        if (!back) return;
-        back.hidden = !back.hidden;
+        const frontFace = card.querySelector(".index-card-face--front");
+        const backFace = card.querySelector(".index-card-face--back");
+        const nextFlipped = !isIndexCardFlipped(cardId);
+        setIndexCardFlipped(cardId, nextFlipped);
+        if (frontFace) frontFace.hidden = nextFlipped;
+        if (backFace) backFace.hidden = !nextFlipped;
+        flipButton.textContent = nextFlipped ? "↺" : "↩";
+      });
+    }
+
+    for (const stageButton of container.querySelectorAll("[data-card-stage]")) {
+      stageButton.addEventListener("click", () => {
+        const cardId = stageButton.getAttribute("data-card-stage");
+        const card = visibleCards.find((item) => item.element_id === cardId);
+        if (card) {
+          placeIndexCardOnStage(card);
+        }
+      });
+    }
+  }
+
+  function renderStageIndexCards(container, cards) {
+    if (!container) return;
+
+    if (cards.length === 0) {
+      container.innerHTML = "";
+      return;
+    }
+
+    const mid = (cards.length - 1) / 2;
+    const baseLeft = 50;
+    const baseTop = 48;
+    const spreadX = 15;
+    const spreadY = 9;
+
+    container.innerHTML = cards
+      .map((card, index) => {
+        const front = escapeHtml(indexCardTextFromData(card, "front_text"));
+        const back = escapeHtml(indexCardTextFromData(card, "back_text"));
+        const color = escapeHtml(indexCardColorFromData(card));
+        const flipped = isIndexCardFlipped(card.element_id);
+        const pos = card?.position || {};
+        const order = Number(pos.order || index);
+        const left = baseLeft + ((index - mid) * spreadX) + Number(pos.x || 0) * 2;
+        const top = baseTop + Math.floor(index / 2) * spreadY + Number(pos.y || 0) * 2;
+        const tilt = Math.max(-10, Math.min(10, (index % 2 === 0 ? -1 : 1) * (4 + order)));
+        const zIndex = 20 + index;
+        return `
+          <div
+            class="index-card-item"
+            data-card-id="${escapeHtml(card.element_id || "")}"
+            data-surface="stage"
+            style="--card-accent:${color}; left:${left}%; top:${top}%; --card-tilt:${tilt}deg; z-index:${zIndex};"
+          >
+            <div class="index-card-face index-card-face--front" ${flipped ? "hidden" : ""}>
+              <div class="index-card-front">${front || "Untitled card"}</div>
+            </div>
+            <div class="index-card-face index-card-face--back" ${flipped ? "" : "hidden"}>
+              <div class="index-card-back">${back || "No back text yet."}</div>
+            </div>
+            <button type="button" class="index-card-flip-button" data-card-back="${escapeHtml(card.element_id || "")}" aria-label="${flipped ? "Show front" : "Show back"}">${flipped ? "↺" : "↩"}</button>
+          </div>
+        `;
+      })
+      .join("");
+
+    for (const cardEl of container.querySelectorAll(".index-card-item")) {
+      cardEl.addEventListener("click", (event) => {
+        if (event.target.closest("button")) return;
+        const cardId = cardEl.getAttribute("data-card-id");
+        const card = cards.find((item) => item.element_id === cardId);
+        if (card) {
+          loadIndexCardEditor(card);
+        }
+      });
+    }
+
+    for (const flipButton of container.querySelectorAll("[data-card-back]")) {
+      flipButton.addEventListener("click", () => {
+        const cardId = flipButton.getAttribute("data-card-back");
+        const card = Array.from(container.querySelectorAll(".index-card-item")).find((item) => item.dataset.cardId === cardId);
+        if (!card) return;
+        const frontFace = card.querySelector(".index-card-face--front");
+        const backFace = card.querySelector(".index-card-face--back");
+        const nextFlipped = !isIndexCardFlipped(cardId);
+        setIndexCardFlipped(cardId, nextFlipped);
+        if (frontFace) frontFace.hidden = nextFlipped;
+        if (backFace) backFace.hidden = !nextFlipped;
+        flipButton.textContent = nextFlipped ? "↺" : "↩";
       });
     }
   }
@@ -996,7 +1464,35 @@
   }
 
   function refreshIndexCardPanels() {
-    renderIndexCardTray(latestSnapshotElements);
+    const cards = sortIndexCards(latestSnapshotElements);
+    const workshopCards = cards.filter((card) => indexCardSurface(card) === "workshop");
+    const venueCards = cards.filter((card) => indexCardSurface(card) === "tray");
+    const stageCards = cards
+      .filter((card) => indexCardSurface(card) === "stage")
+      .sort((a, b) => {
+        const orderA = Number(a?.position?.order ?? a?.data?.position?.order ?? 0);
+        const orderB = Number(b?.position?.order ?? b?.data?.position?.order ?? 0);
+        if (orderA !== orderB) return orderA - orderB;
+        const updatedA = String(a?.data?.updated_at || a?.data?.created_at || "");
+        const updatedB = String(b?.data?.updated_at || b?.data?.created_at || "");
+        if (updatedA !== updatedB) return updatedA.localeCompare(updatedB);
+        return String(a?.name || a?.slug || "").localeCompare(String(b?.name || b?.slug || ""));
+      });
+
+    if (indexCardCount) {
+      indexCardCount.textContent = `${cards.length} card${cards.length === 1 ? "" : "s"}`;
+    }
+
+    if (indexCardWorkshopSection) {
+      indexCardWorkshopSection.hidden = !isWorkshopMode;
+    }
+    if (indexCardWorkshopTools) {
+      indexCardWorkshopTools.hidden = !isWorkshopMode;
+    }
+    renderIndexCardSurface(indexCardWorkshopTray, workshopCards, "No workshop cards yet.", "workshop");
+    renderIndexCardSurface(indexCardVenueTray, venueCards, "No venue tray cards yet.", "venue");
+    renderIndexCardSurface(indexCardStage, stageCards, "No staged cards yet.", "stage");
+    renderStageIndexCards(stageCardOverlay, stageCards);
     renderIndexCardHistory(latestSnapshotActions);
   }
 
@@ -1006,6 +1502,59 @@
       back_text: String(indexCardBack?.value || "").trim(),
       color: String(indexCardColor?.value || "#d9c7a6").trim() || "#d9c7a6",
     };
+  }
+
+  function setWorkshopPlacementStatus(text) {
+    if (workshopPlacementStatus) {
+      workshopPlacementStatus.textContent = text;
+    }
+  }
+
+  async function loadWorkshopVenues() {
+    if (!workshopVenueSelect) return;
+
+    workshopVenueSelect.innerHTML = `<option value="">Loading venues...</option>`;
+
+    try {
+      const response = await fetch("/api/workshop/venues", {
+        credentials: "include",
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
+
+      workshopVenues = Array.isArray(payload.data) ? payload.data : [];
+      workshopVenueSelect.innerHTML = "";
+
+      if (workshopVenues.length === 0) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "No enabled venues";
+        workshopVenueSelect.appendChild(option);
+        workshopVenueSelect.disabled = true;
+        return;
+      }
+
+      workshopVenueSelect.disabled = false;
+      for (const venue of workshopVenues) {
+        const option = document.createElement("option");
+        option.value = venue.slug || "";
+        option.textContent = venue.name || venue.slug || "Unknown Venue";
+        workshopVenueSelect.appendChild(option);
+      }
+
+      const caveOption = workshopVenues.find((venue) => venue.slug === "the-cave");
+      if (caveOption) {
+        workshopVenueSelect.value = caveOption.slug;
+      }
+    } catch (err) {
+      workshopVenueSelect.innerHTML = `<option value="">Unavailable</option>`;
+      workshopVenueSelect.disabled = true;
+      console.error("loadWorkshopVenues failed", err);
+      setWorkshopPlacementStatus(err.message || String(err));
+    }
   }
 
   function sendIndexCardAction(type) {
@@ -1020,6 +1569,7 @@
     }
 
     const payload = {
+      action_type: type,
       front_text: draft.front_text,
       back_text: draft.back_text,
       color: draft.color,
@@ -1035,17 +1585,105 @@
       payload.element_slug = selectedIndexCard.slug || "";
     }
 
+    pendingIndexCardSave = {
+      type,
+      front_text: draft.front_text,
+      back_text: draft.back_text,
+      color: draft.color,
+      element_id: selectedIndexCard?.element_id || "",
+      element_slug: selectedIndexCard?.slug || "",
+    };
     setIndexCardStatus("Saving...");
-    if (!sendAction(type, payload)) {
-      setIndexCardStatus("Unable to send card action.");
+    fetch("/api/index-cards", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    })
+      .then((response) => response.json().catch(() => ({})).then((result) => ({ response, result })))
+      .then(async ({ response, result }) => {
+        const errorText = result?.data?.error || result?.error || "";
+
+        if (response.status === 401 || response.status === 403 || errorText === "not_authenticated" || errorText === "forbidden" || errorText === "not_session_participant") {
+          clearPendingIndexCardSave();
+          setIndexCardStatus("Save failed: access denied.");
+          return;
+        }
+
+        if (!response.ok || !result?.ok) {
+          throw new Error(errorText || `HTTP ${response.status}`);
+        }
+
+        await confirmPendingIndexCardSaveFromSnapshot();
+        if (pendingIndexCardSave) {
+          clearPendingIndexCardSave();
+          setIndexCardStatus("Card saved.");
+        }
+      })
+      .catch((err) => {
+        console.error("index card save failed", err);
+        clearPendingIndexCardSave();
+        setIndexCardStatus(`Save failed: ${err.message || String(err)}`);
+      });
+  }
+
+  function sendWorkshopPlacement(layer) {
+    if (!selectedIndexCard?.element_id) {
+      setWorkshopPlacementStatus("Select a card first.");
       return;
     }
 
-    if (type === "create/index_card") {
-      setIndexCardStatus("Card creation sent.");
-    } else {
-      setIndexCardStatus("Card update sent.");
+    const venueSlug = String(workshopVenueSelect?.value || "").trim();
+    if (!venueSlug) {
+      setWorkshopPlacementStatus("Choose a venue first.");
+      return;
     }
+
+    setWorkshopPlacementStatus("Placing...");
+    const ok = sendAction("act/place_element", {
+      element_id: selectedIndexCard.element_id,
+      element_slug: selectedIndexCard.slug || "",
+      venue_slug: venueSlug,
+      layer,
+      x: 0,
+      y: 0,
+      order: 0,
+    });
+
+    if (!ok) {
+      setWorkshopPlacementStatus("Unable to place element.");
+      return;
+    }
+
+    setWorkshopPlacementStatus(layer === "stage" ? "Placement sent to stage." : "Placement sent to venue tray.");
+  }
+
+  function placeIndexCardOnStage(card) {
+    if (!card?.element_id) return;
+    if (!canManageIndexCards(currentRole)) {
+      setIndexCardStatus("Only producers and directors can place cards on stage.");
+      return;
+    }
+
+    setIndexCardStatus("Placing on stage...");
+    const ok = sendAction("act/place_element", {
+      element_id: card.element_id,
+      element_slug: card.slug || "",
+      venue_slug: "the-cave",
+      layer: "stage",
+      x: 0,
+      y: 0,
+      order: 0,
+    });
+
+    if (!ok) {
+      setIndexCardStatus("Unable to place card on stage.");
+      return;
+    }
+
+    setIndexCardStatus("Placement sent to stage.");
   }
 
   function setPresenceUsers(users) {
@@ -1147,12 +1785,24 @@
 
   function displayNameFromCard(card) {
     const data = card?.data || {};
-    return (
-      data.created_by_display_name ||
-      data.created_by_handle ||
-      String(data.created_by || "").slice(0, 8) ||
-      "Unknown Participant"
-    );
+    const displayName = String(data.created_by_display_name || "").trim();
+    const handle = String(data.created_by_handle || "").trim();
+    const createdBy = String(data.created_by || "").trim();
+    const placeholderNames = new Set(["web user", "friend", "unknown participant"]);
+
+    if (displayName && !placeholderNames.has(displayName.toLowerCase())) {
+      return displayName;
+    }
+
+    if (handle) {
+      return handle
+        .split("_")
+        .map((part) => part ? part.charAt(0).toUpperCase() + part.slice(1) : "")
+        .filter(Boolean)
+        .join(" ");
+    }
+
+    return createdBy ? createdBy.slice(0, 8) : "Unknown Participant";
   }
 
   function addChatMessage(text, time = formatTime(), source = "local") {
@@ -1252,6 +1902,9 @@
     if (indexCardColor) indexCardColor.disabled = !canEditCards;
     if (indexCardSave) indexCardSave.disabled = !canEditCards;
     if (indexCardNew) indexCardNew.disabled = !canEditCards;
+    if (workshopVenueSelect) workshopVenueSelect.disabled = !canEditCards || workshopVenueSelect.options.length === 0;
+    if (workshopSendTray) workshopSendTray.disabled = !canEditCards;
+    if (workshopPlaceStage) workshopPlaceStage.disabled = !canEditCards;
     updateSelectionUI();
   }
 
@@ -1388,10 +2041,18 @@
 
     ws.addEventListener("close", () => {
       setConnectionStatus("Disconnected");
+      if (pendingIndexCardSave) {
+        clearPendingIndexCardSave();
+        setIndexCardStatus("Save failed: connection closed.");
+      }
     });
 
     ws.addEventListener("error", () => {
       setConnectionStatus("Connection error");
+      if (pendingIndexCardSave) {
+        clearPendingIndexCardSave();
+        setIndexCardStatus("Save failed: connection error.");
+      }
     });
 
     ws.addEventListener("message", async (event) => {
@@ -1444,12 +2105,37 @@
 
         if (actionType === "act/reveal_element" || actionType === "act/hide_element" || actionType === "create/index_card" || actionType === "update/index_card") {
           await refreshSnapshot();
+          if (
+            pendingIndexCardSave &&
+            actionType === pendingIndexCardSave.type &&
+            String(action?.actor?.user_id || action?.actor_id || "") === String(currentActorId || "")
+          ) {
+            const targetId = String(action?.target?.element_id || "");
+            const targetSlug = String(action?.target?.element_slug || "");
+            const savedCard = latestSnapshotElements.find((el) =>
+              el &&
+              (
+                (targetId && el.element_id === targetId) ||
+                (targetSlug && el.slug === targetSlug)
+              )
+            );
+            finalizePendingIndexCardSave(savedCard || null);
+          }
+          return;
+        }
+
+        if (actionType === "act/place_element") {
+          await refreshSnapshot();
           return;
         }
       }
 
       if (msg.type === "error") {
         const errorText = msg.error || "action_denied";
+        if (pendingIndexCardSave) {
+          clearPendingIndexCardSave();
+          setIndexCardStatus(`Save failed: ${errorText}`);
+        }
         setConnectionStatus(`Action denied: ${errorText}`);
         addChatMessage(`Action denied: ${errorText}`, formatTime(), "system");
         console.error("WS error:", msg.error);
@@ -1573,12 +2259,20 @@
       clearSelectedElement();
       updateSelectionUI();
 
+      if (isWorkshopMode) {
+        await loadWorkshopVenues();
+      }
+
       await joinCave();
       if (!currentSessionId || !currentActorId) return;
       connectWS();
       await refreshSnapshot();
     } catch (err) {
       setConnectionStatus(err.message || String(err));
+      if (pendingIndexCardSave) {
+        clearPendingIndexCardSave();
+        setIndexCardStatus(`Save failed: ${err.message || String(err)}`);
+      }
       console.error(err);
     }
   }
@@ -1609,6 +2303,25 @@
 
     clearIndexCardEditor();
   });
+
+  workshopSendTray?.addEventListener("click", () => {
+    sendWorkshopPlacement("tray");
+  });
+
+  workshopPlaceStage?.addEventListener("click", () => {
+    sendWorkshopPlacement("stage");
+  });
+
+  for (const pagerButton of document.querySelectorAll("[data-tray-prev], [data-tray-next]")) {
+    pagerButton.addEventListener("click", () => {
+      const trayKey = pagerButton.getAttribute("data-tray-prev") || pagerButton.getAttribute("data-tray-next");
+      if (!trayKey) return;
+      const current = indexCardTrayPage[trayKey] || 0;
+      const delta = pagerButton.hasAttribute("data-tray-prev") ? -1 : 1;
+      indexCardTrayPage[trayKey] = Math.max(0, current + delta);
+      refreshIndexCardPanels();
+    });
+  }
 
   chatInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {

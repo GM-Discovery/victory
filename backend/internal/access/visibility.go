@@ -132,7 +132,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 			FROM venues v
 			JOIN lots l ON l.id = v.lot_id
 			JOIN location_memberships lm ON lm.location_id = l.location_id
-			WHERE v.slug IN ('audition-hall', 'greenroom', 'trailers')
+			WHERE v.slug IN ('audition-hall', 'greenroom', 'trailers', 'workshop')
 			  AND lm.user_id = $1
 			  AND lm.active = TRUE
 			  AND lm.role IN ('producer', 'director', 'cast', 'crew')
@@ -220,4 +220,35 @@ func UserCanAccessVenueSlug(ctx context.Context, pool *pgxpool.Pool, userID, slu
 	}
 
 	return false, nil
+}
+
+func ResolveWorkshopVenues(ctx context.Context, pool *pgxpool.Pool, userID string) ([]VisibleVenue, error) {
+	rows, err := pool.Query(ctx, `
+		SELECT v.slug, v.name, v.kind, 'index_cards_enabled'::text AS visible_because
+		FROM venues v
+		WHERE COALESCE((v.config ->> 'index_cards_enabled')::boolean, FALSE) = TRUE
+		ORDER BY v.slug
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []VisibleVenue
+	for rows.Next() {
+		var v VisibleVenue
+		if err := rows.Scan(&v.Slug, &v.Name, &v.Kind, &v.VisibleBecause); err != nil {
+			return nil, err
+		}
+		allowed, err := UserCanAccessVenueSlug(ctx, pool, userID, v.Slug)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			continue
+		}
+		out = append(out, v)
+	}
+
+	return out, rows.Err()
 }

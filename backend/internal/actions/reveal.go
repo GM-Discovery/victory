@@ -225,9 +225,9 @@ func resolveRevealTarget(ctx context.Context, tx pgx.Tx, sessionID, elementID, e
 func isRevealableElement(elementType, surface, slug string) bool {
 	elementType = strings.TrimSpace(strings.ToLower(elementType))
 	surface = strings.TrimSpace(strings.ToLower(surface))
-	slug = strings.TrimSpace(strings.ToLower(slug))
+	_ = strings.TrimSpace(strings.ToLower(slug))
 
-	if surface == "" || slug != "first-fire" {
+	if surface == "" {
 		return false
 	}
 

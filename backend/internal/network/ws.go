@@ -38,6 +38,7 @@ var storeSpeakFunc = actions.StoreSpeak
 var storeRevealFunc = actions.StoreReveal
 var storeIndexCardCreateFunc = actions.StoreIndexCardCreate
 var storeIndexCardUpdateFunc = actions.StoreIndexCardUpdate
+var storePlaceElementFunc = actions.StorePlaceElement
 
 func ServeCaveWS(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -329,6 +330,68 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 					"error": err.Error(),
 				})
 				log.Printf("action store failed: user=%s session=%s action=%s target=%s err=%v", actorID, sessionID, payload["type"], elementSlug, err)
+				return
+			}
+
+			msgOut, _ := json.Marshal(map[string]any{
+				"type": "action",
+				"data": storedAction,
+			})
+			hub.Broadcast(msgOut)
+		}
+
+	case "act/place_element":
+		{
+			sessionID, _ := payload["session_id"].(string)
+			actorID := c.UserID
+			elementID, _ := payload["element_id"].(string)
+			elementSlug, _ := payload["element_slug"].(string)
+			venueSlug, _ := payload["venue_slug"].(string)
+			layer, _ := payload["layer"].(string)
+
+			x := 0
+			if raw, ok := payload["x"].(float64); ok {
+				x = int(raw)
+			}
+			y := 0
+			if raw, ok := payload["y"].(float64); ok {
+				y = int(raw)
+			}
+			order := 0
+			if raw, ok := payload["order"].(float64); ok {
+				order = int(raw)
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			storedAction, err := storePlaceElementFunc(ctx, pool, actions.PlaceElementRequest{
+				SessionID:   sessionID,
+				ActorID:     actorID,
+				ElementID:   elementID,
+				ElementSlug: elementSlug,
+				VenueSlug:   venueSlug,
+				Layer:       layer,
+				X:           x,
+				Y:           y,
+				Order:       order,
+			})
+			cancel()
+
+			if err != nil {
+				var denied *actions.ActionDeniedError
+				if errors.As(err, &denied) {
+					_ = c.Conn.WriteJSON(map[string]any{
+						"type":  "error",
+						"error": denied.Reason,
+					})
+					log.Printf("place element denied: user=%s session=%s venue=%s target=%s reason=%s", actorID, sessionID, venueSlug, elementSlug, denied.Reason)
+					return
+				}
+
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": err.Error(),
+				})
+				log.Printf("place element failed: user=%s session=%s venue=%s target=%s err=%v", actorID, sessionID, venueSlug, elementSlug, err)
 				return
 			}
 
