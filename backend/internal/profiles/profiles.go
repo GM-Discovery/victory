@@ -660,7 +660,7 @@ func upsertDraftProfile(ctx context.Context, pool *pgxpool.Pool, input profileRe
 			draft_history,
 			updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, NOW())
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, NOW())
 		ON CONFLICT (user_id) DO UPDATE
 		SET
 			draft_display_name = EXCLUDED.draft_display_name,

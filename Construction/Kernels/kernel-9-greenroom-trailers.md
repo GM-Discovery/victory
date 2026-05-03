@@ -62,6 +62,7 @@ The profile table only stores safe public-facing performer data:
 ## Draft / publish rules
 
 - edits save to draft first
+- publish copies the current draft into the public projection
 - published projection does not change until publish is pressed
 - Greenroom renders the published projection only
 - Trailers renders draft edits and published preview side by side

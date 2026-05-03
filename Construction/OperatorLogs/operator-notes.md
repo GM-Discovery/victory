@@ -510,6 +510,7 @@ VALUES (
 ### Frontend
 - Cave now has a send-note-card form.
 - Trailers links directly to Mailbox.
+- Publish saves the current draft first, then copies it into the public projection.
 
 ### Restart
 - Backend restart is required after the schema/bootstrap and route changes.

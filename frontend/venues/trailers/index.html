@@ -384,9 +384,10 @@
         <p class="note">Fields marked public are shown to the room once you publish. Draft edits stay hidden until then.</p>
         <div id="draft-fields"></div>
         <div class="actions">
-          <button class="button save" type="button" id="save-button">Save Draft</button>
+          <button class="button save" type="button" id="save-button">Save Draft (Optional)</button>
           <button class="button publish" type="button" id="publish-button">Publish</button>
         </div>
+        <p class="note">Publish saves the current draft first, then makes it public.</p>
         <div class="status" id="status"></div>
       </section>
 
@@ -921,9 +922,12 @@
       return payload.data;
     }
 
-    async function saveDraft() {
+    async function persistDraft(options = {}) {
       const status = document.getElementById("status");
-      status.textContent = "Saving draft...";
+      const silent = Boolean(options.silent);
+      if (!silent) {
+        status.textContent = "Saving draft...";
+      }
       try {
         const response = await fetch("/api/profiles/me/save", {
           method: "PATCH",
@@ -937,7 +941,7 @@
 
         if (isForbiddenAccessResponse(response, payload)) {
           showForbiddenScreen();
-          return;
+          return null;
         }
 
         if (!response.ok || !payload?.ok) {
@@ -946,17 +950,34 @@
 
         state.profile = payload.data;
         renderPreview(state.profile.profile || {});
-        status.textContent = "Draft saved.";
+        if (!silent) {
+          status.textContent = "Draft saved.";
+        }
+        return payload.data;
       } catch (error) {
         console.error(error);
-        status.textContent = "Save failed.";
+        if (!silent) {
+          status.textContent = "Save failed.";
+        }
+        return null;
       }
+    }
+
+    async function saveDraft() {
+      return persistDraft({ silent: false });
     }
 
     async function publishProfile() {
       const status = document.getElementById("status");
-      status.textContent = "Publishing profile...";
+      status.textContent = "Saving draft...";
       try {
+        const saved = await persistDraft({ silent: true });
+        if (!saved) {
+          status.textContent = "Publish failed.";
+          return;
+        }
+
+        status.textContent = "Publishing profile...";
         const response = await fetch("/api/profiles/me/publish", {
           method: "POST",
           credentials: "include",

@@ -128,9 +128,14 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 2 AS reason_rank, 'signed_in'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 2 AS reason_rank, 'performer_surface'::text AS visible_because
 			FROM venues v
+			JOIN lots l ON l.id = v.lot_id
+			JOIN location_memberships lm ON lm.location_id = l.location_id
 			WHERE v.slug IN ('audition-hall', 'greenroom', 'trailers')
+			  AND lm.user_id = $1
+			  AND lm.active = TRUE
+			  AND lm.role IN ('producer', 'director', 'cast', 'crew')
 
 			UNION
 
