@@ -232,7 +232,7 @@ func isRevealableElement(elementType, surface, slug string) bool {
 	}
 
 	switch elementType {
-	case "image", "prop", "set_piece", "overlay", "html", "text", "panel":
+	case "image", "prop", "set_piece", "overlay", "html", "text", "panel", "index_card":
 		return true
 	default:
 		return surface == "stage" || surface == "overlay"

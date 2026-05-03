@@ -322,7 +322,7 @@ This is not a complete security system. It is the first enforceable boundary.
 - other sensitive identity records
 
 ### Access Rules
-- Greenroom and Trailers are signed-in venues
+- Greenroom and Trailers are signed-in performer venues
 - unauthenticated access is redirected away
 - public profile API responses are not anonymous in this kernel
 
@@ -399,6 +399,30 @@ This is not a complete security system. It is the first enforceable boundary.
 - Users can only read their own mailbox
 - `POST /api/note-cards` is authenticated and session-gated
 - `POST /api/messages` remains operator/dev only
+
+## 14. Kernel 12 Index Card Boundaries
+
+### Sender / Authority
+- Index cards are created and edited by producer or director only
+- Client identity claims are never trusted for card ownership
+- The server decides whether `create/index_card` or `update/index_card` is allowed
+
+### Storage
+- Index cards are materialized as `elements.element_type = 'index_card'`
+- Save actions are appended to the action log
+- Card metadata is server-owned, including creator fields and timestamps
+
+### Visibility
+- Index cards are hidden from audience by default
+- Director may reveal cards to cast/crew with the actor layer
+- Director may reveal cards to audience with the audience layer
+- Hiding uses the existing reveal/hide spine
+
+### Limits
+- Front + back text are capped at 2000 characters total
+- No drag/drop
+- No images
+- No separate card universe
 
 ---
 

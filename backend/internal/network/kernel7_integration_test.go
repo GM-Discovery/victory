@@ -186,6 +186,111 @@ func TestKernel8IdentitySurfaceAndPersonaNull(t *testing.T) {
 	t.Log("KERNEL8_PROOF PASS")
 }
 
+func TestKernel12IndexCardActionAuthorityAndBroadcast(t *testing.T) {
+	oldCreate := storeIndexCardCreateFunc
+	oldUpdate := storeIndexCardUpdateFunc
+	defer func() {
+		storeIndexCardCreateFunc = oldCreate
+		storeIndexCardUpdateFunc = oldUpdate
+	}()
+
+	var createReq actions.IndexCardRequest
+	var updateReq actions.IndexCardRequest
+
+	storeIndexCardCreateFunc = func(ctx context.Context, pool *pgxpool.Pool, req actions.IndexCardRequest) (*actions.StoredAction, error) {
+		createReq = req
+		return &actions.StoredAction{
+			ID:        "action-card-create",
+			SessionID: req.SessionID,
+			MomentID:  11,
+			ActorID:   req.ActorID,
+			Actor: map[string]any{
+				"user_id":      req.ActorID,
+				"handle":       "director",
+				"display_name": "Director One",
+				"role":         "director",
+				"persona":      nil,
+			},
+			Persona: nil,
+			Type:    "create/index_card",
+			Payload: map[string]any{"front_text": req.FrontText, "back_text": req.BackText, "color": req.Color},
+			Target:  map[string]any{"kind": "index_card", "element_id": "card-1", "element_slug": "index-card-director"},
+		}, nil
+	}
+	storeIndexCardUpdateFunc = func(ctx context.Context, pool *pgxpool.Pool, req actions.IndexCardRequest) (*actions.StoredAction, error) {
+		updateReq = req
+		return &actions.StoredAction{
+			ID:        "action-card-update",
+			SessionID: req.SessionID,
+			MomentID:  12,
+			ActorID:   req.ActorID,
+			Actor: map[string]any{
+				"user_id":      req.ActorID,
+				"handle":       "director",
+				"display_name": "Director One",
+				"role":         "director",
+				"persona":      nil,
+			},
+			Persona: nil,
+			Type:    "update/index_card",
+			Payload: map[string]any{"front_text": req.FrontText, "back_text": req.BackText, "color": req.Color},
+			Target:  map[string]any{"kind": "index_card", "element_id": req.ElementID, "element_slug": req.ElementSlug},
+		}, nil
+	}
+
+	hub := NewHub()
+	receiver := &Client{Send: make(chan []byte, 8)}
+	hub.Add(receiver)
+	defer hub.Remove(receiver)
+
+	manager := &Client{UserID: "user-director", SessionID: "session-kernel12"}
+	handleCavePayload(hub, nil, manager, map[string]any{
+		"type":       "create/index_card",
+		"session_id": "session-kernel12",
+		"actor_id":   "spoofed-user-id",
+		"front_text": "Call sheet",
+		"back_text":  "Remember the monologue.",
+		"color":      "#d9c7a6",
+	})
+	createBroadcast := recvJSON(t, receiver.Send)
+	if createBroadcast["type"] != "action" {
+		t.Fatalf("expected action broadcast, got %v", createBroadcast["type"])
+	}
+	assertPersonaNull(t, createBroadcast["data"])
+	if createReq.ActorID != manager.UserID {
+		t.Fatalf("expected create actor id %q, got %q", manager.UserID, createReq.ActorID)
+	}
+	if got := createReq.FrontText; got != "Call sheet" {
+		t.Fatalf("expected create front text, got %q", got)
+	}
+	t.Logf("INDEX CARD CREATE %s", testJSON(createBroadcast))
+
+	handleCavePayload(hub, nil, manager, map[string]any{
+		"type":         "update/index_card",
+		"session_id":   "session-kernel12",
+		"actor_id":     "spoofed-user-id",
+		"element_id":   "card-1",
+		"element_slug": "index-card-director",
+		"front_text":   "Updated call sheet",
+		"back_text":    "Updated back",
+		"color":        "#334455",
+	})
+	updateBroadcast := recvJSON(t, receiver.Send)
+	if updateBroadcast["type"] != "action" {
+		t.Fatalf("expected action broadcast, got %v", updateBroadcast["type"])
+	}
+	assertPersonaNull(t, updateBroadcast["data"])
+	if updateReq.ActorID != manager.UserID {
+		t.Fatalf("expected update actor id %q, got %q", manager.UserID, updateReq.ActorID)
+	}
+	if got := updateReq.ElementID; got != "card-1" {
+		t.Fatalf("expected update element id card-1, got %q", got)
+	}
+	t.Logf("INDEX CARD UPDATE %s", testJSON(updateBroadcast))
+
+	t.Log("KERNEL12_PROOF PASS")
+}
+
 func recvJSON(t *testing.T, ch <-chan []byte) map[string]any {
 	t.Helper()
 

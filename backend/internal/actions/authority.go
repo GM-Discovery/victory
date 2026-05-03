@@ -57,8 +57,15 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 		return Decision{Allowed: false, Reason: "not_session_participant"}, nil
 	}
 	if actionType != "act/reveal_element" && actionType != "act/hide_element" {
-		return Decision{Allowed: false, Reason: "unknown_action"}, nil
+		if actionType != "create/index_card" && actionType != "update/index_card" {
+			return Decision{Allowed: false, Reason: "unknown_action"}, nil
+		}
 	}
+
+	if actionType == "create/index_card" || actionType == "update/index_card" {
+		return canActIndexCardInCave(ctx, q, userID, sessionID, target, actionType)
+	}
+
 	if target.Kind != "element" {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
@@ -136,6 +143,48 @@ func canActRevealInCave(ctx context.Context, q actionQuerier, userID, sessionID 
 	}
 
 	return Decision{Allowed: true, Reason: "allowed"}, nil
+}
+
+func canActIndexCardInCave(ctx context.Context, q actionQuerier, userID, sessionID string, target ActionTarget, actionType string) (Decision, error) {
+	var (
+		venueSlug       string
+		participantRole string
+	)
+
+	err := q.QueryRow(ctx, `
+		SELECT
+			v.slug,
+			sp.role::text
+		FROM sessions s
+		JOIN venues v ON v.id = s.venue_id
+		JOIN session_participants sp ON sp.session_id = s.id
+		WHERE s.id = $1
+		  AND sp.user_id = $2
+		LIMIT 1
+	`, sessionID, userID).Scan(&venueSlug, &participantRole)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Decision{Allowed: false, Reason: "not_session_participant"}, nil
+		}
+		return Decision{}, err
+	}
+
+	if venueSlug != "the-cave" {
+		return Decision{Allowed: false, Reason: "unknown_target"}, nil
+	}
+
+	if actionType == "update/index_card" {
+		if strings.TrimSpace(target.ElementID) == "" && strings.TrimSpace(target.ElementSlug) == "" {
+			return Decision{Allowed: false, Reason: "unknown_target"}, nil
+		}
+	}
+
+	switch normalizeActionRole(participantRole) {
+	case "producer", "director":
+		return Decision{Allowed: true, Reason: "allowed"}, nil
+	default:
+		return Decision{Allowed: false, Reason: "insufficient_role"}, nil
+	}
 }
 
 func canRoleRevealHide(role string, actorsCanReveal bool) bool {

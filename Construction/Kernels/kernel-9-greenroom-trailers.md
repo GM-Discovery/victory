@@ -55,7 +55,7 @@ The profile table only stores safe public-facing performer data:
 ## Access rules
 
 - Greenroom and Trailers are not anonymous venues
-- signed-in users only
+- signed-in performer users only
 - unauthenticated requests are redirected to the forbidden access screen
 - public profile API responses still require authentication in this kernel
 

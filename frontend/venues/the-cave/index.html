@@ -286,6 +286,205 @@
       font-size: 0.95rem;
     }
 
+    .index-card-panel {
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .index-card-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .index-card-count {
+      color: #b9a78a;
+      font-size: 0.95rem;
+    }
+
+    .index-card-toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 0 0 12px;
+      align-items: center;
+    }
+
+    .index-card-toolbar label {
+      color: #ead7b2;
+      font-size: 0.95rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #index-card-layer,
+    #index-card-color {
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: #221c17;
+      color: white;
+    }
+
+    .index-card-editor {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    #index-card-front,
+    #index-card-back {
+      width: 100%;
+      min-height: 84px;
+      resize: vertical;
+      padding: 10px 12px;
+      font-size: 1rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: #221c17;
+      color: white;
+      box-sizing: border-box;
+    }
+
+    .index-card-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .index-card-actions button {
+      padding: 10px 14px;
+      font-size: 1rem;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #4b5a7a;
+      color: white;
+    }
+
+    .index-card-actions button:hover {
+      background: #5a6b90;
+    }
+
+    #index-card-save {
+      background: #7a4c1f;
+    }
+
+    #index-card-save:hover {
+      background: #955b24;
+    }
+
+    #index-card-new {
+      background: #4f6b38;
+    }
+
+    #index-card-new:hover {
+      background: #618645;
+    }
+
+    .index-card-status {
+      color: #c7bba5;
+      min-height: 1.2em;
+      font-size: 0.95rem;
+    }
+
+    .index-card-tray {
+      display: grid;
+      gap: 10px;
+    }
+
+    .index-card-empty {
+      color: #b9a78a;
+      font-style: italic;
+    }
+
+    .index-card-item {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255, 255, 255, 0.04);
+      position: relative;
+    }
+
+    .index-card-item.is-selected {
+      border-color: rgba(240, 207, 137, 0.42);
+      box-shadow: 0 0 0 1px rgba(240, 207, 137, 0.18) inset;
+    }
+
+    .index-card-swatch {
+      width: 48px;
+      height: 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.16);
+    }
+
+    .index-card-front {
+      font-weight: 700;
+      color: #fff2d0;
+      line-height: 1.35;
+    }
+
+    .index-card-meta {
+      color: #b9a78a;
+      font-size: 0.9rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .index-card-back {
+      color: #f5efe4;
+      font-size: 0.95rem;
+      line-height: 1.45;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      white-space: pre-wrap;
+    }
+
+    .index-card-mini {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .index-card-mini button {
+      padding: 6px 10px;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      color: #fff2d0;
+      cursor: pointer;
+    }
+
+    .index-card-history {
+      margin-top: 12px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .index-card-history h3 {
+      margin: 0;
+      font-size: 0.95rem;
+      color: #ead7b2;
+    }
+
+    .index-card-history-item {
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.03);
+      color: #f5efe4;
+      border: 1px solid rgba(255,255,255,0.06);
+      font-size: 0.92rem;
+    }
+
     #chat-input {
       flex: 1;
       padding: 10px 12px;
@@ -339,15 +538,52 @@
           <span id="selected-label">None</span>
         </div>
 
-    <div class="tool-row">
+        <div class="tool-row">
+          <label for="selection-layer"><strong>Share with:</strong></label>
+          <select id="selection-layer">
+            <option value="audience">Audience</option>
+            <option value="actor">Cast / Crew</option>
+          </select>
+        </div>
+
+        <div class="tool-row">
         <button id="reveal-selected" type="button" disabled>Reveal Selected</button>
         <button id="hide-selected" type="button" disabled>Hide Selected</button>
         <button id="clear-selection" type="button" disabled>Clear</button>
+        </div>
+        <div class="tool-row">
+          <button id="note-card-toggle" type="button">Send Note Card</button>
+        </div>
       </div>
-      <div class="tool-row">
-        <button id="note-card-toggle" type="button">Send Note Card</button>
+
+      <div class="index-card-panel" id="index-card-panel">
+        <div class="index-card-heading">
+          <h2>Index Cards</h2>
+          <div id="index-card-count" class="index-card-count">0 cards</div>
+        </div>
+        <div class="index-card-toolbar">
+          <label>
+            Color
+            <input id="index-card-color" type="color" value="#d9c7a6" />
+          </label>
+          <button id="index-card-new" type="button">New Card</button>
+          <button id="index-card-save" type="button">Save Card</button>
+        </div>
+        <div class="index-card-editor">
+          <textarea id="index-card-front" placeholder="Front text"></textarea>
+          <textarea id="index-card-back" placeholder="Back text"></textarea>
+          <div id="index-card-status" class="index-card-status"></div>
+        </div>
+        <div id="index-card-tray" class="index-card-tray">
+          <div class="index-card-empty">No cards visible yet.</div>
+        </div>
+        <div class="index-card-history">
+          <h3>Save History</h3>
+          <div id="index-card-history" class="index-card-tray">
+            <div class="index-card-empty">No card saves yet.</div>
+          </div>
+        </div>
       </div>
-    </div>
 
     <h2>Chat</h2>
     <div id="chat-log"></div>
@@ -396,6 +632,17 @@
   const noteCardPanel = document.getElementById("note-card-panel");
   const noteCardClose = document.getElementById("note-card-close");
   const noteCardStatus = document.getElementById("note-card-status");
+  const indexCardPanel = document.getElementById("index-card-panel");
+  const indexCardTray = document.getElementById("index-card-tray");
+  const indexCardHistory = document.getElementById("index-card-history");
+  const indexCardFront = document.getElementById("index-card-front");
+  const indexCardBack = document.getElementById("index-card-back");
+  const indexCardColor = document.getElementById("index-card-color");
+  const indexCardSave = document.getElementById("index-card-save");
+  const indexCardNew = document.getElementById("index-card-new");
+  const indexCardStatus = document.getElementById("index-card-status");
+  const indexCardCount = document.getElementById("index-card-count");
+  const selectionLayer = document.getElementById("selection-layer");
   const connectionStatus = document.getElementById("connection-status");
   const speechEl = document.getElementById("speech");
   const fireEl = document.getElementById("fire");
@@ -412,12 +659,16 @@
   let currentActorId = null;
   let currentRole = "none";
   let selectedElement = null;
+  let selectedIndexCard = null;
   let presenceUsers = {};
+  let latestSnapshotElements = [];
+  let latestSnapshotActions = [];
   const noteCardRoleOrder = {
     director: 0,
     cast: 1,
     crew: 2,
   };
+  const indexCardRoleOrder = noteCardRoleOrder;
 
   function formatTime(date = new Date()) {
     return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -588,6 +839,215 @@
     }
   }
 
+  function canManageIndexCards(role) {
+    const normalized = normalizeRole(role);
+    return normalized === "producer" || normalized === "director";
+  }
+
+  function indexCardTextFromData(element, key) {
+    return String(element?.data?.[key] || "").trim();
+  }
+
+  function indexCardColorFromData(element) {
+    return String(element?.data?.color || "#d9c7a6").trim() || "#d9c7a6";
+  }
+
+  function setIndexCardStatus(text) {
+    if (indexCardStatus) {
+      indexCardStatus.textContent = text;
+    }
+  }
+
+  function clearIndexCardEditor() {
+    selectedIndexCard = null;
+    selectedElement = null;
+    if (indexCardFront) indexCardFront.value = "";
+    if (indexCardBack) indexCardBack.value = "";
+    if (indexCardColor) indexCardColor.value = "#d9c7a6";
+    if (indexCardSave) indexCardSave.textContent = "Save Card";
+    setIndexCardStatus("Ready for a new card.");
+    updateSelectionUI();
+    refreshIndexCardPanels();
+  }
+
+  function loadIndexCardEditor(card) {
+    if (!card) {
+      clearIndexCardEditor();
+      return;
+    }
+
+    selectedIndexCard = card;
+    selectedElement = {
+      element_id: card.element_id,
+      slug: card.slug,
+      name: card.name || card.data?.front_text || "Index Card",
+      element_type: card.element_type,
+      surface: card.surface,
+      data: card.data || {},
+    };
+
+    if (indexCardFront) indexCardFront.value = indexCardTextFromData(card, "front_text");
+    if (indexCardBack) indexCardBack.value = indexCardTextFromData(card, "back_text");
+    if (indexCardColor) indexCardColor.value = indexCardColorFromData(card);
+    if (indexCardSave) indexCardSave.textContent = "Update Card";
+    setIndexCardStatus("Editing selected card.");
+    updateSelectionUI();
+    refreshIndexCardPanels();
+  }
+
+  function renderIndexCardTray(elements) {
+    if (!indexCardTray) return;
+
+    const cards = (Array.isArray(elements) ? elements : [])
+      .filter((el) => String(el?.element_type || "").toLowerCase() === "index_card")
+      .sort((a, b) => {
+        const updatedA = String(a?.data?.updated_at || a?.data?.created_at || "");
+        const updatedB = String(b?.data?.updated_at || b?.data?.created_at || "");
+        if (updatedA !== updatedB) return updatedB.localeCompare(updatedA);
+        return String(a?.name || a?.slug || "").localeCompare(String(b?.name || b?.slug || ""));
+      });
+
+    if (indexCardCount) {
+      indexCardCount.textContent = `${cards.length} card${cards.length === 1 ? "" : "s"}`;
+    }
+
+    if (cards.length === 0) {
+      indexCardTray.innerHTML = `<div class="index-card-empty">No cards visible yet.</div>`;
+      return;
+    }
+
+    indexCardTray.innerHTML = cards
+      .map((card) => {
+        const front = escapeHtml(indexCardTextFromData(card, "front_text"));
+        const back = escapeHtml(indexCardTextFromData(card, "back_text"));
+        const color = escapeHtml(indexCardColorFromData(card));
+        const createdBy = escapeHtml(displayNameFromCard(card));
+        const createdRole = roleBadgeHtml(String(card?.data?.created_by_role || ""));
+        const updatedAt = escapeHtml(String(card?.data?.updated_at || card?.data?.created_at || ""));
+        const selected = selectedIndexCard && selectedIndexCard.element_id === card.element_id ? " is-selected" : "";
+        return `
+          <div class="index-card-item${selected}" data-card-id="${escapeHtml(card.element_id || "")}">
+            <div class="index-card-swatch" style="background:${color}"></div>
+            <div class="index-card-front">${front || "Untitled card"}</div>
+            <div class="index-card-meta">
+              <span>${escapeHtml(card.name || card.slug || "Index Card")}</span>
+              <span>by ${createdBy}</span>
+              ${createdRole}
+              ${updatedAt ? `<span>${updatedAt}</span>` : ""}
+            </div>
+            <div class="index-card-mini">
+              <button type="button" data-card-select="${escapeHtml(card.element_id || "")}">Select</button>
+              <button type="button" data-card-back="${escapeHtml(card.element_id || "")}">View Back</button>
+            </div>
+            <div class="index-card-back" hidden>${back || "No back text yet."}</div>
+          </div>
+        `;
+      })
+      .join("");
+
+    for (const cardEl of indexCardTray.querySelectorAll("[data-card-select]")) {
+      cardEl.addEventListener("click", () => {
+        const cardId = cardEl.getAttribute("data-card-select");
+        const card = cards.find((item) => item.element_id === cardId);
+        if (card) {
+          loadIndexCardEditor(card);
+        }
+      });
+    }
+
+    for (const flipButton of indexCardTray.querySelectorAll("[data-card-back]")) {
+      flipButton.addEventListener("click", () => {
+        const cardId = flipButton.getAttribute("data-card-back");
+        const card = Array.from(indexCardTray.querySelectorAll(".index-card-item")).find((item) => item.dataset.cardId === cardId);
+        if (!card) return;
+        const back = card.querySelector(".index-card-back");
+        if (!back) return;
+        back.hidden = !back.hidden;
+      });
+    }
+  }
+
+  function renderIndexCardHistory(actions) {
+    if (!indexCardHistory) return;
+
+    const rows = (Array.isArray(actions) ? actions : [])
+      .filter((action) => action?.type === "create/index_card" || action?.type === "update/index_card")
+      .slice(0, 12);
+
+    if (rows.length === 0) {
+      indexCardHistory.innerHTML = `<div class="index-card-empty">No card saves yet.</div>`;
+      return;
+    }
+
+    indexCardHistory.innerHTML = rows
+      .map((action) => {
+        const time = escapeHtml(formatActionTime(action));
+        const actor = escapeHtml(identityDisplayName(action?.actor || action || {}));
+        const cardFront = escapeHtml(action?.payload?.front_text || action?.payload?.title || "Index Card");
+        const verb = action.type === "create/index_card" ? "created" : "updated";
+        return `
+          <div class="index-card-history-item">
+            <span class="chat-time">[${time}]</span>
+            <strong>${actor}</strong> ${verb} <span class="chat-action-text">${cardFront}</span>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  function refreshIndexCardPanels() {
+    renderIndexCardTray(latestSnapshotElements);
+    renderIndexCardHistory(latestSnapshotActions);
+  }
+
+  function getIndexCardDraft() {
+    return {
+      front_text: String(indexCardFront?.value || "").trim(),
+      back_text: String(indexCardBack?.value || "").trim(),
+      color: String(indexCardColor?.value || "#d9c7a6").trim() || "#d9c7a6",
+    };
+  }
+
+  function sendIndexCardAction(type) {
+    const draft = getIndexCardDraft();
+    if (!draft.front_text && !draft.back_text) {
+      setIndexCardStatus("Front or back text is required.");
+      return;
+    }
+    if ((draft.front_text.length + draft.back_text.length) > 2000) {
+      setIndexCardStatus("Index cards are capped at 2000 characters total.");
+      return;
+    }
+
+    const payload = {
+      front_text: draft.front_text,
+      back_text: draft.back_text,
+      color: draft.color,
+    };
+
+    if (type === "update/index_card" && selectedIndexCard?.element_id) {
+      payload.element_id = selectedIndexCard.element_id;
+      payload.element_slug = selectedIndexCard.slug || "";
+    }
+
+    if (type === "create/index_card" && selectedIndexCard?.element_id) {
+      payload.element_id = selectedIndexCard.element_id;
+      payload.element_slug = selectedIndexCard.slug || "";
+    }
+
+    setIndexCardStatus("Saving...");
+    if (!sendAction(type, payload)) {
+      setIndexCardStatus("Unable to send card action.");
+      return;
+    }
+
+    if (type === "create/index_card") {
+      setIndexCardStatus("Card creation sent.");
+    } else {
+      setIndexCardStatus("Card update sent.");
+    }
+  }
+
   function setPresenceUsers(users) {
     const next = {};
     for (const user of Array.isArray(users) ? users : []) {
@@ -685,6 +1145,16 @@
     }
   }
 
+  function displayNameFromCard(card) {
+    const data = card?.data || {};
+    return (
+      data.created_by_display_name ||
+      data.created_by_handle ||
+      String(data.created_by || "").slice(0, 8) ||
+      "Unknown Participant"
+    );
+  }
+
   function addChatMessage(text, time = formatTime(), source = "local") {
     const row = document.createElement("div");
     row.className = "chat-message";
@@ -729,6 +1199,11 @@
 
   function setSelectedElement(element) {
     selectedElement = element || null;
+    if (!element || String(element.element_type || "").toLowerCase() !== "index_card") {
+      selectedIndexCard = null;
+      if (indexCardSave) indexCardSave.textContent = "Save Card";
+      refreshIndexCardPanels();
+    }
     updateSelectionUI();
   }
 
@@ -743,7 +1218,8 @@
     }
 
     const hasSelection = !!selectedElement;
-    const revealHideAllowed = canRevealHide(currentRole);
+    const isIndexCard = String(selectedElement?.element_type || "").toLowerCase() === "index_card";
+    const revealHideAllowed = isIndexCard ? canManageIndexCards(currentRole) : canRevealHide(currentRole);
 
     if (revealSelectedBtn) {
       revealSelectedBtn.disabled = !hasSelection;
@@ -759,18 +1235,31 @@
       clearSelectionBtn.disabled = !hasSelection;
       clearSelectionBtn.hidden = !revealHideAllowed;
     }
+
+    if (selectionLayer) {
+      selectionLayer.disabled = !revealHideAllowed || !hasSelection;
+      selectionLayer.hidden = !revealHideAllowed;
+    }
   }
 
   function applyRoleUI() {
     const speakingAllowed = canSpeak(currentRole);
     chatInput.disabled = !speakingAllowed;
     chatSend.disabled = !speakingAllowed;
+    const canEditCards = canManageIndexCards(currentRole);
+    if (indexCardFront) indexCardFront.disabled = !canEditCards;
+    if (indexCardBack) indexCardBack.disabled = !canEditCards;
+    if (indexCardColor) indexCardColor.disabled = !canEditCards;
+    if (indexCardSave) indexCardSave.disabled = !canEditCards;
+    if (indexCardNew) indexCardNew.disabled = !canEditCards;
     updateSelectionUI();
   }
 
   function applySnapshot(snapshot) {
     const elements = Array.isArray(snapshot?.elements) ? snapshot.elements : [];
     const actions = Array.isArray(snapshot?.actions) ? snapshot.actions : [];
+    latestSnapshotElements = elements;
+    latestSnapshotActions = actions;
 
     const fireElement = elements.find((el) => el && el.slug === "first-fire");
     fireEl.hidden = !fireElement;
@@ -786,6 +1275,7 @@
 
     speechEl.textContent = latestSpeechText || "";
     renderActionHistory(actions);
+    refreshIndexCardPanels();
 
     if (selectedElement) {
       const stillVisible = elements.find((el) =>
@@ -806,6 +1296,15 @@
           surface: stillVisible.surface,
           element_type: stillVisible.element_type
         });
+      }
+    }
+
+    if (selectedIndexCard) {
+      const stillVisibleCard = elements.find((el) => el && el.element_id === selectedIndexCard.element_id);
+      if (!stillVisibleCard) {
+        clearIndexCardEditor();
+      } else {
+        selectedIndexCard = stillVisibleCard;
       }
     }
   }
@@ -943,7 +1442,7 @@
           return;
         }
 
-        if (actionType === "act/reveal_element" || actionType === "act/hide_element") {
+        if (actionType === "act/reveal_element" || actionType === "act/hide_element" || actionType === "create/index_card" || actionType === "update/index_card") {
           await refreshSnapshot();
           return;
         }
@@ -978,11 +1477,17 @@
   }
 
   function performReveal(element) {
-    return sendAction("act/reveal_element", element);
+    return sendAction("act/reveal_element", {
+      ...element,
+      layer: selectionLayer?.value || element?.layer || "audience"
+    });
   }
 
   function performHide(element) {
-    return sendAction("act/hide_element", element);
+    return sendAction("act/hide_element", {
+      ...element,
+      layer: selectionLayer?.value || element?.layer || "audience"
+    });
   }
 
   function sendChat() {
@@ -1082,6 +1587,28 @@
   noteCardSend?.addEventListener("click", sendNoteCard);
   noteCardToggle?.addEventListener("click", openNoteCardPanel);
   noteCardClose?.addEventListener("click", closeNoteCardPanel);
+  indexCardSave?.addEventListener("click", () => {
+    if (!canManageIndexCards(currentRole)) {
+      setIndexCardStatus("Only producers and directors can save cards.");
+      return;
+    }
+
+    if (selectedIndexCard?.element_id) {
+      sendIndexCardAction("update/index_card");
+      return;
+    }
+
+    sendIndexCardAction("create/index_card");
+  });
+
+  indexCardNew?.addEventListener("click", () => {
+    if (!canManageIndexCards(currentRole)) {
+      setIndexCardStatus("Only producers and directors can create cards.");
+      return;
+    }
+
+    clearIndexCardEditor();
+  });
 
   chatInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {

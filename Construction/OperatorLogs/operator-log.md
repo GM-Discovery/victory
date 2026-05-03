@@ -217,3 +217,22 @@ Implement `perform/speak` using the same action pipeline:
 - Body limit is 250 characters
 - Sender identity is server-resolved from the Cave session
 - Backend restart is required for the new route and schema bootstrap
+
+## 2026-05-03 — Index Card Element v1
+
+### Backend
+- Added `create/index_card` and `update/index_card` action handling
+- Index cards now materialize as `elements.element_type = 'index_card'`
+- Index cards persist front/back/color plus server-owned creator and production/session metadata
+- Directors and producers can create and edit cards; cast/crew/audience are filtered by the existing visibility spine
+
+### Frontend
+- Added an Index Cards tray/editor inside The Cave
+- Added card selection, back-side preview, and save history rendering
+- Added a visibility layer selector for sharing cards with cast/crew or audience
+
+### Operational Notes
+- Index cards are Elements, not a separate card universe
+- Saves append action history and refresh the Cave snapshot
+- Card content is capped at 2000 characters total
+- Backend restart is required for the new action handlers to appear

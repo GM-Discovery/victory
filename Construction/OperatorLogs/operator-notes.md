@@ -44,7 +44,7 @@ Status notes for newer kernels:
 - Kernel 7 presence and attribution are centralized in `backend/internal/network/presence.go`
 - Presence is in-memory only; it is not canonical history
 - The Cave remains the only venue wired for live action/presence protocol right now
-- The Greenroom and Trailers are signed-in profile venues
+- The Greenroom and Trailers are signed-in performer profile venues
 - `persona` is reserved for future production characters and is `null` for Kernels 8 and 9
 - The profile surface now includes expressive fields like favorite fun, favorite color, favorite artist, favorite food, favorite song, favorite place, favorite movie or show, hidden talent, and ideal day
 - `OPERATOR_HANDLE` and `OPERATOR_USER_ID` provide an infrastructure-only permission seam and do not create a production membership
@@ -403,7 +403,7 @@ In priority order:
 2. actor-capable session path
 3. full two-user kernel proof
 4. minimal browser-facing UI
-5. later: note cards
+5. later: note cards and index cards
 6. later: reveal/hide and stronger role-aware visibility
 
 ---

@@ -254,6 +254,7 @@ Rules:
 - publish copies draft values to the published projection
 - Greenroom reads published only
 - Trailers edits draft only
+- Greenroom and Trailers are performer-only venues, not audience surfaces
 - the profile surface intentionally supports expressive, public self-description fields
 - `persona` remains null for now
 - age is a public performance range, not a birthdate
@@ -341,3 +342,15 @@ messages
 
 Limit
 - body capped at 2000 characters
+
+Kernel 12 additions
+
+Index cards
+- reusable Elements, not a parallel card system
+- stored as `element_type = 'index_card'`
+- director and producer create/edit by default
+- audience does not see cards unless reveal actions expose them
+- cast and crew may be shown cards through the existing visibility spine
+- no drag/drop
+- no images
+- no rich text

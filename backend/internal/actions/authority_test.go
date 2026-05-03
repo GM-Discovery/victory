@@ -1,6 +1,51 @@
 package actions
 
-import "testing"
+import (
+	"context"
+	"testing"
+
+	"github.com/jackc/pgx/v5"
+)
+
+type fakeRow struct {
+	values []any
+	err    error
+}
+
+func (r fakeRow) Scan(dest ...any) error {
+	if r.err != nil {
+		return r.err
+	}
+	for i := range dest {
+		if i >= len(r.values) {
+			break
+		}
+		switch d := dest[i].(type) {
+		case *string:
+			if v, ok := r.values[i].(string); ok {
+				*d = v
+				continue
+			}
+		case *bool:
+			if v, ok := r.values[i].(bool); ok {
+				*d = v
+				continue
+			}
+		}
+	}
+	return nil
+}
+
+type fakeQuerier struct {
+	role string
+}
+
+func (q fakeQuerier) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
+	_ = ctx
+	_ = sql
+	_ = args
+	return fakeRow{values: []any{"the-cave", q.role}}
+}
 
 func TestCanRoleRevealHide(t *testing.T) {
 	tests := []struct {
@@ -64,6 +109,40 @@ func TestIsRevealableCaveTarget(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isRevealableCaveTarget(tt.target); got != tt.want {
 				t.Fatalf("isRevealableCaveTarget(%+v) = %v, want %v", tt.target, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCanActIndexCardCreateUpdate(t *testing.T) {
+	tests := []struct {
+		name string
+		role string
+		want bool
+	}{
+		{name: "producer allowed", role: "producer", want: true},
+		{name: "director allowed", role: "director", want: true},
+		{name: "cast denied", role: "cast", want: false},
+		{name: "crew denied", role: "crew", want: false},
+		{name: "audience denied", role: "audience", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			decision, err := CanAct(context.Background(), fakeQuerier{role: tt.role}, "user-1", "create/index_card", "session-1", ActionTarget{Kind: "index_card"})
+			if err != nil {
+				t.Fatalf("CanAct create/index_card returned error: %v", err)
+			}
+			if decision.Allowed != tt.want {
+				t.Fatalf("CanAct create/index_card allowed=%v, want %v", decision.Allowed, tt.want)
+			}
+
+			decision, err = CanAct(context.Background(), fakeQuerier{role: tt.role}, "user-1", "update/index_card", "session-1", ActionTarget{Kind: "index_card", ElementID: "card-1"})
+			if err != nil {
+				t.Fatalf("CanAct update/index_card returned error: %v", err)
+			}
+			if decision.Allowed != tt.want {
+				t.Fatalf("CanAct update/index_card allowed=%v, want %v", decision.Allowed, tt.want)
 			}
 		})
 	}
