@@ -195,7 +195,7 @@ func HandleNoteCards(pool *pgxpool.Pool) http.HandlerFunc {
 			writeErrorJSON(w, errors.New("body_required"))
 			return
 		}
-		if utf8.RuneCountInString(req.Body) > 2000 {
+		if utf8.RuneCountInString(req.Body) > 250 {
 			writeErrorJSON(w, errors.New("note_card_body_too_long"))
 			return
 		}
@@ -315,7 +315,7 @@ func sanitizeNoteCardRequest(req noteCardRequest) noteCardRequest {
 	req.ToUserID = strings.TrimSpace(req.ToUserID)
 	req.ToParticipantID = strings.TrimSpace(req.ToParticipantID)
 	req.Subject = truncateRunes(strings.TrimSpace(req.Subject), 120)
-	req.Body = strings.TrimSpace(req.Body)
+	req.Body = truncateRunes(strings.TrimSpace(req.Body), 250)
 	req.Context.VenueSlug = strings.TrimSpace(req.Context.VenueSlug)
 	req.Context.SessionID = strings.TrimSpace(req.Context.SessionID)
 	return req
@@ -342,6 +342,9 @@ func resolveNoteCardRecipient(ctx context.Context, pool *pgxpool.Pool, sessionID
 			}
 			return "", "", "", err
 		}
+		if !isNoteCardRecipientRole(role) {
+			return "", "", "", errors.New("recipient_role_not_allowed")
+		}
 		return recipientUserID, displayNameOrHandle(displayName, handle, recipientUserID), role, nil
 	}
 
@@ -365,6 +368,9 @@ func resolveNoteCardRecipient(ctx context.Context, pool *pgxpool.Pool, sessionID
 			}
 			return "", "", "", err
 		}
+		if !isNoteCardRecipientRole(role) {
+			return "", "", "", errors.New("recipient_role_not_allowed")
+		}
 		return recipientUserID, displayNameOrHandle(displayName, handle, recipientUserID), role, nil
 	}
 
@@ -378,13 +384,8 @@ func resolveNoteCardRecipient(ctx context.Context, pool *pgxpool.Pool, sessionID
 		FROM session_participants sp
 		JOIN users u ON u.id = sp.user_id
 		WHERE sp.session_id = $1
-		  AND sp.role IN ('director', 'producer')
+		  AND sp.role = 'director'
 		ORDER BY
-		  CASE sp.role
-			WHEN 'director' THEN 1
-			WHEN 'producer' THEN 2
-			ELSE 99
-		  END,
 		  sp.created_at ASC
 		LIMIT 1
 	`, sessionID).Scan(&recipientUserID, &handle, &displayName, &role)
@@ -394,8 +395,20 @@ func resolveNoteCardRecipient(ctx context.Context, pool *pgxpool.Pool, sessionID
 		}
 		return "", "", "", err
 	}
+	if !isNoteCardRecipientRole(role) {
+		return "", "", "", errors.New("recipient_role_not_allowed")
+	}
 
 	return recipientUserID, displayNameOrHandle(displayName, handle, recipientUserID), role, nil
+}
+
+func isNoteCardRecipientRole(role string) bool {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "director", "cast", "crew":
+		return true
+	default:
+		return false
+	}
 }
 
 func displayNameOrHandle(displayName, handle, userID string) string {

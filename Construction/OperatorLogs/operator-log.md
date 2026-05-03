@@ -214,6 +214,6 @@ Implement `perform/speak` using the same action pipeline:
 
 ### Operational Notes
 - Note cards are durable mail, not chat
-- Body limit is 2000 characters
+- Body limit is 250 characters
 - Sender identity is server-resolved from the Cave session
 - Backend restart is required for the new route and schema bootstrap

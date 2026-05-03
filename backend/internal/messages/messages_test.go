@@ -52,3 +52,20 @@ func TestSanitizeNoteCardRequest(t *testing.T) {
 		t.Fatalf("expected note card text fields to be trimmed, got %+v", got)
 	}
 }
+
+func TestIsNoteCardRecipientRole(t *testing.T) {
+	cases := map[string]bool{
+		"director": true,
+		"cast":     true,
+		"crew":     true,
+		"audience": false,
+		"producer": false,
+		"":         false,
+	}
+
+	for input, want := range cases {
+		if got := isNoteCardRecipientRole(input); got != want {
+			t.Fatalf("role %q: want %v, got %v", input, want, got)
+		}
+	}
+}

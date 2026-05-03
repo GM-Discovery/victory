@@ -344,6 +344,9 @@
         <button id="hide-selected" type="button" disabled>Hide Selected</button>
         <button id="clear-selection" type="button" disabled>Clear</button>
       </div>
+      <div class="tool-row">
+        <button id="note-card-toggle" type="button">Send Note Card</button>
+      </div>
     </div>
 
     <h2>Chat</h2>
@@ -354,16 +357,17 @@
         <button id="chat-send" type="button">Send</button>
       </div>
 
-      <div class="note-card-panel">
+      <div class="note-card-panel" id="note-card-panel" hidden>
         <h2>Send Note Card</h2>
-        <p class="note-card-help">Durable mail to a current participant or the director fallback.</p>
+        <p class="note-card-help">Durable mail to a visible cast, crew, or director participant.</p>
         <div class="note-card-row">
           <select id="note-card-recipient" aria-label="Note card recipient"></select>
           <input id="note-card-subject" type="text" placeholder="Subject (optional)" maxlength="120" />
         </div>
-        <textarea id="note-card-body" maxlength="2000" placeholder="Write your note card..."></textarea>
+        <textarea id="note-card-body" maxlength="250" placeholder="Write your note card..."></textarea>
         <div class="note-card-actions">
           <button id="note-card-send" type="button">Send Note Card</button>
+          <button id="note-card-close" type="button">Close</button>
           <div id="note-card-status" class="note-card-status"></div>
         </div>
       </div>
@@ -388,6 +392,9 @@
   const noteCardSubject = document.getElementById("note-card-subject");
   const noteCardBody = document.getElementById("note-card-body");
   const noteCardSend = document.getElementById("note-card-send");
+  const noteCardToggle = document.getElementById("note-card-toggle");
+  const noteCardPanel = document.getElementById("note-card-panel");
+  const noteCardClose = document.getElementById("note-card-close");
   const noteCardStatus = document.getElementById("note-card-status");
   const connectionStatus = document.getElementById("connection-status");
   const speechEl = document.getElementById("speech");
@@ -406,6 +413,11 @@
   let currentRole = "none";
   let selectedElement = null;
   let presenceUsers = {};
+  const noteCardRoleOrder = {
+    director: 0,
+    cast: 1,
+    crew: 2,
+  };
 
   function formatTime(date = new Date()) {
     return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -534,7 +546,25 @@
   function renderNoteCardRecipients() {
     if (!noteCardRecipient) return;
 
-    const users = Object.values(presenceUsers || {});
+    const users = Object.values(presenceUsers || {})
+      .filter((user) => {
+        if (!user?.user_id || user.user_id === currentActorId) return false;
+        const role = normalizeRole(user.role);
+        return role === "director" || role === "cast" || role === "crew";
+      })
+      .sort((a, b) => {
+        const roleA = normalizeRole(a?.role);
+        const roleB = normalizeRole(b?.role);
+        const orderA = noteCardRoleOrder[roleA] ?? 99;
+        const orderB = noteCardRoleOrder[roleB] ?? 99;
+        if (orderA !== orderB) return orderA - orderB;
+
+        const nameA = identityDisplayName(a || {});
+        const nameB = identityDisplayName(b || {});
+        if (nameA !== nameB) return nameA.localeCompare(nameB);
+
+        return String(a?.user_id || "").localeCompare(String(b?.user_id || ""));
+      });
     const options = [];
 
     options.push({
@@ -543,7 +573,6 @@
     });
 
     for (const user of users) {
-      if (!user?.user_id || user.user_id === currentActorId) continue;
       options.push({
         value: user.user_id,
         label: `${identityDisplayName(user)} — ${roleLabel(user.role)}`,
@@ -676,6 +705,18 @@
     if (noteCardStatus) {
       noteCardStatus.textContent = text;
     }
+  }
+
+  function openNoteCardPanel() {
+    if (!noteCardPanel) return;
+    noteCardPanel.hidden = false;
+    noteCardBody?.focus();
+  }
+
+  function closeNoteCardPanel() {
+    if (!noteCardPanel) return;
+    noteCardPanel.hidden = true;
+    setNoteCardStatus("");
   }
 
   function canSpeak(role) {
@@ -967,8 +1008,8 @@
       setNoteCardStatus("Note card body is required.");
       return;
     }
-    if (body.length > 2000) {
-      setNoteCardStatus("Note cards are capped at 2000 characters.");
+    if (body.length > 250) {
+      setNoteCardStatus("Note cards are capped at 250 characters.");
       return;
     }
 
@@ -1039,6 +1080,8 @@
 
   chatSend.addEventListener("click", sendChat);
   noteCardSend?.addEventListener("click", sendNoteCard);
+  noteCardToggle?.addEventListener("click", openNoteCardPanel);
+  noteCardClose?.addEventListener("click", closeNoteCardPanel);
 
   chatInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {

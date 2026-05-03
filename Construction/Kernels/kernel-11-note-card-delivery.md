@@ -24,11 +24,10 @@
   - send to a specific session participant by `to_participant_id`
 - Fallback:
   - deliver to the current director mailbox
-  - producer is the fallback of last resort if no director is present
 
 ## Limits
 
-- Note card body is capped at 2000 characters in the API.
+- Note card body is capped at 250 characters in the API.
 - No attachments.
 - No threading.
 - No realtime delivery.
@@ -48,6 +47,15 @@
 - Cave sender form: `frontend/venues/the-cave/index.html`
 - mailbox view: `frontend/mailbox/index.html`
 - mailbox link: `frontend/venues/trailers/index.html`
+
+## Presence-scoped recipient rule
+
+- The Cave sender form is populated from the current presence roster.
+- Audience-visible recipients are filtered to:
+  - Director
+  - Cast
+  - Crew
+- Other audience members are never shown as note-card recipients.
 
 ## Operator notes
 

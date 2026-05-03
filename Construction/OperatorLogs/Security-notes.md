@@ -377,6 +377,10 @@ This is not a complete security system. It is the first enforceable boundary.
 ### Recipient
 - Prefer a visible Cave participant
 - May target a session participant by id
+- Recipient role must be visible and allowed:
+  - Director
+  - Cast
+  - Crew
 - May fall back to the current director mailbox
 - Users cannot target arbitrary inboxes
 
@@ -386,7 +390,7 @@ This is not a complete security system. It is the first enforceable boundary.
 - `venue_slug` and `session_id` are stored for traceability
 
 ### Limits
-- Body capped at 2000 characters
+- Body capped at 250 characters
 - No attachments
 - No threading
 - No realtime delivery

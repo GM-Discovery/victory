@@ -489,15 +489,18 @@ VALUES (
 ### Recipient Rules
 - Prefer a visible/current Cave participant.
 - Support `to_participant_id` when available.
+- Only allow recipients visible in the Cave roster with these roles:
+  - Director
+  - Cast
+  - Crew
 - Fall back to the current director mailbox.
-- Producer is the last-resort fallback if no director is present.
 
 ### Data Model
 - Note cards live in `messages`.
 - Context fields:
   - `venue_slug`
   - `session_id`
-- Body limit is 2000 characters.
+- Body limit is 250 characters.
 
 ### Routes
 - `POST /api/note-cards`
