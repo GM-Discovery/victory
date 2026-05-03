@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"victory/backend/internal/identity"
 )
 
 var allowedReactions = map[string]struct{}{
@@ -31,16 +33,21 @@ type ReactRequest struct {
 }
 
 type StoredAction struct {
-	ID         string         `json:"id"`
-	SessionID  string         `json:"session_id"`
-	MomentID   int64          `json:"moment_id"`
-	ActorID    string         `json:"actor_id"`
-	Type       string         `json:"type"`
-	Target     map[string]any `json:"target"`
-	Payload    map[string]any `json:"payload"`
-	Scope      map[string]any `json:"scope"`
-	Visibility map[string]any `json:"visibility"`
-	Timestamp  string         `json:"ts"`
+	ID               string         `json:"id"`
+	SessionID        string         `json:"session_id"`
+	MomentID         int64          `json:"moment_id"`
+	ActorID          string         `json:"actor_id"`
+	ActorDisplayName string         `json:"actor_display_name,omitempty"`
+	ActorHandle      string         `json:"actor_handle,omitempty"`
+	ActorRole        string         `json:"actor_role,omitempty"`
+	Actor            map[string]any `json:"actor,omitempty"`
+	Persona          any            `json:"persona"`
+	Type             string         `json:"type"`
+	Target           map[string]any `json:"target"`
+	Payload          map[string]any `json:"payload"`
+	Scope            map[string]any `json:"scope"`
+	Visibility       map[string]any `json:"visibility"`
+	Timestamp        string         `json:"ts"`
 }
 
 func StoreReaction(ctx context.Context, pool *pgxpool.Pool, req ReactRequest) (*StoredAction, error) {
@@ -133,6 +140,11 @@ func StoreReaction(ctx context.Context, pool *pgxpool.Pool, req ReactRequest) (*
 		return nil, err
 	}
 
+	displayName, handle, role, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
@@ -140,6 +152,17 @@ func StoreReaction(ctx context.Context, pool *pgxpool.Pool, req ReactRequest) (*
 	out.SessionID = req.SessionID
 	out.MomentID = nextMoment
 	out.ActorID = req.ActorID
+	out.ActorDisplayName = displayName
+	out.ActorHandle = handle
+	out.ActorRole = role
+	out.Actor = map[string]any{
+		"user_id":      req.ActorID,
+		"handle":       handle,
+		"display_name": displayName,
+		"role":         role,
+		"persona":      nil,
+	}
+	out.Persona = nil
 	out.Type = "react/emote"
 	out.Target = target
 	out.Payload = payload
@@ -195,6 +218,11 @@ func StoreSpeak(ctx context.Context, pool *pgxpool.Pool, sessionID, actorID, tex
 		return nil, err
 	}
 
+	displayName, handle, role, err := loadActorIdentity(ctx, tx, sessionID, actorID)
+	if err != nil {
+		return nil, err
+	}
+
 	target := map[string]any{
 		"kind": "session",
 		"id":   sessionID,
@@ -246,6 +274,17 @@ func StoreSpeak(ctx context.Context, pool *pgxpool.Pool, sessionID, actorID, tex
 	out.SessionID = sessionID
 	out.MomentID = nextMoment
 	out.ActorID = actorID
+	out.ActorDisplayName = displayName
+	out.ActorHandle = handle
+	out.ActorRole = role
+	out.Actor = map[string]any{
+		"user_id":      actorID,
+		"handle":       handle,
+		"display_name": displayName,
+		"role":         role,
+		"persona":      nil,
+	}
+	out.Persona = nil
 	out.Type = "perform/speak"
 	out.Target = target
 	out.Payload = payload
@@ -254,4 +293,13 @@ func StoreSpeak(ctx context.Context, pool *pgxpool.Pool, sessionID, actorID, tex
 	out.Timestamp = ts.UTC().Format(time.RFC3339)
 
 	return &out, nil
+}
+
+func loadActorIdentity(ctx context.Context, q actionQuerier, sessionID, actorID string) (displayName, handle, role string, err error) {
+	ident, err := identity.ResolveSessionIdentity(ctx, q, sessionID, actorID)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	return ident.DisplayName, ident.Handle, ident.Role, nil
 }

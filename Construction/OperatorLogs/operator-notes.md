@@ -20,15 +20,34 @@ Current confirmed capabilities:
 - persistent user creation/join works by `handle`
 - HTTP snapshot endpoint works
 - WebSocket observer connection works
+- `perform/speak` works over WebSocket
 - `react/emote` works over WebSocket
 - `react/emote` is persisted into `actions`
 - `react/emote` is broadcast to connected observers
 - later-joining observers see prior recorded actions in snapshot history
+- The Cave WebSocket now resolves server-side identity and emits presence joins/leaves
+- Speech and reaction actions carry server-enriched actor display names, handles, and roles
+- The Cave client renders a live "Who is here?" roster
+- The Cave client renders speech and reactions with attribution badges
+- Multiple tabs for the same user are deduped in the visible presence roster
+- Presence messages now use explicit `presence/snapshot`, `presence/join`, and `presence/leave` event types
+- Kernel 7 evidence is covered by `go test ./internal/network -run TestKernel7PresenceAndAttributionEvidence -v`
+- Kernel 8 adds a shared identity surface and `persona: null` in action/presence payloads
+- The Cave does not allow anonymous presence
+- Presence labels must never render blank; fall back through display name, handle, shortened user id, then `Unknown Participant`
 
 Not yet complete:
-- `perform/speak`
-- explicit actor-role path
 - full two-user kernel proof: actor speaks, audience perceives, audience reacts, actor perceives reaction
+
+Status notes for newer kernels:
+- Kernel 6 action authority is centralized in `backend/internal/actions/authority.go`
+- Kernel 7 presence and attribution are centralized in `backend/internal/network/presence.go`
+- Presence is in-memory only; it is not canonical history
+- The Cave remains the only venue wired for live action/presence protocol right now
+- The Greenroom and Trailers are signed-in profile venues
+- `persona` is reserved for future production characters and is `null` for Kernels 8 and 9
+- The profile surface now includes expressive fields like favorite fun, favorite color, favorite artist, favorite food, favorite song, favorite place, favorite movie or show, hidden talent, and ideal day
+- `OPERATOR_HANDLE` and `OPERATOR_USER_ID` provide an infrastructure-only permission seam and do not create a production membership
 
 ---
 
@@ -111,6 +130,16 @@ Append-forward event in a session.
 Do not destructively rewrite past recorded actions.
 Change forward by appending a new action.
 
+### Presence
+Live connection state for a session.
+Presence is:
+- derived from authenticated WebSocket state
+- in-memory
+- ephemeral
+- not canonical history
+- safe to project to the current Cave session audience
+- The Greenroom public profile projection is server-resolved from profile state, not client claims
+
 ---
 
 ## Critical Modeling Decisions Already Settled
@@ -139,6 +168,7 @@ A likely long-term separation:
 - venue runtime layer
 - institutional/admin layer (school, CRM, records, staffing)
 - shared identity/location/library layer
+- profile/public identity layer
 
 ### 5. Append-only action stream is the canon rule
 Actions are ordered by server-assigned `moment_id`.
@@ -222,6 +252,13 @@ Tables currently in use:
 - `location_memberships`
 - `lots`
 - `venues`
+- `sessions`
+- `session_participants`
+- `actions`
+
+Current operator-reference files:
+- `Construction/Kernels/kernel-6-action-authority.md`
+- `Construction/Kernels/kernel-7-presence-attribution.md`
 - `libraries`
 - `elements`
 - `venue_layout_elements`
@@ -386,3 +423,90 @@ In priority order:
 - preserve library-vs-placement distinction
 - preserve observer-first action flow
 - preserve event-driven runtime rather than whole-state replacement
+
+---
+
+## Kernel 10 Info Booth + Mailbox
+
+### Delivery Model
+- Info Booth is a public map modal.
+- Mailbox is durable authenticated inbox delivery.
+- Chat stays immediate; mailbox stays durable.
+
+### Security Rules
+- Users can only read their own inbox.
+- Message creation is operator/dev only.
+- Client identity claims are never trusted for messages.
+
+### Data Model
+- Messages are stored in `messages`.
+- Public API shape includes:
+  - `id`
+  - `to_user_id`
+  - `from_user_id`
+  - `subject`
+  - `body`
+  - `created_at`
+  - `read`
+- Message bodies are capped around 250 characters.
+
+### Routes
+- `GET /api/messages`
+- `GET /api/messages/{id}`
+- `POST /api/messages`
+- mailbox page: `/mailbox/`
+
+### Test Insert
+Use SQL for a quick operator test message:
+
+```sql
+INSERT INTO messages (to_user_id, from_user_id, subject, body)
+VALUES (
+  '<recipient-user-id>',
+  NULL,
+  'System message',
+  'Mailbox foundation is live.'
+);
+```
+
+### Restart
+- Backend restart is required after code changes.
+
+---
+
+## Kernel 11 Note Cards
+
+### Delivery Model
+- Note cards are mailbox messages with `message_type = note_card`.
+- They are durable and read later.
+- They are not live chat and do not pop up in real time.
+
+### Sender Rules
+- Sender must be authenticated.
+- Sender is resolved from the Cave session server-side.
+- Client-provided `from_user_id` is never trusted.
+
+### Recipient Rules
+- Prefer a visible/current Cave participant.
+- Support `to_participant_id` when available.
+- Fall back to the current director mailbox.
+- Producer is the last-resort fallback if no director is present.
+
+### Data Model
+- Note cards live in `messages`.
+- Context fields:
+  - `venue_slug`
+  - `session_id`
+- Body limit is 2000 characters.
+
+### Routes
+- `POST /api/note-cards`
+- `GET /api/messages`
+- `GET /api/messages/{id}`
+
+### Frontend
+- Cave now has a send-note-card form.
+- Trailers links directly to Mailbox.
+
+### Restart
+- Backend restart is required after the schema/bootstrap and route changes.

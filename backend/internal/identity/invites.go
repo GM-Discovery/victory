@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"victory/backend/internal/access"
 	"victory/backend/internal/sessions"
 
 	"github.com/jackc/pgx/v5"
@@ -18,19 +19,19 @@ import (
 )
 
 type CreateInviteRequest struct {
-	TargetRole string `json:"target_role"`
-	TargetEmail string `json:"target_email"`
-	ProductionID string `json:"production_id"`
-	VenueID string `json:"venue_id"`
-	ExpiresInHours int `json:"expires_in_hours"`
-	MaxUses int `json:"max_uses"`
+	TargetRole     string `json:"target_role"`
+	TargetEmail    string `json:"target_email"`
+	ProductionID   string `json:"production_id"`
+	VenueID        string `json:"venue_id"`
+	ExpiresInHours int    `json:"expires_in_hours"`
+	MaxUses        int    `json:"max_uses"`
 }
 
 type AcceptInviteRequest struct {
-	Token string `json:"token"`
-	Email string `json:"email"`
-	Handle string `json:"handle"`
-	Password string `json:"password"`
+	Token       string `json:"token"`
+	Email       string `json:"email"`
+	Handle      string `json:"handle"`
+	Password    string `json:"password"`
 	DisplayName string `json:"display_name"`
 }
 
@@ -79,15 +80,24 @@ func HandleCreateInvite(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		var locationID string
-		err = pool.QueryRow(ctx, `
-			SELECT lm.location_id
-			FROM location_memberships lm
-			WHERE lm.user_id = $1
-			  AND lm.role = 'producer'
-			  AND lm.active = TRUE
-			ORDER BY lm.created_at ASC
-			LIMIT 1
-		`, inviterUserID).Scan(&locationID)
+		if ok, err := access.IsOperatorUser(ctx, pool, inviterUserID); err == nil && ok {
+			err = pool.QueryRow(ctx, `
+				SELECT id
+				FROM locations
+				WHERE slug = 'amurray-family'
+				LIMIT 1
+			`).Scan(&locationID)
+		} else {
+			err = pool.QueryRow(ctx, `
+				SELECT lm.location_id
+				FROM location_memberships lm
+				WHERE lm.user_id = $1
+				  AND lm.role = 'producer'
+				  AND lm.active = TRUE
+				ORDER BY lm.created_at ASC
+				LIMIT 1
+			`, inviterUserID).Scan(&locationID)
+		}
 		if err != nil {
 			writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "producer_membership_required"})
 			return
@@ -130,9 +140,9 @@ func HandleCreateInvite(pool *pgxpool.Pool) http.HandlerFunc {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"ok": true,
 			"data": map[string]any{
-				"invite_id": inviteID,
-				"token": rawToken,
-				"expires_at": expiresAt,
+				"invite_id":   inviteID,
+				"token":       rawToken,
+				"expires_at":  expiresAt,
 				"target_role": req.TargetRole,
 			},
 		})
@@ -293,11 +303,11 @@ func HandleAcceptInvite(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc 
 		writeJSON(w, http.StatusOK, map[string]any{
 			"ok": true,
 			"data": map[string]any{
-				"user_id": userID,
-				"target_role": targetRole,
-				"location_id": locationID,
+				"user_id":       userID,
+				"target_role":   targetRole,
+				"location_id":   locationID,
 				"production_id": derefString(productionID),
-				"venue_id": derefString(venueID),
+				"venue_id":      derefString(venueID),
 			},
 		})
 	}

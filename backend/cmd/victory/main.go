@@ -30,7 +30,9 @@ import (
 	"victory/backend/internal/assets"
 	"victory/backend/internal/db"
 	"victory/backend/internal/identity"
+	"victory/backend/internal/messages"
 	"victory/backend/internal/network"
+	"victory/backend/internal/profiles"
 	"victory/backend/internal/world"
 )
 
@@ -48,6 +50,13 @@ func main() {
 		log.Fatalf("db connect failed: %v", err)
 	}
 	defer pool.Close()
+
+	if err := profiles.EnsureKernel9ProfileSurface(ctx, pool); err != nil {
+		log.Fatalf("kernel 9 profile bootstrap failed: %v", err)
+	}
+	if err := messages.EnsureKernel11MessagesSurface(ctx, pool); err != nil {
+		log.Fatalf("kernel 11 messages bootstrap failed: %v", err)
+	}
 
 	hub := network.NewHub()
 
@@ -71,6 +80,16 @@ func main() {
 	mux.HandleFunc("/api/requests/create", identity.HandleCreatePermissionRequest(pool))
 	mux.HandleFunc("/api/requests/mine", identity.HandleListMyPermissionRequests(pool))
 	mux.HandleFunc("/api/session/me", identity.HandleMe(pool))
+	mux.HandleFunc("/api/profiles/me", profiles.HandleGetMyProfile(pool))
+	mux.HandleFunc("/api/profiles/public", profiles.HandleGetPublicProfile(pool))
+	mux.HandleFunc("/api/profiles/me/save", profiles.HandleSaveMyProfile(pool))
+	mux.HandleFunc("/api/profiles/me/publish", profiles.HandlePublishMyProfile(pool))
+	mux.HandleFunc("/api/profiles/admin/save", profiles.HandleAdminSaveProfile(pool))
+	mux.HandleFunc("/api/profiles/admin/publish", profiles.HandleAdminPublishProfile(pool))
+	mux.HandleFunc("GET /api/messages", messages.HandleMessages(pool))
+	mux.HandleFunc("POST /api/messages", messages.HandleMessages(pool))
+	mux.HandleFunc("GET /api/messages/{id}", messages.HandleMessageByID(pool))
+	mux.HandleFunc("POST /api/note-cards", messages.HandleNoteCards(pool))
 
 	mux.HandleFunc("/api/map/visibility", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

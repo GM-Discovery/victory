@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type RevealRequest struct {
@@ -66,8 +66,26 @@ func StoreReveal(ctx context.Context, pool *pgxpool.Pool, req RevealRequest) (*S
 		return nil, err
 	}
 
-	if !isRevealableElement(resolvedType, resolvedSurface) {
+	if !isRevealableElement(resolvedType, resolvedSurface, resolvedSlug) {
 		return nil, errors.New("element is not revealable")
+	}
+
+	decision, err := CanAct(ctx, tx, req.ActorID, actionTypeForReveal(req.Visible), req.SessionID, ActionTarget{
+		Kind:        "element",
+		ElementID:   resolvedID,
+		ElementSlug: resolvedSlug,
+		Layer:       req.Layer,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !decision.Allowed {
+		return nil, &ActionDeniedError{Reason: decision.Reason}
+	}
+
+	displayName, handle, role, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
+	if err != nil {
+		return nil, err
 	}
 
 	var nextMoment int64
@@ -140,6 +158,17 @@ func StoreReveal(ctx context.Context, pool *pgxpool.Pool, req RevealRequest) (*S
 	out.SessionID = req.SessionID
 	out.MomentID = nextMoment
 	out.ActorID = req.ActorID
+	out.ActorDisplayName = displayName
+	out.ActorHandle = handle
+	out.ActorRole = role
+	out.Actor = map[string]any{
+		"user_id":      req.ActorID,
+		"handle":       handle,
+		"display_name": displayName,
+		"role":         role,
+		"persona":      nil,
+	}
+	out.Persona = nil
 	out.Type = actionType
 	out.Target = target
 	out.Payload = payload
@@ -148,6 +177,14 @@ func StoreReveal(ctx context.Context, pool *pgxpool.Pool, req RevealRequest) (*S
 	out.Timestamp = ts.UTC().Format(time.RFC3339)
 
 	return &out, nil
+}
+
+func actionTypeForReveal(visible bool) string {
+	if visible {
+		return "act/reveal_element"
+	}
+
+	return "act/hide_element"
 }
 
 func resolveRevealTarget(ctx context.Context, tx pgx.Tx, sessionID, elementID, elementSlug string) (resolvedID, resolvedSlug, elementType, surface string, err error) {
@@ -185,11 +222,12 @@ func resolveRevealTarget(ctx context.Context, tx pgx.Tx, sessionID, elementID, e
 	return resolvedID, resolvedSlug, elementType, surface, nil
 }
 
-func isRevealableElement(elementType, surface string) bool {
+func isRevealableElement(elementType, surface, slug string) bool {
 	elementType = strings.TrimSpace(strings.ToLower(elementType))
 	surface = strings.TrimSpace(strings.ToLower(surface))
+	slug = strings.TrimSpace(strings.ToLower(slug))
 
-	if surface == "" {
+	if surface == "" || slug != "first-fire" {
 		return false
 	}
 
@@ -197,7 +235,6 @@ func isRevealableElement(elementType, surface string) bool {
 	case "image", "prop", "set_piece", "overlay", "html", "text", "panel":
 		return true
 	default:
-		// for now, be permissive if it is placed on a visible surface
 		return surface == "stage" || surface == "overlay"
 	}
 }

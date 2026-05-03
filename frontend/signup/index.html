@@ -38,6 +38,13 @@
       margin-bottom: 14px;
     }
 
+    .hint {
+      margin: 6px 0 0;
+      color: #b8a687;
+      font-size: 0.92rem;
+      line-height: 1.35;
+    }
+
     label {
       display: block;
       margin-bottom: 6px;
@@ -98,11 +105,13 @@
       <div class="field">
         <label for="handle">Handle</label>
         <input id="handle" name="handle" type="text" required />
+        <p class="hint">This is your login name. Keep it stable.</p>
       </div>
 
       <div class="field">
         <label for="display_name">Display Name</label>
-        <input id="display_name" name="display_name" type="text" required />
+        <input id="display_name" name="display_name" type="text" placeholder="Public display name" required />
+        <p class="hint">This is the public name people see. You can change it later in Trailers.</p>
       </div>
 
       <div class="field">

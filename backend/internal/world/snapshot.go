@@ -44,15 +44,20 @@ type PlacedElement struct {
 }
 
 type Action struct {
-	ID         string         `json:"id"`
-	MomentID   int64          `json:"moment_id"`
-	ActorID    string         `json:"actor_id"`
-	Type       string         `json:"type"`
-	Target     map[string]any `json:"target"`
-	Payload    map[string]any `json:"payload"`
-	Scope      map[string]any `json:"scope"`
-	Visibility map[string]any `json:"visibility"`
-	Timestamp  string         `json:"ts"`
+	ID               string         `json:"id"`
+	MomentID         int64          `json:"moment_id"`
+	ActorID          string         `json:"actor_id"`
+	ActorDisplayName string         `json:"actor_display_name,omitempty"`
+	ActorHandle      string         `json:"actor_handle,omitempty"`
+	ActorRole        string         `json:"actor_role,omitempty"`
+	Actor            map[string]any `json:"actor,omitempty"`
+	Persona          any            `json:"persona"`
+	Type             string         `json:"type"`
+	Target           map[string]any `json:"target"`
+	Payload          map[string]any `json:"payload"`
+	Scope            map[string]any `json:"scope"`
+	Visibility       map[string]any `json:"visibility"`
+	Timestamp        string         `json:"ts"`
 }
 
 func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string) (*Snapshot, error) {
@@ -158,18 +163,23 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 
 	actionRows, err := pool.Query(ctx, `
 		SELECT
-			id,
-			moment_id,
-			actor_id,
-			type,
-			target,
-			payload,
-			scope,
-			visibility,
-			ts
-		FROM actions
-		WHERE session_id = $1
-		ORDER BY moment_id DESC
+			a.id,
+			a.moment_id,
+			a.actor_id,
+			COALESCE(NULLIF(u.display_name, ''), NULLIF(u.handle, ''), LEFT(u.id::text, 8), 'Unknown Participant'),
+			COALESCE(NULLIF(u.handle, ''), LEFT(u.id::text, 8), 'Unknown Participant'),
+			COALESCE(sp.role::text, 'audience'),
+			a.type,
+			a.target,
+			a.payload,
+			a.scope,
+			a.visibility,
+			a.ts
+		FROM actions a
+		LEFT JOIN users u ON u.id = a.actor_id
+		LEFT JOIN session_participants sp ON sp.session_id = a.session_id AND sp.user_id = a.actor_id
+		WHERE a.session_id = $1
+		ORDER BY a.moment_id DESC
 		LIMIT 50
 	`, snap.Session.ID)
 	if err != nil {
@@ -186,6 +196,9 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 			&a.ID,
 			&a.MomentID,
 			&a.ActorID,
+			&a.ActorDisplayName,
+			&a.ActorHandle,
+			&a.ActorRole,
 			&a.Type,
 			&targetRaw,
 			&payloadRaw,
@@ -200,6 +213,14 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 		a.Payload = decodeJSONMap(payloadRaw)
 		a.Scope = decodeJSONMap(scopeRaw)
 		a.Visibility = decodeJSONMap(visibilityRaw)
+		a.Actor = map[string]any{
+			"user_id":      a.ActorID,
+			"handle":       a.ActorHandle,
+			"display_name": a.ActorDisplayName,
+			"role":         a.ActorRole,
+			"persona":      nil,
+		}
+		a.Persona = nil
 		a.Timestamp = ts.UTC().Format(time.RFC3339)
 
 		snap.Actions = append(snap.Actions, a)
@@ -210,7 +231,7 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 	}
 
 	layerVisibility := deriveElementLayerVisibility(snap.Actions)
-	
+
 	filtered := make([]PlacedElement, 0, len(snap.Elements))
 	for _, el := range snap.Elements {
 		switch normalizeRole(viewerRole) {

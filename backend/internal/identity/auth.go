@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"victory/backend/internal/access"
 	"victory/backend/internal/sessions"
 
 	"github.com/jackc/pgx/v5"
@@ -55,6 +56,9 @@ func HandleSignup(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc {
 		req.Email = strings.TrimSpace(strings.ToLower(req.Email))
 		req.Handle = normalizeHandle(req.Handle)
 		req.DisplayName = strings.TrimSpace(req.DisplayName)
+		if req.DisplayName == "" {
+			req.DisplayName = req.Handle
+		}
 
 		if req.Email == "" || req.Handle == "" || req.Password == "" || req.DisplayName == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "email_handle_password_display_name_required"})
@@ -424,7 +428,7 @@ func HandleMe(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
-				"ok": false,
+				"ok":    false,
 				"error": "method_not_allowed",
 			})
 			return
@@ -436,7 +440,7 @@ func HandleMe(pool *pgxpool.Pool) http.HandlerFunc {
 		userID, err := currentUserID(ctx, pool, r)
 		if err != nil || strings.TrimSpace(userID) == "" {
 			writeJSON(w, http.StatusOK, map[string]any{
-				"ok": true,
+				"ok":        true,
 				"signed_in": false,
 			})
 			return
@@ -451,19 +455,31 @@ func HandleMe(pool *pgxpool.Pool) http.HandlerFunc {
 		`, userID).Scan(&handle, &displayName)
 		if err != nil {
 			writeJSON(w, http.StatusOK, map[string]any{
-				"ok": true,
+				"ok":        true,
 				"signed_in": false,
 			})
 			return
 		}
 
+		role, err := access.CurrentLocationRole(ctx, pool, userID)
+		if err != nil {
+			role = "audience"
+		}
+
+		isOperator, err := access.IsOperatorUser(ctx, pool, userID)
+		if err != nil {
+			isOperator = false
+		}
+
 		writeJSON(w, http.StatusOK, map[string]any{
-			"ok": true,
+			"ok":        true,
 			"signed_in": true,
 			"data": map[string]any{
-				"user_id": userID,
-				"handle": handle,
+				"user_id":      userID,
+				"handle":       handle,
 				"display_name": displayName,
+				"role":         role,
+				"is_operator":  isOperator,
 			},
 		})
 	}

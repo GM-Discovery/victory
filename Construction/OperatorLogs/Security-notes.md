@@ -218,6 +218,43 @@ This is not a complete security system. It is the first enforceable boundary.
 
 ## 8. Data Integrity Protections
 
+---
+
+## 9. Presence + Attribution (Kernel 7)
+
+### Presence Rules
+- Presence is derived from authenticated WebSocket state
+- Presence is in-memory only and is not canonical history
+- Multiple open tabs for the same user are deduped in the visible roster
+- The server broadcasts `presence/snapshot`, `presence/join`, and `presence/leave`
+
+### Attribution Rules
+- Speech, reaction, and reveal/hide actions are server-enriched with actor identity
+- The client does not get to choose the actor for a stored action
+- Outgoing action payloads should be treated as requests, not authority
+
+### Security Guarantee
+- A forged client payload cannot spoof another speaker or role in the stored/broadcast action stream
+
+---
+
+## 10. Identity Surface + Presence Repair (Kernel 8)
+
+### Presence Rules
+- The Cave does not allow anonymous presence
+- Presence identity is resolved server-side from the authenticated session and session participant
+- Connected users should always render with a non-blank label
+- Multiple tabs for one user remain deduped in the visible roster
+
+### Identity Rules
+- `actor` is accountable identity
+- `persona` is performed identity and is currently `null`
+- Client-provided `actor` and `persona` values are ignored or overwritten
+- Live and replayed actions use the same identity shape
+
+### Security Guarantee
+- A forged client payload cannot survive as trusted actor/persona data in the stored or broadcast action stream
+
 ### Constraints Enforced in DB
 - role constraints (e.g., director requires production)
 - invite usage limits
@@ -259,6 +296,105 @@ This is not a complete security system. It is the first enforceable boundary.
 - Roles are never client-assigned
 - Access is granted, never assumed
 - Default stance: deny unless explicitly allowed
+
+---
+
+## 11. Kernel 9 Profile Surface Safety
+
+### Safe Data Only
+- Greenroom and Trailers store only performer-facing public fields
+- Allowed fields are limited to:
+  - stage name
+  - pronouns
+  - headshot URL or data URL
+  - performance age range
+  - bio
+  - credits
+  - skills
+  - availability
+  - public links
+
+### Explicitly Excluded
+- birthdate
+- SSN
+- credit card details
+- bank details
+- other sensitive identity records
+
+### Access Rules
+- Greenroom and Trailers are signed-in venues
+- unauthenticated access is redirected away
+- public profile API responses are not anonymous in this kernel
+
+### Identity Rules
+- `persona` remains `null`
+- client identity claims are never trusted
+- public profile state is server-resolved and draft/publish controlled
+
+### Expressive Profile Fields
+- The profile surface intentionally supports more than a handful of prompts
+- Safe public fields may expand as long as they do not include birthdates, SSNs, card data, or other sensitive records
+- Age is a performance range string, not a date of birth
+
+### Operator Override
+- `OPERATOR_HANDLE` or `OPERATOR_USER_ID` can mark an infrastructure operator who bypasses producer-gated admin surfaces
+- The operator is outside the in-app production roster and is not represented as a producer membership row
+
+### Operational Rule
+- Age exposure is only a public performance range string
+- Do not add a DOB field in later kernels unless the privacy model is rewritten intentionally
+
+## 12. Kernel 10 Mailbox Boundaries
+
+### Info Booth
+- Public modal on the map
+- No auth gate required
+- Exists only as a front-door surface
+
+### Mailbox
+- Authenticated-only durable inbox
+- Server enforces `to_user_id` ownership
+- Users cannot read other users' mail
+- `POST /api/messages` is operator/dev only
+
+### Message Safety
+- Body length is capped in the API
+- `from_user_id` is server-resolved or null
+- Client-provided identity fields are ignored
+
+### Storage / Startup
+- `messages` table is bootstrapped on server startup
+- Migration file exists for durable setup
+- Backend restart is required after code changes
+
+## 13. Kernel 11 Note Card Boundaries
+
+### Sender
+- Must be authenticated
+- Must be in the Cave session on the server
+- Cannot spoof `from_user_id`
+
+### Recipient
+- Prefer a visible Cave participant
+- May target a session participant by id
+- May fall back to the current director mailbox
+- Users cannot target arbitrary inboxes
+
+### Storage
+- Note cards use `message_type = note_card`
+- Context is server-owned
+- `venue_slug` and `session_id` are stored for traceability
+
+### Limits
+- Body capped at 2000 characters
+- No attachments
+- No threading
+- No realtime delivery
+
+### Access
+- Users can only read their own mailbox
+- `POST /api/note-cards` is authenticated and session-gated
+- `POST /api/messages` remains operator/dev only
 
 ---
 

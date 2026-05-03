@@ -45,6 +45,17 @@ body {
   gap: 1rem;
 }
 
+.account-controls {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+[hidden] {
+  display: none !important;
+}
+
 .forbidden-screen {
   min-height: 100vh;
   display: flex;
@@ -110,6 +121,58 @@ body {
 }
 
 .login-link:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.account-menu-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  cursor: pointer;
+}
+
+.account-menu-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.account-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  min-width: 12rem;
+  padding: 0.45rem;
+  border-radius: 1rem;
+  background: rgba(16, 15, 14, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+  display: grid;
+  gap: 0.35rem;
+  z-index: 30;
+}
+
+.account-menu-link,
+.account-menu-button {
+  appearance: none;
+  border: 0;
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.75rem;
+  color: #fff;
+  background: transparent;
+  text-decoration: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.account-menu-link:hover,
+.account-menu-button:hover {
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -254,6 +317,129 @@ body {
   background: rgba(0, 0, 0, 0.75);
   font-weight: 600;
   letter-spacing: 0.02em;
+}
+
+.modal-open {
+  overflow: hidden;
+}
+
+.booth-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 10, 12, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.booth-sheet {
+  position: relative;
+  width: min(1120px, 100%);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(34, 28, 24, 0.98), rgba(18, 14, 12, 0.98));
+  color: #f7efe3;
+  padding: 24px;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
+}
+
+.booth-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.booth-eyebrow {
+  margin: 0 0 8px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #d9b36d;
+  font-size: 0.76rem;
+}
+
+.booth-title {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+}
+
+.booth-copy {
+  margin: 10px 0 0;
+  color: rgba(247, 239, 227, 0.84);
+  line-height: 1.55;
+  max-width: 78ch;
+}
+
+.booth-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(160px, 1fr) minmax(320px, 1.4fr) minmax(180px, 1fr);
+  margin-top: 20px;
+}
+
+.booth-column {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 18px;
+}
+
+.booth-column h3 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  color: #f0d39e;
+}
+
+.booth-column ul {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.6;
+  color: rgba(247, 239, 227, 0.88);
+}
+
+.booth-center {
+  background:
+    radial-gradient(circle at top, rgba(214, 175, 99, 0.16), transparent 44%),
+    rgba(255, 255, 255, 0.04);
+}
+
+.booth-footer {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.booth-footer strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.booth-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 232, 190, 0.3);
+  background: linear-gradient(180deg, #6b4a24 0%, #473018 100%);
+  color: #fff2d0;
+  text-decoration: none;
+  font-weight: 700;
 }
 
 @keyframes theaterPulse {

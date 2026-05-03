@@ -55,6 +55,38 @@ curl -s http://127.0.0.1:8081/health
 curl -s http://127.0.0.1:8081/api/world/the-cave
 WebSocket
 wscat -c ws://127.0.0.1:8081/ws/the-cave
+
+For multi-user presence and attribution checks, open a second `wscat` session or a second browser tab and verify `presence/join` / `presence/leave` plus action attribution.
+
+Kernel 8 identity check:
+
+GOCACHE=/tmp/victory-gocache go test ./internal/network -run TestKernel8IdentitySurfaceAndPersonaNull -v
+
+Kernel 9 profile check:
+
+GOCACHE=/tmp/victory-gocache go test ./internal/profiles ./internal/access ./internal/actions ./internal/network ./internal/world
+
+Kernel 10 mailbox check:
+
+GOCACHE=/tmp/victory-gocache go test ./internal/messages ./internal/profiles ./internal/access ./internal/actions ./internal/network ./internal/world
+
+Kernel 11 note-card check:
+
+GOCACHE=/tmp/victory-gocache go test ./internal/messages ./internal/profiles ./internal/access ./internal/actions ./internal/network ./internal/world
+
+New venue routes:
+
+/venues/greenroom/
+
+/venues/trailers/
+
+New message route:
+
+/mailbox/
+
+New note-card route:
+
+/api/note-cards
 Making Code Changes
 
 Typical loop:
@@ -115,3 +147,6 @@ observe
 react (done)
 speak (next)
 multi-user proof
+greenroom / trailers profile surface
+info booth / mailbox foundation
+note card delivery system

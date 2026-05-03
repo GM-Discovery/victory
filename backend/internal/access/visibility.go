@@ -16,6 +16,50 @@ type VisibleVenue struct {
 	VisibleBecause string `json:"visible_because"`
 }
 
+func CurrentLocationRole(ctx context.Context, pool *pgxpool.Pool, userID string) (string, error) {
+	if strings.TrimSpace(userID) == "" {
+		return "audience", nil
+	}
+
+	var role string
+	err := pool.QueryRow(ctx, `
+		SELECT m.role::text
+		FROM location_memberships m
+		WHERE m.user_id = $1
+		  AND m.active = TRUE
+		ORDER BY
+		  CASE m.role
+			WHEN 'producer' THEN 1
+			WHEN 'director' THEN 2
+			WHEN 'cast' THEN 3
+			WHEN 'crew' THEN 4
+			WHEN 'audience' THEN 5
+			ELSE 99
+		  END,
+		  m.created_at ASC
+		LIMIT 1
+	`, userID).Scan(&role)
+	if err != nil {
+		return "audience", nil
+	}
+
+	switch role {
+	case "producer", "director", "cast", "crew", "audience":
+		return role, nil
+	default:
+		return "audience", nil
+	}
+}
+
+func IsPerformerRole(role string) bool {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "producer", "director", "cast", "crew":
+		return true
+	default:
+		return false
+	}
+}
+
 func CurrentUserIDFromRequest(ctx context.Context, pool *pgxpool.Pool, rawCookie string) (string, error) {
 	rawCookie = strings.TrimSpace(rawCookie)
 	if rawCookie == "" {
@@ -54,6 +98,28 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 		return out, rows.Err()
 	}
 
+	if ok, err := IsOperatorUser(ctx, pool, userID); err == nil && ok {
+		rows, err := pool.Query(ctx, `
+			SELECT v.slug, v.name, v.kind, 'operator'::text AS visible_because
+			FROM venues v
+			ORDER BY v.slug
+		`)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		var out []VisibleVenue
+		for rows.Next() {
+			var v VisibleVenue
+			if err := rows.Scan(&v.Slug, &v.Name, &v.Kind, &v.VisibleBecause); err != nil {
+				return nil, err
+			}
+			out = append(out, v)
+		}
+		return out, rows.Err()
+	}
+
 	rows, err := pool.Query(ctx, `
 		WITH visible AS (
 			SELECT v.id, v.slug, v.name, v.kind, 1 AS reason_rank, 'public'::text AS visible_because
@@ -64,7 +130,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			SELECT v.id, v.slug, v.name, v.kind, 2 AS reason_rank, 'signed_in'::text AS visible_because
 			FROM venues v
-			WHERE v.slug = 'audition-hall'
+			WHERE v.slug IN ('audition-hall', 'greenroom', 'trailers')
 
 			UNION
 

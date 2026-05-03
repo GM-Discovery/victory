@@ -27,13 +27,14 @@ type JoinResponse struct {
 
 func JoinTheCave(ctx context.Context, pool *pgxpool.Pool, req JoinRequest, sessionCookie string) (*JoinResponse, error) {
 	displayName := strings.TrimSpace(req.DisplayName)
-	if displayName == "" {
-		return nil, errors.New("display_name is required")
-	}
 
 	userID, handle, resolvedRole, err := resolveJoiningUser(ctx, pool, req, sessionCookie)
 	if err != nil {
 		return nil, err
+	}
+
+	if displayName == "" {
+		displayName = handle
 	}
 
 	tx, err := pool.Begin(ctx)
@@ -119,6 +120,11 @@ func resolveJoiningUser(ctx context.Context, pool *pgxpool.Pool, req JoinRequest
 		return "", "", "", errors.New("handle is required")
 	}
 
+	displayName := strings.TrimSpace(req.DisplayName)
+	if displayName == "" {
+		displayName = handle
+	}
+
 	var userID string
 	err := pool.QueryRow(ctx, `
 		INSERT INTO users (handle, display_name)
@@ -127,7 +133,7 @@ func resolveJoiningUser(ctx context.Context, pool *pgxpool.Pool, req JoinRequest
 		SET display_name = EXCLUDED.display_name,
 		    last_seen_at = NOW()
 		RETURNING id
-	`, handle, strings.TrimSpace(req.DisplayName)).Scan(&userID)
+	`, handle, displayName).Scan(&userID)
 	if err != nil {
 		return "", "", "", err
 	}

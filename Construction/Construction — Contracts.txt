@@ -8,6 +8,14 @@ Every action the system processes follows one envelope:
   "type": "perform/speak | direct/reveal | create/element | react/emote | ...",
   "actorId": "user_123",
   "role": "director | cast | crew | audience | producer",
+  "actor": {
+    "user_id": "uuid",
+    "handle": "grant",
+    "display_name": "Grant",
+    "role": "cast",
+    "persona": null
+  },
+  "persona": null,
   "sessionId": "sess_456",
   "momentId": "m_789",
   "target": { "kind": "element|surface|view|role", "id": "..." },
@@ -33,6 +41,8 @@ verify allowed action in current projection state (rehearsal/live)
 verify target exists & is mutable
 clamp payload (size/type)
 assign canonical timestamp/order
+resolve actor identity from authenticated session / participant membership
+set persona to null for Kernel 8
 write to log (if record=true)
 broadcast to interested clients (WebSocket)
 
@@ -77,12 +87,20 @@ session:{id}:actions → broadcast validated actions
 session:{id}:presence → joins/leaves
 session:{id}:control → director overrides / sync points
 
+Presence event types
+  presence/snapshot → { users: [{ user_id, handle, display_name, role, persona: null, connected_at }] }
+  presence/join → { user: { ... } }
+  presence/leave → { user: { ... } }
+
 Flow
 client sends action → ws/send
 server validates → assigns momentId/ts
 server appends to stream (and DB if record)
 server broadcasts action
 clients update local state → recompute view
+
+Server authority note
+The client may request an actor, but the server resolves the actual actor from session-bound identity and membership. Stored/broadcast actions should carry server-resolved actor attribution and `persona: null` for Kernel 8.
 
 Keep it event-driven, not “replace whole state.”
 
@@ -182,6 +200,65 @@ No destructive edits to past recorded actions
 If you “change,” you append a new action that overrides going forward
 Optional: snapshots for fast load
 
+9) Profile Surface Contract (Kernel 9)
+
+Profiles are a server-owned public performer surface, not a private identity dump.
+
+Table:
+performer_profiles(
+  user_id uuid pk,
+  draft_stage_name text,
+  draft_pronouns text,
+  draft_headshot_url text,
+  draft_performance_age_range text,
+  draft_favorite_fun text,
+  draft_most_relaxed text,
+  draft_favorite_color text,
+  draft_favorite_artist text,
+  draft_favorite_food text,
+  draft_favorite_song text,
+  draft_favorite_place text,
+  draft_favorite_movie_or_show text,
+  draft_hidden_talent text,
+  draft_ideal_day text,
+  draft_bio text,
+  draft_credits text,
+  draft_skills text,
+  draft_availability text,
+  draft_public_links text,
+  published_stage_name text,
+  published_pronouns text,
+  published_headshot_url text,
+  published_performance_age_range text,
+  published_favorite_fun text,
+  published_most_relaxed text,
+  published_favorite_color text,
+  published_favorite_artist text,
+  published_favorite_food text,
+  published_favorite_song text,
+  published_favorite_place text,
+  published_favorite_movie_or_show text,
+  published_hidden_talent text,
+  published_ideal_day text,
+  published_bio text,
+  published_credits text,
+  published_skills text,
+  published_availability text,
+  published_public_links text,
+  is_published boolean,
+  published_at timestamptz
+)
+
+Rules:
+- draft saves do not change the public projection
+- publish copies draft values to the published projection
+- Greenroom reads published only
+- Trailers edits draft only
+- the profile surface intentionally supports expressive, public self-description fields
+- `persona` remains null for now
+- age is a public performance range, not a birthdate
+- do not add birthdate, SSN, or credit-card-adjacent fields
+
 Implementation sketch (first cuts)
 Backend (Go)
 HTTP: auth, uploads, admin
@@ -210,3 +287,57 @@ DirectorConsole
 ActorTools
 AudienceView
 recompute view on each action (fast, incremental)
+
+---
+
+Kernel 10 additions
+
+Info Booth
+- public map modal
+- front-door content only
+- opens Mailbox entry
+
+Mailbox
+- durable inbox per authenticated user
+- server owns `to_user_id`
+- users may only read their own messages
+- `POST /api/messages` is operator/dev only
+
+Message contract
+messages
+- id
+- to_user_id
+- from_user_id nullable
+- subject
+- body
+- created_at
+- read
+
+Limits
+- body capped at about 250 characters in the API
+- no realtime delivery
+- no threading
+- no user-to-user chat
+
+---
+
+Kernel 11 additions
+
+Note cards
+- durable messages delivered through mailbox
+- sender must be authenticated
+- sender identity is server-resolved from the Cave session
+- recipient must be a server-known participant or director fallback
+- no anonymous note cards
+- no live popups
+- no threading
+- no attachments
+
+Message contract extensions
+messages
+- message_type
+- venue_slug
+- session_id
+
+Limit
+- body capped at 2000 characters

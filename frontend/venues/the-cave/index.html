@@ -64,10 +64,118 @@
       padding: 16px 20px 20px;
     }
 
+    .presence-panel {
+      border-top: 1px solid rgba(255,255,255,0.1);
+      background: #120f0c;
+      padding: 16px 20px 20px;
+    }
+
     .chat-panel h2 {
       margin: 0 0 12px;
       font-size: 1rem;
       color: #ead7b2;
+    }
+
+    .presence-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .presence-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .presence-count {
+      color: #b9a78a;
+      font-size: 0.95rem;
+    }
+
+    .presence-empty {
+      color: #b9a78a;
+      font-style: italic;
+    }
+
+    .presence-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .presence-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      font-weight: 600;
+    }
+
+    .presence-handle {
+      color: #b9a78a;
+      font-size: 0.95rem;
+    }
+
+    .chat-actor {
+      font-weight: 700;
+      color: #f7e9c8;
+    }
+
+    .chat-handle {
+      color: #b9a78a;
+      font-weight: 500;
+    }
+
+    .chat-action-text {
+      color: #f5efe4;
+    }
+
+    .role-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      line-height: 1.4;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: #f2dfb8;
+      white-space: nowrap;
+    }
+
+    .role-badge--producer,
+    .role-badge--director {
+      background: rgba(199, 154, 64, 0.18);
+      border-color: rgba(235, 196, 103, 0.3);
+      color: #ffe0a0;
+    }
+
+    .role-badge--cast,
+    .role-badge--actor {
+      background: rgba(104, 142, 215, 0.16);
+      border-color: rgba(104, 142, 215, 0.28);
+      color: #d9e7ff;
+    }
+
+    .role-badge--crew {
+      background: rgba(118, 118, 118, 0.16);
+      border-color: rgba(160, 160, 160, 0.24);
+      color: #e8e8e8;
+    }
+
+    .role-badge--audience {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: #e5d7b2;
     }
 
     #chat-log {
@@ -98,6 +206,84 @@
     .chat-controls {
       display: flex;
       gap: 10px;
+    }
+
+    .note-card-panel {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .note-card-panel h2 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+      color: #ead7b2;
+    }
+
+    .note-card-help {
+      margin: 0 0 12px;
+      color: #b9a78a;
+      font-size: 0.95rem;
+    }
+
+    .note-card-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    #note-card-recipient,
+    #note-card-subject {
+      flex: 1;
+      min-width: 180px;
+      padding: 10px 12px;
+      font-size: 1rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: #221c17;
+      color: white;
+    }
+
+    #note-card-body {
+      width: 100%;
+      min-height: 96px;
+      resize: vertical;
+      padding: 10px 12px;
+      font-size: 1rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: #221c17;
+      color: white;
+      box-sizing: border-box;
+    }
+
+    .note-card-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    #note-card-send {
+      padding: 10px 14px;
+      font-size: 1rem;
+      border: 0;
+      border-radius: 8px;
+      background: #4f6b38;
+      color: white;
+      cursor: pointer;
+    }
+
+    #note-card-send:hover {
+      background: #618645;
+    }
+
+    .note-card-status {
+      color: #c7bba5;
+      min-height: 1.2em;
+      font-size: 0.95rem;
     }
 
     #chat-input {
@@ -167,6 +353,30 @@
         <input id="chat-input" type="text" placeholder="Type a message..." />
         <button id="chat-send" type="button">Send</button>
       </div>
+
+      <div class="note-card-panel">
+        <h2>Send Note Card</h2>
+        <p class="note-card-help">Durable mail to a current participant or the director fallback.</p>
+        <div class="note-card-row">
+          <select id="note-card-recipient" aria-label="Note card recipient"></select>
+          <input id="note-card-subject" type="text" placeholder="Subject (optional)" maxlength="120" />
+        </div>
+        <textarea id="note-card-body" maxlength="2000" placeholder="Write your note card..."></textarea>
+        <div class="note-card-actions">
+          <button id="note-card-send" type="button">Send Note Card</button>
+          <div id="note-card-status" class="note-card-status"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="presence-panel">
+      <div class="presence-heading">
+        <h2>Who is here?</h2>
+        <div id="presence-count" class="presence-count">0 connected</div>
+      </div>
+      <div id="presence-list" class="presence-list">
+        <div class="presence-empty">Waiting for presence...</div>
+      </div>
     </div>
   </div>
 
@@ -174,9 +384,16 @@
   const chatLog = document.getElementById("chat-log");
   const chatInput = document.getElementById("chat-input");
   const chatSend = document.getElementById("chat-send");
+  const noteCardRecipient = document.getElementById("note-card-recipient");
+  const noteCardSubject = document.getElementById("note-card-subject");
+  const noteCardBody = document.getElementById("note-card-body");
+  const noteCardSend = document.getElementById("note-card-send");
+  const noteCardStatus = document.getElementById("note-card-status");
   const connectionStatus = document.getElementById("connection-status");
   const speechEl = document.getElementById("speech");
   const fireEl = document.getElementById("fire");
+  const presenceList = document.getElementById("presence-list");
+  const presenceCount = document.getElementById("presence-count");
 
   const selectedLabel = document.getElementById("selected-label");
   const revealSelectedBtn = document.getElementById("reveal-selected");
@@ -188,6 +405,7 @@
   let currentActorId = null;
   let currentRole = "none";
   let selectedElement = null;
+  let presenceUsers = {};
 
   function formatTime(date = new Date()) {
     return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -200,6 +418,242 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#39;");
+  }
+
+  function normalizeRole(role) {
+    const value = String(role || "audience").trim().toLowerCase();
+    if (["producer", "director", "cast", "crew", "audience", "actor"].includes(value)) {
+      return value;
+    }
+
+    return "audience";
+  }
+
+  function roleLabel(role) {
+    switch (normalizeRole(role)) {
+      case "producer":
+        return "Producer";
+      case "director":
+        return "Director";
+      case "cast":
+      case "actor":
+        return "Cast";
+      case "crew":
+        return "Crew";
+      default:
+        return "Audience";
+    }
+  }
+
+  function shortUserID(userId) {
+    const value = String(userId || "").trim();
+    if (!value) return "Unknown Participant";
+    return value.length > 8 ? value.slice(0, 8) : value;
+  }
+
+  function personaDisplayName(persona) {
+    return persona?.display_name || persona?.name || "";
+  }
+
+  function identityDisplayName(identity) {
+    const personaName = personaDisplayName(identity?.persona);
+    const displayName = identity?.display_name || identity?.handle || shortUserID(identity?.user_id);
+
+    if (personaName) {
+      return `${personaName} (${displayName || shortUserID(identity?.user_id)})`;
+    }
+
+    return displayName || "Unknown Participant";
+  }
+
+  function actorHandle(action) {
+    return (
+      action?.actor_handle ||
+      action?.actor?.handle ||
+      action?.handle ||
+      ""
+    );
+  }
+
+  function actorRole(action) {
+    return normalizeRole(
+      action?.actor_role ||
+      action?.actor?.role ||
+      action?.role ||
+      "audience"
+    );
+  }
+
+  function formatActionTime(action) {
+    if (action?.ts) {
+      const parsed = new Date(action.ts);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      }
+    }
+
+    return formatTime();
+  }
+
+  function roleBadgeHtml(role) {
+    const normalized = normalizeRole(role);
+    return `<span class="role-badge role-badge--${normalized}">${escapeHtml(roleLabel(normalized))}</span>`;
+  }
+
+  function renderPresencePanel(users) {
+    if (!presenceList) return;
+
+    const rows = Object.values(users || {});
+    if (presenceCount) {
+      presenceCount.textContent = `${rows.length} connected`;
+    }
+
+    if (rows.length === 0) {
+      presenceList.innerHTML = `<div class="presence-empty">No one is currently in The Cave.</div>`;
+      return;
+    }
+
+    presenceList.innerHTML = rows
+      .map((user) => {
+        const displayName = escapeHtml(identityDisplayName(user || {}));
+        const handle = user?.handle ? `<span class="presence-handle">@${escapeHtml(user.handle)}</span>` : "";
+        const role = roleBadgeHtml(user?.role || "audience");
+        return `
+          <div class="presence-item">
+            <div class="presence-name">
+              <span>${displayName}</span>
+              ${handle}
+            </div>
+            <div>${role}</div>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  function renderNoteCardRecipients() {
+    if (!noteCardRecipient) return;
+
+    const users = Object.values(presenceUsers || {});
+    const options = [];
+
+    options.push({
+      value: "",
+      label: "Director fallback",
+    });
+
+    for (const user of users) {
+      if (!user?.user_id || user.user_id === currentActorId) continue;
+      options.push({
+        value: user.user_id,
+        label: `${identityDisplayName(user)} — ${roleLabel(user.role)}`,
+      });
+    }
+
+    noteCardRecipient.innerHTML = "";
+    for (const option of options) {
+      const el = document.createElement("option");
+      el.value = option.value;
+      el.textContent = option.label;
+      noteCardRecipient.appendChild(el);
+    }
+  }
+
+  function setPresenceUsers(users) {
+    const next = {};
+    for (const user of Array.isArray(users) ? users : []) {
+      if (!user?.user_id) continue;
+      next[user.user_id] = user;
+    }
+
+    presenceUsers = next;
+    renderPresencePanel(presenceUsers);
+    renderNoteCardRecipients();
+  }
+
+  function upsertPresenceUser(user) {
+    if (!user?.user_id) return;
+    presenceUsers = {
+      ...presenceUsers,
+      [user.user_id]: user
+    };
+    renderPresencePanel(presenceUsers);
+    renderNoteCardRecipients();
+  }
+
+  function removePresenceUser(user) {
+    const userId = user?.user_id;
+    if (!userId || !presenceUsers[userId]) return;
+
+    const next = { ...presenceUsers };
+    delete next[userId];
+    presenceUsers = next;
+    renderPresencePanel(presenceUsers);
+    renderNoteCardRecipients();
+  }
+
+  function renderActionLine(action) {
+    const type = action?.type || "";
+    const handle = actorHandle(action);
+    const role = actorRole(action);
+    const badge = roleBadgeHtml(role);
+    const time = escapeHtml(formatActionTime(action));
+    const identity = action?.actor || action || {};
+    const actorLabel = identityDisplayName(identity);
+
+    if (type === "perform/speak") {
+      const text = escapeHtml(action?.payload?.text || action?.text || "");
+      return `
+        <span class="chat-time">[${time}]</span>
+        <span class="chat-actor">${escapeHtml(actorLabel)}</span>
+        ${handle ? `<span class="chat-handle">@${escapeHtml(handle)}</span>` : ""}
+        ${badge}
+        <span class="chat-action-text">: ${text}</span>
+      `;
+    }
+
+    if (type === "react/emote") {
+      const text = escapeHtml(action?.payload?.kind || action?.kind || "");
+      return `
+        <span class="chat-time">[${time}]</span>
+        <span class="chat-actor">${escapeHtml(actorLabel)}</span>
+        ${handle ? `<span class="chat-handle">@${escapeHtml(handle)}</span>` : ""}
+        ${badge}
+        <span class="chat-action-text"> reacted: ${text}</span>
+      `;
+    }
+
+    return "";
+  }
+
+  function appendActionMessage(action) {
+    if (!action) return;
+
+    const body = renderActionLine(action);
+    if (!body) return;
+
+    const row = document.createElement("div");
+    row.className = "chat-message";
+    row.innerHTML = body;
+    chatLog.appendChild(row);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  function renderActionHistory(actions) {
+    chatLog.innerHTML = "";
+
+    const ordered = Array.isArray(actions) ? [...actions].reverse() : [];
+    for (const action of ordered) {
+      if (!action || (action.type !== "perform/speak" && action.type !== "react/emote")) {
+        continue;
+      }
+
+      appendActionMessage(action);
+    }
+
+    if (chatLog.childElementCount === 0) {
+      addChatMessage("No speech or reactions yet.", formatTime(), "system");
+    }
   }
 
   function addChatMessage(text, time = formatTime(), source = "local") {
@@ -216,6 +670,12 @@
 
   function setConnectionStatus(text) {
     connectionStatus.textContent = text;
+  }
+
+  function setNoteCardStatus(text) {
+    if (noteCardStatus) {
+      noteCardStatus.textContent = text;
+    }
   }
 
   function canSpeak(role) {
@@ -284,6 +744,7 @@
       "";
 
     speechEl.textContent = latestSpeechText || "";
+    renderActionHistory(actions);
 
     if (selectedElement) {
       const stillVisible = elements.find((el) =>
@@ -410,14 +871,34 @@
         return;
       }
 
+      if (msg.type === "presence/snapshot") {
+        setPresenceUsers(msg.users || []);
+        return;
+      }
+
+      if (msg.type === "presence/join") {
+        upsertPresenceUser(msg.user);
+        return;
+      }
+
+      if (msg.type === "presence/leave") {
+        removePresenceUser(msg.user);
+        return;
+      }
+
       if (msg.type === "action" && msg.data) {
         const action = msg.data;
         const actionType = action.type || "";
         const actionText = action.payload?.text || action.text || "";
 
         if (actionType === "perform/speak" && actionText) {
-          addChatMessage(actionText, formatTime(), "remote");
+          appendActionMessage(action);
           speechEl.textContent = actionText;
+          return;
+        }
+
+        if (actionType === "react/emote") {
+          appendActionMessage(action);
           return;
         }
 
@@ -428,6 +909,9 @@
       }
 
       if (msg.type === "error") {
+        const errorText = msg.error || "action_denied";
+        setConnectionStatus(`Action denied: ${errorText}`);
+        addChatMessage(`Action denied: ${errorText}`, formatTime(), "system");
         console.error("WS error:", msg.error);
       }
     });
@@ -442,7 +926,6 @@
     ws.send(JSON.stringify({
       type,
       session_id: currentSessionId,
-      actor_id: currentActorId,
       ...extra
     }));
 
@@ -476,6 +959,67 @@
     chatInput.focus();
   }
 
+  async function sendNoteCard() {
+    if (!noteCardBody) return;
+
+    const body = noteCardBody.value.trim();
+    if (!body) {
+      setNoteCardStatus("Note card body is required.");
+      return;
+    }
+    if (body.length > 2000) {
+      setNoteCardStatus("Note cards are capped at 2000 characters.");
+      return;
+    }
+
+    const subject = noteCardSubject?.value.trim() || "";
+    const recipient = noteCardRecipient?.value || "";
+
+    const payload = {
+      subject,
+      body,
+      context: {
+        venue_slug: "the-cave",
+        session_id: currentSessionId || "",
+      },
+    };
+
+    if (recipient) {
+      payload.to_user_id = recipient;
+    }
+
+    setNoteCardStatus("Sending...");
+
+    try {
+      const response = await fetch("/api/note-cards", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json().catch(() => null);
+      const error = result?.data?.error || result?.error || "";
+
+      if (response.status === 401 || response.status === 403 || error === "not_authenticated" || error === "forbidden" || error === "not_session_participant") {
+        setNoteCardStatus("Access denied.");
+        return;
+      }
+
+      if (!response.ok || !result?.ok) {
+        throw new Error(error || `HTTP ${response.status}`);
+      }
+
+      noteCardBody.value = "";
+      if (noteCardSubject) noteCardSubject.value = "";
+      setNoteCardStatus("Note card sent.");
+    } catch (err) {
+      setNoteCardStatus(err.message || String(err));
+    }
+  }
+
   async function startCave() {
     try {
       fireEl.hidden = true;
@@ -484,6 +1028,7 @@
       updateSelectionUI();
 
       await joinCave();
+      if (!currentSessionId || !currentActorId) return;
       connectWS();
       await refreshSnapshot();
     } catch (err) {
@@ -493,6 +1038,7 @@
   }
 
   chatSend.addEventListener("click", sendChat);
+  noteCardSend?.addEventListener("click", sendNoteCard);
 
   chatInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {

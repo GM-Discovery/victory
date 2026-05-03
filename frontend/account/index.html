@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Account</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101315;
+      --panel: rgba(21, 27, 30, 0.94);
+      --line: rgba(255, 255, 255, 0.12);
+      --accent: #d6e7f2;
+      --accent-strong: #ffffff;
+      --muted: #aebbc3;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(97, 143, 191, 0.22), transparent 30%),
+        radial-gradient(circle at 80% 0%, rgba(181, 210, 158, 0.15), transparent 28%),
+        linear-gradient(180deg, #0f1316 0%, #090c0e 100%);
+      color: #f7fbff;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    .card {
+      width: min(920px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.35);
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+      font-size: 0.76rem;
+      margin: 0 0 10px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 3.6rem);
+      line-height: 1.05;
+    }
+
+    .subtitle,
+    .status,
+    .note {
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .button,
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      padding: 11px 16px;
+      color: var(--accent-strong);
+      background: rgba(255, 255, 255, 0.04);
+      font-weight: 700;
+    }
+
+    .button {
+      background: linear-gradient(180deg, #5b6d7c 0%, #3e4b55 100%);
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-top: 20px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .label {
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin: 0 0 8px;
+    }
+
+    .profile-name {
+      margin: 0 0 4px;
+      font-size: 1.5rem;
+    }
+
+    .profile-role {
+      margin: 0;
+      color: #d6e7f2;
+      font-weight: 700;
+    }
+
+    .session-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #d8e6ef;
+      font-size: 0.95rem;
+    }
+
+    .session-state[data-state="signed-out"] {
+      color: #f0d2c0;
+      border-color: rgba(240, 210, 192, 0.2);
+    }
+
+    .stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .meta {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .meta-row:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .meta-label {
+      color: var(--muted);
+    }
+
+    .meta-value {
+      text-align: right;
+      white-space: pre-wrap;
+    }
+
+    .recovery {
+      margin-top: 18px;
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.03);
+      display: none;
+    }
+
+    .recovery.visible {
+      display: block;
+    }
+
+    .recovery h2 {
+      margin: 0 0 6px;
+      font-size: 1.1rem;
+    }
+
+    @media (max-width: 820px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <main class="shell">
+    <section class="card">
+      <p class="eyebrow">Account / Identity</p>
+      <h1>Your Account</h1>
+      <p class="subtitle">This is your account hub. Use it to get back to your profile, open the Greenroom, or edit your public trailer.</p>
+
+      <div class="toolbar">
+        <a class="button" href="/venues/trailers/">Open Trailers</a>
+        <a class="chip" href="/venues/greenroom/">Open Greenroom</a>
+        <a class="chip" href="/">Back to Map</a>
+        <button id="logout-button" class="chip" type="button">Logout</button>
+      </div>
+
+      <div class="grid">
+        <section class="panel">
+          <p class="label">Session</p>
+          <h2 class="profile-name" id="display-name">Checking access...</h2>
+          <p class="profile-role" id="role-name">Loading...</p>
+          <div id="session-state" class="session-state" data-state="loading">Checking session...</div>
+          <p class="note" id="session-note">We are checking your session now.</p>
+        </section>
+
+        <section class="panel">
+          <p class="label">Profile</p>
+          <h2 class="profile-name" id="profile-heading">Profile</h2>
+          <p class="note" id="profile-note">Your profile summary will appear here.</p>
+          <div class="meta" id="profile-meta"></div>
+        </section>
+      </div>
+
+      <section id="recovery" class="recovery">
+        <h2>Need to sign in again?</h2>
+        <p class="note">Your browser session is not reaching the server. Logging in again usually fixes Greenroom, Trailers, and this account hub.</p>
+        <div class="toolbar">
+          <a class="button" href="/login/">Log in again</a>
+          <a class="chip" href="/">Back to map</a>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/identity.js"></script>
+  <script>
+    function profileValue(value) {
+      const text = String(value || "").trim();
+      return text || "Not set";
+    }
+
+    function renderMeta(el, items) {
+      el.innerHTML = "";
+      for (const item of items) {
+        const row = document.createElement("div");
+        row.className = "meta-row";
+
+        const label = document.createElement("div");
+        label.className = "meta-label";
+        label.textContent = item.label;
+
+        const value = document.createElement("div");
+        value.className = "meta-value";
+        value.textContent = item.value;
+
+        row.appendChild(label);
+        row.appendChild(value);
+        el.appendChild(row);
+      }
+    }
+
+    document.getElementById("logout-button").addEventListener("click", async () => {
+      try {
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          credentials: "include",
+        });
+      } catch (error) {
+        console.error("logout failed", error);
+      } finally {
+        window.location.href = "/";
+      }
+    });
+
+    async function bootstrapAccount() {
+      const sessionNote = document.getElementById("session-note");
+      const profileNote = document.getElementById("profile-note");
+      const displayNameEl = document.getElementById("display-name");
+      const roleEl = document.getElementById("role-name");
+      const profileHeading = document.getElementById("profile-heading");
+      const sessionState = document.getElementById("session-state");
+      const recovery = document.getElementById("recovery");
+
+      const sessionResponse = await fetch("/api/session/me", {
+        credentials: "include",
+      });
+      const sessionPayload = await sessionResponse.json().catch(() => null);
+
+      if (!sessionResponse.ok || !sessionPayload?.ok || !sessionPayload.signed_in) {
+        if (sessionState) {
+          sessionState.textContent = "Signed out";
+          sessionState.dataset.state = "signed-out";
+        }
+        if (displayNameEl) displayNameEl.textContent = "Not signed in";
+        if (roleEl) roleEl.textContent = "No account session";
+        if (sessionNote) sessionNote.textContent = "Clear cookies or log in again to reach your account and profile pages.";
+        if (recovery) recovery.classList.add("visible");
+        showForbiddenScreen();
+        return;
+      }
+
+      const session = sessionPayload.data || {};
+      const displayName = identityDisplayName(session);
+      displayNameEl.textContent = displayName;
+      roleEl.textContent = `${roleLabel(session.role)} account`;
+      if (sessionState) {
+        sessionState.textContent = "Signed in";
+        sessionState.dataset.state = "signed-in";
+      }
+      if (recovery) recovery.classList.remove("visible");
+      sessionNote.textContent = "Signed in and ready.";
+
+      try {
+        const response = await fetch("/api/profiles/me", {
+          credentials: "include",
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || !payload?.ok) {
+        profileNote.textContent = "Profile data is not available right now, but your account session is active.";
+        profileHeading.textContent = "Profile unavailable";
+          renderMeta(document.getElementById("profile-meta"), [
+            { label: "Trailers", value: "Open Trailers to edit" },
+            { label: "Greenroom", value: "Open Greenroom to view" },
+            { label: "Persona", value: "Still null" },
+          ]);
+          return;
+        }
+
+        const profile = payload.data?.profile || {};
+        const publicProfile = profile.public || {};
+        profileHeading.textContent = profileValue(publicProfile.stage_name) !== "Not set" ? profileValue(publicProfile.stage_name) : "Profile ready";
+        profileNote.textContent = profile.is_published ? "Published profile is live in the Greenroom." : "Draft profile exists. Publish it from Trailers when ready.";
+
+        renderMeta(document.getElementById("profile-meta"), [
+          { label: "Stage Name", value: profileValue(publicProfile.stage_name) },
+          { label: "Pronouns", value: profileValue(publicProfile.pronouns) },
+          { label: "Age Range", value: profileValue(publicProfile.performance_age_range) },
+          { label: "Favorite Color", value: profileValue(publicProfile.favorite_color) },
+          { label: "Favorite Artist", value: profileValue(publicProfile.favorite_artist) },
+          { label: "Favorite Food", value: profileValue(publicProfile.favorite_food) },
+          { label: "Ideal Day", value: profileValue(publicProfile.ideal_day) },
+        ]);
+      } catch (error) {
+        console.error("account bootstrap failed", error);
+        profileNote.textContent = "We could not load your profile, but the account session is active.";
+      }
+    }
+
+    bootstrapAccount();
+  </script>
+</body>
+</html>

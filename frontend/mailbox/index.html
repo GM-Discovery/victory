@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mailbox</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #15110d;
+      --panel: rgba(28, 22, 18, 0.94);
+      --panel-soft: rgba(36, 29, 23, 0.9);
+      --line: rgba(255, 235, 205, 0.12);
+      --accent: #f2d19b;
+      --accent-strong: #fff2d6;
+      --muted: #d2c1ae;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(156, 101, 53, 0.24), transparent 28%),
+        radial-gradient(circle at 80% 0%, rgba(80, 118, 164, 0.12), transparent 26%),
+        linear-gradient(180deg, #19130f 0%, #0d0a08 100%);
+      color: #f6ecdd;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding: 22px 24px 12px;
+      max-width: 1280px;
+      width: 100%;
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--accent);
+      font-size: 0.76rem;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      line-height: 1.05;
+    }
+
+    .subtitle {
+      margin: 10px 0 0;
+      color: var(--muted);
+      max-width: 72ch;
+      line-height: 1.5;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .chip,
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 999px;
+      text-decoration: none;
+      border: 1px solid var(--line);
+      padding: 11px 16px;
+      color: var(--accent-strong);
+      background: rgba(255, 255, 255, 0.03);
+      font-weight: 700;
+    }
+
+    .button {
+      background: linear-gradient(180deg, #6b4a24 0%, #4a341c 100%);
+    }
+
+    .stage {
+      max-width: 1280px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 8px 24px 28px;
+      box-sizing: border-box;
+      display: grid;
+      gap: 18px;
+      grid-template-columns: minmax(280px, 1.15fr) minmax(340px, 1.35fr) minmax(240px, 0.8fr);
+      align-items: start;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.24);
+    }
+
+    .messages-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .message-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.03);
+      color: #fff6eb;
+      padding: 12px 14px;
+      cursor: pointer;
+    }
+
+    .message-item--unread {
+      border-color: rgba(242, 209, 155, 0.26);
+      background: rgba(242, 209, 155, 0.06);
+    }
+
+    .message-subject {
+      margin: 0 0 4px;
+      font-weight: 700;
+    }
+
+    .message-type {
+      display: inline-flex;
+      align-items: center;
+      margin-bottom: 6px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: #f2d19b;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .message-meta {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .detail-title {
+      margin: 0 0 6px;
+      font-size: 1.45rem;
+    }
+
+    .detail-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      color: var(--muted);
+      font-size: 0.94rem;
+      margin-bottom: 14px;
+    }
+
+    .detail-body {
+      white-space: pre-wrap;
+      line-height: 1.6;
+      color: #f5ecdd;
+    }
+
+    .empty-state {
+      color: var(--muted);
+      font-style: italic;
+      margin: 0;
+    }
+
+    .status {
+      margin-top: 12px;
+      color: #ffdca2;
+      min-height: 1.4em;
+    }
+
+    .note {
+      color: var(--muted);
+      line-height: 1.55;
+      margin: 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    @media (max-width: 1040px) {
+      .stage {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <header class="header">
+      <p class="eyebrow">Durable Messages</p>
+      <h1>Mailbox</h1>
+      <p class="subtitle">
+        This is not chat. This is durable message delivery. Messages belong to the authenticated user only and stay here until you read them.
+      </p>
+      <div class="toolbar">
+        <a class="button" href="/">Back to Map</a>
+        <a class="chip" href="/venues/greenroom/">Open Greenroom</a>
+      </div>
+    </header>
+
+    <main class="stage">
+      <section class="card">
+        <h2>Inbox</h2>
+        <p class="note" id="session-label">Checking access...</p>
+        <div class="messages-list" id="message-list"></div>
+      </section>
+
+      <section class="card">
+        <div class="badge" id="read-badge">Message</div>
+        <h2 class="detail-title" id="message-subject">Select a message</h2>
+        <div class="detail-meta" id="message-meta"></div>
+        <div class="detail-body" id="message-body">Your selected message will appear here.</div>
+      </section>
+
+      <section class="card">
+        <h3>Status</h3>
+        <p class="note" id="status">Loading mailbox...</p>
+        <h3 style="margin-top:18px;">Rules</h3>
+        <p class="note">
+          The server decides who can write messages. The user can only read their own inbox.
+        </p>
+      </section>
+    </main>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/identity.js"></script>
+  <script>
+    const state = {
+      session: null,
+      messages: [],
+      selectedId: "",
+    };
+
+    function humanTime(value) {
+      if (!value) return "Unknown time";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value);
+      return date.toLocaleString();
+    }
+
+    function showSignedOut() {
+      const forbiddenScreen = document.getElementById("forbidden-screen");
+      const shell = document.querySelector(".shell");
+      if (forbiddenScreen) forbiddenScreen.hidden = false;
+      if (shell) shell.hidden = true;
+    }
+
+    function renderList() {
+      const list = document.getElementById("message-list");
+      if (!list) return;
+
+      list.innerHTML = "";
+      if (!state.messages.length) {
+        const empty = document.createElement("p");
+        empty.className = "empty-state";
+        empty.textContent = "No messages yet.";
+        list.appendChild(empty);
+        return;
+      }
+
+      for (const message of state.messages) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "message-item";
+        if (!message.read) button.classList.add("message-item--unread");
+        if (message.id === state.selectedId) button.setAttribute("aria-pressed", "true");
+
+      const subject = document.createElement("p");
+      subject.className = "message-subject";
+      subject.textContent = message.subject || "No subject";
+
+      const type = document.createElement("div");
+      type.className = "message-type";
+      type.textContent = message.message_type === "note_card" ? "Note Card" : "Message";
+
+      const meta = document.createElement("p");
+      meta.className = "message-meta";
+      const contextBits = [];
+      if (message.message_type === "note_card") {
+        if (message.venue_slug) contextBits.push(message.venue_slug);
+        if (message.session_id) contextBits.push(message.session_id.slice(0, 8));
+      }
+      meta.textContent = `${message.sender_label || "System"} · ${humanTime(message.created_at)}${contextBits.length ? ` · ${contextBits.join(" / ")}` : ""}`;
+
+      button.appendChild(type);
+      button.appendChild(subject);
+      button.appendChild(meta);
+      button.addEventListener("click", () => openMessage(message.id));
+      list.appendChild(button);
+      }
+    }
+
+    function renderDetail(message) {
+      const badge = document.getElementById("read-badge");
+      const subject = document.getElementById("message-subject");
+      const meta = document.getElementById("message-meta");
+      const body = document.getElementById("message-body");
+
+      if (!message) {
+        if (badge) badge.textContent = "Message";
+        if (subject) subject.textContent = "Select a message";
+        if (meta) meta.innerHTML = "";
+        if (body) body.textContent = "Your selected message will appear here.";
+        return;
+      }
+
+      if (badge) badge.textContent = message.message_type === "note_card" ? "Note Card" : (message.read ? "Read" : "Unread");
+      if (subject) subject.textContent = message.subject || "No subject";
+      if (meta) {
+        meta.innerHTML = "";
+        const entries = [
+          `From ${message.sender_label || "System"}`,
+          `Sent ${humanTime(message.created_at)}`,
+          message.message_type === "note_card" ? "Durable note card" : (message.read ? "Marked read" : "Unread"),
+        ];
+        if (message.venue_slug) entries.push(`Venue ${message.venue_slug}`);
+        if (message.session_id) entries.push(`Session ${message.session_id.slice(0, 8)}`);
+        for (const value of entries) {
+          const item = document.createElement("span");
+          item.textContent = value;
+          meta.appendChild(item);
+        }
+      }
+      if (body) body.textContent = message.body || "No body";
+    }
+
+    async function openMessage(messageId) {
+      const status = document.getElementById("status");
+      try {
+        const response = await fetch(`/api/messages/${encodeURIComponent(messageId)}`, {
+          credentials: "include",
+        });
+
+        const payload = await response.json().catch(() => null);
+        if (
+          response.status === 401 ||
+          response.status === 403 ||
+          payload?.data?.error === "not_authenticated" ||
+          payload?.data?.error === "forbidden"
+        ) {
+          showForbiddenScreen();
+          return;
+        }
+
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.data?.error || `HTTP ${response.status}`);
+        }
+
+        const message = payload.data;
+        state.selectedId = message.id;
+        state.messages = state.messages.map((item) =>
+          item.id === message.id ? { ...item, read: true } : item
+        );
+        renderList();
+        renderDetail(message);
+        if (status) status.textContent = "Message loaded.";
+      } catch (error) {
+        if (status) status.textContent = `Failed to load message: ${error.message}`;
+      }
+    }
+
+    async function loadMailbox() {
+      const status = document.getElementById("status");
+      const sessionLabel = document.getElementById("session-label");
+
+      try {
+        const sessionResponse = await fetch("/api/session/me", {
+          credentials: "include",
+        });
+        const sessionPayload = await sessionResponse.json().catch(() => null);
+        if (!sessionResponse.ok || !sessionPayload?.signed_in) {
+          showSignedOut();
+          return;
+        }
+
+        const session = sessionPayload.data || {};
+        state.session = session;
+        if (sessionLabel) {
+          const displayName = identityDisplayName(session);
+          sessionLabel.textContent = `Signed in as ${displayName} · ${roleLabel(session.role)}`;
+        }
+
+        const response = await fetch("/api/messages", {
+          credentials: "include",
+        });
+        const payload = await response.json().catch(() => null);
+        if (
+          response.status === 401 ||
+          response.status === 403 ||
+          payload?.data?.error === "not_authenticated" ||
+          payload?.data?.error === "forbidden"
+        ) {
+          showSignedOut();
+          return;
+        }
+
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.data?.error || `HTTP ${response.status}`);
+        }
+
+        state.messages = Array.isArray(payload?.data?.messages) ? payload.data.messages : [];
+        state.selectedId = state.messages[0]?.id || "";
+        renderList();
+        renderDetail(state.messages[0] || null);
+        if (status) status.textContent = `${state.messages.length} message${state.messages.length === 1 ? "" : "s"} loaded.`;
+      } catch (error) {
+        if (status) status.textContent = `Mailbox load failed: ${error.message}`;
+      }
+    }
+
+    loadMailbox();
+  </script>
+</body>
+</html>

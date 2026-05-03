@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"victory/backend/internal/access"
 	"victory/backend/internal/sessions"
 
 	xdraw "golang.org/x/image/draw"
@@ -307,6 +308,21 @@ func HandleWorkshopUpload(pool *pgxpool.Pool, storageRoot string) http.HandlerFu
 }
 
 func resolveProducerScope(ctx context.Context, pool *pgxpool.Pool, userID string) (bool, string, string, error) {
+	if ok, err := access.IsOperatorUser(ctx, pool, userID); err == nil && ok {
+		var locationID string
+		err = pool.QueryRow(ctx, `
+			SELECT id
+			FROM locations
+			WHERE slug = 'amurray-family'
+			LIMIT 1
+		`).Scan(&locationID)
+		if err != nil {
+			return false, "", "", err
+		}
+
+		return true, userID, locationID, nil
+	}
+
 	var producerUserID string
 	var locationID string
 

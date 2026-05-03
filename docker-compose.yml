@@ -23,6 +23,7 @@ services:
       PORT: 8081
       DATABASE_URL: postgres://victory:REDACTED@victory-postgres:5432/victory?sslmode=disable
       STORAGE_ROOT: /opt/victory/storage
+      OPERATOR_HANDLE: straturli
     depends_on:
       - postgres
     volumes:

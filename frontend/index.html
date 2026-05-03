@@ -15,7 +15,15 @@
           <p class="app-subtitle">Choose a visible venue.</p>
         </div>
 
-        <a id="account-link" class="login-link" href="/login/">Log In</a>      </div>
+        <div class="account-controls">
+          <a id="account-link" class="login-link" href="/login/">Log In</a>
+          <button id="account-menu-toggle" class="account-menu-toggle" type="button" hidden aria-label="Account options" aria-expanded="false">▾</button>
+          <div id="account-menu" class="account-menu" hidden>
+            <a id="account-profile-link" class="account-menu-link" href="/venues/trailers/">View Profile</a>
+            <button id="account-logout-button" class="account-menu-button" type="button">Logout</button>
+          </div>
+        </div>
+      </div>
     </header>
 
     <section class="map-stage" aria-label="Victory venue map">
@@ -27,6 +35,54 @@
       </div>
     </section>
   </main>
+
+  <div id="info-booth-modal" class="booth-modal" hidden role="dialog" aria-modal="true" aria-labelledby="info-booth-title">
+    <div class="booth-sheet">
+      <button id="info-booth-close" class="booth-close" type="button" aria-label="Close info booth">×</button>
+      <p class="booth-eyebrow">Public Front Door</p>
+      <h2 id="info-booth-title" class="booth-title">Info Booth</h2>
+      <p class="booth-copy">
+        Victory Virtual Tabletop Theaters is a stage-first system for live and replayable performance. The Info Booth is the public entry surface for visitors, performers, and curious passersby. Mailbox is durable. Chat is immediate. We keep those separate.
+      </p>
+
+      <div class="booth-grid" aria-label="Info booth lineup">
+        <section class="booth-column">
+          <h3>Opening Act</h3>
+          <ul>
+            <li>DnD</li>
+            <li>Public orientation</li>
+            <li>Venue map</li>
+          </ul>
+        </section>
+
+        <section class="booth-column booth-center">
+          <h3>Headliner</h3>
+          <ul>
+            <li>Socio: Stories of Us</li>
+            <li>Accountable identity</li>
+            <li>Public profile and mailbox access</li>
+          </ul>
+        </section>
+
+        <section class="booth-column">
+          <h3>Also Featuring</h3>
+          <ul>
+            <li>Microscope</li>
+            <li>Other performances</li>
+            <li>More coming soon</li>
+          </ul>
+        </section>
+      </div>
+
+      <div class="booth-footer">
+        <div>
+          <strong>Victory Virtual Tabletop Theaters (Victory VTT)</strong>
+          <div class="mini">The front door for the building.</div>
+        </div>
+        <a id="info-booth-mailbox" class="booth-button" href="/mailbox/">Open Mailbox</a>
+      </div>
+    </div>
+  </div>
 
   <script src="/app.js"></script>
 </body>

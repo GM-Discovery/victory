@@ -6,7 +6,6 @@ export function createActionClient({ getWS, getSessionId, getActorId }) {
     ws.send(JSON.stringify({
       type,
       session_id: getSessionId(),
-      actor_id: getActorId(),
       ...payload
     }));
 

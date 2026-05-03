@@ -8,19 +8,23 @@ import (
 )
 
 type Client struct {
-	Conn   *websocket.Conn
-	Send   chan []byte
-	UserID string
+	Conn      *websocket.Conn
+	Send      chan []byte
+	UserID    string
+	SessionID string
+	Presence  PresenceUser
 }
 
 type Hub struct {
-	mu      sync.RWMutex
-	clients map[*Client]struct{}
+	mu       sync.RWMutex
+	clients  map[*Client]struct{}
+	presence *PresenceRegistry
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		clients: make(map[*Client]struct{}),
+		clients:  make(map[*Client]struct{}),
+		presence: NewPresenceRegistry(),
 	}
 }
 
@@ -48,4 +52,8 @@ func (h *Hub) Broadcast(msg []byte) {
 			log.Printf("dropping slow websocket client")
 		}
 	}
+}
+
+func (h *Hub) Presence() *PresenceRegistry {
+	return h.presence
 }
