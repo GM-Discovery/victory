@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Grant's Cabin</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #13100d;
+      --panel: rgba(28, 22, 18, 0.94);
+      --line: rgba(255, 235, 209, 0.1);
+      --text: #f5ead7;
+      --muted: #d2c0aa;
+      --accent: #dfc08a;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(131, 88, 48, 0.18), transparent 28%),
+        linear-gradient(180deg, #1a1511 0%, #0d0b09 100%);
+      color: var(--text);
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    .card {
+      width: min(100%, 860px);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 22px;
+      box-sizing: border-box;
+      box-shadow: 0 20px 64px rgba(0, 0, 0, 0.3);
+    }
+
+    .hero {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: minmax(260px, 360px) 1fr;
+      align-items: start;
+    }
+
+    .hero img {
+      width: 100%;
+      border-radius: 16px;
+      display: block;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: #221b17;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 4vw, 3rem);
+    }
+
+    p {
+      margin: 0 0 12px;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+
+    .note {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(223, 192, 138, 0.22);
+      background: rgba(106, 74, 38, 0.18);
+      color: #f7e6c9;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 11px 16px;
+      border-radius: 999px;
+      color: #fff5dd;
+      text-decoration: none;
+      background: linear-gradient(180deg, #6a4b26 0%, #4a341d 100%);
+      margin-top: 14px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 760px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <div class="card">
+      <div class="hero">
+        <img src="/assets/grantsoffice.png" alt="Grant's Cabin" />
+        <div>
+          <h1>Grant's Cabin</h1>
+          <p>
+            This cabin is invite-only and still under construction. It is intended for a very small, trusted circle and may never be broadly visible on the map.
+          </p>
+          <p id="access-line">Checking access...</p>
+          <div id="access-note" class="note hidden">
+            If you need access, email <strong>grant@amurray.family</strong>.
+          </div>
+          <a href="/" class="button">← Back to Map</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script>
+    const accessLine = document.getElementById("access-line");
+    const accessNote = document.getElementById("access-note");
+
+    async function bootstrapCabin() {
+      try {
+        const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
+        const sessionPayload = await sessionResponse.json().catch(() => null);
+
+        if (!sessionPayload?.signed_in) {
+          showForbiddenScreen();
+          return;
+        }
+
+        const visibilityResponse = await fetch("/api/map/visibility", { credentials: "include" });
+        const visibilityPayload = await visibilityResponse.json().catch(() => null);
+        const visible = Array.isArray(visibilityPayload?.data)
+          ? visibilityPayload.data.some((venue) => venue?.slug === "grants-cabin")
+          : false;
+
+        if (visible) {
+          accessLine.textContent = "Access granted";
+          accessLine.style.color = "#e8d19a";
+          accessNote.classList.add("hidden");
+        } else {
+          accessLine.textContent = "Invite-only venue";
+          accessLine.style.color = "#d2c0aa";
+          accessNote.classList.remove("hidden");
+        }
+      } catch (error) {
+        console.error("grant's cabin bootstrap failed", error);
+        showForbiddenScreen();
+      }
+    }
+
+    bootstrapCabin();
+  </script>
+</body>
+</html>

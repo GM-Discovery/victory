@@ -57,6 +57,9 @@ func main() {
 	if err := messages.EnsureKernel11MessagesSurface(ctx, pool); err != nil {
 		log.Fatalf("kernel 11 messages bootstrap failed: %v", err)
 	}
+	if err := access.EnsureKernel16VenueSurface(ctx, pool); err != nil {
+		log.Fatalf("kernel 16 venue bootstrap failed: %v", err)
+	}
 
 	hub := network.NewHub()
 

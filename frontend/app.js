@@ -81,6 +81,8 @@ async function loadVenues() {
       trailers: { x: 67, y: 38 },
       "producers-office": { x: 46, y: 24 },
       "directors-chair": { x: 56, y: 22 },
+      "grants-cabin": { x: 74, y: 57 },
+      catharsis: { x: 84, y: 63 },
     };
 
     for (const venue of venues) {
@@ -113,8 +115,10 @@ async function loadVenues() {
         "construction": "/assets/construction.png",
         "greenroom": "/assets/Greenroom.png",
         "trailers": "/assets/trailers.png",
-        "producers-office": "/assets/default.png",
-        "directors-chair": "/assets/default.png",
+        "producers-office": "/assets/producersoffice.png",
+        "directors-chair": "/assets/directorschair.png",
+        "grants-cabin": "/assets/grantsoffice.png",
+        catharsis: "/assets/catharsis.png",
       };
 
       icon.src = venue.icon_url || venueIcons[venue.slug] || "/assets/default.png";
@@ -184,6 +188,16 @@ async function loadVenues() {
 
         if (venue.slug === "directors-chair") {
           window.location.href = "/venues/directors-chair/";
+          return;
+        }
+
+        if (venue.slug === "grants-cabin") {
+          window.location.href = "/venues/grants-cabin/";
+          return;
+        }
+
+        if (venue.slug === "catharsis") {
+          window.location.href = "/venues/catharsis/";
           return;
         }
 

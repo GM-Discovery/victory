@@ -84,14 +84,20 @@ func HandleListIncomingPermissionRequests(pool *pgxpool.Pool) http.HandlerFunc {
 			  pr.created_at::text
 			FROM permission_requests pr
 			JOIN users u ON u.id = pr.user_id
+			JOIN venues v ON v.slug = pr.venue_slug
+			JOIN lots l ON l.id = v.lot_id
 			WHERE pr.status = 'pending'
+			  AND (
+			    $1::boolean = TRUE
+			    OR l.location_id = $3::uuid
+			  )
 			  AND (
 			    $1::boolean = TRUE
 			    OR ($2 = 'producer' AND pr.requested_role::text = 'director')
 			    OR ($2 = 'director' AND pr.requested_role::text IN ('cast', 'crew'))
 			  )
 			ORDER BY pr.created_at DESC
-		`, allowed, locationRole)
+		`, allowed, locationRole, locationID)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "query_failed"})
 			return

@@ -131,7 +131,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			SELECT v.id, v.slug, v.name, v.kind, 2 AS reason_rank, 'authenticated_surface'::text AS visible_because
 			FROM venues v
-			WHERE v.slug = 'audition-hall'
+			WHERE v.slug IN ('audition-hall', 'catharsis')
 
 			UNION
 
@@ -192,6 +192,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 			WHERE lm.user_id = $1
 			AND lm.active = TRUE
 			AND lm.role IN ('producer', 'director', 'cast', 'crew')
+			AND v.slug NOT IN ('grants-cabin')
 
 			UNION
 
@@ -202,6 +203,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 			AND m.active = TRUE
 			AND m.production_id IS NOT NULL
 			AND m.role IN ('director', 'cast', 'crew')
+			AND v.slug NOT IN ('grants-cabin')
 		),
 		ranked AS (
 			SELECT

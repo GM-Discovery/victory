@@ -191,6 +191,10 @@ This is not a complete security system. It is the first enforceable boundary.
 ### Intended Rule (Not Fully Enforced Yet)
 - No ticket → no map visibility → no venue access
 
+### Current Venue Exceptions
+- Grant's Cabin stays invisible unless a venue grant exists
+- Catharsis is signed-in only and remains ticketing-bound until the audience model is finalized
+
 ### Gap
 - Map visibility endpoint not yet implemented
 - Venue access still partially permissive
