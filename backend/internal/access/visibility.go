@@ -10,10 +10,11 @@ import (
 )
 
 type VisibleVenue struct {
-	Slug           string `json:"slug"`
-	Name           string `json:"name"`
-	Kind           string `json:"kind"`
-	VisibleBecause string `json:"visible_because"`
+	Slug              string `json:"slug"`
+	Name              string `json:"name"`
+	Kind              string `json:"kind"`
+	VisibleBecause    string `json:"visible_because"`
+	NotificationCount int    `json:"notification_count,omitempty"`
 }
 
 func CurrentLocationRole(ctx context.Context, pool *pgxpool.Pool, userID string) (string, error) {
@@ -128,7 +129,35 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 2 AS reason_rank, 'performer_surface'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 2 AS reason_rank, 'authenticated_surface'::text AS visible_because
+			FROM venues v
+			WHERE v.slug = 'audition-hall'
+
+			UNION
+
+			SELECT v.id, v.slug, v.name, v.kind, 3 AS reason_rank, 'producer_surface'::text AS visible_because
+			FROM venues v
+			JOIN lots l ON l.id = v.lot_id
+			JOIN location_memberships lm ON lm.location_id = l.location_id
+			WHERE v.slug = 'producers-office'
+			  AND lm.user_id = $1
+			  AND lm.active = TRUE
+			  AND lm.role = 'producer'
+
+			UNION
+
+			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'director_surface'::text AS visible_because
+			FROM venues v
+			JOIN lots l ON l.id = v.lot_id
+			JOIN location_memberships lm ON lm.location_id = l.location_id
+			WHERE v.slug = 'directors-chair'
+			  AND lm.user_id = $1
+			  AND lm.active = TRUE
+			  AND lm.role IN ('producer', 'director')
+
+			UNION
+
+			SELECT v.id, v.slug, v.name, v.kind, 5 AS reason_rank, 'performer_surface'::text AS visible_because
 			FROM venues v
 			JOIN lots l ON l.id = v.lot_id
 			JOIN location_memberships lm ON lm.location_id = l.location_id
@@ -139,7 +168,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 3 AS reason_rank, 'venue_membership'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 6 AS reason_rank, 'venue_membership'::text AS visible_because
 			FROM venues v
 			JOIN memberships m ON m.venue_id = v.id
 			WHERE m.user_id = $1
@@ -147,7 +176,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'grant'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 7 AS reason_rank, 'grant'::text AS visible_because
 			FROM venues v
 			JOIN access_grants ag ON ag.venue_id = v.id
 			WHERE ag.user_id = $1
@@ -156,7 +185,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 5 AS reason_rank, 'location_role'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 8 AS reason_rank, 'location_role'::text AS visible_because
 			FROM venues v
 			JOIN lots l ON l.id = v.lot_id
 			JOIN location_memberships lm ON lm.location_id = l.location_id
@@ -166,7 +195,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 6 AS reason_rank, 'production_role'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 9 AS reason_rank, 'production_role'::text AS visible_because
 			FROM venues v
 			JOIN memberships m ON m.venue_id = v.id
 			WHERE m.user_id = $1
@@ -203,8 +232,54 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 		}
 		out = append(out, v)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
-	return out, rows.Err()
+	if counts, err := resolveVenueNotificationCounts(ctx, pool); err == nil {
+		for i := range out {
+			if count := counts[out[i].Slug]; count > 0 {
+				out[i].NotificationCount = count
+			}
+		}
+	}
+
+	return out, nil
+}
+
+func resolveVenueNotificationCounts(ctx context.Context, pool *pgxpool.Pool) (map[string]int, error) {
+	rows, err := pool.Query(ctx, `
+		SELECT venue_slug, COUNT(*)::int
+		FROM (
+			SELECT 'producers-office'::text AS venue_slug
+			FROM permission_requests
+			WHERE status = 'pending'
+			  AND requested_role::text = 'director'
+
+			UNION ALL
+
+			SELECT 'directors-chair'::text AS venue_slug
+			FROM permission_requests
+			WHERE status = 'pending'
+			  AND requested_role::text IN ('cast', 'crew')
+		) queued
+		GROUP BY venue_slug
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int)
+	for rows.Next() {
+		var slug string
+		var count int
+		if err := rows.Scan(&slug, &count); err != nil {
+			return nil, err
+		}
+		counts[slug] = count
+	}
+	return counts, rows.Err()
 }
 
 func UserCanAccessVenueSlug(ctx context.Context, pool *pgxpool.Pool, userID, slug string) (bool, error) {

@@ -532,6 +532,20 @@ VALUES (
 - Workshop entry: `/venues/workshop/`
 - Workshop mode on the Cave shell: `/venues/the-cave/?mode=workshop`
 
+## Kernel 15: Producer's Office + Director's Chair
+
+- New map venues:
+  - `producers-office`
+  - `directors-chair`
+- Map visibility now includes notification counts for pending request queues.
+- `GET /api/requests/incoming` returns the producer/director review queue.
+- `POST /api/requests/respond` approves or denies a pending request and writes the grant or membership server-side.
+- `GET /api/productions` returns the current scoping productions for invite creation.
+- Producers can create director/cast/crew/audience invites from the Producer's Office.
+- Directors can create cast/crew/audience invites from The Director's Chair.
+- Audience invites are venue-scoped. Director/cast/crew invites are production-scoped.
+- Request cards now foreground display name, not login handle.
+
 ### Operator Flow
 - Open Workshop from the map.
 - Create or edit an index card.

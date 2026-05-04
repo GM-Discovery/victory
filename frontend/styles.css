@@ -259,6 +259,25 @@ body {
   cursor: pointer;
 }
 
+.venue-pin .venue-notification {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.75rem;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #cf5b31;
+  color: #fff7ec;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+}
+
 .venue-pin img {
   width: clamp(64px, 6vw, 88px);
   height: auto;

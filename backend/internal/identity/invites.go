@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"victory/backend/internal/access"
 	"victory/backend/internal/sessions"
 
 	"github.com/jackc/pgx/v5"
@@ -23,6 +22,7 @@ type CreateInviteRequest struct {
 	TargetEmail    string `json:"target_email"`
 	ProductionID   string `json:"production_id"`
 	VenueID        string `json:"venue_id"`
+	VenueSlug      string `json:"venue_slug"`
 	ExpiresInHours int    `json:"expires_in_hours"`
 	MaxUses        int    `json:"max_uses"`
 }
@@ -79,33 +79,71 @@ func HandleCreateInvite(pool *pgxpool.Pool) http.HandlerFunc {
 			req.MaxUses = 1
 		}
 
-		var locationID string
-		if ok, err := access.IsOperatorUser(ctx, pool, inviterUserID); err == nil && ok {
-			err = pool.QueryRow(ctx, `
-				SELECT id
-				FROM locations
-				WHERE slug = 'amurray-family'
-				LIMIT 1
-			`).Scan(&locationID)
-		} else {
-			err = pool.QueryRow(ctx, `
-				SELECT lm.location_id
-				FROM location_memberships lm
-				WHERE lm.user_id = $1
-				  AND lm.role = 'producer'
-				  AND lm.active = TRUE
-				ORDER BY lm.created_at ASC
-				LIMIT 1
-			`, inviterUserID).Scan(&locationID)
-		}
+		locationRole, locationID, err := resolveInviteAuthorityScope(ctx, pool, inviterUserID)
 		if err != nil {
 			writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "producer_membership_required"})
 			return
 		}
 
-		if req.TargetRole == "director" && strings.TrimSpace(req.ProductionID) == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "director_requires_production_id"})
+		allowed := false
+		switch locationRole {
+		case "producer":
+			allowed = true
+		case "director":
+			switch req.TargetRole {
+			case "director":
+				allowed = false
+			case "cast", "crew", "audience":
+				allowed = true
+			}
+		}
+		if !allowed {
+			writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "insufficient_role"})
 			return
+		}
+
+		req.VenueSlug = strings.TrimSpace(req.VenueSlug)
+		req.VenueID = strings.TrimSpace(req.VenueID)
+		req.ProductionID = strings.TrimSpace(req.ProductionID)
+
+		var venueID string
+		if req.VenueID != "" {
+			if err := pool.QueryRow(ctx, `
+				SELECT v.id::text
+				FROM venues v
+				JOIN lots l ON l.id = v.lot_id
+				WHERE v.id = $1::uuid
+				  AND l.location_id = $2::uuid
+				LIMIT 1
+			`, req.VenueID, locationID).Scan(&venueID); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "venue_not_found"})
+				return
+			}
+		} else if req.VenueSlug != "" {
+			if err := pool.QueryRow(ctx, `
+				SELECT v.id::text
+				FROM venues v
+				JOIN lots l ON l.id = v.lot_id
+				WHERE v.slug = $1
+				  AND l.location_id = $2::uuid
+				LIMIT 1
+			`, req.VenueSlug, locationID).Scan(&venueID); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "venue_not_found"})
+				return
+			}
+		}
+
+		if (req.TargetRole == "director" || req.TargetRole == "cast" || req.TargetRole == "crew") && req.ProductionID == "" {
+			if err := pool.QueryRow(ctx, `
+				SELECT p.id::text
+				FROM productions p
+				WHERE p.location_id = $1::uuid
+				ORDER BY p.created_at ASC
+				LIMIT 1
+			`, locationID).Scan(&req.ProductionID); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "production_required"})
+				return
+			}
 		}
 
 		rawToken, tokenHash, err := newInviteToken()
@@ -131,7 +169,7 @@ func HandleCreateInvite(pool *pgxpool.Pool) http.HandlerFunc {
 			)
 			VALUES ($1, $2, $3::location_role, NULLIF($4, ''), NULLIF($5, '')::uuid, NULLIF($6, '')::uuid, $7, $8, $9)
 			RETURNING id
-		`, locationID, inviterUserID, req.TargetRole, req.TargetEmail, strings.TrimSpace(req.ProductionID), strings.TrimSpace(req.VenueID), tokenHash, expiresAt, req.MaxUses).Scan(&inviteID)
+		`, locationID, inviterUserID, req.TargetRole, req.TargetEmail, req.ProductionID, venueID, tokenHash, expiresAt, req.MaxUses).Scan(&inviteID)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invite_create_failed"})
 			return

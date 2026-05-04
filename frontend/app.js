@@ -70,16 +70,18 @@ async function loadVenues() {
       return;
     }
 
-      const fallbackPositions = {
-        "workshop": { x: 62, y: 47 },
-        "info-booth": { x: 50, y: 88 },
-        "audition-hall": { x: 30, y: 27 },
-        "the-cave": { x: 20, y: 17 },
-        "victory-theater": { x: 50, y: 70 },
-        "construction": { x: 37, y: 50 },
-        "greenroom": { x: 60, y: 30 },
-        "trailers": { x: 67, y: 38 },
-      };
+    const fallbackPositions = {
+      workshop: { x: 62, y: 47 },
+      "info-booth": { x: 50, y: 88 },
+      "audition-hall": { x: 30, y: 27 },
+      "the-cave": { x: 20, y: 17 },
+      "victory-theater": { x: 50, y: 70 },
+      construction: { x: 37, y: 50 },
+      greenroom: { x: 60, y: 30 },
+      trailers: { x: 67, y: 38 },
+      "producers-office": { x: 46, y: 24 },
+      "directors-chair": { x: 56, y: 22 },
+    };
 
     for (const venue of venues) {
       const pin = document.createElement("button");
@@ -111,6 +113,8 @@ async function loadVenues() {
         "construction": "/assets/construction.png",
         "greenroom": "/assets/Greenroom.png",
         "trailers": "/assets/trailers.png",
+        "producers-office": "/assets/default.png",
+        "directors-chair": "/assets/default.png",
       };
 
       icon.src = venue.icon_url || venueIcons[venue.slug] || "/assets/default.png";
@@ -119,6 +123,13 @@ async function loadVenues() {
       const label = document.createElement("span");
       label.className = "venue-label";
       label.textContent = venue.name || venue.slug || "Unknown Venue";
+
+      if (Number(venue.notification_count || 0) > 0) {
+        const badge = document.createElement("span");
+        badge.className = "venue-notification";
+        badge.textContent = String(venue.notification_count);
+        pin.appendChild(badge);
+      }
 
       pin.appendChild(icon);
       pin.appendChild(label);
@@ -163,6 +174,16 @@ async function loadVenues() {
 
         if (venue.slug === "trailers") {
           window.location.href = "/venues/trailers/";
+          return;
+        }
+
+        if (venue.slug === "producers-office") {
+          window.location.href = "/venues/producers-office/";
+          return;
+        }
+
+        if (venue.slug === "directors-chair") {
+          window.location.href = "/venues/directors-chair/";
           return;
         }
 

@@ -1433,6 +1433,17 @@
         flipButton.textContent = nextFlipped ? "↺" : "↩";
       });
     }
+
+    for (const cardEl of container.querySelectorAll(".index-card-item")) {
+      cardEl.addEventListener("click", (event) => {
+        if (event.target.closest("button")) return;
+        const cardId = cardEl.getAttribute("data-card-id");
+        const card = cards.find((item) => item.element_id === cardId);
+        if (card) {
+          loadIndexCardEditor(card);
+        }
+      });
+    }
   }
 
   function renderIndexCardHistory(actions) {
@@ -1868,8 +1879,7 @@
     }
 
     const hasSelection = !!selectedElement;
-    const isIndexCard = String(selectedElement?.element_type || "").toLowerCase() === "index_card";
-    const revealHideAllowed = isIndexCard ? canManageIndexCards(currentRole) : canRevealHide(currentRole);
+    const revealHideAllowed = canRevealHide(currentRole);
 
     if (revealSelectedBtn) {
       revealSelectedBtn.disabled = !hasSelection;

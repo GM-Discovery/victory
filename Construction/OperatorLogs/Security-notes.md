@@ -389,6 +389,16 @@ This is not a complete security system. It is the first enforceable boundary.
 - Context is server-owned
 - `venue_slug` and `session_id` are stored for traceability
 
+## Kernel 15 venue/permission notes
+
+- `Producer's Office` is producer-only on the map.
+- `The Director's Chair` is producer/director-only on the map.
+- `GET /api/requests/incoming` is read-only and role-filtered by the server.
+- `POST /api/requests/respond` is the only response path and writes reviewed_by/reviewed_at server-side.
+- `GET /api/productions` is server-resolved and never trusts client-supplied production IDs as authority.
+- `POST /api/invites` now validates venue slugs and production scope before storing a scoped invite.
+- Office UIs show display names publicly; login handles are treated as internal identifiers.
+
 ### Limits
 - Body capped at 250 characters
 - No attachments

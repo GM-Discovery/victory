@@ -61,12 +61,12 @@ func StoreReveal(ctx context.Context, pool *pgxpool.Pool, req RevealRequest) (*S
 		return nil, errors.New("actor is not joined to session")
 	}
 
-	resolvedID, resolvedSlug, resolvedType, resolvedSurface, err := resolveRevealTarget(ctx, tx, req.SessionID, req.ElementID, req.ElementSlug)
+	resolvedID, resolvedSlug, _, resolvedSurface, err := resolveRevealTarget(ctx, tx, req.SessionID, req.ElementID, req.ElementSlug)
 	if err != nil {
 		return nil, err
 	}
 
-	if !isRevealableElement(resolvedType, resolvedSurface, resolvedSlug) {
+	if strings.TrimSpace(resolvedID) == "" || strings.TrimSpace(resolvedSurface) == "" {
 		return nil, errors.New("element is not revealable")
 	}
 
@@ -220,21 +220,4 @@ func resolveRevealTarget(ctx context.Context, tx pgx.Tx, sessionID, elementID, e
 	}
 
 	return resolvedID, resolvedSlug, elementType, surface, nil
-}
-
-func isRevealableElement(elementType, surface, slug string) bool {
-	elementType = strings.TrimSpace(strings.ToLower(elementType))
-	surface = strings.TrimSpace(strings.ToLower(surface))
-	_ = strings.TrimSpace(strings.ToLower(slug))
-
-	if surface == "" {
-		return false
-	}
-
-	switch elementType {
-	case "image", "prop", "set_piece", "overlay", "html", "text", "panel", "index_card":
-		return true
-	default:
-		return surface == "stage" || surface == "overlay"
-	}
 }

@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Producer's Office</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #15110f;
+      --panel: rgba(30, 24, 19, 0.94);
+      --panel-soft: rgba(20, 16, 13, 0.92);
+      --line: rgba(255, 228, 192, 0.14);
+      --accent: #efd6a5;
+      --accent-strong: #fff0d8;
+      --muted: #c8b6a0;
+      --warning: #d2a05d;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at 15% 0%, rgba(130, 92, 41, 0.28), transparent 26%),
+        radial-gradient(circle at 85% 10%, rgba(106, 74, 33, 0.18), transparent 22%),
+        linear-gradient(180deg, #15110f 0%, #0d0907 100%);
+      color: #f7ede0;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header,
+    .content {
+      max-width: 1180px;
+      width: 100%;
+      margin: 0 auto;
+      box-sizing: border-box;
+      padding: 24px;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: #d7b470;
+      font-size: 0.76rem;
+      margin: 0 0 8px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2.1rem, 4vw, 3.6rem);
+      line-height: 1.05;
+    }
+
+    .subtitle {
+      margin: 10px 0 0;
+      color: var(--muted);
+      max-width: 80ch;
+      line-height: 1.55;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .button,
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 999px;
+      text-decoration: none;
+      border: 1px solid var(--line);
+      padding: 11px 16px;
+      color: var(--accent-strong);
+      background: rgba(255, 255, 255, 0.03);
+      font-weight: 700;
+    }
+
+    .button {
+      background: linear-gradient(180deg, #6d4b26 0%, #4b341a 100%);
+    }
+
+    .grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: minmax(280px, 1.1fr) minmax(320px, 0.9fr);
+      align-items: start;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--panel);
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.25);
+      padding: 20px;
+    }
+
+    .card h2,
+    .card h3 {
+      margin: 0 0 12px;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .status {
+      min-height: 1.2em;
+      color: var(--warning);
+      margin-top: 10px;
+      line-height: 1.45;
+    }
+
+    .requests {
+      display: grid;
+      gap: 12px;
+    }
+
+    .request {
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: var(--panel-soft);
+    }
+
+    .request-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff5df;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .request-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    label {
+      display: block;
+      margin: 0 0 6px;
+      font-weight: 700;
+    }
+
+    input,
+    select,
+    textarea,
+    button {
+      font: inherit;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: #2b221b;
+      color: white;
+      margin-bottom: 14px;
+    }
+
+    textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+
+    .inline {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .small {
+      font-size: 0.92rem;
+    }
+
+    .chip-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 900px) {
+      .grid,
+      .inline {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell" id="office-shell" hidden>
+    <header class="header">
+      <p class="eyebrow">The Front Door Above the Lobby</p>
+      <h1>Producer's Office</h1>
+      <p class="subtitle">
+        This is where producers review directorship requests, issue venue access, and hand out production invitations. The goal is simple: let trusted people into the room so they can look around and begin playing without friction.
+      </p>
+      <div class="toolbar">
+        <a class="button" href="/">← Back to Map</a>
+        <a class="chip" href="/venues/audition-hall/">Open Audition Hall</a>
+        <a class="chip" href="/venues/directors-chair/">Open Director's Chair</a>
+      </div>
+    </header>
+
+    <main class="content grid">
+      <section class="card">
+        <h2>Incoming Requests</h2>
+        <p class="muted small">Pending director requests show up here. Use them as a signal that someone wants into the production.</p>
+        <div id="incoming-status" class="status"></div>
+        <div id="incoming-requests" class="requests">
+          <div class="muted">Loading requests...</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Grant Access / Invite</h2>
+        <p class="muted small">
+          Use an audience invite for venue access, or a production invite for cast, crew, and director permissions. People will see the public display name, not the private login handle.
+        </p>
+
+        <form id="invite-form">
+          <label for="target-role">Target Role</label>
+          <select id="target-role" required>
+            <option value="director">Director</option>
+            <option value="cast">Cast</option>
+            <option value="crew">Crew</option>
+            <option value="audience">Audience</option>
+          </select>
+
+          <div class="inline">
+            <div>
+              <label for="production-id">Current Production</label>
+              <select id="production-id">
+                <option value="">Loading productions...</option>
+              </select>
+            </div>
+            <div>
+              <label for="venue-slug">Venue</label>
+              <select id="venue-slug" required>
+                <option value="the-cave">The Cave</option>
+                <option value="workshop">Workshop</option>
+                <option value="audition-hall">Audition Hall</option>
+                <option value="greenroom">The Greenroom</option>
+                <option value="trailers">Trailers</option>
+                <option value="producers-office">Producer's Office</option>
+                <option value="directors-chair">The Director's Chair</option>
+              </select>
+            </div>
+          </div>
+
+          <label for="target-email">Invite Email</label>
+          <input id="target-email" type="email" placeholder="Optional email for the invite" />
+          <div class="muted small" style="margin-top:-8px; margin-bottom:14px;">
+            If you leave this blank, you still get a shareable invite code.
+          </div>
+
+          <label for="invite-note">Note</label>
+          <textarea id="invite-note" placeholder="Why are you granting this permission?"></textarea>
+
+          <div class="chip-list">
+            <button class="button" type="submit">Create Invite</button>
+          </div>
+        </form>
+
+        <div id="invite-status" class="status"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const forbiddenScreen = document.getElementById("forbidden-screen");
+    const officeShell = document.getElementById("office-shell");
+    const incomingRequests = document.getElementById("incoming-requests");
+    const incomingStatus = document.getElementById("incoming-status");
+    const inviteForm = document.getElementById("invite-form");
+    const inviteStatus = document.getElementById("invite-status");
+    const targetRole = document.getElementById("target-role");
+    const productionID = document.getElementById("production-id");
+    const venueSlug = document.getElementById("venue-slug");
+
+    const officeAccess = new Set(["producer"]);
+
+    const venueOptions = [
+      "the-cave",
+      "workshop",
+      "audition-hall",
+      "greenroom",
+      "trailers",
+      "producers-office",
+      "directors-chair",
+    ];
+
+    function showForbidden() {
+      if (forbiddenScreen) forbiddenScreen.hidden = false;
+      if (officeShell) officeShell.hidden = true;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function setStatus(el, text) {
+      if (el) el.textContent = text;
+    }
+
+    function renderRequests(rows) {
+      if (!rows.length) {
+        incomingRequests.innerHTML = `<div class="muted">No pending director requests right now.</div>`;
+        return;
+      }
+
+      incomingRequests.innerHTML = rows.map((row) => `
+        <div class="request">
+          <div class="request-head">
+            <strong>${escapeHtml(row.display_name || row.user_id)}</strong>
+            <span class="badge">${escapeHtml(row.requested_role)}</span>
+          </div>
+          <div class="muted small"><strong>Venue:</strong> ${escapeHtml(row.venue_slug || "(none)")}</div>
+          <div class="muted small"><strong>Submitted:</strong> ${escapeHtml(row.created_at)}</div>
+          <div class="muted small" style="margin-top:8px;"><strong>Note:</strong> ${escapeHtml(row.note || "(none)")}</div>
+          <div class="chip-list" style="margin-top:12px;">
+            <button class="button" type="button" data-request-action="approve" data-request-id="${escapeHtml(row.id)}">Approve</button>
+            <button class="chip" type="button" data-request-action="deny" data-request-id="${escapeHtml(row.id)}">Deny</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    async function respondToRequest(requestId, decision) {
+      setStatus(incomingStatus, `${decision === "approve" ? "Approving" : "Denying"} request...`);
+      const response = await fetch("/api/requests/respond", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          request_id: requestId,
+          decision,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || `Request update failed (HTTP ${response.status})`);
+      }
+      await loadIncomingRequests();
+      setStatus(incomingStatus, decision === "approve" ? "Request approved." : "Request denied.");
+    }
+
+    async function loadProductions() {
+      productionID.innerHTML = `<option value="">Loading productions...</option>`;
+      try {
+        const res = await fetch("/api/productions", { credentials: "include" });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Failed to load productions (HTTP ${res.status})`);
+        }
+        const rows = Array.isArray(payload.data) ? payload.data : [];
+        productionID.innerHTML = "";
+        if (!rows.length) {
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "No productions available";
+          productionID.appendChild(option);
+          productionID.disabled = true;
+          return;
+        }
+        for (const row of rows) {
+          const option = document.createElement("option");
+          option.value = row.id;
+          option.textContent = row.name || row.slug || row.id;
+          productionID.appendChild(option);
+        }
+        if (rows.length === 1) {
+          productionID.selectedIndex = 0;
+        }
+      } catch (error) {
+        productionID.innerHTML = `<option value="">Unavailable</option>`;
+        productionID.disabled = true;
+        console.error(error);
+      }
+    }
+
+    async function loadIncomingRequests() {
+      setStatus(incomingStatus, "Loading incoming requests...");
+      try {
+        const res = await fetch("/api/requests/incoming", { credentials: "include" });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Failed to load incoming requests (HTTP ${res.status})`);
+        }
+        const rows = Array.isArray(payload.data) ? payload.data : [];
+        setStatus(incomingStatus, rows.length ? `${rows.length} pending request${rows.length === 1 ? "" : "s"}` : "No pending requests.");
+        renderRequests(rows);
+      } catch (error) {
+        setStatus(incomingStatus, error.message || String(error));
+        incomingRequests.innerHTML = `<div class="muted">${escapeHtml(error.message || String(error))}</div>`;
+      }
+    }
+
+    inviteForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      setStatus(inviteStatus, "Creating invite...");
+
+      const selectedRole = targetRole.value;
+      const selectedProduction = productionID.value.trim();
+      const selectedVenue = venueSlug.value.trim();
+      const note = document.getElementById("invite-note").value.trim();
+      const email = document.getElementById("target-email").value.trim();
+
+      if (selectedRole === "director" && !selectedProduction) {
+        setStatus(inviteStatus, "Pick a production for director invites.");
+        return;
+      }
+
+      if (selectedRole === "audience" && !selectedVenue) {
+        setStatus(inviteStatus, "Pick a venue for audience access.");
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/invites", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            target_role: selectedRole,
+            target_email: email,
+            production_id: selectedProduction,
+            venue_slug: selectedVenue,
+            expires_in_hours: 72,
+            max_uses: 1,
+            note,
+          }),
+        });
+
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Invite failed (HTTP ${response.status})`);
+        }
+
+        setStatus(inviteStatus, `Invite created. Token: ${payload.data?.token || "(hidden)"}`);
+        await loadIncomingRequests();
+      } catch (error) {
+        setStatus(inviteStatus, error.message || String(error));
+      }
+    });
+
+    (async () => {
+      try {
+        const response = await fetch("/api/session/me", { credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (!payload?.signed_in) {
+          showForbidden();
+          return;
+        }
+
+        const role = String(payload?.data?.role || "").toLowerCase();
+        if (!officeAccess.has(role) && !payload?.data?.is_operator) {
+          showForbidden();
+          return;
+        }
+
+        officeShell.hidden = false;
+
+        for (const option of Array.from(venueSlug.options)) {
+          if (option.value === "audition-hall" || venueOptions.includes(option.value)) {
+            option.hidden = false;
+          }
+        }
+
+        await Promise.all([loadProductions(), loadIncomingRequests()]);
+      } catch (error) {
+        console.error("producer office bootstrap failed", error);
+        showForbidden();
+      }
+    })();
+
+    incomingRequests?.addEventListener("click", async (event) => {
+      const button = event.target.closest("button[data-request-action][data-request-id]");
+      if (!button) return;
+      const requestId = button.getAttribute("data-request-id");
+      const decision = button.getAttribute("data-request-action");
+      try {
+        await respondToRequest(requestId, decision);
+      } catch (error) {
+        setStatus(incomingStatus, error.message || String(error));
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,419 @@
+package identity
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strings"
+	"time"
+
+	"victory/backend/internal/access"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type incomingPermissionRequestRow struct {
+	ID            string `json:"id"`
+	UserID        string `json:"user_id"`
+	Handle        string `json:"handle"`
+	DisplayName   string `json:"display_name"`
+	VenueSlug     string `json:"venue_slug"`
+	RequestedRole string `json:"requested_role"`
+	Note          string `json:"note"`
+	Status        string `json:"status"`
+	CreatedAt     string `json:"created_at"`
+}
+
+type productionRow struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	LocationSlug string `json:"location_slug"`
+}
+
+type respondPermissionRequestInput struct {
+	RequestID string `json:"request_id"`
+	Decision  string `json:"decision"`
+}
+
+func HandleListIncomingPermissionRequests(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method_not_allowed"})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		userID, err := currentUserID(ctx, pool, r)
+		if err != nil || strings.TrimSpace(userID) == "" {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "not_authenticated"})
+			return
+		}
+
+		allowed, err := access.IsOperatorUser(ctx, pool, userID)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "operator_lookup_failed"})
+			return
+		}
+
+		locationRole, locationID, err := resolveInviteAuthorityScope(ctx, pool, userID)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "authority_lookup_failed"})
+			return
+		}
+
+		if !allowed && locationRole != "producer" && locationRole != "director" {
+			writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "forbidden"})
+			return
+		}
+
+		rows, err := pool.Query(ctx, `
+			SELECT
+			  pr.id::text,
+			  pr.user_id::text,
+			  COALESCE(NULLIF(u.handle, ''), LEFT(u.id::text, 8), 'Unknown Participant'),
+			  COALESCE(NULLIF(u.display_name, ''), NULLIF(u.handle, ''), LEFT(u.id::text, 8), 'Unknown Participant'),
+			  pr.venue_slug,
+			  pr.requested_role::text,
+			  COALESCE(pr.note, ''),
+			  pr.status,
+			  pr.created_at::text
+			FROM permission_requests pr
+			JOIN users u ON u.id = pr.user_id
+			WHERE pr.status = 'pending'
+			  AND (
+			    $1::boolean = TRUE
+			    OR ($2 = 'producer' AND pr.requested_role::text = 'director')
+			    OR ($2 = 'director' AND pr.requested_role::text IN ('cast', 'crew'))
+			  )
+			ORDER BY pr.created_at DESC
+		`, allowed, locationRole)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "query_failed"})
+			return
+		}
+		defer rows.Close()
+
+		var out []incomingPermissionRequestRow
+		for rows.Next() {
+			var row incomingPermissionRequestRow
+			if err := rows.Scan(&row.ID, &row.UserID, &row.Handle, &row.DisplayName, &row.VenueSlug, &row.RequestedRole, &row.Note, &row.Status, &row.CreatedAt); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "scan_failed"})
+				return
+			}
+			out = append(out, row)
+		}
+		if err := rows.Err(); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "query_failed"})
+			return
+		}
+
+		_ = locationID
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":   true,
+			"data": out,
+		})
+	}
+}
+
+func HandleListProductions(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method_not_allowed"})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		userID, err := currentUserID(ctx, pool, r)
+		if err != nil || strings.TrimSpace(userID) == "" {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "not_authenticated"})
+			return
+		}
+
+		if ok, err := access.IsOperatorUser(ctx, pool, userID); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "operator_lookup_failed"})
+			return
+		} else if ok {
+			rows, err := pool.Query(ctx, `
+				SELECT
+				  p.id::text,
+				  p.name,
+				  p.slug,
+				  l.slug
+				FROM productions p
+				JOIN locations l ON l.id = p.location_id
+				ORDER BY p.created_at ASC
+			`)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "query_failed"})
+				return
+			}
+			defer rows.Close()
+
+			var out []productionRow
+			for rows.Next() {
+				var row productionRow
+				if err := rows.Scan(&row.ID, &row.Name, &row.Slug, &row.LocationSlug); err != nil {
+					writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "scan_failed"})
+					return
+				}
+				out = append(out, row)
+			}
+			if err := rows.Err(); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "query_failed"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": out})
+			return
+		}
+
+		_, locationID, err := resolveInviteAuthorityScope(ctx, pool, userID)
+		if err != nil {
+			writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "forbidden"})
+			return
+		}
+
+		rows, err := pool.Query(ctx, `
+			SELECT
+			  p.id::text,
+			  p.name,
+			  p.slug,
+			  l.slug
+			FROM productions p
+			JOIN locations l ON l.id = p.location_id
+			WHERE p.location_id = $1
+			ORDER BY p.created_at ASC
+		`, locationID)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "query_failed"})
+			return
+		}
+		defer rows.Close()
+
+		var out []productionRow
+		for rows.Next() {
+			var row productionRow
+			if err := rows.Scan(&row.ID, &row.Name, &row.Slug, &row.LocationSlug); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "scan_failed"})
+				return
+			}
+			out = append(out, row)
+		}
+		if err := rows.Err(); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "query_failed"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": out})
+	}
+}
+
+func HandleRespondPermissionRequest(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method_not_allowed"})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+
+		userID, err := currentUserID(ctx, pool, r)
+		if err != nil || strings.TrimSpace(userID) == "" {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "not_authenticated"})
+			return
+		}
+
+		authorityRole, locationID, err := resolveInviteAuthorityScope(ctx, pool, userID)
+		if err != nil {
+			writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "forbidden"})
+			return
+		}
+
+		allowedToReview := authorityRole == "producer" || authorityRole == "director"
+		if !allowedToReview {
+			writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "forbidden"})
+			return
+		}
+
+		var input respondPermissionRequestInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid_json"})
+			return
+		}
+
+		requestID := strings.TrimSpace(input.RequestID)
+		decision := strings.ToLower(strings.TrimSpace(input.Decision))
+		if requestID == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "request_id_required"})
+			return
+		}
+		if decision != "approve" && decision != "deny" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "decision_required"})
+			return
+		}
+
+		var requestUserID, venueSlug, requestedRole, requestStatus, venueID string
+		err = pool.QueryRow(ctx, `
+			SELECT
+			  pr.user_id::text,
+			  pr.venue_slug,
+			  pr.requested_role::text,
+			  pr.status,
+			  v.id::text
+			FROM permission_requests pr
+			JOIN venues v ON v.slug = pr.venue_slug
+			JOIN lots l ON l.id = v.lot_id
+			WHERE pr.id = $1::uuid
+			  AND l.location_id = $2::uuid
+			LIMIT 1
+		`, requestID, locationID).Scan(&requestUserID, &venueSlug, &requestedRole, &requestStatus, &venueID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "request_not_found"})
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "query_failed"})
+			return
+		}
+
+		if requestStatus != "pending" {
+			writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "error": "request_already_reviewed"})
+			return
+		}
+
+		switch authorityRole {
+		case "producer":
+		case "director":
+			if requestedRole == "director" {
+				writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "insufficient_role"})
+				return
+			}
+		}
+
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "tx_begin_failed"})
+			return
+		}
+		defer tx.Rollback(ctx)
+
+		if decision == "approve" {
+			switch requestedRole {
+			case "director", "cast", "crew":
+				var productionID string
+				if err := tx.QueryRow(ctx, `
+					SELECT p.id::text
+					FROM productions p
+					WHERE p.location_id = $1::uuid
+					ORDER BY p.created_at ASC
+					LIMIT 1
+				`, locationID).Scan(&productionID); err != nil {
+					writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "production_required"})
+					return
+				}
+
+				_, err = tx.Exec(ctx, `
+					INSERT INTO memberships (location_id, user_id, role, production_id, granted_by_user_id, active)
+					VALUES ($1, $2, $3::location_role, $4::uuid, $5, TRUE)
+					ON CONFLICT DO NOTHING
+				`, locationID, requestUserID, requestedRole, productionID, userID)
+				if err != nil {
+					writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "membership_create_failed"})
+					return
+				}
+			default:
+				_, err = tx.Exec(ctx, `
+					INSERT INTO access_grants (location_id, user_id, grant_type, venue_id, granted_by_user_id, created_at)
+					VALUES ($1, $2, 'venue_access', $3::uuid, $4, NOW())
+					ON CONFLICT DO NOTHING
+				`, locationID, requestUserID, venueID, userID)
+				if err != nil {
+					writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "grant_create_failed"})
+					return
+				}
+			}
+		}
+
+		_, err = tx.Exec(ctx, `
+			UPDATE permission_requests
+			SET status = $2,
+			    reviewed_by = $3,
+			    reviewed_at = NOW()
+			WHERE id = $1::uuid
+		`, requestID, map[string]string{"approve": "approved", "deny": "denied"}[decision], userID)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "request_update_failed"})
+			return
+		}
+
+		if err := tx.Commit(ctx); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "tx_commit_failed"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok": true,
+			"data": map[string]any{
+				"request_id":     requestID,
+				"decision":       decision,
+				"venue_slug":     venueSlug,
+				"requested_role": requestedRole,
+			},
+		})
+	}
+}
+
+func resolveInviteAuthorityScope(ctx context.Context, pool *pgxpool.Pool, userID string) (string, string, error) {
+	if ok, err := access.IsOperatorUser(ctx, pool, userID); err != nil {
+		return "", "", err
+	} else if ok {
+		var locationID string
+		if err := pool.QueryRow(ctx, `
+			SELECT id::text
+			FROM locations
+			WHERE slug = 'amurray-family'
+			LIMIT 1
+		`).Scan(&locationID); err != nil {
+			return "", "", err
+		}
+		return "producer", locationID, nil
+	}
+
+	var locationID, role string
+	err := pool.QueryRow(ctx, `
+		SELECT lm.location_id::text, lm.role::text
+		FROM location_memberships lm
+		WHERE lm.user_id = $1
+		  AND lm.active = TRUE
+		ORDER BY
+		  CASE lm.role
+			WHEN 'producer' THEN 1
+			WHEN 'director' THEN 2
+			WHEN 'cast' THEN 3
+			WHEN 'crew' THEN 4
+			WHEN 'audience' THEN 5
+			ELSE 99
+		  END,
+		  lm.created_at ASC
+		LIMIT 1
+	`, userID).Scan(&locationID, &role)
+	if err != nil {
+		return "", "", err
+	}
+
+	switch role {
+	case "producer", "director", "cast", "crew", "audience":
+		return role, locationID, nil
+	default:
+		return "", "", pgx.ErrNoRows
+	}
+}
