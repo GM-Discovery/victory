@@ -94,10 +94,12 @@ func TestKernel8IdentitySurfaceAndPersonaNull(t *testing.T) {
 	oldSpeak := storeSpeakFunc
 	oldReact := storeReactionFunc
 	oldReveal := storeRevealFunc
+	oldChat := storeChatMessageFunc
 	defer func() {
 		storeSpeakFunc = oldSpeak
 		storeReactionFunc = oldReact
 		storeRevealFunc = oldReveal
+		storeChatMessageFunc = oldChat
 	}()
 
 	storeSpeakFunc = func(ctx context.Context, pool *pgxpool.Pool, sessionID, actorID, text string) (*actions.StoredAction, error) {
@@ -138,6 +140,24 @@ func TestKernel8IdentitySurfaceAndPersonaNull(t *testing.T) {
 	}
 	storeRevealFunc = func(ctx context.Context, pool *pgxpool.Pool, req actions.RevealRequest) (*actions.StoredAction, error) {
 		return &actions.StoredAction{}, nil
+	}
+	storeChatMessageFunc = func(ctx context.Context, pool *pgxpool.Pool, req actions.ChatMessageRequest) (*actions.StoredAction, error) {
+		return &actions.StoredAction{
+			ID:        "action-chat",
+			SessionID: req.SessionID,
+			MomentID:  3,
+			ActorID:   req.ActorID,
+			Actor: map[string]any{
+				"user_id":      req.ActorID,
+				"handle":       "audience",
+				"display_name": "Audience Grant",
+				"role":         "audience",
+				"persona":      nil,
+			},
+			Persona: nil,
+			Type:    "chat/message",
+			Payload: map[string]any{"text": req.Text},
+		}, nil
 	}
 
 	actionHub := NewHub()
@@ -183,7 +203,26 @@ func TestKernel8IdentitySurfaceAndPersonaNull(t *testing.T) {
 	}
 	t.Logf("REACTION %s", testJSON(reaction))
 
-	t.Log("KERNEL8_PROOF PASS")
+	chatty := &Client{UserID: audience.UserID, SessionID: sessionID}
+	handleCavePayload(actionHub, nil, chatty, map[string]any{
+		"type":       "chat/message",
+		"session_id": sessionID,
+		"text":       "This is just venue chat.",
+		"actor_id":   "spoofed-user-id",
+		"role":       "producer",
+	})
+	chat := recvJSON(t, actionReceiver.Send)
+	if chat["type"] != "action" {
+		t.Fatalf("expected action broadcast, got %v", chat["type"])
+	}
+	assertActionActor(t, chat["data"], audience.UserID, "audience")
+	assertPersonaNull(t, chat["data"])
+	if got := actionText(t, chat["data"]); got != "This is just venue chat." {
+		t.Fatalf("expected chat text, got %q", got)
+	}
+	t.Logf("CHAT %s", testJSON(chat))
+
+	t.Log("KERNEL21_PROOF PASS")
 }
 
 func TestKernel12IndexCardActionAuthorityAndBroadcast(t *testing.T) {

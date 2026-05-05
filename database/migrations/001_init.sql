@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS elements (
   name TEXT NOT NULL,
   slug TEXT NOT NULL,
   element_type TEXT NOT NULL,
+  context_class TEXT NOT NULL DEFAULT '',
   state element_state NOT NULL DEFAULT 'library',
   data JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -172,9 +173,33 @@ CREATE INDEX IF NOT EXISTS idx_session_participants_session_id
 CREATE INDEX IF NOT EXISTS idx_session_participants_user_id
   ON session_participants(user_id);
 
+CREATE TABLE IF NOT EXISTS showings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE UNIQUE,
+  production_id UUID NOT NULL REFERENCES productions(id) ON DELETE RESTRICT,
+  venue_id UUID NOT NULL REFERENCES venues(id) ON DELETE RESTRICT,
+  run_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
+  status session_status NOT NULL DEFAULT 'rehearsal',
+  audience_view_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ended_at TIMESTAMPTZ,
+  created_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_showings_production_id
+  ON showings(production_id);
+
+CREATE INDEX IF NOT EXISTS idx_showings_venue_id
+  ON showings(venue_id);
+
+CREATE INDEX IF NOT EXISTS idx_showings_status
+  ON showings(status);
+
 CREATE TABLE IF NOT EXISTS actions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  showing_id UUID REFERENCES showings(id) ON DELETE CASCADE,
   moment_id BIGINT NOT NULL,
   actor_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   type TEXT NOT NULL,
@@ -189,6 +214,9 @@ CREATE TABLE IF NOT EXISTS actions (
 
 CREATE INDEX IF NOT EXISTS idx_actions_session_id
   ON actions(session_id);
+
+CREATE INDEX IF NOT EXISTS idx_actions_showing_id
+  ON actions(showing_id);
 
 CREATE INDEX IF NOT EXISTS idx_actions_actor_id
   ON actions(actor_id);

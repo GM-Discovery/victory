@@ -6,34 +6,24 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"unicode/utf8"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/showings"
 )
 
-type OverlayRequest struct {
-	SessionID   string `json:"session_id"`
-	ActorID     string `json:"actor_id"`
-	ElementID   string `json:"element_id"`
-	ElementSlug string `json:"element_slug"`
-	OverlayType string `json:"overlay_type"`
+type ChatMessageRequest struct {
+	SessionID string `json:"session_id"`
+	ActorID   string `json:"actor_id"`
+	Text      string `json:"text"`
 }
 
-func StoreOverlayShow(ctx context.Context, pool *pgxpool.Pool, req OverlayRequest) (*StoredAction, error) {
-	return storeOverlayAction(ctx, pool, req, "act/show_overlay")
-}
-
-func StoreOverlayHide(ctx context.Context, pool *pgxpool.Pool, req OverlayRequest) (*StoredAction, error) {
-	return storeOverlayAction(ctx, pool, req, "act/hide_overlay")
-}
-
-func storeOverlayAction(ctx context.Context, pool *pgxpool.Pool, req OverlayRequest, actionType string) (*StoredAction, error) {
+func StoreChatMessage(ctx context.Context, pool *pgxpool.Pool, req ChatMessageRequest) (*StoredAction, error) {
 	req.SessionID = strings.TrimSpace(req.SessionID)
 	req.ActorID = strings.TrimSpace(req.ActorID)
-	req.ElementID = strings.TrimSpace(req.ElementID)
-	req.ElementSlug = strings.TrimSpace(req.ElementSlug)
-	req.OverlayType = strings.TrimSpace(strings.ToLower(req.OverlayType))
+	req.Text = strings.TrimSpace(req.Text)
 
 	if req.SessionID == "" {
 		return nil, errors.New("session_id is required")
@@ -41,11 +31,11 @@ func storeOverlayAction(ctx context.Context, pool *pgxpool.Pool, req OverlayRequ
 	if req.ActorID == "" {
 		return nil, errors.New("actor_id is required")
 	}
-	if req.ElementID == "" && req.ElementSlug == "" {
-		return nil, errors.New("element_id or element_slug is required")
+	if req.Text == "" {
+		return nil, errors.New("text is required")
 	}
-	if actionType == "act/show_overlay" && req.OverlayType != "text" && req.OverlayType != "image" {
-		return nil, errors.New("invalid overlay type")
+	if utf8.RuneCountInString(req.Text) > 250 {
+		return nil, errors.New("message_too_long")
 	}
 
 	tx, err := pool.Begin(ctx)
@@ -54,21 +44,7 @@ func storeOverlayAction(ctx context.Context, pool *pgxpool.Pool, req OverlayRequ
 	}
 	defer tx.Rollback(ctx)
 
-	resolvedID, resolvedSlug, _, resolvedSurface, err := resolveRevealTarget(ctx, tx, req.SessionID, req.ElementID, req.ElementSlug)
-	if err != nil {
-		return nil, err
-	}
-	if strings.ToLower(strings.TrimSpace(resolvedSurface)) != "stage" {
-		return nil, errors.New("element is not revealable")
-	}
-
-	target := ActionTarget{
-		Kind:        "element",
-		ElementID:   resolvedID,
-		ElementSlug: resolvedSlug,
-		Layer:       "stage",
-	}
-	decision, err := CanAct(ctx, tx, req.ActorID, actionType, req.SessionID, target)
+	decision, err := CanAct(ctx, tx, req.ActorID, "chat/message", req.SessionID, ActionTarget{Kind: "session"})
 	if err != nil {
 		return nil, err
 	}
@@ -95,15 +71,15 @@ func storeOverlayAction(ctx context.Context, pool *pgxpool.Pool, req OverlayRequ
 		return nil, err
 	}
 
-	payload := map[string]any{
-		"overlay_type": req.OverlayType,
+	target := map[string]any{
+		"kind": "session",
+		"id":   req.SessionID,
 	}
-	targetPayload := map[string]any{
-		"element_id":   resolvedID,
-		"element_slug": resolvedSlug,
+	payload := map[string]any{
+		"text": req.Text,
 	}
 	scope := map[string]any{
-		"surfaces":         []string{"overlay"},
+		"surfaces":         []string{"chat"},
 		"audienceSegments": []string{"all"},
 	}
 	visibility := map[string]any{
@@ -111,7 +87,7 @@ func storeOverlayAction(ctx context.Context, pool *pgxpool.Pool, req OverlayRequ
 		"privateTo": []string{},
 	}
 
-	targetJSON, _ := json.Marshal(targetPayload)
+	targetJSON, _ := json.Marshal(target)
 	payloadJSON, _ := json.Marshal(payload)
 	scopeJSON, _ := json.Marshal(scope)
 	visibilityJSON, _ := json.Marshal(visibility)
@@ -131,9 +107,9 @@ func storeOverlayAction(ctx context.Context, pool *pgxpool.Pool, req OverlayRequ
 			showing_id,
 			recorded
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE)
+		VALUES ($1, $2, $3, 'chat/message', $4, $5, $6, $7, $8, TRUE)
 		RETURNING id, ts
-	`, req.SessionID, nextMoment, req.ActorID, actionType, targetJSON, payloadJSON, scopeJSON, visibilityJSON, showing.ID).
+	`, req.SessionID, nextMoment, req.ActorID, targetJSON, payloadJSON, scopeJSON, visibilityJSON, showing.ID).
 		Scan(&out.ID, &ts); err != nil {
 		return nil, err
 	}
@@ -157,12 +133,54 @@ func storeOverlayAction(ctx context.Context, pool *pgxpool.Pool, req OverlayRequ
 		"persona":      nil,
 	}
 	out.Persona = nil
-	out.Type = actionType
-	out.Target = targetPayload
+	out.Type = "chat/message"
+	out.Target = target
 	out.Payload = payload
 	out.Scope = scope
 	out.Visibility = visibility
 	out.Timestamp = ts.UTC().Format(time.RFC3339)
 
 	return &out, nil
+}
+
+func canActChatMessage(ctx context.Context, q actionQuerier, userID, sessionID string) (Decision, error) {
+	var (
+		participantRole string
+		chatEnabled     bool
+		talkingEnabled  bool
+	)
+
+	err := q.QueryRow(ctx, `
+		SELECT
+			sp.role::text,
+			COALESCE((v.config ->> 'chat_enabled')::boolean, FALSE),
+			COALESCE((v.config ->> 'talking_enabled')::boolean, FALSE)
+		FROM sessions s
+		JOIN venues v ON v.id = s.venue_id
+		JOIN session_participants sp ON sp.session_id = s.id
+		WHERE s.id = $1
+		  AND sp.user_id = $2
+		LIMIT 1
+	`, sessionID, userID).Scan(&participantRole, &chatEnabled, &talkingEnabled)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Decision{Allowed: false, Reason: "not_session_participant"}, nil
+		}
+		return Decision{}, err
+	}
+
+	if !chatEnabled {
+		return Decision{Allowed: false, Reason: "policy_denied"}, nil
+	}
+
+	if talkingEnabled {
+		return Decision{Allowed: true, Reason: "allowed"}, nil
+	}
+
+	switch normalizeActionRole(participantRole) {
+	case "producer", "director", "cast", "crew":
+		return Decision{Allowed: true, Reason: "allowed"}, nil
+	default:
+		return Decision{Allowed: false, Reason: "insufficient_role"}, nil
+	}
 }

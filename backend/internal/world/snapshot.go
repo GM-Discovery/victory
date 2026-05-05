@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"victory/backend/internal/showings"
 )
 
 type Snapshot struct {
@@ -15,6 +17,7 @@ type Snapshot struct {
 	Lot      string          `json:"lot"`
 	Venue    Venue           `json:"venue"`
 	Session  Session         `json:"session"`
+	Showing  Showing         `json:"showing"`
 	Elements []PlacedElement `json:"elements"`
 	Overlay  *Overlay        `json:"overlay,omitempty"`
 	Actions  []Action        `json:"actions"`
@@ -33,6 +36,8 @@ type Session struct {
 	Status    string `json:"status"`
 	StartedAt string `json:"started_at"`
 }
+
+type Showing = showings.Showing
 
 type PlacedElement struct {
 	ElementID    string         `json:"element_id"`
@@ -64,6 +69,7 @@ type Action struct {
 	ID               string         `json:"id"`
 	MomentID         int64          `json:"moment_id"`
 	ActorID          string         `json:"actor_id"`
+	ShowingID        string         `json:"showing_id,omitempty"`
 	ActorDisplayName string         `json:"actor_display_name,omitempty"`
 	ActorHandle      string         `json:"actor_handle,omitempty"`
 	ActorRole        string         `json:"actor_role,omitempty"`
@@ -96,11 +102,22 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 			v.config,
 			s.id,
 			s.status,
-			s.started_at
+			s.started_at,
+			COALESCE(sh.id::text, ''),
+			COALESCE(sh.production_id::text, ''),
+			COALESCE(sh.venue_id::text, ''),
+			COALESCE(sh.run_id::text, ''),
+			COALESCE(sh.status::text, ''),
+			COALESCE(sh.audience_view_enabled, FALSE),
+			COALESCE(sh.started_at::text, ''),
+			COALESCE(sh.ended_at::text, ''),
+			COALESCE(sh.created_by::text, ''),
+			COALESCE(sh.session_id::text, '')
 		FROM venues v
 		JOIN lots lo ON lo.id = v.lot_id
 		JOIN locations l ON l.id = lo.location_id
 		LEFT JOIN sessions s ON s.venue_id = v.id AND s.status IN ('rehearsal', 'live')
+		LEFT JOIN showings sh ON sh.session_id = s.id
 		WHERE v.slug = 'the-cave'
 		ORDER BY s.started_at DESC NULLS LAST
 		LIMIT 1
@@ -115,6 +132,16 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 		&snap.Session.ID,
 		&snap.Session.Status,
 		&startedAt,
+		&snap.Showing.ID,
+		&snap.Showing.ProductionID,
+		&snap.Showing.VenueID,
+		&snap.Showing.RunID,
+		&snap.Showing.Status,
+		&snap.Showing.AudienceViewEnabled,
+		&snap.Showing.StartedAt,
+		&snap.Showing.EndedAt,
+		&snap.Showing.CreatedBy,
+		&snap.Showing.SessionID,
 	)
 	if err != nil {
 		return nil, err
@@ -131,6 +158,7 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 			e.id,
 			e.name,
 			e.slug,
+			COALESCE(NULLIF(e.context_class, ''), '') AS context_class,
 			e.element_type,
 			vle.surface,
 			vle.position,
@@ -140,6 +168,7 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 		JOIN elements e ON e.id = vle.element_id
 		JOIN venues v ON v.id = vle.venue_id
 		WHERE v.slug = 'the-cave'
+		  AND e.state <> 'deleted'
 		ORDER BY e.name ASC
 	`)
 	if err != nil {
@@ -155,6 +184,7 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 			&item.ElementID,
 			&item.Name,
 			&item.Slug,
+			&item.ContextClass,
 			&item.ElementType,
 			&item.Surface,
 			&posRaw,
@@ -167,7 +197,11 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 		item.Position = decodeJSONMap(posRaw)
 		item.Visibility = decodeJSONMap(visRaw)
 		item.Data = decodeJSONMap(dataRaw)
-		item.ContextClass = deriveElementContextClass(item.ElementType, item.Slug, item.Data)
+		if value := strings.TrimSpace(item.ContextClass); value != "" {
+			item.ContextClass = strings.ToLower(value)
+		} else {
+			item.ContextClass = deriveElementContextClass(item.ElementType, item.Slug, item.Data)
+		}
 		snap.Elements = append(snap.Elements, item)
 	}
 
@@ -188,6 +222,7 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 			COALESCE(NULLIF(u.handle, ''), LEFT(u.id::text, 8), 'Unknown Participant'),
 			COALESCE(sp.role::text, 'audience'),
 			a.type,
+			COALESCE(a.showing_id::text, ''),
 			a.target,
 			a.payload,
 			a.scope,
@@ -218,6 +253,7 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 			&a.ActorHandle,
 			&a.ActorRole,
 			&a.Type,
+			&a.ShowingID,
 			&targetRaw,
 			&payloadRaw,
 			&scopeRaw,
@@ -320,7 +356,7 @@ func deriveElementContextClass(elementType, slug string, data map[string]any) st
 
 	switch strings.ToLower(strings.TrimSpace(slug)) {
 	case "first-fire":
-		return "prop"
+		return "scenery"
 	}
 
 	return "system"

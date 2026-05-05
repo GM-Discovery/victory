@@ -427,7 +427,7 @@ This is not a complete security system. It is the first enforceable boundary.
 - The server decides whether `create/index_card` or `update/index_card` is allowed
 
 ### Storage
-- Index cards are materialized as `elements.element_type = 'index_card'`
+- Index cards are materialized as `elements.element_type = 'index_card'` and `elements.context_class = 'card'`
 - Save actions are appended to the action log
 - Card metadata is server-owned, including creator fields and timestamps
 
@@ -442,6 +442,32 @@ This is not a complete security system. It is the first enforceable boundary.
 - No drag/drop
 - No images
 - No separate card universe
+
+## 16. Context Class Distinction
+
+### Storage
+- `elements.context_class` is persisted in Postgres for later use
+- `prop` means mobile
+- `scenery` means fixed set piece / stage anchor
+- `card` means index card
+- future element classes should be stored explicitly rather than inferred only in the UI
+
+### Current Seed
+- `first-fire` is treated as fixed `scenery`
+
+### Chat Boundary
+- Venue chat must remain separate from `perform/speak`
+- Kernel 21 chat should use `chat/message` and not stage speech semantics
+- Chat is session-scoped and stored in the action log, not in a separate chat transport
+
+## Kernel 22 Showing Model
+
+- Presence is ephemeral and tells us who is connected right now.
+- Showing is durable and records the theatrical event.
+- `showing_id` is server-owned and now attaches to Cave actions.
+- A closed showing must reject new chat, reveal/hide, overlay, and card placement.
+- Reconnects should not create a new showing.
+- The Cave chat lane stays in the bottom panel; `perform/speak` remains the stage speech lane.
 
 ## 15. Kernel 13 Workshop Placement Boundaries
 

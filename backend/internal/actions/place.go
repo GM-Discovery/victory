@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/access"
+	"victory/backend/internal/showings"
 )
 
 type PlaceElementRequest struct {
@@ -61,6 +62,11 @@ func StorePlaceElement(ctx context.Context, pool *pgxpool.Pool, req PlaceElement
 	}
 	if !decision.Allowed {
 		return nil, &ActionDeniedError{Reason: decision.Reason}
+	}
+
+	showing, err := showings.EnsureForSession(ctx, tx, req.SessionID, req.ActorID)
+	if err != nil {
+		return nil, err
 	}
 
 	elementID, elementSlug, err := resolveIndexCardElement(ctx, tx, req.ElementID, req.ElementSlug)
@@ -180,11 +186,12 @@ func StorePlaceElement(ctx context.Context, pool *pgxpool.Pool, req PlaceElement
 			payload,
 			scope,
 			visibility,
+			showing_id,
 			recorded
 		)
-		VALUES ($1, $2, $3, 'act/place_element', $4, $5, $6, $7, TRUE)
+		VALUES ($1, $2, $3, 'act/place_element', $4, $5, $6, $7, $8, TRUE)
 		RETURNING id, ts
-	`, req.SessionID, nextMoment, req.ActorID, targetJSON, payloadJSON, scopeJSON, visibilityJSON2).
+	`, req.SessionID, nextMoment, req.ActorID, targetJSON, payloadJSON, scopeJSON, visibilityJSON2, showing.ID).
 		Scan(&out.ID, &ts); err != nil {
 		return nil, err
 	}
@@ -194,6 +201,7 @@ func StorePlaceElement(ctx context.Context, pool *pgxpool.Pool, req PlaceElement
 	}
 
 	out.SessionID = req.SessionID
+	out.ShowingID = showing.ID
 	out.MomentID = nextMoment
 	out.ActorID = req.ActorID
 	out.ActorDisplayName = displayName

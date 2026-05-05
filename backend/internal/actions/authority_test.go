@@ -38,15 +38,22 @@ func (r fakeRow) Scan(dest ...any) error {
 }
 
 type fakeQuerier struct {
-	role         string
-	venueSlug    string
-	venueEnabled bool
+	role          string
+	venueSlug     string
+	venueEnabled  bool
+	showingStatus string
 }
 
 func (q fakeQuerier) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
 	_ = ctx
 	_ = args
 	switch {
+	case strings.Contains(sql, "FROM showings"):
+		status := q.showingStatus
+		if status == "" {
+			status = "live"
+		}
+		return fakeRow{values: []any{status}}
 	case strings.Contains(sql, "COALESCE((v.config ->> 'index_cards_enabled')::boolean, FALSE)"):
 		return fakeRow{values: []any{q.venueSlug, q.venueEnabled}}
 	case strings.Contains(sql, "FROM session_participants sp") && strings.Contains(sql, "SELECT sp.role::text"):
@@ -168,5 +175,15 @@ func TestCanActPlaceElement(t *testing.T) {
 				t.Fatalf("CanAct act/place_element allowed=%v, want %v", decision.Allowed, tt.want)
 			}
 		})
+	}
+}
+
+func TestCanActBlockedWhenShowingClosed(t *testing.T) {
+	decision, err := CanAct(context.Background(), fakeQuerier{role: "producer", venueSlug: "the-cave", venueEnabled: true, showingStatus: "closed"}, "user-1", "chat/message", "session-1", ActionTarget{Kind: "session"})
+	if err != nil {
+		t.Fatalf("CanAct chat/message returned error: %v", err)
+	}
+	if decision.Allowed {
+		t.Fatalf("expected chat/message to be blocked when showing is closed")
 	}
 }

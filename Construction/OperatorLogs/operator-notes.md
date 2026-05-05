@@ -35,6 +35,10 @@ Current confirmed capabilities:
 - Kernel 8 adds a shared identity surface and `persona: null` in action/presence payloads
 - The Cave does not allow anonymous presence
 - Presence labels must never render blank; fall back through display name, handle, shortened user id, then `Unknown Participant`
+- `elements.context_class` is now persisted in Postgres so props, scenery, cards, and future classes do not depend only on UI inference
+- `prop` means mobile stage object; `scenery` means fixed set piece / anchor; `first-fire` is treated as fixed scenery for now
+- Kernel 21 venue chat is a separate `chat/message` lane and must not be conflated with `perform/speak`
+- The Cave chat panel is venue-scoped, session-backed, and collapses after inactivity
 
 Not yet complete:
 - full two-user kernel proof: actor speaks, audience perceives, audience reacts, actor perceives reaction
@@ -114,6 +118,12 @@ Elements belong here, not to the venue.
 Reusable object / asset.
 Example:
 - `first-fire`
+
+Element subtype / context class is now stored in the database with `elements.context_class` so later kernels can distinguish:
+- `prop` for mobile objects
+- `scenery` for fixed set pieces
+- `card` for index cards
+- other future classes as needed
 
 ### Placement
 Instruction that places an element into a venue/session context.
@@ -556,3 +566,15 @@ VALUES (
 - Send to venue tray.
 - Place on stage.
 - Reveal to audience through the existing visibility system.
+
+## Kernel 22 Showing Model
+
+- Presence is who is connected now; showing is the durable theatrical record.
+- Reconnects should reuse the same showing instead of creating a new one.
+- Actions, chat, reactions, reveal/hide, overlay, and card placement now record a `showing_id`.
+- `rehearsal` means audience view off.
+- `live` means audience view on.
+- `closed` means no new chat or stage actions.
+- The Cave venue chat lives in the bottom panel.
+- `perform/speak` remains the separate stage speech lane above the fire.
+- There is no chat-above-fire configuration in Kernel 22.

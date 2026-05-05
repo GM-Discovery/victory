@@ -33,6 +33,7 @@ import (
 	"victory/backend/internal/messages"
 	"victory/backend/internal/network"
 	"victory/backend/internal/profiles"
+	"victory/backend/internal/showings"
 	"victory/backend/internal/world"
 )
 
@@ -59,6 +60,9 @@ func main() {
 	}
 	if err := access.EnsureKernel16VenueSurface(ctx, pool); err != nil {
 		log.Fatalf("kernel 16 venue bootstrap failed: %v", err)
+	}
+	if err := showings.EnsureKernel22ShowingSurface(ctx, pool); err != nil {
+		log.Fatalf("kernel 22 showing bootstrap failed: %v", err)
 	}
 
 	hub := network.NewHub()

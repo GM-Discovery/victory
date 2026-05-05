@@ -32,6 +32,8 @@ new_venue AS (
            "stage":{"anchor":"center-front"},
            "audience":{"anchor":"facing-stage"},
            "overlay":{"enabled":true},
+           "chat_enabled":true,
+           "talking_enabled":true,
            "backdrop":{"kind":"mountain-wall"},
            "terrain_editing":false,
            "vertical_complexity":false
@@ -71,15 +73,17 @@ library_row AS (
   LIMIT 1
 ),
 new_element AS (
-  INSERT INTO elements (library_id, name, slug, element_type, state, data)
+  INSERT INTO elements (library_id, name, slug, element_type, context_class, state, data)
   SELECT
     id,
     'first-fire',
     'first-fire',
     'image',
+    'scenery',
     'library',
     '{
       "src": "/assets/fire.png",
+      "context_class": "scenery",
       "label": "First Fire",
       "description": "Persistent central fire element for the-cave",
       "visual": {
@@ -91,6 +95,7 @@ new_element AS (
   ON CONFLICT (library_id, slug) DO UPDATE
     SET name = EXCLUDED.name,
         element_type = EXCLUDED.element_type,
+        context_class = EXCLUDED.context_class,
         state = EXCLUDED.state,
         data = EXCLUDED.data
   RETURNING id

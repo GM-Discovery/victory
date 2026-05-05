@@ -9,6 +9,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"victory/backend/internal/showings"
 )
 
 type RevealRequest struct {
@@ -71,6 +73,11 @@ func StoreReveal(ctx context.Context, pool *pgxpool.Pool, req RevealRequest) (*S
 	}
 	if strings.ToLower(strings.TrimSpace(resolvedSurface)) != "stage" {
 		return nil, errors.New("element is not revealable")
+	}
+
+	showing, err := showings.EnsureForSession(ctx, tx, req.SessionID, req.ActorID)
+	if err != nil {
+		return nil, err
 	}
 
 	decision, err := CanAct(ctx, tx, req.ActorID, actionTypeForReveal(req.Visible), req.SessionID, ActionTarget{
@@ -144,11 +151,12 @@ func StoreReveal(ctx context.Context, pool *pgxpool.Pool, req RevealRequest) (*S
 			payload,
 			scope,
 			visibility,
+			showing_id,
 			recorded
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE)
 		RETURNING id, ts
-	`, req.SessionID, nextMoment, req.ActorID, actionType, targetJSON, payloadJSON, scopeJSON, visibilityJSON).
+	`, req.SessionID, nextMoment, req.ActorID, actionType, targetJSON, payloadJSON, scopeJSON, visibilityJSON, showing.ID).
 		Scan(&out.ID, &ts)
 	if err != nil {
 		return nil, err
@@ -159,6 +167,7 @@ func StoreReveal(ctx context.Context, pool *pgxpool.Pool, req RevealRequest) (*S
 	}
 
 	out.SessionID = req.SessionID
+	out.ShowingID = showing.ID
 	out.MomentID = nextMoment
 	out.ActorID = req.ActorID
 	out.ActorDisplayName = displayName

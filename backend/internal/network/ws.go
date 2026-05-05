@@ -34,12 +34,14 @@ var upgrader = websocket.Upgrader{
 }
 
 var storeReactionFunc = actions.StoreReaction
+var storeChatMessageFunc = actions.StoreChatMessage
 var storeSpeakFunc = actions.StoreSpeak
 var storeRevealFunc = actions.StoreReveal
 var storeOverlayShowFunc = actions.StoreOverlayShow
 var storeOverlayHideFunc = actions.StoreOverlayHide
 var storeIndexCardCreateFunc = actions.StoreIndexCardCreate
 var storeIndexCardUpdateFunc = actions.StoreIndexCardUpdate
+var storeIndexCardDeleteFunc = actions.StoreIndexCardDelete
 var storePlaceElementFunc = actions.StorePlaceElement
 
 func ServeCaveWS(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
@@ -260,6 +262,46 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 					"type":  "error",
 					"error": err.Error(),
 				})
+				return
+			}
+
+			msgOut, _ := json.Marshal(map[string]any{
+				"type": "action",
+				"data": storedAction,
+			})
+			hub.Broadcast(msgOut)
+		}
+
+	case "chat/message":
+		{
+			sessionID, _ := payload["session_id"].(string)
+			actorID := c.UserID
+			text, _ := payload["text"].(string)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			storedAction, err := storeChatMessageFunc(ctx, pool, actions.ChatMessageRequest{
+				SessionID: sessionID,
+				ActorID:   actorID,
+				Text:      text,
+			})
+			cancel()
+
+			if err != nil {
+				var denied *actions.ActionDeniedError
+				if errors.As(err, &denied) {
+					_ = c.Conn.WriteJSON(map[string]any{
+						"type":  "error",
+						"error": denied.Reason,
+					})
+					log.Printf("chat denied: user=%s session=%s action=%s reason=%s", actorID, sessionID, payload["type"], denied.Reason)
+					return
+				}
+
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": err.Error(),
+				})
+				log.Printf("chat store failed: user=%s session=%s action=%s err=%v", actorID, sessionID, payload["type"], err)
 				return
 			}
 
@@ -540,6 +582,47 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 					"error": err.Error(),
 				})
 				log.Printf("index card update failed: user=%s session=%s err=%v", c.UserID, sessionID, err)
+				return
+			}
+
+			msgOut, _ := json.Marshal(map[string]any{
+				"type": "action",
+				"data": storedAction,
+			})
+			hub.Broadcast(msgOut)
+		}
+
+	case "delete/index_card":
+		{
+			sessionID, _ := payload["session_id"].(string)
+			elementID, _ := payload["element_id"].(string)
+			elementSlug, _ := payload["element_slug"].(string)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			storedAction, err := storeIndexCardDeleteFunc(ctx, pool, actions.IndexCardRequest{
+				SessionID:   sessionID,
+				ActorID:     c.UserID,
+				ElementID:   elementID,
+				ElementSlug: elementSlug,
+			})
+			cancel()
+
+			if err != nil {
+				var denied *actions.ActionDeniedError
+				if errors.As(err, &denied) {
+					_ = c.Conn.WriteJSON(map[string]any{
+						"type":  "error",
+						"error": denied.Reason,
+					})
+					log.Printf("index card denied: user=%s session=%s action=%s reason=%s", c.UserID, sessionID, payload["type"], denied.Reason)
+					return
+				}
+
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": err.Error(),
+				})
+				log.Printf("index card delete failed: user=%s session=%s err=%v", c.UserID, sessionID, err)
 				return
 			}
 

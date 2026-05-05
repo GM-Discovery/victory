@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/identity"
+	"victory/backend/internal/showings"
 )
 
 var allowedReactions = map[string]struct{}{
@@ -35,6 +36,7 @@ type ReactRequest struct {
 type StoredAction struct {
 	ID               string         `json:"id"`
 	SessionID        string         `json:"session_id"`
+	ShowingID        string         `json:"showing_id,omitempty"`
 	MomentID         int64          `json:"moment_id"`
 	ActorID          string         `json:"actor_id"`
 	ActorDisplayName string         `json:"actor_display_name,omitempty"`
@@ -86,6 +88,11 @@ func StoreReaction(ctx context.Context, pool *pgxpool.Pool, req ReactRequest) (*
 		return nil, errors.New("actor is not joined to session")
 	}
 
+	showing, err := showings.EnsureForSession(ctx, tx, req.SessionID, req.ActorID)
+	if err != nil {
+		return nil, err
+	}
+
 	var nextMoment int64
 	err = tx.QueryRow(ctx, `
 		SELECT COALESCE(MAX(moment_id), 0) + 1
@@ -130,11 +137,12 @@ func StoreReaction(ctx context.Context, pool *pgxpool.Pool, req ReactRequest) (*
 			payload,
 			scope,
 			visibility,
+			showing_id,
 			recorded
 		)
-		VALUES ($1, $2, $3, 'react/emote', $4, $5, $6, $7, TRUE)
+		VALUES ($1, $2, $3, 'react/emote', $4, $5, $6, $7, $8, TRUE)
 		RETURNING id, ts
-	`, req.SessionID, nextMoment, req.ActorID, targetJSON, payloadJSON, scopeJSON, visibilityJSON).
+	`, req.SessionID, nextMoment, req.ActorID, targetJSON, payloadJSON, scopeJSON, visibilityJSON, showing.ID).
 		Scan(&out.ID, &ts)
 	if err != nil {
 		return nil, err
@@ -150,6 +158,7 @@ func StoreReaction(ctx context.Context, pool *pgxpool.Pool, req ReactRequest) (*
 	}
 
 	out.SessionID = req.SessionID
+	out.ShowingID = showing.ID
 	out.MomentID = nextMoment
 	out.ActorID = req.ActorID
 	out.ActorDisplayName = displayName
@@ -208,6 +217,11 @@ func StoreSpeak(ctx context.Context, pool *pgxpool.Pool, sessionID, actorID, tex
 		return nil, errors.New("actor is not joined to session")
 	}
 
+	showing, err := showings.EnsureForSession(ctx, tx, sessionID, actorID)
+	if err != nil {
+		return nil, err
+	}
+
 	var nextMoment int64
 	err = tx.QueryRow(ctx, `
 		SELECT COALESCE(MAX(moment_id), 0) + 1
@@ -257,11 +271,12 @@ func StoreSpeak(ctx context.Context, pool *pgxpool.Pool, sessionID, actorID, tex
 			payload,
 			scope,
 			visibility,
+			showing_id,
 			recorded
 		)
-		VALUES ($1, $2, $3, 'perform/speak', $4, $5, $6, $7, TRUE)
+		VALUES ($1, $2, $3, 'perform/speak', $4, $5, $6, $7, $8, TRUE)
 		RETURNING id, ts
-	`, sessionID, nextMoment, actorID, targetJSON, payloadJSON, scopeJSON, visibilityJSON).
+	`, sessionID, nextMoment, actorID, targetJSON, payloadJSON, scopeJSON, visibilityJSON, showing.ID).
 		Scan(&out.ID, &ts)
 	if err != nil {
 		return nil, err
@@ -272,6 +287,7 @@ func StoreSpeak(ctx context.Context, pool *pgxpool.Pool, sessionID, actorID, tex
 	}
 
 	out.SessionID = sessionID
+	out.ShowingID = showing.ID
 	out.MomentID = nextMoment
 	out.ActorID = actorID
 	out.ActorDisplayName = displayName

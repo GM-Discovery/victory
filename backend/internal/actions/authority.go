@@ -58,12 +58,29 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 		return Decision{Allowed: false, Reason: "not_session_participant"}, nil
 	}
 	if actionType != "act/reveal_element" && actionType != "act/hide_element" {
-		if actionType != "create/index_card" && actionType != "update/index_card" && actionType != "act/place_element" && actionType != "act/show_overlay" && actionType != "act/hide_overlay" {
+		if actionType != "create/index_card" && actionType != "update/index_card" && actionType != "delete/index_card" && actionType != "act/place_element" && actionType != "act/show_overlay" && actionType != "act/hide_overlay" && actionType != "chat/message" {
 			return Decision{Allowed: false, Reason: "unknown_action"}, nil
 		}
 	}
 
-	if actionType == "create/index_card" || actionType == "update/index_card" || actionType == "act/place_element" {
+	var showingStatus string
+	err := q.QueryRow(ctx, `
+		SELECT COALESCE(status::text, '')
+		FROM showings
+		WHERE session_id = $1
+		LIMIT 1
+	`, sessionID).Scan(&showingStatus)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Decision{Allowed: false, Reason: "showing_not_found"}, nil
+		}
+		return Decision{}, err
+	}
+	if strings.EqualFold(strings.TrimSpace(showingStatus), "closed") {
+		return Decision{Allowed: false, Reason: "showing_closed"}, nil
+	}
+
+	if actionType == "create/index_card" || actionType == "update/index_card" || actionType == "delete/index_card" || actionType == "act/place_element" {
 		if actionType == "act/place_element" {
 			return canActPlaceElement(ctx, q, userID, sessionID, target)
 		}
@@ -72,6 +89,10 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 
 	if actionType == "act/show_overlay" || actionType == "act/hide_overlay" {
 		return canActOverlayInCave(ctx, q, userID, sessionID, target)
+	}
+
+	if actionType == "chat/message" {
+		return canActChatMessage(ctx, q, userID, sessionID)
 	}
 
 	if target.Kind != "element" {
@@ -234,6 +255,12 @@ func canActIndexCardInCave(ctx context.Context, q actionQuerier, userID, session
 	}
 
 	if actionType == "update/index_card" {
+		if strings.TrimSpace(target.ElementID) == "" && strings.TrimSpace(target.ElementSlug) == "" {
+			return Decision{Allowed: false, Reason: "unknown_target"}, nil
+		}
+	}
+
+	if actionType == "delete/index_card" {
 		if strings.TrimSpace(target.ElementID) == "" && strings.TrimSpace(target.ElementSlug) == "" {
 			return Decision{Allowed: false, Reason: "unknown_target"}, nil
 		}

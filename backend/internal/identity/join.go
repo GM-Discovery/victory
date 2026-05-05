@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"victory/backend/internal/sessions"
+	"victory/backend/internal/showings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -75,6 +76,10 @@ func JoinTheCave(ctx context.Context, pool *pgxpool.Pool, req JoinRequest, sessi
 		WHERE id = $1
 	`, userID, displayName)
 	if err != nil {
+		return nil, err
+	}
+
+	if _, err := showings.EnsureForSession(ctx, tx, sessionID, userID); err != nil {
 		return nil, err
 	}
 

@@ -11,6 +11,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"victory/backend/internal/showings"
 )
 
 type IndexCardRequest struct {
@@ -50,6 +52,11 @@ func StoreIndexCardCreate(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 	}
 	if !decision.Allowed {
 		return nil, &ActionDeniedError{Reason: decision.Reason}
+	}
+
+	showing, err := showings.EnsureForSession(ctx, tx, req.SessionID, req.ActorID)
+	if err != nil {
+		return nil, err
 	}
 
 	card, productionID, err := createIndexCard(ctx, tx, req)
@@ -99,11 +106,12 @@ func StoreIndexCardCreate(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 			payload,
 			scope,
 			visibility,
+			showing_id,
 			recorded
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE)
 		RETURNING id, ts
-	`, req.SessionID, nextMoment, req.ActorID, "create/index_card", targetJSON, payloadJSON, scopeJSON, visibilityJSON).
+	`, req.SessionID, nextMoment, req.ActorID, "create/index_card", targetJSON, payloadJSON, scopeJSON, visibilityJSON, showing.ID).
 		Scan(&out.ID, &ts); err != nil {
 		return nil, err
 	}
@@ -113,6 +121,7 @@ func StoreIndexCardCreate(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 	}
 
 	out.SessionID = req.SessionID
+	out.ShowingID = showing.ID
 	out.MomentID = nextMoment
 	out.ActorID = req.ActorID
 	out.ActorDisplayName = displayName
@@ -169,6 +178,11 @@ func StoreIndexCardUpdate(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 		return nil, &ActionDeniedError{Reason: decision.Reason}
 	}
 
+	showing, err := showings.EnsureForSession(ctx, tx, req.SessionID, req.ActorID)
+	if err != nil {
+		return nil, err
+	}
+
 	card, productionID, err := updateIndexCard(ctx, tx, req)
 	if err != nil {
 		return nil, err
@@ -216,11 +230,12 @@ func StoreIndexCardUpdate(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 			payload,
 			scope,
 			visibility,
+			showing_id,
 			recorded
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE)
 		RETURNING id, ts
-	`, req.SessionID, nextMoment, req.ActorID, "update/index_card", targetJSON, payloadJSON, scopeJSON, visibilityJSON).
+	`, req.SessionID, nextMoment, req.ActorID, "update/index_card", targetJSON, payloadJSON, scopeJSON, visibilityJSON, showing.ID).
 		Scan(&out.ID, &ts); err != nil {
 		return nil, err
 	}
@@ -230,6 +245,7 @@ func StoreIndexCardUpdate(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 	}
 
 	out.SessionID = req.SessionID
+	out.ShowingID = showing.ID
 	out.MomentID = nextMoment
 	out.ActorID = req.ActorID
 	out.ActorDisplayName = displayName
@@ -244,6 +260,180 @@ func StoreIndexCardUpdate(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 	}
 	out.Persona = nil
 	out.Type = "update/index_card"
+	out.Target = target
+	out.Payload = payload
+	out.Scope = scope
+	out.Visibility = visibility
+	out.Timestamp = ts.UTC().Format(time.RFC3339)
+
+	return &out, nil
+}
+
+func StoreIndexCardDelete(ctx context.Context, pool *pgxpool.Pool, req IndexCardRequest) (*StoredAction, error) {
+	req = sanitizeIndexCardRequest(req)
+	if req.SessionID == "" {
+		return nil, errors.New("session_id is required")
+	}
+	if req.ActorID == "" {
+		return nil, errors.New("actor_id is required")
+	}
+	if req.ElementID == "" && req.ElementSlug == "" {
+		return nil, errors.New("element_id or element_slug is required")
+	}
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	decision, err := CanAct(ctx, tx, req.ActorID, "delete/index_card", req.SessionID, ActionTarget{
+		Kind:        "index_card",
+		ElementID:   req.ElementID,
+		ElementSlug: req.ElementSlug,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !decision.Allowed {
+		return nil, &ActionDeniedError{Reason: decision.Reason}
+	}
+
+	showing, err := showings.EnsureForSession(ctx, tx, req.SessionID, req.ActorID)
+	if err != nil {
+		return nil, err
+	}
+
+	resolvedID, resolvedSlug, err := resolveIndexCardTarget(ctx, tx, req.SessionID, req.ElementID, req.ElementSlug)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		existingData []byte
+		existingName string
+	)
+	if err := tx.QueryRow(ctx, `
+		SELECT
+			e.data,
+			e.name
+		FROM elements e
+		WHERE e.id = $1
+		  AND e.element_type = 'index_card'
+		LIMIT 1
+	`, resolvedID).Scan(&existingData, &existingName); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.New("index_card_not_found")
+		}
+		return nil, err
+	}
+	_ = existingName
+
+	displayName, handle, role, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
+	if err != nil {
+		return nil, err
+	}
+
+	deletedAt := time.Now().UTC().Format(time.RFC3339)
+	var existing map[string]any
+	_ = json.Unmarshal(existingData, &existing)
+	if existing == nil {
+		existing = map[string]any{}
+	}
+	existing["deleted_at"] = deletedAt
+	existing["deleted_by"] = req.ActorID
+	existing["deleted_by_display_name"] = displayName
+	existing["deleted_by_handle"] = handle
+	existing["deleted_by_role"] = role
+	existing["deleted_reason"] = "delete/index_card"
+	existing["state"] = "deleted"
+
+	deletedJSON, _ := json.Marshal(existing)
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE elements
+		SET state = 'deleted',
+		    data = $2
+		WHERE id = $1
+		  AND element_type = 'index_card'
+	`, resolvedID, deletedJSON); err != nil {
+		return nil, err
+	}
+
+	var nextMoment int64
+	if err := tx.QueryRow(ctx, `
+		SELECT COALESCE(MAX(moment_id), 0) + 1
+		FROM actions
+		WHERE session_id = $1
+	`, req.SessionID).Scan(&nextMoment); err != nil {
+		return nil, err
+	}
+
+	target := map[string]any{
+		"kind":         "index_card",
+		"element_id":   resolvedID,
+		"element_slug": resolvedSlug,
+	}
+	payload := map[string]any{
+		"deleted_at": deletedAt,
+		"deleted_by": req.ActorID,
+	}
+	scope := map[string]any{
+		"surfaces":         []string{"tray", "stage"},
+		"audienceSegments": []string{"director", "producer"},
+	}
+	visibility := map[string]any{
+		"toRoles":   []string{"director", "producer"},
+		"privateTo": []string{},
+	}
+
+	targetJSON, _ := json.Marshal(target)
+	payloadJSON, _ := json.Marshal(payload)
+	scopeJSON, _ := json.Marshal(scope)
+	visibilityJSON, _ := json.Marshal(visibility)
+
+	var out StoredAction
+	var ts time.Time
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO actions (
+			session_id,
+			showing_id,
+			moment_id,
+			actor_id,
+			type,
+			target,
+			payload,
+			scope,
+			visibility,
+			recorded
+		)
+		VALUES ($1, $2, $3, $4, 'delete/index_card', $5, $6, $7, $8, TRUE)
+		RETURNING id, ts
+	`, req.SessionID, showing.ID, nextMoment, req.ActorID, targetJSON, payloadJSON, scopeJSON, visibilityJSON).
+		Scan(&out.ID, &ts); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	out.SessionID = req.SessionID
+	out.ShowingID = showing.ID
+	out.MomentID = nextMoment
+	out.ActorID = req.ActorID
+	out.ActorDisplayName = displayName
+	out.ActorHandle = handle
+	out.ActorRole = role
+	out.Actor = map[string]any{
+		"user_id":      req.ActorID,
+		"handle":       handle,
+		"display_name": displayName,
+		"role":         role,
+		"persona":      nil,
+	}
+	out.Persona = nil
+	out.Type = "delete/index_card"
 	out.Target = target
 	out.Payload = payload
 	out.Scope = scope
@@ -287,6 +477,7 @@ func createIndexCard(ctx context.Context, tx pgx.Tx, req IndexCardRequest) (inde
 	slug := uniqueIndexCardSlug(req.FrontText, req.ActorID)
 	data := map[string]any{
 		"type":                    "index_card",
+		"context_class":           "card",
 		"front_text":              req.FrontText,
 		"back_text":               req.BackText,
 		"color":                   req.Color,
@@ -310,10 +501,11 @@ func createIndexCard(ctx context.Context, tx pgx.Tx, req IndexCardRequest) (inde
 			name,
 			slug,
 			element_type,
+			context_class,
 			state,
 			data
 		)
-		VALUES ($1, $2, $3, 'index_card', 'library', $4)
+		VALUES ($1, $2, $3, 'index_card', 'card', 'library', $4)
 		RETURNING id::text
 	`, libraryID, indexCardDisplayName(req.FrontText), slug, dataJSON).Scan(&elementID); err != nil {
 		return indexCardRecord{}, "", err
@@ -403,6 +595,7 @@ func updateIndexCard(ctx context.Context, tx pgx.Tx, req IndexCardRequest) (inde
 
 	updatedData := map[string]any{
 		"type":                    "index_card",
+		"context_class":           "card",
 		"front_text":              req.FrontText,
 		"back_text":               req.BackText,
 		"color":                   req.Color,
@@ -421,6 +614,7 @@ func updateIndexCard(ctx context.Context, tx pgx.Tx, req IndexCardRequest) (inde
 	if _, err := tx.Exec(ctx, `
 		UPDATE elements
 		SET name = $2,
+		    context_class = 'card',
 		    data = $3
 		WHERE id = $1
 		  AND element_type = 'index_card'
