@@ -141,6 +141,7 @@ Presence is:
 - The Greenroom public profile projection is server-resolved from profile state, not client claims
 - Grant's Cabin is invite-only and only appears on the map when a venue grant exists
 - Catharsis is a signed-in audience venue with invitation/ticketing still deferred
+- The Cave stage now uses a right-click context menu for move/reveal/hide/remove/info actions on placed elements
 
 ---
 

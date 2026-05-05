@@ -186,11 +186,15 @@ body {
   position: relative;
   width: 100%;
   height: 100vh;
-  background-image: url("/assets/mapbackground.png");
+  background-image: url("/assets/mapbackgroundbackup.png");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   overflow: hidden;
+}
+
+.map-layer.map-layer--signed-in {
+  background-image: url("/assets/mapbackground.png");
 }
 
 .status {

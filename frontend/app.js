@@ -41,6 +41,7 @@ function initInfoBoothModal() {
 
 async function loadVenues() {
   const statusEl = document.getElementById("status");
+  const mapLayerEl = document.querySelector(".map-layer");
   const venueIconsEl = document.getElementById("venue-icons");
 
   initInfoBoothModal();
@@ -71,18 +72,18 @@ async function loadVenues() {
     }
 
     const fallbackPositions = {
-      workshop: { x: 62, y: 47 },
-      "info-booth": { x: 50, y: 88 },
-      "audition-hall": { x: 30, y: 27 },
-      "the-cave": { x: 20, y: 17 },
-      "victory-theater": { x: 50, y: 70 },
-      construction: { x: 37, y: 50 },
-      greenroom: { x: 60, y: 30 },
-      trailers: { x: 67, y: 38 },
-      "producers-office": { x: 46, y: 24 },
-      "directors-chair": { x: 56, y: 22 },
-      "grants-cabin": { x: 74, y: 57 },
-      catharsis: { x: 84, y: 63 },
+      "the-cave": { x: 22, y: 23 },
+      "grants-cabin": { x: 29, y: 24 },
+      "audition-hall": { x: 24, y: 37 },
+      "producers-office": { x: 39, y: 14 },
+      "directors-chair": { x: 54, y: 14 },
+      greenroom: { x: 64, y: 25 },
+      trailers: { x: 81, y: 51 },
+      catharsis: { x: 37, y: 77 },
+      "victory-theater": { x: 81, y: 77 },
+      workshop: { x: 81, y: 37 },
+      construction: { x: 29, y: 57 },
+      "info-booth": { x: 50, y: 92 },
     };
 
     for (const venue of venues) {
@@ -317,6 +318,9 @@ async function loadAccountLink() {
       accountLink.textContent = `Hello ${displayName}`;
       accountLink.href = "/account/";
       accountLink.title = "View your account";
+      if (mapLayerEl) {
+        mapLayerEl.classList.add("map-layer--signed-in");
+      }
       if (accountMenuToggle) accountMenuToggle.hidden = false;
       if (accountProfileLink) accountProfileLink.href = "/account/";
       closeMenu();
@@ -326,11 +330,17 @@ async function loadAccountLink() {
     accountLink.textContent = "Log In";
     accountLink.href = "/login/";
     accountLink.title = "Log in";
+    if (mapLayerEl) {
+      mapLayerEl.classList.remove("map-layer--signed-in");
+    }
     if (accountMenuToggle) accountMenuToggle.hidden = true;
     closeMenu();
   } catch (error) {
     accountLink.textContent = "Log In";
     accountLink.href = "/login/";
+    if (mapLayerEl) {
+      mapLayerEl.classList.remove("map-layer--signed-in");
+    }
     if (accountMenuToggle) accountMenuToggle.hidden = true;
     closeMenu();
   }

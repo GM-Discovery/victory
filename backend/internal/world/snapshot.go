@@ -16,6 +16,7 @@ type Snapshot struct {
 	Venue    Venue           `json:"venue"`
 	Session  Session         `json:"session"`
 	Elements []PlacedElement `json:"elements"`
+	Overlay  *Overlay        `json:"overlay,omitempty"`
 	Actions  []Action        `json:"actions"`
 }
 
@@ -34,14 +35,29 @@ type Session struct {
 }
 
 type PlacedElement struct {
-	ElementID   string         `json:"element_id"`
-	Name        string         `json:"name"`
-	Slug        string         `json:"slug"`
-	ElementType string         `json:"element_type"`
-	Surface     string         `json:"surface"`
-	Position    map[string]any `json:"position"`
-	Visibility  map[string]any `json:"visibility"`
-	Data        map[string]any `json:"data"`
+	ElementID    string         `json:"element_id"`
+	Name         string         `json:"name"`
+	Slug         string         `json:"slug"`
+	ElementType  string         `json:"element_type"`
+	ContextClass string         `json:"context_class"`
+	Surface      string         `json:"surface"`
+	Position     map[string]any `json:"position"`
+	Visibility   map[string]any `json:"visibility"`
+	Data         map[string]any `json:"data"`
+}
+
+type Overlay struct {
+	ElementID    string         `json:"element_id"`
+	ElementSlug  string         `json:"element_slug"`
+	OverlayType  string         `json:"overlay_type"`
+	ContextClass string         `json:"context_class"`
+	Title        string         `json:"title"`
+	Text         string         `json:"text,omitempty"`
+	ImageURL     string         `json:"image_url,omitempty"`
+	Surface      string         `json:"surface"`
+	Position     map[string]any `json:"position,omitempty"`
+	Data         map[string]any `json:"data,omitempty"`
+	Visibility   map[string]any `json:"visibility,omitempty"`
 }
 
 type Action struct {
@@ -151,6 +167,7 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 		item.Position = decodeJSONMap(posRaw)
 		item.Visibility = decodeJSONMap(visRaw)
 		item.Data = decodeJSONMap(dataRaw)
+		item.ContextClass = deriveElementContextClass(item.ElementType, item.Slug, item.Data)
 		snap.Elements = append(snap.Elements, item)
 	}
 
@@ -231,6 +248,8 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 		return nil, err
 	}
 
+	snap.Overlay = deriveActiveOverlay(snap.Actions, snap.Elements)
+
 	layerVisibility := deriveElementLayerVisibility(snap.Actions)
 
 	filtered := make([]PlacedElement, 0, len(snap.Elements))
@@ -273,6 +292,162 @@ func decodeJSONMap(raw []byte) map[string]any {
 		return map[string]any{}
 	}
 	return out
+}
+
+func deriveElementContextClass(elementType, slug string, data map[string]any) string {
+	if data != nil {
+		if raw, ok := data["context_class"].(string); ok {
+			if value := strings.TrimSpace(strings.ToLower(raw)); value != "" {
+				return value
+			}
+		}
+	}
+
+	switch strings.ToLower(strings.TrimSpace(elementType)) {
+	case "index_card":
+		return "card"
+	case "prop":
+		return "prop"
+	case "scenery":
+		return "scenery"
+	case "surface":
+		return "surface"
+	case "actor":
+		return "actor"
+	case "media":
+		return "media"
+	}
+
+	switch strings.ToLower(strings.TrimSpace(slug)) {
+	case "first-fire":
+		return "prop"
+	}
+
+	return "system"
+}
+
+func deriveActiveOverlay(actions []Action, elements []PlacedElement) *Overlay {
+	if len(actions) == 0 {
+		return nil
+	}
+
+	elementByID := map[string]PlacedElement{}
+	elementBySlug := map[string]PlacedElement{}
+	for _, el := range elements {
+		if strings.TrimSpace(el.ElementID) != "" {
+			elementByID[strings.ToLower(strings.TrimSpace(el.ElementID))] = el
+		}
+		if strings.TrimSpace(el.Slug) != "" {
+			elementBySlug[strings.ToLower(strings.TrimSpace(el.Slug))] = el
+		}
+	}
+
+	for _, a := range actions {
+		switch a.Type {
+		case "act/show_overlay":
+			el, ok := lookupOverlayElement(a, elementByID, elementBySlug)
+			if !ok {
+				continue
+			}
+			return buildOverlayState(el, overlayTypeFromActionOrElement(a, el))
+		case "act/hide_overlay":
+			return nil
+		}
+	}
+
+	return nil
+}
+
+func lookupOverlayElement(a Action, elementByID, elementBySlug map[string]PlacedElement) (PlacedElement, bool) {
+	if id := strings.ToLower(strings.TrimSpace(actionTargetElementID(a))); id != "" {
+		if el, ok := elementByID[id]; ok {
+			return el, true
+		}
+	}
+	if slug := strings.ToLower(strings.TrimSpace(actionTargetElementSlug(a))); slug != "" {
+		if el, ok := elementBySlug[slug]; ok {
+			return el, true
+		}
+	}
+	return PlacedElement{}, false
+}
+
+func overlayTypeFromActionOrElement(a Action, el PlacedElement) string {
+	if raw, ok := a.Payload["overlay_type"].(string); ok {
+		if value := strings.TrimSpace(strings.ToLower(raw)); value != "" {
+			return value
+		}
+	}
+
+	if raw, ok := el.Data["overlay_type"].(string); ok {
+		if value := strings.TrimSpace(strings.ToLower(raw)); value != "" {
+			return value
+		}
+	}
+
+	switch strings.ToLower(strings.TrimSpace(el.ContextClass)) {
+	case "card":
+		return "text"
+	case "media", "prop", "scenery", "surface":
+		return "image"
+	default:
+		return "text"
+	}
+}
+
+func buildOverlayState(el PlacedElement, overlayType string) *Overlay {
+	title := strings.TrimSpace(el.Name)
+	if title == "" {
+		title = strings.TrimSpace(el.Slug)
+	}
+	if title == "" {
+		title = "Overlay"
+	}
+
+	text := ""
+	imageURL := ""
+	if overlayType == "image" {
+		imageURL = overlayImageURL(el)
+	}
+	if overlayType != "image" || imageURL == "" {
+		text = overlayTextContent(el)
+	}
+
+	return &Overlay{
+		ElementID:    el.ElementID,
+		ElementSlug:  el.Slug,
+		OverlayType:  overlayType,
+		ContextClass: el.ContextClass,
+		Title:        title,
+		Text:         text,
+		ImageURL:     imageURL,
+		Surface:      el.Surface,
+		Position:     el.Position,
+		Data:         el.Data,
+		Visibility:   el.Visibility,
+	}
+}
+
+func overlayTextContent(el PlacedElement) string {
+	if text, ok := el.Data["front_text"].(string); ok && strings.TrimSpace(text) != "" {
+		return strings.TrimSpace(text)
+	}
+	if text, ok := el.Data["text"].(string); ok && strings.TrimSpace(text) != "" {
+		return strings.TrimSpace(text)
+	}
+	if text, ok := el.Data["title"].(string); ok && strings.TrimSpace(text) != "" {
+		return strings.TrimSpace(text)
+	}
+	return strings.TrimSpace(el.Name)
+}
+
+func overlayImageURL(el PlacedElement) string {
+	for _, key := range []string{"image_url", "icon_url", "overlay_image_url", "src"} {
+		if raw, ok := el.Data[key].(string); ok && strings.TrimSpace(raw) != "" {
+			return strings.TrimSpace(raw)
+		}
+	}
+	return ""
 }
 
 func normalizeRole(role string) string {

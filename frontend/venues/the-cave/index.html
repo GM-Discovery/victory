@@ -47,6 +47,97 @@
       z-index: 4;
     }
 
+    .stage-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+
+    .stage-overlay[hidden] {
+      display: none;
+    }
+
+    .stage-overlay-panel {
+      max-width: min(88vw, 1020px);
+      max-height: 88vh;
+      width: 100%;
+      border-radius: 18px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+      overflow: hidden;
+      background: rgba(20, 16, 12, 0.72);
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .stage-overlay-panel--text {
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .stage-overlay-banner {
+      max-width: 100%;
+      padding: 18px 24px;
+      border-radius: 14px;
+      background: rgba(15, 12, 10, 0.84);
+      color: #fff4dc;
+      text-align: center;
+      font-size: clamp(1.1rem, 2.8vw, 2rem);
+      line-height: 1.28;
+      white-space: pre-wrap;
+      overflow-y: auto;
+      max-height: 68vh;
+    }
+
+    .stage-overlay-image {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 84vh;
+      object-fit: contain;
+      background: rgba(0, 0, 0, 0.18);
+    }
+
+    .stage-move-preview {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 90;
+    }
+
+    .stage-move-preview .index-card-item {
+      position: fixed;
+      width: min(240px, calc(100vw - 40px));
+      max-width: 240px;
+      min-height: 156px;
+      transform: translate(-50%, -50%) rotate(-2deg);
+      box-shadow:
+        0 22px 34px rgba(0, 0, 0, 0.26),
+        inset 0 1px 0 rgba(255, 255, 255, 0.62);
+      opacity: 0.92;
+      cursor: grabbing;
+    }
+
+    .stage-move-preview .move-preview-hint {
+      position: absolute;
+      right: 8px;
+      bottom: 8px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(58, 42, 24, 0.82);
+      color: #fff6e8;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
     #speech {
       position: absolute;
       top: 24px;
@@ -215,6 +306,96 @@
     .chat-controls {
       display: flex;
       gap: 10px;
+    }
+
+    .element-context-menu {
+      position: fixed;
+      z-index: 80;
+      min-width: 220px;
+      border-radius: 14px;
+      background: rgba(18, 14, 11, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.36);
+      padding: 8px;
+    }
+
+    .element-context-menu[hidden] {
+      display: none;
+    }
+
+    .element-context-menu button {
+      width: 100%;
+      display: block;
+      text-align: left;
+      padding: 10px 12px;
+      margin: 0;
+      border: 0;
+      background: transparent;
+      color: #f5efe4;
+      border-radius: 10px;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .element-context-menu button:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .element-context-menu .menu-separator {
+      height: 1px;
+      margin: 6px 4px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .element-info-popup {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 79;
+      width: min(420px, calc(100vw - 32px));
+      max-height: min(60vh, 540px);
+      overflow: auto;
+      border-radius: 14px;
+      background: rgba(17, 13, 10, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.36);
+      padding: 14px;
+      color: #f5efe4;
+    }
+
+    .element-info-popup[hidden] {
+      display: none;
+    }
+
+    .element-info-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .element-info-head strong {
+      font-size: 1rem;
+    }
+
+    .element-info-close {
+      border: 0;
+      border-radius: 999px;
+      width: 32px;
+      height: 32px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .element-info-content {
+      display: grid;
+      gap: 8px;
+      color: #d8c9b0;
+      font-size: 0.95rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
     }
 
     .note-card-panel {
@@ -725,6 +906,8 @@
     <div class="stage">
       <div id="speech"></div>
       <div id="stage-card-overlay" class="stage-card-overlay" aria-hidden="true"></div>
+      <div id="stage-overlay" class="stage-overlay" aria-hidden="true" hidden></div>
+      <div id="stage-move-preview" class="stage-move-preview" aria-hidden="true" hidden></div>
       <img id="fire" src="/assets/fire.jpg" alt="Fire" hidden />    </div>
 
     <div class="chat-panel">
@@ -852,6 +1035,15 @@
       </div>
     </div>
 
+    <div id="element-context-menu" class="element-context-menu" hidden></div>
+    <div id="element-info-popup" class="element-info-popup" hidden>
+      <div class="element-info-head">
+        <strong id="element-info-title">Element</strong>
+        <button id="element-info-close" class="element-info-close" type="button" aria-label="Close info">×</button>
+      </div>
+      <div id="element-info-content" class="element-info-content"></div>
+    </div>
+
     <div class="presence-panel">
       <div class="presence-heading">
         <h2>Who is here?</h2>
@@ -875,6 +1067,12 @@
   const noteCardPanel = document.getElementById("note-card-panel");
   const noteCardClose = document.getElementById("note-card-close");
   const noteCardStatus = document.getElementById("note-card-status");
+  const elementContextMenu = document.getElementById("element-context-menu");
+  const elementInfoPopup = document.getElementById("element-info-popup");
+  const elementInfoTitle = document.getElementById("element-info-title");
+  const elementInfoContent = document.getElementById("element-info-content");
+  const elementInfoClose = document.getElementById("element-info-close");
+  const stageMovePreview = document.getElementById("stage-move-preview");
   const indexCardPanel = document.getElementById("index-card-panel");
   const indexCardWorkshopTools = document.getElementById("index-card-workshop-tools");
   const workshopVenueSelect = document.getElementById("workshop-venue-select");
@@ -898,7 +1096,9 @@
   const selectionLayer = document.getElementById("selection-layer");
   const connectionStatus = document.getElementById("connection-status");
   const speechEl = document.getElementById("speech");
+  const stageEl = document.querySelector(".stage");
   const stageCardOverlay = document.getElementById("stage-card-overlay");
+  const stageOverlay = document.getElementById("stage-overlay");
   const fireEl = document.getElementById("fire");
   const presenceList = document.getElementById("presence-list");
   const presenceCount = document.getElementById("presence-count");
@@ -925,9 +1125,13 @@
   let presenceUsers = {};
   let latestSnapshotElements = [];
   let latestSnapshotActions = [];
+  let latestSnapshotOverlay = null;
   let workshopVenues = [];
   let pendingIndexCardSave = null;
   let pendingIndexCardSaveTimer = null;
+  let contextMenuTarget = null;
+  let activeMoveElement = null;
+  let activeMovePointer = { x: 0, y: 0 };
   const indexCardFlipState = new Map();
   const indexCardTrayPage = {
     workshop: 0,
@@ -1114,6 +1318,500 @@
   function canManageIndexCards(role) {
     const normalized = normalizeRole(role);
     return normalized === "producer" || normalized === "director";
+  }
+
+  function canUseStageContextMenu(role) {
+    return normalizeRole(role) !== "audience";
+  }
+
+  function canControlOverlay(role) {
+    const normalized = normalizeRole(role);
+    return normalized === "producer" || normalized === "director";
+  }
+
+  function contextClassForElement(element) {
+    const explicit = String(element?.context_class || element?.data?.context_class || "").trim().toLowerCase();
+    if (explicit) return explicit;
+
+    const type = String(element?.element_type || "").trim().toLowerCase();
+    if (type === "index_card") return "card";
+    if (type === "prop") return "prop";
+    if (type === "scenery") return "scenery";
+    if (type === "surface") return "surface";
+    if (type === "actor") return "actor";
+    if (type === "media") return "media";
+
+    const slug = String(element?.slug || "").trim().toLowerCase();
+    if (slug === "first-fire") return "prop";
+
+    return "system";
+  }
+
+  function isIndexCardElement(element) {
+    return contextClassForElement(element) === "card" || String(element?.element_type || "").toLowerCase() === "index_card";
+  }
+
+  function canMoveStageElement(role, element) {
+    if (!canManageIndexCards(role)) return false;
+    return contextClassForElement(element) === "card";
+  }
+
+  function canRemoveStageElement(role, element) {
+    return canMoveStageElement(role, element);
+  }
+
+  function canShowOverlay(role, element) {
+    if (!canControlOverlay(role)) return false;
+    return ["card", "prop", "scenery", "surface", "media"].includes(contextClassForElement(element));
+  }
+
+  function overlayTypeForElement(element) {
+    const explicit = String(element?.data?.overlay_type || "").trim().toLowerCase();
+    if (explicit === "text" || explicit === "image") {
+      return explicit;
+    }
+
+    const contextClass = contextClassForElement(element);
+    if (contextClass === "card") {
+      return "text";
+    }
+
+    for (const key of ["image_url", "icon_url", "overlay_image_url", "src"]) {
+      const raw = String(element?.data?.[key] || "").trim();
+      if (raw) {
+        return "image";
+      }
+    }
+
+    return "text";
+  }
+
+  function currentOverlayMatches(element) {
+    if (!latestSnapshotOverlay || !element) return false;
+    const overlayID = String(latestSnapshotOverlay.element_id || "");
+    const overlaySlug = String(latestSnapshotOverlay.element_slug || "");
+    return (
+      (overlayID && overlayID === String(element.element_id || "")) ||
+      (overlaySlug && overlaySlug === String(element.slug || ""))
+    );
+  }
+
+  function renderStageOverlay(overlay) {
+    if (!stageOverlay) return;
+    if (!overlay) {
+      stageOverlay.hidden = true;
+      stageOverlay.innerHTML = "";
+      return;
+    }
+
+    const title = escapeHtml(overlay.title || overlay.element_slug || "Overlay");
+    if (overlay.overlay_type === "image") {
+      const src = escapeHtml(overlay.image_url || "");
+      if (!src) {
+        stageOverlay.hidden = false;
+        stageOverlay.innerHTML = `
+          <div class="stage-overlay-panel stage-overlay-panel--text" role="presentation">
+            <div class="stage-overlay-banner">${escapeHtml(overlay.text || overlay.title || "Overlay")}</div>
+          </div>
+        `;
+        return;
+      }
+      stageOverlay.hidden = false;
+      stageOverlay.innerHTML = `
+        <div class="stage-overlay-panel stage-overlay-panel--image" role="presentation">
+          <img class="stage-overlay-image" src="${src}" alt="${title}" />
+        </div>
+      `;
+      return;
+    }
+
+    const text = escapeHtml(overlay.text || overlay.title || "");
+    stageOverlay.hidden = false;
+    stageOverlay.innerHTML = `
+      <div class="stage-overlay-panel stage-overlay-panel--text" role="presentation">
+        <div class="stage-overlay-banner">${text}</div>
+      </div>
+    `;
+  }
+
+  function contextMenuActionsForElement(role, element) {
+    const normalizedRole = normalizeRole(role);
+    if (normalizedRole === "audience") return [];
+
+    const contextClass = contextClassForElement(element);
+    const canReveal = canRevealHide(role);
+    const canManageCards = canManageIndexCards(role);
+    const canOverlay = canShowOverlay(role, element);
+    const overlayActive = currentOverlayMatches(element);
+    const actions = [];
+
+    if (contextClass === "card") {
+      if (canMoveStageElement(role, element)) {
+        actions.push("move");
+      }
+      if (canReveal) {
+        actions.push("reveal", "hide");
+      }
+      if (canRemoveStageElement(role, element)) {
+        actions.push("remove");
+      }
+      if (canOverlay) {
+        actions.push(overlayActive ? "hide-overlay" : "show-overlay");
+      }
+      actions.push("info");
+      if (canManageCards) {
+        actions.push("create-card");
+      }
+      return actions;
+    }
+
+    if (["prop", "scenery", "surface", "actor", "media"].includes(contextClass)) {
+      if (canReveal) {
+        actions.push("reveal", "hide");
+      }
+      if (canOverlay) {
+        actions.push(overlayActive ? "hide-overlay" : "show-overlay");
+      }
+      actions.push("info");
+      return actions;
+    }
+
+    actions.push("info");
+    return actions;
+  }
+
+  function elementPositionString(element) {
+    const pos = element?.position || element?.data?.position || {};
+    const x = Number(pos.x ?? 0);
+    const y = Number(pos.y ?? 0);
+    const order = Number(pos.order ?? 0);
+    return `x: ${Number.isFinite(x) ? x : 0}, y: ${Number.isFinite(y) ? y : 0}, order: ${Number.isFinite(order) ? order : 0}`;
+  }
+
+  function closeElementContextMenu() {
+    if (elementContextMenu) {
+      elementContextMenu.hidden = true;
+      elementContextMenu.innerHTML = "";
+    }
+    contextMenuTarget = null;
+  }
+
+  function closeElementInfoPopup() {
+    if (elementInfoPopup) {
+      elementInfoPopup.hidden = true;
+    }
+  }
+
+  function renderElementInfoContent(element) {
+    const parts = [];
+    const name = String(element?.name || element?.slug || "Element").trim();
+    const type = String(element?.element_type || "element").trim();
+    const contextClass = String(element?.context_class || element?.data?.context_class || contextClassForElement(element)).trim();
+    const surface = String(element?.surface || "stage").trim();
+    parts.push(`Type: ${type}`);
+    parts.push(`Context class: ${contextClass}`);
+    parts.push(`Surface: ${surface}`);
+    parts.push(`Position: ${elementPositionString(element)}`);
+
+    if (isIndexCardElement(element)) {
+      const front = indexCardTextFromData(element, "front_text");
+      const back = indexCardTextFromData(element, "back_text");
+      const color = indexCardColorFromData(element);
+      parts.push(`Front: ${front || "(blank)"}`);
+      parts.push(`Back: ${back || "(blank)"}`);
+      parts.push(`Color: ${color}`);
+    }
+
+    return {
+      title: name,
+      content: parts.join("\n"),
+    };
+  }
+
+  function openElementInfo(element) {
+    if (!elementInfoPopup || !elementInfoTitle || !elementInfoContent) return;
+    const info = renderElementInfoContent(element);
+    elementInfoTitle.textContent = info.title;
+    elementInfoContent.textContent = info.content;
+    elementInfoPopup.hidden = false;
+  }
+
+  function clearMoveMode() {
+    activeMoveElement = null;
+    if (stageMovePreview) {
+      stageMovePreview.hidden = true;
+      stageMovePreview.innerHTML = "";
+    }
+  }
+
+  function cancelMoveMode(reason = "Move canceled.") {
+    clearMoveMode();
+    setConnectionStatus(reason);
+  }
+
+  function renderMovePreview(element) {
+    if (!stageMovePreview || !element) return;
+
+    const front = escapeHtml(indexCardTextFromData(element, "front_text"));
+    const color = escapeHtml(indexCardColorFromData(element));
+    stageMovePreview.hidden = false;
+    stageMovePreview.innerHTML = `
+      <div
+        class="index-card-item index-card-item--moving"
+        style="--card-accent:${color}; left:${activeMovePointer.x}px; top:${activeMovePointer.y}px;"
+      >
+        <div class="index-card-face">
+          <div class="index-card-front">${front || "Untitled card"}</div>
+        </div>
+        <div class="move-preview-hint">Click to drop</div>
+      </div>
+    `;
+  }
+
+  function startMoveMode(element) {
+    if (!canMoveStageElement(currentRole, element)) {
+      setConnectionStatus("Move denied.");
+      return;
+    }
+
+    activeMoveElement = element;
+    if (!activeMovePointer.x && !activeMovePointer.y) {
+      activeMovePointer = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    }
+    renderMovePreview(element);
+    setConnectionStatus("Click the stage to drop. Escape cancels.");
+    closeElementContextMenu();
+  }
+
+  function updateMovePreviewPosition(event) {
+    if (!activeMoveElement) return;
+    activeMovePointer = {
+      x: Number(event.clientX || 0),
+      y: Number(event.clientY || 0),
+    };
+    renderMovePreview(activeMoveElement);
+  }
+
+  function dropMoveElement(event) {
+    if (!activeMoveElement) return;
+
+    const stageBounds = document.querySelector(".stage")?.getBoundingClientRect();
+    if (!stageBounds) return;
+
+    const withinStage =
+      event.clientX >= stageBounds.left &&
+      event.clientX <= stageBounds.right &&
+      event.clientY >= stageBounds.top &&
+      event.clientY <= stageBounds.bottom;
+
+    if (!withinStage) {
+      return;
+    }
+
+    const x = (((event.clientX - stageBounds.left) / stageBounds.width) * 100) - 50;
+    const y = (((event.clientY - stageBounds.top) / stageBounds.height) * 100) - 50;
+
+    const ok = sendAction("act/place_element", {
+      element_id: activeMoveElement.element_id || "",
+      element_slug: activeMoveElement.slug || "",
+      venue_slug: "the-cave",
+      layer: "stage",
+      x: Math.max(-50, Math.min(50, x)),
+      y: Math.max(-50, Math.min(50, y)),
+      order: Number(activeMoveElement?.position?.order ?? 0),
+    });
+
+    if (!ok) {
+      setConnectionStatus("Move failed to send.");
+      return;
+    }
+
+    setConnectionStatus("Move sent.");
+    clearMoveMode();
+  }
+
+  function scrollToIndexCardPanel() {
+    indexCardPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function createIndexCardFromMenu() {
+    if (!canManageIndexCards(currentRole)) {
+      setIndexCardStatus("Only producers and directors can create cards.");
+      return;
+    }
+    clearIndexCardEditor();
+    scrollToIndexCardPanel();
+    indexCardFront?.focus();
+    closeElementContextMenu();
+  }
+
+  function moveContextElement() {
+    const element = contextMenuTarget;
+    if (!element) return;
+    startMoveMode(element);
+  }
+
+  function removeContextElementFromStage() {
+    const element = contextMenuTarget;
+    if (!element) return;
+    if (!canRemoveStageElement(currentRole, element)) {
+      setConnectionStatus("Remove denied.");
+      return;
+    }
+
+    const ok = sendAction("act/place_element", {
+      element_id: element.element_id || "",
+      element_slug: element.slug || "",
+      venue_slug: "the-cave",
+      layer: "tray",
+      x: 0,
+      y: 0,
+      order: 0,
+    });
+
+    if (!ok) {
+      setConnectionStatus("Remove failed to send.");
+      return;
+    }
+
+    setConnectionStatus("Removed from stage.");
+    closeElementContextMenu();
+  }
+
+  function revealContextElement() {
+    const element = contextMenuTarget;
+    if (!element) return;
+    if (!canRevealHide(currentRole)) {
+      setConnectionStatus("Reveal denied.");
+      return;
+    }
+    performReveal({
+      element_id: element.element_id || "",
+      element_slug: element.slug || "",
+      layer: "audience",
+    });
+    closeElementContextMenu();
+  }
+
+  function hideContextElement() {
+    const element = contextMenuTarget;
+    if (!element) return;
+    if (!canRevealHide(currentRole)) {
+      setConnectionStatus("Hide denied.");
+      return;
+    }
+    performHide({
+      element_id: element.element_id || "",
+      element_slug: element.slug || "",
+      layer: "audience",
+    });
+    closeElementContextMenu();
+  }
+
+  function showOverlayContextElement() {
+    const element = contextMenuTarget;
+    if (!element) return;
+    if (!canShowOverlay(currentRole, element)) {
+      setConnectionStatus("Overlay denied.");
+      return;
+    }
+
+    const ok = sendAction("act/show_overlay", {
+      element_id: element.element_id || "",
+      element_slug: element.slug || "",
+      overlay_type: overlayTypeForElement(element),
+    });
+
+    if (!ok) {
+      setConnectionStatus("Overlay failed to send.");
+      return;
+    }
+
+    setConnectionStatus("Overlay sent.");
+    closeElementContextMenu();
+  }
+
+  function hideOverlayContextElement() {
+    const element = contextMenuTarget;
+    if (!element) return;
+    if (!canShowOverlay(currentRole, element)) {
+      setConnectionStatus("Overlay denied.");
+      return;
+    }
+
+    const ok = sendAction("act/hide_overlay", {
+      element_id: element.element_id || "",
+      element_slug: element.slug || "",
+      overlay_type: overlayTypeForElement(element),
+    });
+
+    if (!ok) {
+      setConnectionStatus("Overlay failed to send.");
+      return;
+    }
+
+    setConnectionStatus("Overlay hidden.");
+    closeElementContextMenu();
+  }
+
+  function openElementContextMenu(event, element) {
+    if (!element || !canUseStageContextMenu(currentRole)) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    contextMenuTarget = element;
+    selectedElement = {
+      element_id: element.element_id || "",
+      slug: element.slug || "",
+      name: element.name || element.slug || "Element",
+      surface: element.surface || "",
+      element_type: element.element_type || "",
+      position: element.position || {},
+      data: element.data || {},
+    };
+    updateSelectionUI();
+
+    if (!elementContextMenu) return;
+
+    const menuItems = contextMenuActionsForElement(currentRole, element).map((action) => {
+      switch (action) {
+        case "move":
+          return `<button type="button" data-menu-action="move">Move</button>`;
+        case "reveal":
+          return `<button type="button" data-menu-action="reveal">Reveal</button>`;
+        case "hide":
+          return `<button type="button" data-menu-action="hide">Hide</button>`;
+        case "remove":
+          return `<button type="button" data-menu-action="remove">Remove from Stage</button>`;
+        case "show-overlay":
+          return `<button type="button" data-menu-action="show-overlay">Show as Overlay</button>`;
+        case "hide-overlay":
+          return `<button type="button" data-menu-action="hide-overlay">Hide Overlay</button>`;
+        case "info":
+          return `<button type="button" data-menu-action="info">Info</button>`;
+        case "create-card":
+          return `<div class="menu-separator"></div><button type="button" data-menu-action="create-card">Create Index Card</button>`;
+        default:
+          return "";
+      }
+    }).filter(Boolean);
+
+    if (!menuItems.length) {
+      closeElementContextMenu();
+      return;
+    }
+
+    elementContextMenu.innerHTML = menuItems.join("");
+    elementContextMenu.hidden = false;
+    elementContextMenu.style.left = "0px";
+    elementContextMenu.style.top = "0px";
+    const rect = elementContextMenu.getBoundingClientRect();
+    const maxX = Math.max(8, window.innerWidth - rect.width - 8);
+    const maxY = Math.max(8, window.innerHeight - rect.height - 8);
+    const left = Math.max(8, Math.min(event.clientX, maxX));
+    const top = Math.max(8, Math.min(event.clientY, maxY));
+    elementContextMenu.style.left = `${left}px`;
+    elementContextMenu.style.top = `${top}px`;
   }
 
   function indexCardTextFromData(element, key) {
@@ -1311,8 +2009,9 @@
         const selected = selectedIndexCard && selectedIndexCard.element_id === card.element_id ? " is-selected" : "";
         const surfaceLabel = escapeHtml(indexCardSurface(card));
         const flipped = isIndexCardFlipped(card.element_id);
+        const moving = activeMoveElement && activeMoveElement.element_id === card.element_id ? " hidden" : "";
         return `
-          <div class="index-card-item${selected}" data-card-id="${escapeHtml(card.element_id || "")}" style="--card-accent:${color};">
+          <div class="index-card-item${selected}" data-card-id="${escapeHtml(card.element_id || "")}"${moving} style="--card-accent:${color};">
             <div class="index-card-face index-card-face--front" ${flipped ? "hidden" : ""}>
               <div class="index-card-front">${front || "Untitled card"}</div>
             </div>
@@ -1328,11 +2027,24 @@
 
     for (const cardEl of container.querySelectorAll(".index-card-item")) {
       cardEl.addEventListener("click", (event) => {
+        if (activeMoveElement) {
+          event.stopPropagation();
+          dropMoveElement(event);
+          return;
+        }
         if (event.target.closest("button")) return;
         const cardId = cardEl.getAttribute("data-card-id");
         const card = cards.find((item) => item.element_id === cardId);
         if (card) {
           loadIndexCardEditor(card);
+        }
+      });
+
+      cardEl.addEventListener("contextmenu", (event) => {
+        const cardId = cardEl.getAttribute("data-card-id");
+        const card = cards.find((item) => item.element_id === cardId);
+        if (card) {
+          openElementContextMenu(event, card);
         }
       });
     }
@@ -1373,9 +2085,9 @@
 
     const mid = (cards.length - 1) / 2;
     const baseLeft = 50;
-    const baseTop = 48;
-    const spreadX = 15;
-    const spreadY = 9;
+    const baseTop = 50;
+    const spreadX = 8;
+    const spreadY = 5;
 
     container.innerHTML = cards
       .map((card, index) => {
@@ -1385,8 +2097,8 @@
         const flipped = isIndexCardFlipped(card.element_id);
         const pos = card?.position || {};
         const order = Number(pos.order || index);
-        const left = baseLeft + ((index - mid) * spreadX) + Number(pos.x || 0) * 2;
-        const top = baseTop + Math.floor(index / 2) * spreadY + Number(pos.y || 0) * 2;
+        const left = baseLeft + ((index - mid) * spreadX) + Number(pos.x || 0);
+        const top = baseTop + Math.floor(index / 2) * spreadY + Number(pos.y || 0);
         const tilt = Math.max(-10, Math.min(10, (index % 2 === 0 ? -1 : 1) * (4 + order)));
         const zIndex = 20 + index;
         return `
@@ -1417,6 +2129,14 @@
           loadIndexCardEditor(card);
         }
       });
+
+      cardEl.addEventListener("contextmenu", (event) => {
+        const cardId = cardEl.getAttribute("data-card-id");
+        const card = cards.find((item) => item.element_id === cardId);
+        if (card) {
+          openElementContextMenu(event, card);
+        }
+      });
     }
 
     for (const flipButton of container.querySelectorAll("[data-card-back]")) {
@@ -1434,16 +2154,6 @@
       });
     }
 
-    for (const cardEl of container.querySelectorAll(".index-card-item")) {
-      cardEl.addEventListener("click", (event) => {
-        if (event.target.closest("button")) return;
-        const cardId = cardEl.getAttribute("data-card-id");
-        const card = cards.find((item) => item.element_id === cardId);
-        if (card) {
-          loadIndexCardEditor(card);
-        }
-      });
-    }
   }
 
   function renderIndexCardHistory(actions) {
@@ -1921,6 +2631,7 @@
   function applySnapshot(snapshot) {
     const elements = Array.isArray(snapshot?.elements) ? snapshot.elements : [];
     const actions = Array.isArray(snapshot?.actions) ? snapshot.actions : [];
+    latestSnapshotOverlay = snapshot?.overlay || null;
     latestSnapshotElements = elements;
     latestSnapshotActions = actions;
 
@@ -1937,6 +2648,7 @@
       "";
 
     speechEl.textContent = latestSpeechText || "";
+    renderStageOverlay(latestSnapshotOverlay);
     renderActionHistory(actions);
     refreshIndexCardPanels();
 
@@ -2340,7 +3052,12 @@
     }
   });
 
-  fireEl.addEventListener("click", () => {
+  fireEl.addEventListener("click", (event) => {
+    if (activeMoveElement) {
+      event.stopPropagation();
+      dropMoveElement(event);
+      return;
+    }
     if (fireEl.hidden) return;
 
     const elementId = fireEl.dataset.elementId || "";
@@ -2353,6 +3070,26 @@
       element_id: elementId,
       slug: elementSlug,
       name: elementName
+    });
+  });
+
+  fireEl.addEventListener("contextmenu", (event) => {
+    if (activeMoveElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (fireEl.hidden) return;
+    const elementId = fireEl.dataset.elementId || "";
+    const elementSlug = fireEl.dataset.elementSlug || "";
+    const elementName = fireEl.dataset.elementName || "Fire";
+    if (!elementId && !elementSlug) return;
+    openElementContextMenu(event, {
+      element_id: elementId,
+      slug: elementSlug,
+      name: elementName,
+      surface: "stage",
+      element_type: "element",
     });
   });
 
@@ -2378,6 +3115,68 @@
 
   clearSelectionBtn?.addEventListener("click", () => {
     clearSelectedElement();
+  });
+
+  elementContextMenu?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-menu-action]");
+    if (!button) return;
+    const action = button.getAttribute("data-menu-action");
+    if (action === "move") {
+      moveContextElement();
+      return;
+    }
+    if (action === "reveal") {
+      revealContextElement();
+      return;
+    }
+    if (action === "hide") {
+      hideContextElement();
+      return;
+    }
+    if (action === "remove") {
+      removeContextElementFromStage();
+      return;
+    }
+    if (action === "info") {
+      openElementInfo(contextMenuTarget);
+      closeElementContextMenu();
+      return;
+    }
+    if (action === "show-overlay") {
+      showOverlayContextElement();
+      return;
+    }
+    if (action === "hide-overlay") {
+      hideOverlayContextElement();
+      return;
+    }
+    if (action === "create-card") {
+      createIndexCardFromMenu();
+      return;
+    }
+  });
+
+  elementInfoClose?.addEventListener("click", closeElementInfoPopup);
+  document.addEventListener("click", (event) => {
+    if (elementContextMenu && !elementContextMenu.hidden && !elementContextMenu.contains(event.target)) {
+      closeElementContextMenu();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      if (activeMoveElement) {
+        cancelMoveMode();
+        return;
+      }
+      closeElementContextMenu();
+      closeElementInfoPopup();
+    }
+  });
+
+  document.addEventListener("pointermove", updateMovePreviewPosition);
+  stageEl?.addEventListener("click", (event) => {
+    if (!activeMoveElement) return;
+    dropMoveElement(event);
   });
 
   startCave();

@@ -89,31 +89,10 @@ func TestIsRevealableCaveTarget(t *testing.T) {
 		target ActionTarget
 		want   bool
 	}{
-		{
-			name: "first fire allowed",
-			target: ActionTarget{
-				Kind:        "element",
-				ElementSlug: "first-fire",
-			},
-			want: true,
-		},
-		{
-			name: "other element denied",
-			target: ActionTarget{
-				Kind:        "element",
-				ElementSlug: "second-fire",
-			},
-			want: false,
-		},
-		{
-			name: "empty slug denied",
-			target: ActionTarget{
-				Kind:        "element",
-				ElementID:   "abc",
-				ElementSlug: "",
-			},
-			want: false,
-		},
+		{name: "element slug allowed", target: ActionTarget{Kind: "element", ElementSlug: "first-fire"}, want: true},
+		{name: "other element allowed", target: ActionTarget{Kind: "element", ElementSlug: "second-fire"}, want: true},
+		{name: "element id allowed", target: ActionTarget{Kind: "element", ElementID: "abc"}, want: true},
+		{name: "empty denied", target: ActionTarget{Kind: "element"}, want: false},
 	}
 
 	for _, tt := range tests {

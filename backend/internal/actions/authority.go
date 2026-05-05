@@ -58,7 +58,7 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 		return Decision{Allowed: false, Reason: "not_session_participant"}, nil
 	}
 	if actionType != "act/reveal_element" && actionType != "act/hide_element" {
-		if actionType != "create/index_card" && actionType != "update/index_card" && actionType != "act/place_element" {
+		if actionType != "create/index_card" && actionType != "update/index_card" && actionType != "act/place_element" && actionType != "act/show_overlay" && actionType != "act/hide_overlay" {
 			return Decision{Allowed: false, Reason: "unknown_action"}, nil
 		}
 	}
@@ -68,6 +68,10 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 			return canActPlaceElement(ctx, q, userID, sessionID, target)
 		}
 		return canActIndexCardInCave(ctx, q, userID, sessionID, target, actionType)
+	}
+
+	if actionType == "act/show_overlay" || actionType == "act/hide_overlay" {
+		return canActOverlayInCave(ctx, q, userID, sessionID, target)
 	}
 
 	if target.Kind != "element" {
@@ -147,6 +151,58 @@ func canActRevealInCave(ctx context.Context, q actionQuerier, userID, sessionID 
 	}
 
 	return Decision{Allowed: true, Reason: "allowed"}, nil
+}
+
+func canActOverlayInCave(ctx context.Context, q actionQuerier, userID, sessionID string, target ActionTarget) (Decision, error) {
+	var (
+		venueSlug       string
+		participantRole string
+		surface         string
+	)
+
+	base := `
+		SELECT
+			v.slug,
+			sp.role::text,
+			vle.surface
+		FROM sessions s
+		JOIN venues v ON v.id = s.venue_id
+		JOIN session_participants sp ON sp.session_id = s.id
+		JOIN venue_layout_elements vle ON vle.venue_id = v.id
+		JOIN elements e ON e.id = vle.element_id
+		WHERE s.id = $1
+		  AND sp.user_id = $2
+	`
+
+	var err error
+	switch {
+	case strings.TrimSpace(target.ElementID) != "":
+		err = q.QueryRow(ctx, base+` AND e.id = $3 LIMIT 1`, sessionID, userID, target.ElementID).Scan(&venueSlug, &participantRole, &surface)
+	case strings.TrimSpace(target.ElementSlug) != "":
+		err = q.QueryRow(ctx, base+` AND e.slug = $3 LIMIT 1`, sessionID, userID, target.ElementSlug).Scan(&venueSlug, &participantRole, &surface)
+	default:
+		return Decision{Allowed: false, Reason: "unknown_target"}, nil
+	}
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Decision{Allowed: false, Reason: "unknown_target"}, nil
+		}
+		return Decision{}, err
+	}
+
+	if venueSlug != "the-cave" {
+		return Decision{Allowed: false, Reason: "unknown_target"}, nil
+	}
+	if strings.ToLower(strings.TrimSpace(surface)) != "stage" {
+		return Decision{Allowed: false, Reason: "unknown_target"}, nil
+	}
+
+	switch normalizeActionRole(participantRole) {
+	case "producer", "director":
+		return Decision{Allowed: true, Reason: "allowed"}, nil
+	default:
+		return Decision{Allowed: false, Reason: "insufficient_role"}, nil
+	}
 }
 
 func canActIndexCardInCave(ctx context.Context, q actionQuerier, userID, sessionID string, target ActionTarget, actionType string) (Decision, error) {
@@ -264,7 +320,7 @@ func canRoleRevealHide(role string, actorsCanReveal bool) bool {
 }
 
 func isRevealableCaveTarget(target ActionTarget) bool {
-	return strings.EqualFold(strings.TrimSpace(target.ElementSlug), "first-fire")
+	return strings.TrimSpace(target.ElementID) != "" || strings.TrimSpace(target.ElementSlug) != ""
 }
 
 func normalizeActionRole(role string) string {

@@ -195,6 +195,11 @@ This is not a complete security system. It is the first enforceable boundary.
 - Grant's Cabin stays invisible unless a venue grant exists
 - Catharsis is signed-in only and remains ticketing-bound until the audience model is finalized
 
+### Stage Element Control
+- Context-menu actions still enforce server authority
+- Reveal/hide is stage-surface scoped, not tray-scoped
+- Audience cannot access the stage context menu
+
 ### Gap
 - Map visibility endpoint not yet implemented
 - Venue access still partially permissive

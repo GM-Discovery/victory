@@ -36,6 +36,8 @@ var upgrader = websocket.Upgrader{
 var storeReactionFunc = actions.StoreReaction
 var storeSpeakFunc = actions.StoreSpeak
 var storeRevealFunc = actions.StoreReveal
+var storeOverlayShowFunc = actions.StoreOverlayShow
+var storeOverlayHideFunc = actions.StoreOverlayHide
 var storeIndexCardCreateFunc = actions.StoreIndexCardCreate
 var storeIndexCardUpdateFunc = actions.StoreIndexCardUpdate
 var storePlaceElementFunc = actions.StorePlaceElement
@@ -330,6 +332,62 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 					"error": err.Error(),
 				})
 				log.Printf("action store failed: user=%s session=%s action=%s target=%s err=%v", actorID, sessionID, payload["type"], elementSlug, err)
+				return
+			}
+
+			msgOut, _ := json.Marshal(map[string]any{
+				"type": "action",
+				"data": storedAction,
+			})
+			hub.Broadcast(msgOut)
+		}
+
+	case "act/show_overlay", "act/hide_overlay":
+		{
+			sessionID, _ := payload["session_id"].(string)
+			actorID := c.UserID
+			elementID, _ := payload["element_id"].(string)
+			elementSlug, _ := payload["element_slug"].(string)
+			overlayType, _ := payload["overlay_type"].(string)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			var storedAction *actions.StoredAction
+			var err error
+			if payload["type"] == "act/show_overlay" {
+				storedAction, err = storeOverlayShowFunc(ctx, pool, actions.OverlayRequest{
+					SessionID:   sessionID,
+					ActorID:     actorID,
+					ElementID:   elementID,
+					ElementSlug: elementSlug,
+					OverlayType: overlayType,
+				})
+			} else {
+				storedAction, err = storeOverlayHideFunc(ctx, pool, actions.OverlayRequest{
+					SessionID:   sessionID,
+					ActorID:     actorID,
+					ElementID:   elementID,
+					ElementSlug: elementSlug,
+					OverlayType: overlayType,
+				})
+			}
+			cancel()
+
+			if err != nil {
+				var denied *actions.ActionDeniedError
+				if errors.As(err, &denied) {
+					_ = c.Conn.WriteJSON(map[string]any{
+						"type":  "error",
+						"error": denied.Reason,
+					})
+					log.Printf("overlay denied: user=%s session=%s action=%s target=%s reason=%s", actorID, sessionID, payload["type"], elementSlug, denied.Reason)
+					return
+				}
+
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": err.Error(),
+				})
+				log.Printf("overlay store failed: user=%s session=%s action=%s target=%s err=%v", actorID, sessionID, payload["type"], elementSlug, err)
 				return
 			}
 
