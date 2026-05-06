@@ -107,8 +107,14 @@ func StoreReaction(ctx context.Context, pool *pgxpool.Pool, req ReactRequest) (*
 		"kind": "session",
 		"id":   req.SessionID,
 	}
+	displayName, handle, role, persona, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
+	if err != nil {
+		return nil, err
+	}
+
 	payload := map[string]any{
-		"kind": req.Kind,
+		"kind":          req.Kind,
+		"actor_persona": persona,
 	}
 	scope := map[string]any{
 		"surfaces":         []string{"overlay"},
@@ -148,11 +154,6 @@ func StoreReaction(ctx context.Context, pool *pgxpool.Pool, req ReactRequest) (*
 		return nil, err
 	}
 
-	displayName, handle, role, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
-	if err != nil {
-		return nil, err
-	}
-
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
@@ -169,9 +170,9 @@ func StoreReaction(ctx context.Context, pool *pgxpool.Pool, req ReactRequest) (*
 		"handle":       handle,
 		"display_name": displayName,
 		"role":         role,
-		"persona":      nil,
+		"persona":      persona,
 	}
-	out.Persona = nil
+	out.Persona = persona
 	out.Type = "react/emote"
 	out.Target = target
 	out.Payload = payload
@@ -232,7 +233,7 @@ func StoreSpeak(ctx context.Context, pool *pgxpool.Pool, sessionID, actorID, tex
 		return nil, err
 	}
 
-	displayName, handle, role, err := loadActorIdentity(ctx, tx, sessionID, actorID)
+	displayName, handle, role, persona, err := loadActorIdentity(ctx, tx, sessionID, actorID)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +243,8 @@ func StoreSpeak(ctx context.Context, pool *pgxpool.Pool, sessionID, actorID, tex
 		"id":   sessionID,
 	}
 	payload := map[string]any{
-		"text": text,
+		"text":          text,
+		"actor_persona": persona,
 	}
 	scope := map[string]any{
 		"surfaces":         []string{"overlay"},
@@ -298,9 +300,9 @@ func StoreSpeak(ctx context.Context, pool *pgxpool.Pool, sessionID, actorID, tex
 		"handle":       handle,
 		"display_name": displayName,
 		"role":         role,
-		"persona":      nil,
+		"persona":      persona,
 	}
-	out.Persona = nil
+	out.Persona = persona
 	out.Type = "perform/speak"
 	out.Target = target
 	out.Payload = payload
@@ -311,11 +313,11 @@ func StoreSpeak(ctx context.Context, pool *pgxpool.Pool, sessionID, actorID, tex
 	return &out, nil
 }
 
-func loadActorIdentity(ctx context.Context, q actionQuerier, sessionID, actorID string) (displayName, handle, role string, err error) {
+func loadActorIdentity(ctx context.Context, q actionQuerier, sessionID, actorID string) (displayName, handle, role string, persona any, err error) {
 	ident, err := identity.ResolveSessionIdentity(ctx, q, sessionID, actorID)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", nil, err
 	}
 
-	return ident.DisplayName, ident.Handle, ident.Role, nil
+	return ident.DisplayName, ident.Handle, ident.Role, ident.Persona, nil
 }

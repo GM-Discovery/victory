@@ -93,7 +93,7 @@ func StoreReveal(ctx context.Context, pool *pgxpool.Pool, req RevealRequest) (*S
 		return nil, &ActionDeniedError{Reason: decision.Reason}
 	}
 
-	displayName, handle, role, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
+	displayName, handle, role, persona, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,8 @@ func StoreReveal(ctx context.Context, pool *pgxpool.Pool, req RevealRequest) (*S
 	}
 
 	payload := map[string]any{
-		"visible": req.Visible,
+		"visible":       req.Visible,
+		"actor_persona": persona,
 	}
 
 	scope := map[string]any{
@@ -178,9 +179,9 @@ func StoreReveal(ctx context.Context, pool *pgxpool.Pool, req RevealRequest) (*S
 		"handle":       handle,
 		"display_name": displayName,
 		"role":         role,
-		"persona":      nil,
+		"persona":      persona,
 	}
-	out.Persona = nil
+	out.Persona = persona
 	out.Type = actionType
 	out.Target = target
 	out.Payload = payload

@@ -100,6 +100,37 @@ func (r *PresenceRegistry) Disconnect(sessionID, userID string) (snapshot []Pres
 	return r.snapshotLocked(sessionID), true
 }
 
+func (r *PresenceRegistry) Update(sessionID string, user PresenceUser) (PresenceUser, bool) {
+	sessionID = strings.TrimSpace(sessionID)
+	user.UserID = strings.TrimSpace(user.UserID)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	entries, ok := r.sessions[sessionID]
+	if !ok {
+		return PresenceUser{}, false
+	}
+
+	entry, ok := entries[user.UserID]
+	if !ok {
+		return PresenceUser{}, false
+	}
+
+	if strings.TrimSpace(user.Handle) != "" {
+		entry.user.Handle = strings.TrimSpace(user.Handle)
+	}
+	if strings.TrimSpace(user.DisplayName) != "" {
+		entry.user.DisplayName = strings.TrimSpace(user.DisplayName)
+	}
+	if strings.TrimSpace(user.Role) != "" {
+		entry.user.Role = strings.TrimSpace(user.Role)
+	}
+	entry.user.Persona = user.Persona
+
+	return entry.user, true
+}
+
 func (r *PresenceRegistry) Snapshot(sessionID string) []PresenceUser {
 	sessionID = strings.TrimSpace(sessionID)
 

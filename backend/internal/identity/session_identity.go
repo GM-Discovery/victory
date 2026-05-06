@@ -54,6 +54,7 @@ func ResolveSessionIdentity(ctx context.Context, q identityQuerier, sessionID, u
 	}
 
 	var ident SessionIdentity
+	var personaCardID, personaName, personaPronouns, personaPortraitURL, personaColor, personaTagline string
 
 	err := q.QueryRow(ctx, `
 		SELECT
@@ -62,22 +63,41 @@ func ResolveSessionIdentity(ctx context.Context, q identityQuerier, sessionID, u
 			u.id::text,
 			COALESCE(NULLIF(u.handle, ''), LEFT(u.id::text, 8), 'Unknown Participant'),
 			COALESCE(NULLIF(u.display_name, ''), NULLIF(u.handle, ''), LEFT(u.id::text, 8), 'Unknown Participant'),
-			COALESCE(sp.role::text, 'audience')
+			COALESCE(sp.role::text, 'audience'),
+			COALESCE(cc.id::text, ''),
+			COALESCE(cc.name, ''),
+			COALESCE(cc.pronouns, ''),
+			COALESCE(cc.portrait_url, ''),
+			COALESCE(cc.color, ''),
+			COALESCE(cc.tagline, '')
 		FROM sessions s
 		JOIN venues v ON v.id = s.venue_id
 		JOIN session_participants sp ON sp.session_id = s.id
 		JOIN users u ON u.id = sp.user_id
+		LEFT JOIN current_session_personas csp ON csp.session_id = s.id AND csp.user_id = sp.user_id
+		LEFT JOIN character_cards cc ON cc.id = csp.character_card_id AND cc.is_deleted = FALSE
 		WHERE v.slug = 'the-cave'
 		  AND s.id = $1
 		  AND sp.user_id = $2
 		  AND s.status IN ('rehearsal', 'live')
 		LIMIT 1
-	`, sessionID, userID).Scan(&ident.SessionParticipantID, &ident.SessionID, &ident.UserID, &ident.Handle, &ident.DisplayName, &ident.Role)
+	`, sessionID, userID).Scan(&ident.SessionParticipantID, &ident.SessionID, &ident.UserID, &ident.Handle, &ident.DisplayName, &ident.Role, &personaCardID, &personaName, &personaPronouns, &personaPortraitURL, &personaColor, &personaTagline)
 	if err != nil {
 		return SessionIdentity{}, err
 	}
 
 	ident.Persona = nil
+	if personaCardID != "" {
+		ident.Persona = map[string]any{
+			"character_card_id": personaCardID,
+			"name":              personaName,
+			"display_name":      personaName,
+			"pronouns":          personaPronouns,
+			"portrait_url":      personaPortraitURL,
+			"color":             personaColor,
+			"tagline":           personaTagline,
+		}
+	}
 	return ident, nil
 }
 

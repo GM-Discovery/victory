@@ -58,7 +58,7 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 		return Decision{Allowed: false, Reason: "not_session_participant"}, nil
 	}
 	if actionType != "act/reveal_element" && actionType != "act/hide_element" {
-		if actionType != "create/index_card" && actionType != "update/index_card" && actionType != "delete/index_card" && actionType != "act/place_element" && actionType != "act/show_overlay" && actionType != "act/hide_overlay" && actionType != "chat/message" {
+		if actionType != "create/index_card" && actionType != "update/index_card" && actionType != "delete/index_card" && actionType != "act/place_element" && actionType != "act/show_overlay" && actionType != "act/hide_overlay" && actionType != "chat/message" && actionType != "persona/equip" && actionType != "persona/unequip" {
 			return Decision{Allowed: false, Reason: "unknown_action"}, nil
 		}
 	}
@@ -95,6 +95,10 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 		return canActChatMessage(ctx, q, userID, sessionID)
 	}
 
+	if actionType == "persona/equip" || actionType == "persona/unequip" {
+		return canActPersona(ctx, q, userID, sessionID, target, actionType)
+	}
+
 	if target.Kind != "element" {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
@@ -103,6 +107,51 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 	}
 
 	return canActRevealInCave(ctx, q, userID, sessionID, target)
+}
+
+func canActPersona(ctx context.Context, q actionQuerier, userID, sessionID string, target ActionTarget, actionType string) (Decision, error) {
+	var participantUserID string
+	err := q.QueryRow(ctx, `
+		SELECT sp.user_id::text
+		FROM session_participants sp
+		WHERE sp.session_id = $1
+		  AND sp.user_id = $2
+		LIMIT 1
+	`, sessionID, userID).Scan(&participantUserID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Decision{Allowed: false, Reason: "not_session_participant"}, nil
+		}
+		return Decision{}, err
+	}
+
+	if actionType == "persona/unequip" {
+		return Decision{Allowed: true, Reason: "allowed"}, nil
+	}
+
+	if strings.TrimSpace(target.ElementID) == "" {
+		return Decision{Allowed: false, Reason: "unknown_target"}, nil
+	}
+
+	var ownerUserID string
+	err = q.QueryRow(ctx, `
+		SELECT owner_user_id::text
+		FROM character_cards
+		WHERE id = $1
+		  AND is_deleted = FALSE
+		LIMIT 1
+	`, target.ElementID).Scan(&ownerUserID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Decision{Allowed: false, Reason: "unknown_target"}, nil
+		}
+		return Decision{}, err
+	}
+	if strings.TrimSpace(ownerUserID) != userID {
+		return Decision{Allowed: false, Reason: "forbidden"}, nil
+	}
+
+	return Decision{Allowed: true, Reason: "allowed"}, nil
 }
 
 func canActRevealInCave(ctx context.Context, q actionQuerier, userID, sessionID string, target ActionTarget) (Decision, error) {

@@ -28,6 +28,7 @@ import (
 
 	"victory/backend/internal/access"
 	"victory/backend/internal/assets"
+	"victory/backend/internal/characters"
 	"victory/backend/internal/db"
 	"victory/backend/internal/identity"
 	"victory/backend/internal/messages"
@@ -64,6 +65,9 @@ func main() {
 	if err := showings.EnsureKernel22ShowingSurface(ctx, pool); err != nil {
 		log.Fatalf("kernel 22 showing bootstrap failed: %v", err)
 	}
+	if err := characters.EnsureKernel23CharacterSurface(ctx, pool); err != nil {
+		log.Fatalf("kernel 23 character bootstrap failed: %v", err)
+	}
 
 	hub := network.NewHub()
 
@@ -96,6 +100,11 @@ func main() {
 	mux.HandleFunc("/api/profiles/me/publish", profiles.HandlePublishMyProfile(pool))
 	mux.HandleFunc("/api/profiles/admin/save", profiles.HandleAdminSaveProfile(pool))
 	mux.HandleFunc("/api/profiles/admin/publish", profiles.HandleAdminPublishProfile(pool))
+	mux.HandleFunc("GET /api/character-cards/me", characters.HandleMyCharacterCards(pool))
+	mux.HandleFunc("POST /api/character-cards", characters.HandleCreateCharacterCard(pool))
+	mux.HandleFunc("/api/character-cards/", characters.HandleCharacterCardByID(pool))
+	mux.HandleFunc("POST /api/character-card-permissions", characters.HandleGrantCharacterPermission(pool))
+	mux.HandleFunc("POST /api/character-card-permissions/revoke", characters.HandleRevokeCharacterPermission(pool))
 	mux.HandleFunc("GET /api/messages", messages.HandleMessages(pool))
 	mux.HandleFunc("POST /api/messages", messages.HandleMessages(pool))
 	mux.HandleFunc("GET /api/messages/{id}", messages.HandleMessageByID(pool))

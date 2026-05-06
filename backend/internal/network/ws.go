@@ -43,6 +43,8 @@ var storeIndexCardCreateFunc = actions.StoreIndexCardCreate
 var storeIndexCardUpdateFunc = actions.StoreIndexCardUpdate
 var storeIndexCardDeleteFunc = actions.StoreIndexCardDelete
 var storePlaceElementFunc = actions.StorePlaceElement
+var storePersonaEquipFunc = actions.StorePersonaEquip
+var storePersonaUnequipFunc = actions.StorePersonaUnequip
 
 func ServeCaveWS(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -631,6 +633,65 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 				"data": storedAction,
 			})
 			hub.Broadcast(msgOut)
+		}
+
+	case "persona/equip", "persona/unequip":
+		{
+			sessionID, _ := payload["session_id"].(string)
+			characterCardID, _ := payload["character_card_id"].(string)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			var storedAction *actions.StoredAction
+			var err error
+			if payload["type"] == "persona/equip" {
+				storedAction, err = storePersonaEquipFunc(ctx, pool, actions.PersonaRequest{
+					SessionID:       sessionID,
+					ActorID:         c.UserID,
+					CharacterCardID: characterCardID,
+				})
+			} else {
+				storedAction, err = storePersonaUnequipFunc(ctx, pool, actions.PersonaRequest{
+					SessionID: sessionID,
+					ActorID:   c.UserID,
+				})
+			}
+			cancel()
+
+			if err != nil {
+				var denied *actions.ActionDeniedError
+				if errors.As(err, &denied) {
+					_ = c.Conn.WriteJSON(map[string]any{
+						"type":  "error",
+						"error": denied.Reason,
+					})
+					log.Printf("persona denied: user=%s session=%s action=%s reason=%s", c.UserID, sessionID, payload["type"], denied.Reason)
+					return
+				}
+
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": err.Error(),
+				})
+				log.Printf("persona action failed: user=%s session=%s action=%s err=%v", c.UserID, sessionID, payload["type"], err)
+				return
+			}
+
+			msgOut, _ := json.Marshal(map[string]any{
+				"type": "action",
+				"data": storedAction,
+			})
+			hub.Broadcast(msgOut)
+
+			hub.UpdateClientPresence(sessionID, c.UserID, storedAction.Persona)
+			if updated, ok := hub.Presence().Update(sessionID, PresenceUser{
+				UserID:      c.UserID,
+				Handle:      c.Presence.Handle,
+				DisplayName: c.Presence.DisplayName,
+				Role:        c.Presence.Role,
+				Persona:     storedAction.Persona,
+			}); ok {
+				broadcastPresenceEvent(hub, sessionID, "presence/update", updated)
+			}
 		}
 	}
 }

@@ -267,14 +267,17 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 		a.Payload = decodeJSONMap(payloadRaw)
 		a.Scope = decodeJSONMap(scopeRaw)
 		a.Visibility = decodeJSONMap(visibilityRaw)
+		a.Persona = a.Payload["actor_persona"]
+		if a.Persona == nil && a.Type == "persona/equip" {
+			a.Persona = a.Payload["persona"]
+		}
 		a.Actor = map[string]any{
 			"user_id":      a.ActorID,
 			"handle":       a.ActorHandle,
 			"display_name": a.ActorDisplayName,
 			"role":         a.ActorRole,
-			"persona":      nil,
+			"persona":      a.Persona,
 		}
-		a.Persona = nil
 		a.Timestamp = ts.UTC().Format(time.RFC3339)
 
 		snap.Actions = append(snap.Actions, a)

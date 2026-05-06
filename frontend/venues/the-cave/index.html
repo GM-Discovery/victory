@@ -346,6 +346,19 @@
       gap: 10px;
     }
 
+    .chat-input-group {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .chat-input-label {
+      color: #ead7b2;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
     .element-context-menu {
       position: fixed;
       z-index: 80;
@@ -511,6 +524,79 @@
     .note-card-status {
       color: #c7bba5;
       min-height: 1.2em;
+      font-size: 0.95rem;
+    }
+
+    .character-panel {
+      display: grid;
+      gap: 12px;
+      padding-bottom: 16px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .character-panel h2 {
+      margin: 0;
+      font-size: 1rem;
+      color: #ead7b2;
+    }
+
+    .character-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .character-grid textarea,
+    .character-grid input,
+    .character-grid select,
+    .character-permission-row input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 9px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: #221c17;
+      color: white;
+      font: inherit;
+    }
+
+    .character-grid textarea {
+      min-height: 70px;
+      resize: vertical;
+    }
+
+    .character-wide {
+      grid-column: 1 / -1;
+    }
+
+    .character-actions,
+    .character-permission-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .character-actions button,
+    .character-permission-row button {
+      padding: 9px 12px;
+      border: 0;
+      border-radius: 8px;
+      background: #4b5a7a;
+      color: white;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .character-actions button:hover,
+    .character-permission-row button:hover {
+      background: #5a6b90;
+    }
+
+    .character-status {
+      min-height: 1.2em;
+      color: #c7bba5;
       font-size: 0.95rem;
     }
 
@@ -949,6 +1035,32 @@
       <img id="fire" src="/assets/fire.jpg" alt="Fire" hidden />    </div>
 
     <div id="chat-panel" class="chat-panel">
+      <div class="character-panel" id="character-panel">
+        <h2>Character</h2>
+        <div class="character-grid">
+          <select id="character-select" class="character-wide" aria-label="Character card"></select>
+          <input id="character-name" type="text" placeholder="Name" maxlength="80" />
+          <input id="character-pronouns" type="text" placeholder="Pronouns" maxlength="80" />
+          <input id="character-portrait-url" type="text" placeholder="Portrait URL" maxlength="500" />
+          <input id="character-color" type="color" value="#d9c7a6" aria-label="Character color" />
+          <input id="character-tagline" class="character-wide" type="text" placeholder="Tagline" maxlength="160" />
+          <textarea id="character-public-description" class="character-wide" placeholder="Public description" maxlength="1000"></textarea>
+          <textarea id="character-private-notes" class="character-wide" placeholder="Private notes" maxlength="2000"></textarea>
+        </div>
+        <div class="character-actions">
+          <button id="character-new" type="button">New</button>
+          <button id="character-save" type="button">Save</button>
+          <button id="character-equip" type="button">Put On</button>
+          <button id="character-unequip" type="button">Take Off</button>
+          <div id="character-status" class="character-status"></div>
+        </div>
+        <div id="character-permission-row" class="character-permission-row" hidden>
+          <input id="character-permission-user" type="text" placeholder="Cast/crew user id" />
+          <button id="character-permission-grant" type="button">Grant Drafting</button>
+          <button id="character-permission-revoke" type="button">Revoke Drafting</button>
+        </div>
+      </div>
+
       <div id="tool-panel" class="tool-panel">
         <div class="tool-row">
           <strong>Selected:</strong>
@@ -970,6 +1082,13 @@
         </div>
         <div class="tool-row">
           <button id="note-card-toggle" type="button">Send Note Card</button>
+        </div>
+        <div class="tool-row tool-row--speech">
+          <div class="chat-input-group">
+            <label class="chat-input-label" for="speech-input">Stage Speech</label>
+            <input id="speech-input" type="text" placeholder="Type stage speech..." maxlength="250" />
+          </div>
+          <button id="speech-send" type="button">Speak</button>
         </div>
       </div>
 
@@ -1053,13 +1172,16 @@
         <h2>Venue Chat</h2>
         <button id="chat-toggle" type="button" class="chat-panel-toggle" aria-expanded="true">Collapse</button>
       </div>
-      <p class="chat-panel-note">Venue conversation lives here. Performance speech stays on the stage.</p>
+      <p class="chat-panel-note">Venue conversation lives here. Performance speech stays on the stage and does not share this input.</p>
       <div class="chat-panel-body" id="chat-panel-body">
         <div id="chat-log"></div>
 
         <div class="chat-controls">
-          <input id="chat-input" type="text" placeholder="Type a chat message..." maxlength="250" />
-          <button id="chat-send" type="button">Send</button>
+          <div class="chat-input-group">
+            <label class="chat-input-label" for="chat-input">Venue Chat Input</label>
+            <input id="chat-input" type="text" placeholder="Type a venue chat message..." maxlength="250" />
+          </div>
+          <button id="chat-send" type="button" aria-label="Send venue chat message">Send</button>
         </div>
       </div>
 
@@ -1114,6 +1236,26 @@
   const noteCardPanel = document.getElementById("note-card-panel");
   const noteCardClose = document.getElementById("note-card-close");
   const noteCardStatus = document.getElementById("note-card-status");
+  const characterPanel = document.getElementById("character-panel");
+  const characterSelect = document.getElementById("character-select");
+  const characterName = document.getElementById("character-name");
+  const characterPronouns = document.getElementById("character-pronouns");
+  const characterPortraitURL = document.getElementById("character-portrait-url");
+  const characterColor = document.getElementById("character-color");
+  const characterTagline = document.getElementById("character-tagline");
+  const characterPublicDescription = document.getElementById("character-public-description");
+  const characterPrivateNotes = document.getElementById("character-private-notes");
+  const characterNew = document.getElementById("character-new");
+  const characterSave = document.getElementById("character-save");
+  const characterEquip = document.getElementById("character-equip");
+  const characterUnequip = document.getElementById("character-unequip");
+  const characterStatus = document.getElementById("character-status");
+  const characterPermissionRow = document.getElementById("character-permission-row");
+  const characterPermissionUser = document.getElementById("character-permission-user");
+  const characterPermissionGrant = document.getElementById("character-permission-grant");
+  const characterPermissionRevoke = document.getElementById("character-permission-revoke");
+  const speechInput = document.getElementById("speech-input");
+  const speechSend = document.getElementById("speech-send");
   const elementContextMenu = document.getElementById("element-context-menu");
   const elementInfoPopup = document.getElementById("element-info-popup");
   const elementInfoTitle = document.getElementById("element-info-title");
@@ -1170,6 +1312,10 @@
   let selectedElement = null;
   let selectedIndexCard = null;
   let presenceUsers = {};
+  let characterCards = [];
+  let canDraftCharacters = false;
+  let selectedCharacterId = "";
+  let activePersona = null;
   let latestSnapshotElements = [];
   let latestSnapshotActions = [];
   let latestSnapshotOverlay = null;
@@ -2776,6 +2922,8 @@
     if (workshopVenueSelect) workshopVenueSelect.disabled = !canEditCards || workshopVenueSelect.options.length === 0;
     if (workshopSendTray) workshopSendTray.disabled = !canEditCards;
     if (workshopPlaceStage) workshopPlaceStage.disabled = !canEditCards;
+    if (speechInput) speechInput.disabled = !canSpeak(currentRole);
+    if (speechSend) speechSend.disabled = !canSpeak(currentRole);
     updateSelectionUI();
   }
 
@@ -3002,7 +3150,7 @@
           return;
         }
 
-        if (actionType === "act/reveal_element" || actionType === "act/hide_element" || actionType === "create/index_card" || actionType === "update/index_card") {
+        if (actionType === "act/reveal_element" || actionType === "act/hide_element" || actionType === "create/index_card" || actionType === "update/index_card" || actionType === "delete/index_card") {
           await refreshSnapshot();
           if (
             pendingIndexCardSave &&
@@ -3090,6 +3238,27 @@
 
     chatInput.value = "";
     chatInput.focus();
+  }
+
+  function sendStageSpeech() {
+    const text = speechInput?.value.trim() || "";
+    if (!text) return;
+
+    if (!canSpeak(currentRole)) {
+      addChatMessage("(stage speech is not enabled for your role)", formatTime(), "system");
+      return;
+    }
+
+    if (text.length > 250) {
+      addChatMessage("(stage speech too long: max 250 characters)", formatTime(), "system");
+      return;
+    }
+
+    const sent = sendAction("perform/speak", { text });
+    if (!sent) return;
+
+    speechInput.value = "";
+    speechInput.focus();
   }
 
   async function sendNoteCard() {
@@ -3191,6 +3360,7 @@
   noteCardSend?.addEventListener("click", sendNoteCard);
   noteCardToggle?.addEventListener("click", openNoteCardPanel);
   noteCardClose?.addEventListener("click", closeNoteCardPanel);
+  speechSend?.addEventListener("click", sendStageSpeech);
   indexCardSave?.addEventListener("click", () => {
     if (!canManageIndexCards(currentRole)) {
       setIndexCardStatus("Only producers and directors can save cards.");
@@ -3237,6 +3407,13 @@
     if (event.key === "Enter") {
       event.preventDefault();
       sendChat();
+    }
+  });
+
+  speechInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      sendStageSpeech();
     }
   });
 

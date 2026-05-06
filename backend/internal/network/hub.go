@@ -54,6 +54,17 @@ func (h *Hub) Broadcast(msg []byte) {
 	}
 }
 
+func (h *Hub) UpdateClientPresence(sessionID, userID string, persona any) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for c := range h.clients {
+		if c.SessionID == sessionID && c.UserID == userID {
+			c.Presence.Persona = persona
+		}
+	}
+}
+
 func (h *Hub) Presence() *PresenceRegistry {
 	return h.presence
 }

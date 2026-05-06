@@ -57,7 +57,7 @@ func StoreChatMessage(ctx context.Context, pool *pgxpool.Pool, req ChatMessageRe
 		return nil, err
 	}
 
-	displayName, handle, role, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
+	displayName, handle, role, persona, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,8 @@ func StoreChatMessage(ctx context.Context, pool *pgxpool.Pool, req ChatMessageRe
 		"id":   req.SessionID,
 	}
 	payload := map[string]any{
-		"text": req.Text,
+		"text":          req.Text,
+		"actor_persona": persona,
 	}
 	scope := map[string]any{
 		"surfaces":         []string{"chat"},
@@ -130,9 +131,9 @@ func StoreChatMessage(ctx context.Context, pool *pgxpool.Pool, req ChatMessageRe
 		"handle":       handle,
 		"display_name": displayName,
 		"role":         role,
-		"persona":      nil,
+		"persona":      persona,
 	}
-	out.Persona = nil
+	out.Persona = persona
 	out.Type = "chat/message"
 	out.Target = target
 	out.Payload = payload

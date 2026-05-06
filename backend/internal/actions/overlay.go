@@ -81,7 +81,7 @@ func storeOverlayAction(ctx context.Context, pool *pgxpool.Pool, req OverlayRequ
 		return nil, err
 	}
 
-	displayName, handle, role, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
+	displayName, handle, role, persona, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,8 @@ func storeOverlayAction(ctx context.Context, pool *pgxpool.Pool, req OverlayRequ
 	}
 
 	payload := map[string]any{
-		"overlay_type": req.OverlayType,
+		"overlay_type":  req.OverlayType,
+		"actor_persona": persona,
 	}
 	targetPayload := map[string]any{
 		"element_id":   resolvedID,
@@ -154,9 +155,9 @@ func storeOverlayAction(ctx context.Context, pool *pgxpool.Pool, req OverlayRequ
 		"handle":       handle,
 		"display_name": displayName,
 		"role":         role,
-		"persona":      nil,
+		"persona":      persona,
 	}
-	out.Persona = nil
+	out.Persona = persona
 	out.Type = actionType
 	out.Target = targetPayload
 	out.Payload = payload

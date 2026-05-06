@@ -130,7 +130,7 @@ func StorePlaceElement(ctx context.Context, pool *pgxpool.Pool, req PlaceElement
 		return nil, err
 	}
 
-	displayName, handle, role, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
+	displayName, handle, role, persona, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
 	if err != nil {
 		return nil, err
 	}
@@ -154,11 +154,12 @@ func StorePlaceElement(ctx context.Context, pool *pgxpool.Pool, req PlaceElement
 		"y":            req.Y,
 	}
 	payload := map[string]any{
-		"venue_slug": req.VenueSlug,
-		"layer":      req.Layer,
-		"x":          req.X,
-		"y":          req.Y,
-		"order":      req.Order,
+		"venue_slug":    req.VenueSlug,
+		"layer":         req.Layer,
+		"x":             req.X,
+		"y":             req.Y,
+		"order":         req.Order,
+		"actor_persona": persona,
 	}
 	scope := map[string]any{
 		"surfaces":         []string{req.Layer},
@@ -212,9 +213,9 @@ func StorePlaceElement(ctx context.Context, pool *pgxpool.Pool, req PlaceElement
 		"handle":       handle,
 		"display_name": displayName,
 		"role":         role,
-		"persona":      nil,
+		"persona":      persona,
 	}
-	out.Persona = nil
+	out.Persona = persona
 	out.Type = "act/place_element"
 	out.Target = target
 	out.Payload = payload

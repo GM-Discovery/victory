@@ -64,7 +64,7 @@ func StoreIndexCardCreate(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 		return nil, err
 	}
 
-	displayName, handle, role, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
+	displayName, handle, role, persona, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
 	if err != nil {
 		return nil, err
 	}
@@ -79,6 +79,7 @@ func StoreIndexCardCreate(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 	}
 
 	payload := indexCardPayload(card, productionID)
+	payload["actor_persona"] = persona
 	target := indexCardTarget(card)
 	scope := map[string]any{
 		"surfaces":         []string{"tray"},
@@ -132,9 +133,9 @@ func StoreIndexCardCreate(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 		"handle":       handle,
 		"display_name": displayName,
 		"role":         role,
-		"persona":      nil,
+		"persona":      persona,
 	}
-	out.Persona = nil
+	out.Persona = persona
 	out.Type = "create/index_card"
 	out.Target = target
 	out.Payload = payload
@@ -188,7 +189,7 @@ func StoreIndexCardUpdate(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 		return nil, err
 	}
 
-	displayName, handle, role, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
+	displayName, handle, role, persona, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
 	if err != nil {
 		return nil, err
 	}
@@ -203,6 +204,7 @@ func StoreIndexCardUpdate(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 	}
 
 	payload := indexCardPayload(card, productionID)
+	payload["actor_persona"] = persona
 	target := indexCardTarget(card)
 	scope := map[string]any{
 		"surfaces":         []string{"tray"},
@@ -256,9 +258,9 @@ func StoreIndexCardUpdate(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 		"handle":       handle,
 		"display_name": displayName,
 		"role":         role,
-		"persona":      nil,
+		"persona":      persona,
 	}
-	out.Persona = nil
+	out.Persona = persona
 	out.Type = "update/index_card"
 	out.Target = target
 	out.Payload = payload
@@ -329,7 +331,7 @@ func StoreIndexCardDelete(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 	}
 	_ = existingName
 
-	displayName, handle, role, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
+	displayName, handle, role, persona, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
 	if err != nil {
 		return nil, err
 	}
@@ -375,8 +377,9 @@ func StoreIndexCardDelete(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 		"element_slug": resolvedSlug,
 	}
 	payload := map[string]any{
-		"deleted_at": deletedAt,
-		"deleted_by": req.ActorID,
+		"deleted_at":    deletedAt,
+		"deleted_by":    req.ActorID,
+		"actor_persona": persona,
 	}
 	scope := map[string]any{
 		"surfaces":         []string{"tray", "stage"},
@@ -430,9 +433,9 @@ func StoreIndexCardDelete(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 		"handle":       handle,
 		"display_name": displayName,
 		"role":         role,
-		"persona":      nil,
+		"persona":      persona,
 	}
-	out.Persona = nil
+	out.Persona = persona
 	out.Type = "delete/index_card"
 	out.Target = target
 	out.Payload = payload
@@ -468,7 +471,7 @@ func createIndexCard(ctx context.Context, tx pgx.Tx, req IndexCardRequest) (inde
 	if err != nil {
 		return indexCardRecord{}, "", err
 	}
-	creatorDisplayName, creatorHandle, creatorRole, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
+	creatorDisplayName, creatorHandle, creatorRole, _, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
 	if err != nil {
 		return indexCardRecord{}, "", err
 	}
