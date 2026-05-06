@@ -96,3 +96,42 @@ func TestCanDraftCharacterRequiresUser(t *testing.T) {
 		t.Fatalf("expected anonymous user to be denied")
 	}
 }
+
+func TestSanitizeInputSheetLinks(t *testing.T) {
+	links := []SheetLink{
+		{
+			ID:        "sheet-1",
+			Ruleset:   "  story-first  ",
+			SheetType: " blank ",
+			Label:     "  Story Sheet  ",
+			URL:       "  ",
+			CreatedAt: "not-a-date",
+		},
+		{},
+	}
+
+	input := sanitizeInput(CharacterCardInput{
+		Name:       "Hero",
+		SheetLinks: &links,
+	})
+	if input.SheetLinks == nil {
+		t.Fatalf("expected sheet links to remain present")
+	}
+
+	got := *input.SheetLinks
+	if len(got) != 1 {
+		t.Fatalf("got %d sheet links, want 1", len(got))
+	}
+	if got[0].Ruleset != "story-first" {
+		t.Fatalf("ruleset = %q, want story-first", got[0].Ruleset)
+	}
+	if got[0].SheetType != "blank" {
+		t.Fatalf("sheet_type = %q, want blank", got[0].SheetType)
+	}
+	if got[0].Label != "Story Sheet" {
+		t.Fatalf("label = %q, want Story Sheet", got[0].Label)
+	}
+	if got[0].CreatedAt == "" || got[0].CreatedAt == "not-a-date" {
+		t.Fatalf("expected invalid created_at to be replaced, got %q", got[0].CreatedAt)
+	}
+}

@@ -33,30 +33,30 @@ type SheetLink struct {
 }
 
 type CharacterCard struct {
-	ID                string `json:"id"`
-	OwnerUserID       string `json:"owner_user_id"`
-	LocationID        string `json:"location_id"`
-	ProductionID      string `json:"production_id,omitempty"`
-	Name              string `json:"name"`
-	Pronouns          string `json:"pronouns"`
-	PortraitURL       string `json:"portrait_url"`
-	Color             string `json:"color"`
-	Tagline           string `json:"tagline"`
-	PublicDescription string `json:"public_description"`
-	PrivateNotes      string `json:"private_notes,omitempty"`
+	ID                string      `json:"id"`
+	OwnerUserID       string      `json:"owner_user_id"`
+	LocationID        string      `json:"location_id"`
+	ProductionID      string      `json:"production_id,omitempty"`
+	Name              string      `json:"name"`
+	Pronouns          string      `json:"pronouns"`
+	PortraitURL       string      `json:"portrait_url"`
+	Color             string      `json:"color"`
+	Tagline           string      `json:"tagline"`
+	PublicDescription string      `json:"public_description"`
+	PrivateNotes      string      `json:"private_notes,omitempty"`
 	SheetLinks        []SheetLink `json:"sheet_links"`
-	CreatedAt         string `json:"created_at"`
-	UpdatedAt         string `json:"updated_at"`
+	CreatedAt         string      `json:"created_at"`
+	UpdatedAt         string      `json:"updated_at"`
 }
 
 type CharacterCardInput struct {
-	Name              string `json:"name"`
-	Pronouns          string `json:"pronouns"`
-	PortraitURL       string `json:"portrait_url"`
-	Color             string `json:"color"`
-	Tagline           string `json:"tagline"`
-	PublicDescription string `json:"public_description"`
-	PrivateNotes      string `json:"private_notes"`
+	Name              string       `json:"name"`
+	Pronouns          string       `json:"pronouns"`
+	PortraitURL       string       `json:"portrait_url"`
+	Color             string       `json:"color"`
+	Tagline           string       `json:"tagline"`
+	PublicDescription string       `json:"public_description"`
+	PrivateNotes      string       `json:"private_notes"`
 	SheetLinks        *[]SheetLink `json:"sheet_links,omitempty"`
 }
 

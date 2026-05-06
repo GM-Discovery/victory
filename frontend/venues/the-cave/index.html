@@ -541,16 +541,7 @@
       color: #ead7b2;
     }
 
-    .character-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-    }
-
-    .character-grid textarea,
-    .character-grid input,
-    .character-grid select,
-    .character-permission-row input {
+    .character-panel select {
       width: 100%;
       box-sizing: border-box;
       padding: 9px 10px;
@@ -561,25 +552,14 @@
       font: inherit;
     }
 
-    .character-grid textarea {
-      min-height: 70px;
-      resize: vertical;
-    }
-
-    .character-wide {
-      grid-column: 1 / -1;
-    }
-
-    .character-actions,
-    .character-permission-row {
+    .character-actions {
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
       align-items: center;
     }
 
-    .character-actions button,
-    .character-permission-row button {
+    .character-actions button {
       padding: 9px 12px;
       border: 0;
       border-radius: 8px;
@@ -589,8 +569,7 @@
       font: inherit;
     }
 
-    .character-actions button:hover,
-    .character-permission-row button:hover {
+    .character-actions button:hover {
       background: #5a6b90;
     }
 
@@ -1037,27 +1016,11 @@
     <div id="chat-panel" class="chat-panel">
       <div class="character-panel" id="character-panel">
         <h2>Character</h2>
-        <div class="character-grid">
-          <select id="character-select" class="character-wide" aria-label="Character card"></select>
-          <input id="character-name" type="text" placeholder="Name" maxlength="80" />
-          <input id="character-pronouns" type="text" placeholder="Pronouns" maxlength="80" />
-          <input id="character-portrait-url" type="text" placeholder="Portrait URL" maxlength="500" />
-          <input id="character-color" type="color" value="#d9c7a6" aria-label="Character color" />
-          <input id="character-tagline" class="character-wide" type="text" placeholder="Tagline" maxlength="160" />
-          <textarea id="character-public-description" class="character-wide" placeholder="Public description" maxlength="1000"></textarea>
-          <textarea id="character-private-notes" class="character-wide" placeholder="Private notes" maxlength="2000"></textarea>
-        </div>
+        <select id="character-select" aria-label="Character card"></select>
         <div class="character-actions">
-          <button id="character-new" type="button">New</button>
-          <button id="character-save" type="button">Save</button>
           <button id="character-equip" type="button">Put On</button>
           <button id="character-unequip" type="button">Take Off</button>
           <div id="character-status" class="character-status"></div>
-        </div>
-        <div id="character-permission-row" class="character-permission-row" hidden>
-          <input id="character-permission-user" type="text" placeholder="Cast/crew user id" />
-          <button id="character-permission-grant" type="button">Grant Drafting</button>
-          <button id="character-permission-revoke" type="button">Revoke Drafting</button>
         </div>
       </div>
 
@@ -1238,22 +1201,9 @@
   const noteCardStatus = document.getElementById("note-card-status");
   const characterPanel = document.getElementById("character-panel");
   const characterSelect = document.getElementById("character-select");
-  const characterName = document.getElementById("character-name");
-  const characterPronouns = document.getElementById("character-pronouns");
-  const characterPortraitURL = document.getElementById("character-portrait-url");
-  const characterColor = document.getElementById("character-color");
-  const characterTagline = document.getElementById("character-tagline");
-  const characterPublicDescription = document.getElementById("character-public-description");
-  const characterPrivateNotes = document.getElementById("character-private-notes");
-  const characterNew = document.getElementById("character-new");
-  const characterSave = document.getElementById("character-save");
   const characterEquip = document.getElementById("character-equip");
   const characterUnequip = document.getElementById("character-unequip");
   const characterStatus = document.getElementById("character-status");
-  const characterPermissionRow = document.getElementById("character-permission-row");
-  const characterPermissionUser = document.getElementById("character-permission-user");
-  const characterPermissionGrant = document.getElementById("character-permission-grant");
-  const characterPermissionRevoke = document.getElementById("character-permission-revoke");
   const speechInput = document.getElementById("speech-input");
   const speechSend = document.getElementById("speech-send");
   const elementContextMenu = document.getElementById("element-context-menu");
@@ -1517,43 +1467,12 @@
     return normalized === "producer" || normalized === "director";
   }
 
-  function canManageCharacterPermissions(role) {
-    return canManageIndexCards(role);
-  }
-
   function setCharacterStatus(text) {
     if (characterStatus) characterStatus.textContent = text || "";
   }
 
   function selectedCharacter() {
     return characterCards.find((card) => card.id === selectedCharacterId) || null;
-  }
-
-  function clearCharacterEditor() {
-    selectedCharacterId = "";
-    if (characterSelect) characterSelect.value = "";
-    if (characterName) characterName.value = "";
-    if (characterPronouns) characterPronouns.value = "";
-    if (characterPortraitURL) characterPortraitURL.value = "";
-    if (characterColor) characterColor.value = "#d9c7a6";
-    if (characterTagline) characterTagline.value = "";
-    if (characterPublicDescription) characterPublicDescription.value = "";
-    if (characterPrivateNotes) characterPrivateNotes.value = "";
-    setCharacterStatus("");
-    applyRoleUI();
-  }
-
-  function loadCharacterEditor(card) {
-    selectedCharacterId = card?.id || "";
-    if (characterSelect) characterSelect.value = selectedCharacterId;
-    if (characterName) characterName.value = card?.name || "";
-    if (characterPronouns) characterPronouns.value = card?.pronouns || "";
-    if (characterPortraitURL) characterPortraitURL.value = card?.portrait_url || "";
-    if (characterColor) characterColor.value = card?.color || "#d9c7a6";
-    if (characterTagline) characterTagline.value = card?.tagline || "";
-    if (characterPublicDescription) characterPublicDescription.value = card?.public_description || "";
-    if (characterPrivateNotes) characterPrivateNotes.value = card?.private_notes || "";
-    applyRoleUI();
   }
 
   function renderCharacterCards() {
@@ -1574,19 +1493,11 @@
 
     if (selectedCharacterId && characterCards.some((card) => card.id === selectedCharacterId)) {
       characterSelect.value = selectedCharacterId;
+    } else {
+      selectedCharacterId = "";
+      characterSelect.value = "";
     }
-  }
-
-  function characterDraft() {
-    return {
-      name: characterName?.value.trim() || "",
-      pronouns: characterPronouns?.value.trim() || "",
-      portrait_url: characterPortraitURL?.value.trim() || "",
-      color: characterColor?.value || "#d9c7a6",
-      tagline: characterTagline?.value.trim() || "",
-      public_description: characterPublicDescription?.value.trim() || "",
-      private_notes: characterPrivateNotes?.value.trim() || "",
-    };
+    applyRoleUI();
   }
 
   async function loadCharacterCards() {
@@ -1606,55 +1517,11 @@
       canDraftCharacters = Boolean(data.can_draft);
       characterCards = Array.isArray(data.cards) ? data.cards : [];
       activePersona = data.active_persona || null;
-      renderCharacterCards();
       if (!selectedCharacterId && characterCards.length > 0) {
-        loadCharacterEditor(characterCards[0]);
+        selectedCharacterId = characterCards[0].id;
       }
-      applyRoleUI();
-    } catch (err) {
-      setCharacterStatus(err.message || String(err));
-    }
-  }
-
-  async function saveCharacterCard() {
-    const draft = characterDraft();
-    if (!draft.name) {
-      setCharacterStatus("Name is required.");
-      return;
-    }
-    if (!canDraftCharacters && !selectedCharacterId) {
-      setCharacterStatus("Character drafting is not granted yet.");
-      return;
-    }
-
-    const cardID = selectedCharacterId;
-    const url = cardID ? `/api/character-cards/${encodeURIComponent(cardID)}` : "/api/character-cards";
-    const method = cardID ? "PATCH" : "POST";
-    setCharacterStatus("Saving...");
-
-    try {
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(draft),
-      });
-      const result = await response.json().catch(() => null);
-      if (!response.ok || !result?.ok) {
-        throw new Error(result?.data?.error || result?.error || `HTTP ${response.status}`);
-      }
-
-      const saved = result.data;
-      const existingIndex = characterCards.findIndex((card) => card.id === saved.id);
-      if (existingIndex >= 0) {
-        characterCards[existingIndex] = saved;
-      } else {
-        characterCards.unshift(saved);
-      }
-      selectedCharacterId = saved.id;
       renderCharacterCards();
-      loadCharacterEditor(saved);
-      setCharacterStatus("Saved.");
+      applyRoleUI();
     } catch (err) {
       setCharacterStatus(err.message || String(err));
     }
@@ -1673,32 +1540,6 @@
   function unequipCharacterCard() {
     const sent = sendAction("persona/unequip");
     if (sent) setCharacterStatus("Taking off character...");
-  }
-
-  async function setCharacterDraftPermission(revoke = false) {
-    const targetUserID = characterPermissionUser?.value.trim() || "";
-    if (!targetUserID) {
-      setCharacterStatus("Enter a cast/crew user id.");
-      return;
-    }
-
-    const url = revoke ? "/api/character-card-permissions/revoke" : "/api/character-card-permissions";
-    setCharacterStatus(revoke ? "Revoking drafting..." : "Granting drafting...");
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ target_user_id: targetUserID }),
-      });
-      const result = await response.json().catch(() => null);
-      if (!response.ok || !result?.ok) {
-        throw new Error(result?.data?.error || result?.error || `HTTP ${response.status}`);
-      }
-      setCharacterStatus(revoke ? "Drafting revoked." : "Drafting granted.");
-    } catch (err) {
-      setCharacterStatus(err.message || String(err));
-    }
   }
 
   function canUseStageContextMenu(role) {
@@ -3098,19 +2939,9 @@
     chatInput.disabled = !chattingAllowed;
     chatSend.disabled = !chattingAllowed;
     const hasCharacter = Boolean(selectedCharacterId);
-    const characterEditable = canDraftCharacters || canManageCharacterPermissions(currentRole);
-    if (characterName) characterName.disabled = !characterEditable;
-    if (characterPronouns) characterPronouns.disabled = !characterEditable;
-    if (characterPortraitURL) characterPortraitURL.disabled = !characterEditable;
-    if (characterColor) characterColor.disabled = !characterEditable;
-    if (characterTagline) characterTagline.disabled = !characterEditable;
-    if (characterPublicDescription) characterPublicDescription.disabled = !characterEditable;
-    if (characterPrivateNotes) characterPrivateNotes.disabled = !characterEditable;
-    if (characterSave) characterSave.disabled = !characterEditable;
-    if (characterNew) characterNew.disabled = !canDraftCharacters;
+    if (characterSelect) characterSelect.disabled = characterCards.length === 0;
     if (characterEquip) characterEquip.disabled = !hasCharacter;
     if (characterUnequip) characterUnequip.disabled = !activePersona;
-    if (characterPermissionRow) characterPermissionRow.hidden = !canManageCharacterPermissions(currentRole);
     const canEditCards = canManageIndexCards(currentRole);
     if (indexCardFront) indexCardFront.disabled = !canEditCards;
     if (indexCardBack) indexCardBack.disabled = !canEditCards;
@@ -3579,19 +3410,12 @@
   noteCardClose?.addEventListener("click", closeNoteCardPanel);
   speechSend?.addEventListener("click", sendStageSpeech);
   characterSelect?.addEventListener("change", () => {
-    const card = characterCards.find((item) => item.id === characterSelect.value);
-    if (card) {
-      loadCharacterEditor(card);
-    } else {
-      clearCharacterEditor();
-    }
+    selectedCharacterId = characterSelect.value;
+    setCharacterStatus("");
+    applyRoleUI();
   });
-  characterNew?.addEventListener("click", clearCharacterEditor);
-  characterSave?.addEventListener("click", saveCharacterCard);
   characterEquip?.addEventListener("click", equipCharacterCard);
   characterUnequip?.addEventListener("click", unequipCharacterCard);
-  characterPermissionGrant?.addEventListener("click", () => setCharacterDraftPermission(false));
-  characterPermissionRevoke?.addEventListener("click", () => setCharacterDraftPermission(true));
   indexCardSave?.addEventListener("click", () => {
     if (!canManageIndexCards(currentRole)) {
       setIndexCardStatus("Only producers and directors can save cards.");

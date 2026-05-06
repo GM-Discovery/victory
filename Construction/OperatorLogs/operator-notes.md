@@ -39,6 +39,9 @@ Current confirmed capabilities:
 - `prop` means mobile stage object; `scenery` means fixed set piece / anchor; `first-fire` is treated as fixed scenery for now
 - Kernel 21 venue chat is a separate `chat/message` lane and must not be conflated with `perform/speak`
 - The Cave chat panel is venue-scoped, session-backed, and collapses after inactivity
+- Kernel 23 adds story-first character cards, draft grants, session personas, `persona/equip`, `persona/unequip`, and `presence/update`
+- Kernel 24 moves character drafting/editing into The Greenroom and leaves The Cave with only live character selection plus Put On / Take Off
+- Character card sheet links are metadata on `character_cards`; they are not playable sheets, macros, dice, stats, or rules execution yet
 
 Not yet complete:
 - full two-user kernel proof: actor speaks, audience perceives, audience reacts, actor perceives reaction

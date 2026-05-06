@@ -483,6 +483,10 @@
               <option value="custom|blank|Custom Blank Sheet">Custom / Blank</option>
             </select>
           </label>
+          <label class="field">
+            Sheet URL
+            <input id="character-sheet-url" type="url" maxlength="500" autocomplete="off" />
+          </label>
           <div class="action-row">
             <button class="text-button" id="character-sheet-add" type="button">Add Sheet Link</button>
           </div>
@@ -565,16 +569,46 @@
   <script src="/lib/forbidden.js"></script>
   <script src="/lib/identity.js"></script>
   <script>
+    const shell = document.getElementById("shell");
+    const greenroomTools = document.getElementById("greenroom-tools");
+    const greenroomToolsClose = document.getElementById("greenroom-tools-close");
+    const profileToolsToggle = document.getElementById("profile-tools-toggle");
+    const characterSelect = document.getElementById("character-select");
+    const characterNew = document.getElementById("character-new");
+    const characterEdit = document.getElementById("character-edit");
+    const characterEditor = document.getElementById("character-editor");
+    const characterEditorTitle = document.getElementById("character-editor-title");
+    const characterName = document.getElementById("character-name");
+    const characterPronouns = document.getElementById("character-pronouns");
+    const characterPortraitURL = document.getElementById("character-portrait-url");
+    const characterColor = document.getElementById("character-color");
+    const characterTagline = document.getElementById("character-tagline");
+    const characterPublicDescription = document.getElementById("character-public-description");
+    const characterPrivateNotes = document.getElementById("character-private-notes");
+    const characterSheetPreset = document.getElementById("character-sheet-preset");
+    const characterSheetURL = document.getElementById("character-sheet-url");
+    const characterSheetAdd = document.getElementById("character-sheet-add");
+    const characterSheetEditorList = document.getElementById("character-sheet-editor-list");
+    const characterSheetDisplayList = document.getElementById("character-sheet-display-list");
+    const characterSave = document.getElementById("character-save");
+    const characterCancel = document.getElementById("character-cancel");
+    const characterDisplay = document.getElementById("character-display");
+    const characterStatus = document.getElementById("character-status");
+    const characterPermissionRow = document.getElementById("character-permission-row");
+    const characterPermissionUser = document.getElementById("character-permission-user");
+    const characterPermissionGrant = document.getElementById("character-permission-grant");
+    const characterPermissionRevoke = document.getElementById("character-permission-revoke");
+
+    let currentRole = "audience";
+    let characterCards = [];
+    let canDraftCharacters = false;
+    let selectedCharacterId = "";
+    let editingCharacterId = "";
+    let editingSheetLinks = [];
+
     function profileValue(value) {
       const text = String(value || "").trim();
       return text || "Not set";
-    }
-
-    function profileLines(value) {
-      return String(value || "")
-        .split(/\r?\n+/)
-        .map((line) => line.trim())
-        .filter(Boolean);
     }
 
     function renderMetaList(el, items) {
@@ -694,10 +728,350 @@
       ]);
 
       const snapshotNote = document.getElementById("snapshot-note");
-      if (profile.is_published) {
-        snapshotNote.textContent = "This is the currently published public snapshot.";
+      snapshotNote.textContent = profile.is_published
+        ? "This is the currently published public snapshot."
+        : "Nothing public has been published yet. Trailers controls the draft.";
+    }
+
+    function selectedCharacter() {
+      return characterCards.find((card) => card.id === selectedCharacterId) || null;
+    }
+
+    function canManageCharacterPermissions(role) {
+      const normalized = String(role || "").trim().toLowerCase();
+      return normalized === "producer" || normalized === "director";
+    }
+
+    function setStatus(text) {
+      const statusNote = document.getElementById("status-note");
+      if (statusNote) statusNote.textContent = text || "";
+    }
+
+    function setCharacterStatus(text) {
+      if (characterStatus) characterStatus.textContent = text || "";
+    }
+
+    function openTools() {
+      if (!greenroomTools) return;
+      greenroomTools.hidden = false;
+      shell?.classList.add("tools-open");
+      applyCharacterUI();
+    }
+
+    function closeTools() {
+      if (!greenroomTools) return;
+      closeCharacterEditor();
+      greenroomTools.hidden = true;
+      shell?.classList.remove("tools-open");
+      applyCharacterUI();
+    }
+
+    function normalizeSheetLinks(links) {
+      const source = Array.isArray(links) ? links : [];
+      return source.map((link) => ({
+        id: String(link?.id || "").trim() || `sheet_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+        ruleset: String(link?.ruleset || "").trim(),
+        sheet_type: String(link?.sheet_type || "").trim(),
+        label: String(link?.label || "").trim() || "Character Sheet",
+        url: String(link?.url || "").trim(),
+        created_at: String(link?.created_at || "").trim() || new Date().toISOString(),
+      })).filter((link) => link.ruleset || link.sheet_type || link.label || link.url);
+    }
+
+    function renderSheetLinks(container, links, editable = false) {
+      if (!container) return;
+      container.innerHTML = "";
+      const cleanLinks = normalizeSheetLinks(links);
+      if (cleanLinks.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "empty-state";
+        empty.textContent = "No sheet links yet.";
+        container.appendChild(empty);
+        return;
+      }
+
+      cleanLinks.forEach((link, index) => {
+        const row = document.createElement("div");
+        row.className = "sheet-link";
+
+        const body = document.createElement("div");
+        const title = document.createElement(link.url ? "a" : "strong");
+        title.textContent = link.label || "Character Sheet";
+        if (link.url) {
+          title.href = link.url;
+        }
+        const meta = document.createElement("span");
+        meta.textContent = [link.ruleset, link.sheet_type].filter(Boolean).join(" / ") || "Reference";
+        body.appendChild(title);
+        body.appendChild(meta);
+        row.appendChild(body);
+
+        if (editable) {
+          const remove = document.createElement("button");
+          remove.className = "text-button";
+          remove.type = "button";
+          remove.textContent = "Remove";
+          remove.addEventListener("click", () => {
+            editingSheetLinks.splice(index, 1);
+            renderSheetLinks(characterSheetEditorList, editingSheetLinks, true);
+          });
+          row.appendChild(remove);
+        }
+
+        container.appendChild(row);
+      });
+    }
+
+    function renderCharacterSelector() {
+      if (!characterSelect) return;
+      characterSelect.innerHTML = "";
+
+      const empty = document.createElement("option");
+      empty.value = "";
+      empty.textContent = characterCards.length ? "Select a character" : "No character cards yet";
+      characterSelect.appendChild(empty);
+
+      for (const card of characterCards) {
+        const option = document.createElement("option");
+        option.value = card.id;
+        option.textContent = card.name || "Unnamed Character";
+        characterSelect.appendChild(option);
+      }
+
+      if (selectedCharacterId && characterCards.some((card) => card.id === selectedCharacterId)) {
+        characterSelect.value = selectedCharacterId;
       } else {
-        snapshotNote.textContent = "Nothing public has been published yet. Trailers controls the draft.";
+        selectedCharacterId = "";
+        characterSelect.value = "";
+      }
+      applyCharacterUI();
+    }
+
+    function renderCharacterDisplay() {
+      if (!characterDisplay) return;
+      characterDisplay.innerHTML = "";
+      const card = selectedCharacter();
+
+      if (!card) {
+        const empty = document.createElement("p");
+        empty.className = "empty-state";
+        empty.textContent = "No character selected.";
+        characterDisplay.appendChild(empty);
+        renderSheetLinks(characterSheetDisplayList, []);
+        return;
+      }
+
+      const title = document.createElement("div");
+      title.className = "character-title";
+      const portraitURL = String(card.portrait_url || "").trim();
+      if (portraitURL) {
+        const img = document.createElement("img");
+        img.className = "character-portrait";
+        img.src = portraitURL;
+        img.alt = card.name || "Character portrait";
+        img.style.borderColor = card.color || "#d9c7a6";
+        title.appendChild(img);
+      } else {
+        const portrait = document.createElement("div");
+        portrait.className = "character-empty-portrait";
+        portrait.style.borderColor = card.color || "#d9c7a6";
+        title.appendChild(portrait);
+      }
+
+      const nameBlock = document.createElement("div");
+      const name = document.createElement("h3");
+      name.textContent = card.name || "Unnamed Character";
+      const pronouns = document.createElement("div");
+      pronouns.className = "mini";
+      pronouns.textContent = profileValue(card.pronouns);
+      nameBlock.appendChild(name);
+      nameBlock.appendChild(pronouns);
+      title.appendChild(nameBlock);
+      characterDisplay.appendChild(title);
+
+      for (const value of [card.tagline, card.public_description, card.private_notes]) {
+        const text = String(value || "").trim();
+        if (!text) continue;
+        const copy = document.createElement("p");
+        copy.className = "character-copy";
+        copy.textContent = text;
+        characterDisplay.appendChild(copy);
+      }
+
+      renderSheetLinks(characterSheetDisplayList, card.sheet_links || []);
+    }
+
+    function applyCharacterUI() {
+      const card = selectedCharacter();
+      if (characterNew) characterNew.disabled = !canDraftCharacters;
+      if (characterEdit) characterEdit.disabled = !card || !canDraftCharacters;
+      if (characterSave) characterSave.disabled = !canDraftCharacters;
+      if (characterSheetAdd) characterSheetAdd.disabled = !canDraftCharacters;
+      if (characterPermissionRow) {
+        characterPermissionRow.hidden = Boolean(greenroomTools?.hidden) || !canManageCharacterPermissions(currentRole);
+      }
+    }
+
+    function loadCharacterEditor(card) {
+      editingCharacterId = card?.id || "";
+      if (characterEditorTitle) characterEditorTitle.textContent = editingCharacterId ? "Edit Character" : "New Character";
+      if (characterName) characterName.value = card?.name || "";
+      if (characterPronouns) characterPronouns.value = card?.pronouns || "";
+      if (characterPortraitURL) characterPortraitURL.value = card?.portrait_url || "";
+      if (characterColor) characterColor.value = card?.color || "#d9c7a6";
+      if (characterTagline) characterTagline.value = card?.tagline || "";
+      if (characterPublicDescription) characterPublicDescription.value = card?.public_description || "";
+      if (characterPrivateNotes) characterPrivateNotes.value = card?.private_notes || "";
+      editingSheetLinks = normalizeSheetLinks(card?.sheet_links || []);
+      renderSheetLinks(characterSheetEditorList, editingSheetLinks, true);
+      if (characterSheetURL) characterSheetURL.value = "";
+    }
+
+    function openCharacterEditor(card) {
+      if (!canDraftCharacters) {
+        setCharacterStatus("Character drafting is not granted yet.");
+        return;
+      }
+      openTools();
+      loadCharacterEditor(card);
+      if (characterEditor) characterEditor.hidden = false;
+      setCharacterStatus("");
+      applyCharacterUI();
+    }
+
+    function closeCharacterEditor() {
+      editingCharacterId = "";
+      editingSheetLinks = [];
+      if (characterEditor) characterEditor.hidden = true;
+      renderSheetLinks(characterSheetEditorList, []);
+    }
+
+    function characterDraft() {
+      return {
+        name: characterName?.value.trim() || "",
+        pronouns: characterPronouns?.value.trim() || "",
+        portrait_url: characterPortraitURL?.value.trim() || "",
+        color: characterColor?.value || "#d9c7a6",
+        tagline: characterTagline?.value.trim() || "",
+        public_description: characterPublicDescription?.value.trim() || "",
+        private_notes: characterPrivateNotes?.value.trim() || "",
+        sheet_links: normalizeSheetLinks(editingSheetLinks),
+      };
+    }
+
+    function selectedSheetPreset() {
+      const [ruleset, sheetType, label] = String(characterSheetPreset?.value || "").split("|");
+      return {
+        ruleset: ruleset || "custom",
+        sheet_type: sheetType || "blank",
+        label: label || "Character Sheet",
+      };
+    }
+
+    function addSheetLink() {
+      const preset = selectedSheetPreset();
+      editingSheetLinks.push({
+        id: `sheet_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+        ruleset: preset.ruleset,
+        sheet_type: preset.sheet_type,
+        label: preset.label,
+        url: characterSheetURL?.value.trim() || "",
+        created_at: new Date().toISOString(),
+      });
+      if (characterSheetURL) characterSheetURL.value = "";
+      renderSheetLinks(characterSheetEditorList, editingSheetLinks, true);
+    }
+
+    async function loadCharacterCards() {
+      try {
+        const response = await fetch("/api/character-cards/me", {
+          method: "GET",
+          credentials: "include",
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || !result?.ok) {
+          throw new Error(result?.data?.error || result?.error || `HTTP ${response.status}`);
+        }
+
+        const data = result.data || {};
+        canDraftCharacters = Boolean(data.can_draft);
+        characterCards = Array.isArray(data.cards) ? data.cards : [];
+        if (!selectedCharacterId && characterCards.length > 0) {
+          selectedCharacterId = characterCards[0].id;
+        }
+        renderCharacterSelector();
+        renderCharacterDisplay();
+        applyCharacterUI();
+      } catch (err) {
+        setCharacterStatus(err.message || String(err));
+        renderCharacterSelector();
+        renderCharacterDisplay();
+      }
+    }
+
+    async function saveCharacterCard() {
+      const draft = characterDraft();
+      if (!draft.name) {
+        setCharacterStatus("Name is required.");
+        return;
+      }
+
+      const url = editingCharacterId ? `/api/character-cards/${encodeURIComponent(editingCharacterId)}` : "/api/character-cards";
+      const method = editingCharacterId ? "PATCH" : "POST";
+      setCharacterStatus("Saving...");
+
+      try {
+        const response = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(draft),
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || !result?.ok) {
+          throw new Error(result?.data?.error || result?.error || `HTTP ${response.status}`);
+        }
+
+        const saved = result.data;
+        const index = characterCards.findIndex((card) => card.id === saved.id);
+        if (index >= 0) {
+          characterCards[index] = saved;
+        } else {
+          characterCards.unshift(saved);
+        }
+        selectedCharacterId = saved.id;
+        renderCharacterSelector();
+        renderCharacterDisplay();
+        closeCharacterEditor();
+        setCharacterStatus("Saved.");
+      } catch (err) {
+        setCharacterStatus(err.message || String(err));
+      }
+    }
+
+    async function setCharacterDraftPermission(revoke = false) {
+      const targetUserID = characterPermissionUser?.value.trim() || "";
+      if (!targetUserID) {
+        setCharacterStatus("Enter a cast/crew user id.");
+        return;
+      }
+
+      const url = revoke ? "/api/character-card-permissions/revoke" : "/api/character-card-permissions";
+      setCharacterStatus(revoke ? "Revoking drafting..." : "Granting drafting...");
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ target_user_id: targetUserID }),
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || !result?.ok) {
+          throw new Error(result?.data?.error || result?.error || `HTTP ${response.status}`);
+        }
+        setCharacterStatus(revoke ? "Drafting revoked." : "Drafting granted.");
+      } catch (err) {
+        setCharacterStatus(err.message || String(err));
       }
     }
 
@@ -717,38 +1091,29 @@
 
     async function bootstrapGreenroom() {
       try {
-        const statusNote = document.getElementById("status-note");
-        if (statusNote) {
-          statusNote.textContent = "Checking signed-in access...";
-        }
-
+        setStatus("Checking signed-in access...");
         const access = await requireSignedInStatus();
         if (!access.allowed) {
           showForbiddenScreen();
           return;
         }
+        currentRole = access.role || "audience";
 
-        if (statusNote) {
-          statusNote.textContent = "Loading public profile...";
-        }
-
+        setStatus("Loading public profile...");
         const response = await fetch("/api/profiles/public", {
           credentials: "include",
         });
         const payload = await response.json().catch(() => null);
 
         if (!response.ok || !payload?.ok) {
-          if (statusNote) {
-            statusNote.textContent = "Profile unavailable right now, but your session is active.";
-          }
           renderHero({
             owner: {
               user_id: "",
               handle: "",
               display_name: "Unknown Participant",
-            role: access.role || "audience",
-            persona: null,
-          },
+              role: currentRole,
+              persona: null,
+            },
             profile: {
               is_published: false,
               public: {},
@@ -756,21 +1121,49 @@
               published: {},
             },
           });
-          return;
+          setStatus("Profile unavailable right now, but your session is active.");
+        } else {
+          renderHero(payload.data);
         }
 
-        renderHero(payload.data);
-        if (statusNote) {
-          statusNote.textContent = "Greenroom loaded.";
-        }
+        await loadCharacterCards();
+        setStatus("Greenroom loaded.");
       } catch (error) {
         console.error("greenroom bootstrap failed", error);
-        const statusNote = document.getElementById("status-note");
-        if (statusNote) {
-          statusNote.textContent = "Greenroom failed to load, but the page shell is still available.";
-        }
+        setStatus("Greenroom failed to load, but the page shell is still available.");
       }
     }
+
+    profileToolsToggle?.addEventListener("click", () => {
+      if (greenroomTools?.hidden) {
+        openTools();
+        closeCharacterEditor();
+      } else {
+        closeTools();
+      }
+    });
+    greenroomToolsClose?.addEventListener("click", closeTools);
+    characterSelect?.addEventListener("change", () => {
+      selectedCharacterId = characterSelect.value;
+      renderCharacterDisplay();
+      closeCharacterEditor();
+      applyCharacterUI();
+    });
+    characterNew?.addEventListener("click", () => {
+      selectedCharacterId = "";
+      renderCharacterSelector();
+      renderCharacterDisplay();
+      openCharacterEditor(null);
+    });
+    characterEdit?.addEventListener("click", () => {
+      const card = selectedCharacter();
+      if (card) openCharacterEditor(card);
+    });
+    characterSheetAdd?.addEventListener("click", addSheetLink);
+    characterSave?.addEventListener("click", saveCharacterCard);
+    characterCancel?.addEventListener("click", closeCharacterEditor);
+    characterPermissionGrant?.addEventListener("click", () => setCharacterDraftPermission(false));
+    characterPermissionRevoke?.addEventListener("click", () => setCharacterDraftPermission(true));
 
     bootstrapGreenroom();
   </script>
