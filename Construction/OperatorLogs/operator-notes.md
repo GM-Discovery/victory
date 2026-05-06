@@ -1,5 +1,12 @@
 # Operator Notes — VICTORY Foundation
 
+## Current Canon Note
+Current system truth now lives in:
+- [current-state.md](/opt/victory/Construction/current-state.md)
+- [roadmap.md](/opt/victory/Construction/roadmap.md)
+
+This file remains useful for longer-form modeling notes and historical reasoning, but some older status sections below are now historical/superseded snapshots rather than the live canonical state.
+
 ## Purpose of this file
 This file exists to keep future builders from re-arguing settled concepts, repeating solved mistakes, or building against the wrong model.
 
@@ -8,7 +15,8 @@ Read this before making structural changes.
 ---
 
 ## Current Status
-Kernel 1.2 (`the-cave`) is **PARTIAL**, but the foundation is real and working.
+Historical note:
+The section below began as an early foundation snapshot and should no longer be treated as the single source of truth for the live system. Use `Construction/current-state.md` for current route, venue, and kernel state.
 
 Current confirmed capabilities:
 - Postgres is running in Docker on the server
@@ -42,6 +50,8 @@ Current confirmed capabilities:
 - Kernel 23 adds story-first character cards, draft grants, session personas, `persona/equip`, `persona/unequip`, and `presence/update`
 - Kernel 24 moves character drafting/editing into The Greenroom and leaves The Cave with only live character selection plus Put On / Take Off
 - Character card sheet links are metadata on `character_cards`; they are not playable sheets, macros, dice, stats, or rules execution yet
+- The Cave is now explicitly the full-feature proving-ground venue. Tools may appear there first, then later move into overlays, drawers, and context menus before template extraction.
+- Showing Review means review of actions/chat/reactions/logs. Video recording is future-only and not a near-term priority.
 
 Not yet complete:
 - full two-user kernel proof: actor speaks, audience perceives, audience reacts, actor perceives reaction

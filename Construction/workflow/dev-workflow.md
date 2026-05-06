@@ -1,154 +1,83 @@
-# Dev Workflow — VICTORY (Active Build Mode)
+# Dev Workflow — VICTORY
 
-## Purpose
-Fast iteration without breaking the install model.
+## Current Note
+This file is current workflow guidance. Older kernel-specific workflow assumptions are historical.
 
-This workflow is for active development on a live server (e.g. `murray-vserver`).
-
----
+For overall current truth, also read:
+- [current-state.md](/opt/victory/Construction/current-state.md)
+- [kernel-maker-field-guide.md](/opt/victory/Construction/kernel-maker-field-guide.md)
 
 ## Core Principle
+Two valid runtime modes exist:
+- Dev mode: host-Go backend + Docker Postgres
+- Install mode: Docker backend + Docker Postgres
 
-Two modes exist:
+Do not confuse them while testing.
 
-### Dev Mode (current use)
-- Go backend runs on host
-- Postgres runs in Docker
-- Fast iteration
+## Dev Mode
+Use this for active kernel work.
 
-### Install Mode (future / validation)
-- Backend runs in Docker
-- Postgres runs in Docker
-- Fully reproducible
-
-Do not confuse them.
-
----
-
-## Start Dev Mode
-
-### 1. Ensure Postgres is running
+Start Postgres:
 ```bash
 cd /opt/victory
 docker compose up -d postgres
+```
 
-Verify:
-
-docker ps
-2. Stop Docker backend (if running)
-docker stop victory-backend
-
-Reason:
-
-host Go backend uses port 8081
-cannot run both at same time
-3. Run backend on host
+Run backend on host:
+```bash
 cd /opt/victory/backend
-DATABASE_URL='postgres://victory:REDACTED@127.0.0.1:5432/victory?sslmode=disable' go run ./cmd/victory
+PORT=8081 DATABASE_URL='postgres://victory:REDACTED@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory
+```
 
-Expected:
+If `8081` is occupied:
+```bash
+PORT=18081 DATABASE_URL='postgres://victory:REDACTED@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory
+```
 
-victory backend listening on :8081
-Test Loop
-HTTP
-curl -s http://127.0.0.1:8081/health
-curl -s http://127.0.0.1:8081/api/world/the-cave
-WebSocket
-wscat -c ws://127.0.0.1:8081/ws/the-cave
-
-For multi-user presence and attribution checks, open a second `wscat` session or a second browser tab and verify `presence/join` / `presence/leave` plus action attribution.
-
-Kernel 8 identity check:
-
-GOCACHE=/tmp/victory-gocache go test ./internal/network -run TestKernel8IdentitySurfaceAndPersonaNull -v
-
-Kernel 9 profile check:
-
-GOCACHE=/tmp/victory-gocache go test ./internal/profiles ./internal/access ./internal/actions ./internal/network ./internal/world
-
-Kernel 10 mailbox check:
-
-GOCACHE=/tmp/victory-gocache go test ./internal/messages ./internal/profiles ./internal/access ./internal/actions ./internal/network ./internal/world
-
-Kernel 11 note-card check:
-
-GOCACHE=/tmp/victory-gocache go test ./internal/messages ./internal/profiles ./internal/access ./internal/actions ./internal/network ./internal/world
-
-New venue routes:
-
-/venues/greenroom/
-
-/venues/trailers/
-
-New message route:
-
-/mailbox/
-
-New note-card route:
-
-/api/note-cards
-Making Code Changes
-
-Typical loop:
-
-edit Go file
-stop running process (Ctrl+C)
-re-run:
-go run ./cmd/victory
-
-Expected restart time: ~1–2 seconds
-
-Optional Upgrade (Auto-Restart)
-
-Install:
-
-go install github.com/cosmtrek/air@latest
-
-Run:
-
-air
-
-Behavior:
-
-watches files
-auto rebuilds + restarts backend
-Database Changes
-Apply migrations manually
-docker exec -i victory-postgres psql -U victory -d victory < database/migrations/XXX.sql
-Verify
-docker exec -it victory-postgres psql -U victory -d victory -c "\dt"
-Switching Back to Install Mode
-
-Before pushing or testing install:
-
+## Install Mode
+Use this when validating the deployable path:
+```bash
 cd /opt/victory
 docker compose up -d --build
+```
 
-Then test:
-
+## Common Checks
+```bash
 curl -s http://127.0.0.1:8081/health
-Rules
-Do
-use host-Go for speed
-keep Postgres in Docker
-test WebSocket behavior frequently
-verify DB state after actions
-Do Not
-remove Docker deployment path
-hardcode host-only assumptions into backend
-expose Postgres publicly
-rely on dev-only hacks for production behavior
-Known Friction
-Docker rebuild ~50s (expected)
-host-Go requires correct DATABASE_URL
-port conflicts if backend container is still running
-Current Priority Flow
-observe
-react (done)
-speak (next)
-multi-user proof
-greenroom / trailers profile surface
-info booth / mailbox foundation
-note card delivery system
-index card element v1
-workshop to venue placement v1
+curl -s http://127.0.0.1:8081/api/world/the-cave
+wscat -c ws://127.0.0.1:8081/ws/the-cave
+GOCACHE=/tmp/victory-gocache go test ./...
+git diff --check
+```
+
+## Current Route Checks Worth Knowing
+- Cave snapshot: `/api/world/the-cave`
+- Cave WebSocket: `/ws/the-cave`
+- Greenroom character cards: `/api/character-cards/me`
+- Trailers profile draft: `/api/profiles/me`
+- Mailbox: `/api/messages`
+
+## Database Changes
+Apply migrations manually:
+```bash
+cd /opt/victory
+docker exec -i victory-postgres psql -U victory -d victory < database/migrations/XXX.sql
+```
+
+Inspect tables:
+```bash
+docker exec -it victory-postgres psql -U victory -d victory -c '\dt'
+```
+
+## Working Rules
+Do:
+- keep Postgres in Docker
+- use `GOCACHE=/tmp/victory-gocache`
+- verify whether `8081` is host-Go or Docker before debugging routes
+- hard refresh venue pages after frontend changes
+- test both HTTP and WebSocket surfaces for Cave-facing kernels
+
+Do not:
+- assume the backend serving `8081` is the newest process
+- assume a browser `404` means the route is missing without checking the live process
+- confuse Showing Review with video recording goals

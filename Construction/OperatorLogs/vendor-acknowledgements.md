@@ -1,5 +1,10 @@
 # Vendor Acknowledgements
 
+## Historical Note
+This file is now a historical snapshot.
+
+Use [Construction/vendor-acknowledgements.md](/opt/victory/Construction/vendor-acknowledgements.md) for the current dependency list.
+
 ## Purpose
 
 This document records all third-party software, libraries, and infrastructure components used in the system.

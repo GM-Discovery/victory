@@ -5,6 +5,10 @@ This guide is for a kernel maker or lower-tier coding agent that needs to change
 
 Victory is a browser-based VTT and venue system. The current live table is The Cave. The Greenroom and Trailers are identity/profile spaces. The backend is Go, the database is Postgres, the frontend is static HTML/CSS/JS served by Caddy or the Go backend's routed APIs.
 
+Current canon references:
+- [current-state.md](/opt/victory/Construction/current-state.md)
+- [roadmap.md](/opt/victory/Construction/roadmap.md)
+
 ## Repo Map
 - `/opt/victory/backend/` - Go service, HTTP APIs, WebSocket handlers, domain packages.
 - `/opt/victory/backend/cmd/victory/main.go` - process entry point, bootstraps kernel surfaces, registers routes.
@@ -39,13 +43,13 @@ Victory is a browser-based VTT and venue system. The current live table is The C
 - **Operator** - infrastructure authority outside ordinary app permissions.
 
 ## Current Character Kernel Baseline
-Kernel 23 added character cards and Cave persona actions:
+Kernel 23 added character cards and Cave persona actions. Kernel 24 moved character editing into Greenroom.
+
+Current product behavior:
 - HTTP:
   - `GET /api/character-cards/me`
   - `POST /api/character-cards`
   - `PATCH /api/character-cards/{id}`
-  - `POST /api/character-card-permissions`
-  - `POST /api/character-card-permissions/revoke`
 - WebSocket:
   - `persona/equip`
   - `persona/unequip`
@@ -56,7 +60,11 @@ Kernel 23 added character cards and Cave persona actions:
   - `permission_grants`
   - `current_session_personas`
 
-Kernel 24 moves character creation and editing to The Greenroom. The Cave should only choose an existing character and put it on or take it off.
+Current authority rule:
+- any active performer role (`producer`, `director`, `cast`, `crew`) can draft character cards in Greenroom
+- legacy character permission routes still exist in code, but current Greenroom behavior does not depend on them
+
+The Greenroom owns character creation and editing. The Cave should only choose an existing character and put it on or take it off.
 
 ## Runtime Modes
 There are two valid ways to run Victory. Do not mix them accidentally.
@@ -183,7 +191,11 @@ Do not:
 - Treat presence as history.
 
 ## Frontend Rules
-- The Cave is the live table. Keep it focused on session actions, presence, chat, speech, cards, and live persona use.
+- The Cave is the live table and the full-feature proving-ground venue.
+- It is acceptable to build runtime tools visibly in The Cave first.
+- Once stable, move them into cleaner overlays, drawers, context menus, or secondary surfaces.
+- A clean template venue should later be extracted from the organized Cave surface.
+- Future venues should descend from that cleaned template.
 - The Greenroom is public profile display plus character dressing room.
 - Trailers owns performer profile drafting and publishing.
 - Avoid putting full editors into The Cave unless the kernel explicitly says the live table owns that workflow.
@@ -258,3 +270,7 @@ For Greenroom character dressing:
 - No playable sheet routes, sheet renderers, macros, dice, stats, or rules execution belong in Kernel 24.
 - The Cave keeps `persona/equip`, `persona/unequip`, and `presence/update`.
 - The Greenroom owns New/Edit/Save for character cards.
+
+## Recording Language
+- Showing Review means review of actions, chat, reactions, notes, and showing/session history.
+- Video Recording is future work and not a near-term planning target.

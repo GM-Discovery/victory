@@ -101,7 +101,7 @@ func main() {
 	mux.HandleFunc("/api/profiles/admin/save", profiles.HandleAdminSaveProfile(pool))
 	mux.HandleFunc("/api/profiles/admin/publish", profiles.HandleAdminPublishProfile(pool))
 	mux.HandleFunc("GET /api/character-cards/me", characters.HandleMyCharacterCards(pool))
-	mux.HandleFunc("POST /api/character-cards", characters.HandleCreateCharacterCard(pool))
+	mux.HandleFunc("/api/character-cards", characters.HandleCreateCharacterCard(pool))
 	mux.HandleFunc("/api/character-cards/", characters.HandleCharacterCardByID(pool))
 	mux.HandleFunc("POST /api/character-card-permissions", characters.HandleGrantCharacterPermission(pool))
 	mux.HandleFunc("POST /api/character-card-permissions/revoke", characters.HandleRevokeCharacterPermission(pool))

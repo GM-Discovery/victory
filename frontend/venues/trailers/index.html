@@ -108,8 +108,16 @@
       box-sizing: border-box;
       display: grid;
       gap: 18px;
-      grid-template-columns: 1fr minmax(340px, 440px) 1fr;
+      grid-template-columns: minmax(340px, 440px) minmax(340px, 1fr);
       align-items: start;
+    }
+
+    .stage.tools-open {
+      grid-template-columns: minmax(300px, 380px) minmax(340px, 440px) minmax(340px, 1fr);
+    }
+
+    [hidden] {
+      display: none !important;
     }
 
     .card {
@@ -121,7 +129,7 @@
     }
 
     .hero {
-      grid-column: 2;
+      grid-column: auto;
       position: relative;
       overflow: hidden;
       padding: 16px;
@@ -315,6 +323,19 @@
       margin-top: 16px;
     }
 
+    .panel-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .panel-heading h2,
+    .panel-heading h3 {
+      margin: 0;
+    }
+
     .status {
       margin-top: 12px;
       color: #ffdca2;
@@ -341,7 +362,8 @@
     }
 
     @media (max-width: 1040px) {
-      .stage {
+      .stage,
+      .stage.tools-open {
         grid-template-columns: 1fr;
       }
 
@@ -379,8 +401,11 @@
     </header>
 
     <main id="shell" class="stage">
-      <section class="card stack">
-        <h2>Draft Fields</h2>
+      <section class="card stack" id="profile-editor-panel" hidden>
+        <div class="panel-heading">
+          <h2>Draft Fields</h2>
+          <button class="chip" type="button" id="editor-close-button">Close</button>
+        </div>
         <p class="note">Fields marked public are shown to the room once you publish. Draft edits stay hidden until then.</p>
         <div id="draft-fields"></div>
         <div class="actions">
@@ -413,7 +438,10 @@
 
       <section class="stack">
         <section class="card">
-          <h2>Public Preview</h2>
+          <div class="panel-heading">
+            <h2>Public Preview</h2>
+            <button class="chip" type="button" id="edit-button">Edit</button>
+          </div>
           <p class="note" id="preview-note">Your published profile appears here. Draft changes do not.</p>
           <div class="meta-list" id="preview-panel"></div>
         </section>
@@ -434,6 +462,11 @@
   <script src="/lib/forbidden.js"></script>
   <script src="/lib/identity.js"></script>
   <script>
+    const shell = document.getElementById("shell");
+    const profileEditorPanel = document.getElementById("profile-editor-panel");
+    const editButton = document.getElementById("edit-button");
+    const editorCloseButton = document.getElementById("editor-close-button");
+
     const profileFields = [
       ["display_name", "Display Name"],
       ["stage_name", "Stage Name"],
@@ -461,6 +494,18 @@
       profile: null,
       dirtyHeadshot: "",
     };
+
+    function openEditor() {
+      if (!profileEditorPanel) return;
+      profileEditorPanel.hidden = false;
+      shell?.classList.add("tools-open");
+    }
+
+    function closeEditor() {
+      if (!profileEditorPanel) return;
+      profileEditorPanel.hidden = true;
+      shell?.classList.remove("tools-open");
+    }
 
     function profileValue(value) {
       const text = String(value || "").trim();
@@ -964,7 +1009,9 @@
     }
 
     async function saveDraft() {
-      return persistDraft({ silent: false });
+      const saved = await persistDraft({ silent: false });
+      if (saved) closeEditor();
+      return saved;
     }
 
     async function publishProfile() {
@@ -1019,6 +1066,7 @@
         renderHeroPreview();
         renderPreview(state.profile.profile || {});
         status.textContent = "Profile published.";
+        closeEditor();
       } catch (error) {
         console.error(error);
         status.textContent = "Publish failed.";
@@ -1027,6 +1075,8 @@
 
     document.getElementById("save-button").addEventListener("click", saveDraft);
     document.getElementById("publish-button").addEventListener("click", publishProfile);
+    editButton?.addEventListener("click", openEditor);
+    editorCloseButton?.addEventListener("click", closeEditor);
     document.getElementById("add-history-line").addEventListener("click", () => {
       appendHistoryRow(emptyHistoryEntry());
       renderHeroPreview();

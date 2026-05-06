@@ -318,7 +318,7 @@ body {
 }
 
 .venue-pin--theater img {
-  transform: scale(2.7);
+  transform: scale(1.7);
   transform-origin: center bottom;
   filter:
     drop-shadow(0 0 8px rgba(255, 220, 120, 0.55))
@@ -328,7 +328,7 @@ body {
 
 .venue-pin--theater:hover img,
 .venue-pin--theater:focus-visible img {
-  transform: scale(2.9);
+  transform: scale(1.7);
   filter:
     drop-shadow(0 0 12px rgba(255, 220, 120, 0.7))
     drop-shadow(0 8px 18px rgba(0, 0, 0, 0.55));

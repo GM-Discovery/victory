@@ -1,5 +1,10 @@
 # Kernel 2 — Security Notes (Identity, Auth, Invites, Access Floor)
 
+## Current Canon Note
+This file is now partly historical.
+
+Use [current-state.md](/opt/victory/Construction/current-state.md) for the live system view. Keep this file for security foundations, older kernel rationale, and historical implementation notes.
+
 ## Scope
 
 This document records the **actual security posture** established during Kernel 2.
@@ -181,6 +186,8 @@ This is not a complete security system. It is the first enforceable boundary.
 - `venues.is_workshop`
 
 ### Current Reality
+Historical note:
+The venue-access and map-visibility notes below describe the early access model and should be read as a foundation record, not a perfect reflection of every current venue/runtime surface.
 - InfoBooth:
   - public
   - visible without authentication
@@ -258,6 +265,13 @@ This is not a complete security system. It is the first enforceable boundary.
 ### Identity Rules
 - `actor` is accountable identity
 - `persona` is performed identity and is currently `null`
+
+## Current Security Truth Addendum
+- Auth remains cookie/session based with hashed session tokens in `auth.sessions`
+- Performer profile editing is separated from character persona editing
+- Character drafting currently follows performer-role access rather than separate draft-grant requirements
+- Presence is still ephemeral connection state, not durable history
+- Showing Review is about logs/actions/chat/reactions, not video capture
 - Client-provided `actor` and `persona` values are ignored or overwritten
 - Live and replayed actions use the same identity shape
 

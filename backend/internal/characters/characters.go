@@ -307,23 +307,7 @@ func CanDraftCharacter(ctx context.Context, q characterQuerier, userID string) (
 	} else if ok {
 		return true, nil
 	}
-
-	var found int
-	err := q.QueryRow(ctx, `
-		SELECT 1
-		FROM permission_grants
-		WHERE grantee_user_id = $1
-		  AND capability = $2
-		  AND revoked_at IS NULL
-		LIMIT 1
-	`, userID, DraftCapability).Scan(&found)
-	if err == nil && found == 1 {
-		return true, nil
-	}
-	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
-	}
-	return false, err
+	return false, nil
 }
 
 func CreateCard(ctx context.Context, pool *pgxpool.Pool, ownerUserID string, input CharacterCardInput) (CharacterCard, error) {
@@ -768,11 +752,11 @@ func hasImplicitDraftRole(ctx context.Context, q characterQuerier, userID string
 		FROM (
 			SELECT user_id, role::text AS role
 			FROM location_memberships
-			WHERE user_id = $1 AND active = TRUE AND role IN ('producer', 'director')
+			WHERE user_id = $1 AND active = TRUE AND role IN ('producer', 'director', 'cast', 'crew')
 			UNION ALL
 			SELECT user_id, role::text AS role
 			FROM memberships
-			WHERE user_id = $1 AND active = TRUE AND role IN ('producer', 'director')
+			WHERE user_id = $1 AND active = TRUE AND role IN ('producer', 'director', 'cast', 'crew')
 		) roles
 		LIMIT 1
 	`, userID).Scan(&found)

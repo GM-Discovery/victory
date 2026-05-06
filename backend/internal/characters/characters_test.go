@@ -37,7 +37,6 @@ func (r fakeRow) Scan(dest ...any) error {
 
 type draftQuerier struct {
 	implicit bool
-	grant    bool
 	err      error
 }
 
@@ -53,11 +52,6 @@ func (q draftQuerier) QueryRow(ctx context.Context, sql string, args ...any) pgx
 			return fakeRow{values: []any{1}}
 		}
 		return fakeRow{err: pgx.ErrNoRows}
-	case strings.Contains(sql, "FROM permission_grants"):
-		if q.grant {
-			return fakeRow{values: []any{1}}
-		}
-		return fakeRow{err: pgx.ErrNoRows}
 	default:
 		return fakeRow{err: pgx.ErrNoRows}
 	}
@@ -69,9 +63,8 @@ func TestCanDraftCharacterRoleInheritanceAndGrant(t *testing.T) {
 		querier draftQuerier
 		want    bool
 	}{
-		{name: "producer director implicit", querier: draftQuerier{implicit: true}, want: true},
-		{name: "cast with grant", querier: draftQuerier{grant: true}, want: true},
-		{name: "cast without grant denied", querier: draftQuerier{}, want: false},
+		{name: "performer role implicit", querier: draftQuerier{implicit: true}, want: true},
+		{name: "user without performer role denied", querier: draftQuerier{}, want: false},
 	}
 
 	for _, tt := range tests {

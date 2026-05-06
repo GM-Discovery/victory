@@ -393,11 +393,6 @@
       font-size: 0.9rem;
     }
 
-    .permission-tools {
-      padding-top: 14px;
-      border-top: 1px solid rgba(255,255,255,0.08);
-    }
-
     @media (max-width: 1040px) {
       .stage,
       .stage.tools-open {
@@ -498,17 +493,6 @@
           </div>
         </section>
 
-        <section class="form-grid permission-tools" id="character-permission-row" hidden>
-          <h3>Drafting Permission</h3>
-          <label class="field">
-            Cast/Crew User ID
-            <input id="character-permission-user" type="text" autocomplete="off" />
-          </label>
-          <div class="action-row">
-            <button class="text-button" id="character-permission-grant" type="button">Grant</button>
-            <button class="text-button" id="character-permission-revoke" type="button">Revoke</button>
-          </div>
-        </section>
       </section>
 
       <section class="card hero" id="hero-card">
@@ -594,11 +578,6 @@
     const characterCancel = document.getElementById("character-cancel");
     const characterDisplay = document.getElementById("character-display");
     const characterStatus = document.getElementById("character-status");
-    const characterPermissionRow = document.getElementById("character-permission-row");
-    const characterPermissionUser = document.getElementById("character-permission-user");
-    const characterPermissionGrant = document.getElementById("character-permission-grant");
-    const characterPermissionRevoke = document.getElementById("character-permission-revoke");
-
     let currentRole = "audience";
     let characterCards = [];
     let canDraftCharacters = false;
@@ -737,9 +716,9 @@
       return characterCards.find((card) => card.id === selectedCharacterId) || null;
     }
 
-    function canManageCharacterPermissions(role) {
+    function isPerformerRole(role) {
       const normalized = String(role || "").trim().toLowerCase();
-      return normalized === "producer" || normalized === "director";
+      return normalized === "producer" || normalized === "director" || normalized === "cast" || normalized === "crew";
     }
 
     function setStatus(text) {
@@ -907,9 +886,6 @@
       if (characterEdit) characterEdit.disabled = !card || !canDraftCharacters;
       if (characterSave) characterSave.disabled = !canDraftCharacters;
       if (characterSheetAdd) characterSheetAdd.disabled = !canDraftCharacters;
-      if (characterPermissionRow) {
-        characterPermissionRow.hidden = Boolean(greenroomTools?.hidden) || !canManageCharacterPermissions(currentRole);
-      }
     }
 
     function loadCharacterEditor(card) {
@@ -994,7 +970,7 @@
         }
 
         const data = result.data || {};
-        canDraftCharacters = Boolean(data.can_draft);
+        canDraftCharacters = Boolean(data.can_draft) || isPerformerRole(currentRole);
         characterCards = Array.isArray(data.cards) ? data.cards : [];
         if (!selectedCharacterId && characterCards.length > 0) {
           selectedCharacterId = characterCards[0].id;
@@ -1003,9 +979,11 @@
         renderCharacterDisplay();
         applyCharacterUI();
       } catch (err) {
+        canDraftCharacters = isPerformerRole(currentRole);
         setCharacterStatus(err.message || String(err));
         renderCharacterSelector();
         renderCharacterDisplay();
+        applyCharacterUI();
       }
     }
 
@@ -1044,32 +1022,6 @@
         renderCharacterDisplay();
         closeCharacterEditor();
         setCharacterStatus("Saved.");
-      } catch (err) {
-        setCharacterStatus(err.message || String(err));
-      }
-    }
-
-    async function setCharacterDraftPermission(revoke = false) {
-      const targetUserID = characterPermissionUser?.value.trim() || "";
-      if (!targetUserID) {
-        setCharacterStatus("Enter a cast/crew user id.");
-        return;
-      }
-
-      const url = revoke ? "/api/character-card-permissions/revoke" : "/api/character-card-permissions";
-      setCharacterStatus(revoke ? "Revoking drafting..." : "Granting drafting...");
-      try {
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ target_user_id: targetUserID }),
-        });
-        const result = await response.json().catch(() => null);
-        if (!response.ok || !result?.ok) {
-          throw new Error(result?.data?.error || result?.error || `HTTP ${response.status}`);
-        }
-        setCharacterStatus(revoke ? "Drafting revoked." : "Drafting granted.");
       } catch (err) {
         setCharacterStatus(err.message || String(err));
       }
@@ -1162,9 +1114,6 @@
     characterSheetAdd?.addEventListener("click", addSheetLink);
     characterSave?.addEventListener("click", saveCharacterCard);
     characterCancel?.addEventListener("click", closeCharacterEditor);
-    characterPermissionGrant?.addEventListener("click", () => setCharacterDraftPermission(false));
-    characterPermissionRevoke?.addEventListener("click", () => setCharacterDraftPermission(true));
-
     bootstrapGreenroom();
   </script>
 </body>

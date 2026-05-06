@@ -3,6 +3,12 @@
 This file records meaningful implementation milestones and notable operational decisions.
 Keep entries factual.
 
+Current status and roadmap now live in:
+- [current-state.md](/opt/victory/Construction/current-state.md)
+- [roadmap.md](/opt/victory/Construction/roadmap.md)
+
+This file should stay historical and chronological.
+
 ---
 
 ## 2026-03-25 — Foundation stood up
@@ -254,3 +260,18 @@ Implement `perform/speak` using the same action pipeline:
 - Workshop is the source surface for cards
 - Tray/backstage and stage are distinct placement surfaces
 - Backend restart is required for placement and venue-list changes
+
+## 2026-05-06 — Kernel 24 and 25 reconciliation checkpoint
+
+### Runtime / Character Notes
+- Greenroom is the character dressing room
+- Trailers is the performer profile drafting/publishing surface
+- The Cave keeps live persona use rather than full character editing
+- Character card drafting is currently available to performer roles without separate draft-grant workflow
+- Character sheet links are metadata references on character cards, not playable sheet records
+
+### Documentation Notes
+- Added `Construction/current-state.md` as current canon
+- Added `Construction/roadmap.md` as active roadmap
+- Added placeholder kernel docs for 22–25 naming reconciliation
+- Older notes are being marked historical/superseded instead of silently overwritten

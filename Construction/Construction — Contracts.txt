@@ -1,11 +1,16 @@
 Construction — Contracts
+Current note:
+This file is a conceptual contract bank and partially historical.
+For current routes, venues, WebSocket events, and kernel state, use [current-state.md](/opt/victory/Construction/current-state.md).
+For roadmap priority, use [roadmap.md](/opt/victory/Construction/roadmap.md).
+
 1) Action Contract (backend shape)
 
 Every action the system processes follows one envelope:
 
 {
   "id": "uuid",
-  "type": "perform/speak | direct/reveal | create/element | react/emote | ...",
+  "type": "perform/speak | chat/message | react/emote | persona/equip | persona/unequip | create/index_card | update/index_card | delete/index_card | act/place_element | act/reveal_element | act/hide_element | act/show_overlay | act/hide_overlay | ...",
   "actorId": "user_123",
   "role": "director | cast | crew | audience | producer",
   "actor": {
@@ -101,6 +106,9 @@ clients update local state → recompute view
 
 Server authority note
 The client may request an actor, but the server resolves the actual actor from session-bound identity and membership. Stored/broadcast actions should carry server-resolved actor attribution and `persona: null` for Kernel 8.
+
+Current note:
+`persona` is no longer always `null`; Cave persona equip/unequip now projects persona state when active.
 
 Keep it event-driven, not “replace whole state.”
 
@@ -203,6 +211,9 @@ Optional: snapshots for fast load
 9) Profile Surface Contract (Kernel 9)
 
 Profiles are a server-owned public performer surface, not a private identity dump.
+
+Current note:
+Trailers owns performer profile editing. Greenroom owns character drafting/editing. The Cave remains the proving-ground runtime venue.
 
 Table:
 performer_profiles(
