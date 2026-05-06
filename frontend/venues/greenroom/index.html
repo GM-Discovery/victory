@@ -97,8 +97,16 @@
       box-sizing: border-box;
       display: grid;
       gap: 18px;
-      grid-template-columns: 1fr minmax(320px, 420px) 1fr;
+      grid-template-columns: minmax(320px, 420px) minmax(320px, 1fr);
       align-items: start;
+    }
+
+    .stage.tools-open {
+      grid-template-columns: minmax(280px, 360px) minmax(320px, 420px) minmax(320px, 1fr);
+    }
+
+    [hidden] {
+      display: none !important;
     }
 
     .card {
@@ -110,7 +118,7 @@
     }
 
     .hero {
-      grid-column: 2;
+      grid-column: auto;
       position: relative;
       overflow: hidden;
       padding: 16px;
@@ -238,8 +246,161 @@
       color: var(--muted);
     }
 
+    .panel-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .panel-heading h2,
+    .panel-heading h3 {
+      margin: 0;
+    }
+
+    .text-button {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 9px 12px;
+      background: rgba(255,255,255,0.05);
+      color: var(--accent-strong);
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+    }
+
+    .text-button:hover {
+      background: rgba(255,255,255,0.1);
+    }
+
+    .text-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .field input,
+    .field select,
+    .field textarea,
+    .inline-field input {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(5, 10, 8, 0.7);
+      color: #f5f7ef;
+      padding: 10px 11px;
+      font: inherit;
+      font-weight: 400;
+    }
+
+    .field textarea {
+      min-height: 92px;
+      resize: vertical;
+    }
+
+    .field input[type="color"] {
+      min-height: 42px;
+      padding: 4px;
+    }
+
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .status-line {
+      min-height: 1.25em;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .character-display {
+      display: grid;
+      gap: 12px;
+    }
+
+    .character-portrait {
+      width: 72px;
+      height: 72px;
+      border-radius: 14px;
+      object-fit: cover;
+      border: 2px solid var(--accent);
+      background: #17231b;
+    }
+
+    .character-empty-portrait {
+      width: 72px;
+      height: 72px;
+      border-radius: 14px;
+      border: 2px solid var(--accent);
+      background: #17231b;
+    }
+
+    .character-title {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .character-title h3 {
+      margin: 0;
+    }
+
+    .character-copy {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+
+    .sheet-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .sheet-link {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.03);
+    }
+
+    .sheet-link strong {
+      display: block;
+    }
+
+    .sheet-link span {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .permission-tools {
+      padding-top: 14px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
     @media (max-width: 1040px) {
-      .stage {
+      .stage,
+      .stage.tools-open {
         grid-template-columns: 1fr;
       }
 
@@ -273,9 +434,77 @@
     </header>
 
     <main id="shell" class="stage">
-      <section class="card stack">
-        <h2>Performance Notes</h2>
+      <section class="card stack" id="greenroom-tools" hidden>
+        <div class="panel-heading">
+          <h2>Performance Notes</h2>
+          <button class="text-button" id="greenroom-tools-close" type="button">Close</button>
+        </div>
         <div class="meta-list" id="left-panel"></div>
+
+        <section class="form-grid" id="character-editor" hidden>
+          <div class="panel-heading">
+            <h2 id="character-editor-title">Character Editor</h2>
+          </div>
+
+          <label class="field">
+            Name
+            <input id="character-name" type="text" maxlength="80" autocomplete="off" />
+          </label>
+          <label class="field">
+            Pronouns
+            <input id="character-pronouns" type="text" maxlength="80" autocomplete="off" />
+          </label>
+          <label class="field">
+            Portrait URL
+            <input id="character-portrait-url" type="url" maxlength="500" autocomplete="off" />
+          </label>
+          <label class="field">
+            Color
+            <input id="character-color" type="color" value="#d9c7a6" />
+          </label>
+          <label class="field">
+            Tagline
+            <input id="character-tagline" type="text" maxlength="160" autocomplete="off" />
+          </label>
+          <label class="field">
+            Public Description
+            <textarea id="character-public-description" maxlength="1000"></textarea>
+          </label>
+          <label class="field">
+            Private Notes
+            <textarea id="character-private-notes" maxlength="2000"></textarea>
+          </label>
+
+          <label class="field">
+            Sheet Type
+            <select id="character-sheet-preset">
+              <option value="story-first|blank|Story-First Blank Sheet">Story-First / Blank</option>
+              <option value="dnd5e|adventurer|5e Adventurer Sheet">5e / Adventurer</option>
+              <option value="custom|blank|Custom Blank Sheet">Custom / Blank</option>
+            </select>
+          </label>
+          <div class="action-row">
+            <button class="text-button" id="character-sheet-add" type="button">Add Sheet Link</button>
+          </div>
+          <div class="sheet-list" id="character-sheet-editor-list"></div>
+
+          <div class="action-row">
+            <button class="text-button" id="character-save" type="button">Save</button>
+            <button class="text-button" id="character-cancel" type="button">Cancel</button>
+          </div>
+        </section>
+
+        <section class="form-grid permission-tools" id="character-permission-row" hidden>
+          <h3>Drafting Permission</h3>
+          <label class="field">
+            Cast/Crew User ID
+            <input id="character-permission-user" type="text" autocomplete="off" />
+          </label>
+          <div class="action-row">
+            <button class="text-button" id="character-permission-grant" type="button">Grant</button>
+            <button class="text-button" id="character-permission-revoke" type="button">Revoke</button>
+          </div>
+        </section>
       </section>
 
       <section class="card hero" id="hero-card">
@@ -293,9 +522,31 @@
 
       <section class="stack">
         <section class="card">
-          <h2>Public Snapshot</h2>
+          <div class="panel-heading">
+            <h2>Public Snapshot</h2>
+            <button class="text-button" id="profile-tools-toggle" type="button">Edit</button>
+          </div>
           <p class="note" id="snapshot-note">Loading current public profile...</p>
           <div class="meta-list" id="right-panel"></div>
+        </section>
+        <section class="card character-display">
+          <div class="panel-heading">
+            <h2>Character Dressing Room</h2>
+          </div>
+          <label class="field">
+            Character
+            <select id="character-select"></select>
+          </label>
+          <div class="action-row">
+            <button class="text-button" id="character-new" type="button">New</button>
+            <button class="text-button" id="character-edit" type="button">Edit</button>
+          </div>
+          <div id="character-display"></div>
+          <div>
+            <h3>Sheet Links</h3>
+            <div class="sheet-list" id="character-sheet-display-list"></div>
+          </div>
+          <div class="status-line" id="character-status"></div>
         </section>
         <section class="card">
           <h3>Status</h3>
@@ -304,7 +555,7 @@
         <section class="card">
           <h3>Future Seam</h3>
           <p class="note">
-            `persona` stays `null` for now. When characters arrive, they will sit on top of the accountable account identity rather than replacing it.
+            Character cards can now be put on in The Cave. Sheet links here are references, not playable rules pages yet.
           </p>
         </section>
       </section>

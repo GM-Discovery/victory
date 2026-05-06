@@ -1517,6 +1517,190 @@
     return normalized === "producer" || normalized === "director";
   }
 
+  function canManageCharacterPermissions(role) {
+    return canManageIndexCards(role);
+  }
+
+  function setCharacterStatus(text) {
+    if (characterStatus) characterStatus.textContent = text || "";
+  }
+
+  function selectedCharacter() {
+    return characterCards.find((card) => card.id === selectedCharacterId) || null;
+  }
+
+  function clearCharacterEditor() {
+    selectedCharacterId = "";
+    if (characterSelect) characterSelect.value = "";
+    if (characterName) characterName.value = "";
+    if (characterPronouns) characterPronouns.value = "";
+    if (characterPortraitURL) characterPortraitURL.value = "";
+    if (characterColor) characterColor.value = "#d9c7a6";
+    if (characterTagline) characterTagline.value = "";
+    if (characterPublicDescription) characterPublicDescription.value = "";
+    if (characterPrivateNotes) characterPrivateNotes.value = "";
+    setCharacterStatus("");
+    applyRoleUI();
+  }
+
+  function loadCharacterEditor(card) {
+    selectedCharacterId = card?.id || "";
+    if (characterSelect) characterSelect.value = selectedCharacterId;
+    if (characterName) characterName.value = card?.name || "";
+    if (characterPronouns) characterPronouns.value = card?.pronouns || "";
+    if (characterPortraitURL) characterPortraitURL.value = card?.portrait_url || "";
+    if (characterColor) characterColor.value = card?.color || "#d9c7a6";
+    if (characterTagline) characterTagline.value = card?.tagline || "";
+    if (characterPublicDescription) characterPublicDescription.value = card?.public_description || "";
+    if (characterPrivateNotes) characterPrivateNotes.value = card?.private_notes || "";
+    applyRoleUI();
+  }
+
+  function renderCharacterCards() {
+    if (!characterSelect) return;
+
+    characterSelect.innerHTML = "";
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = characterCards.length ? "Select a character" : "No character cards yet";
+    characterSelect.appendChild(empty);
+
+    for (const card of characterCards) {
+      const option = document.createElement("option");
+      option.value = card.id;
+      option.textContent = card.name || "Unnamed Character";
+      characterSelect.appendChild(option);
+    }
+
+    if (selectedCharacterId && characterCards.some((card) => card.id === selectedCharacterId)) {
+      characterSelect.value = selectedCharacterId;
+    }
+  }
+
+  function characterDraft() {
+    return {
+      name: characterName?.value.trim() || "",
+      pronouns: characterPronouns?.value.trim() || "",
+      portrait_url: characterPortraitURL?.value.trim() || "",
+      color: characterColor?.value || "#d9c7a6",
+      tagline: characterTagline?.value.trim() || "",
+      public_description: characterPublicDescription?.value.trim() || "",
+      private_notes: characterPrivateNotes?.value.trim() || "",
+    };
+  }
+
+  async function loadCharacterCards() {
+    if (!characterPanel) return;
+
+    try {
+      const response = await fetch("/api/character-cards/me", {
+        method: "GET",
+        credentials: "include",
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.data?.error || result?.error || `HTTP ${response.status}`);
+      }
+
+      const data = result.data || {};
+      canDraftCharacters = Boolean(data.can_draft);
+      characterCards = Array.isArray(data.cards) ? data.cards : [];
+      activePersona = data.active_persona || null;
+      renderCharacterCards();
+      if (!selectedCharacterId && characterCards.length > 0) {
+        loadCharacterEditor(characterCards[0]);
+      }
+      applyRoleUI();
+    } catch (err) {
+      setCharacterStatus(err.message || String(err));
+    }
+  }
+
+  async function saveCharacterCard() {
+    const draft = characterDraft();
+    if (!draft.name) {
+      setCharacterStatus("Name is required.");
+      return;
+    }
+    if (!canDraftCharacters && !selectedCharacterId) {
+      setCharacterStatus("Character drafting is not granted yet.");
+      return;
+    }
+
+    const cardID = selectedCharacterId;
+    const url = cardID ? `/api/character-cards/${encodeURIComponent(cardID)}` : "/api/character-cards";
+    const method = cardID ? "PATCH" : "POST";
+    setCharacterStatus("Saving...");
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(draft),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.data?.error || result?.error || `HTTP ${response.status}`);
+      }
+
+      const saved = result.data;
+      const existingIndex = characterCards.findIndex((card) => card.id === saved.id);
+      if (existingIndex >= 0) {
+        characterCards[existingIndex] = saved;
+      } else {
+        characterCards.unshift(saved);
+      }
+      selectedCharacterId = saved.id;
+      renderCharacterCards();
+      loadCharacterEditor(saved);
+      setCharacterStatus("Saved.");
+    } catch (err) {
+      setCharacterStatus(err.message || String(err));
+    }
+  }
+
+  function equipCharacterCard() {
+    const card = selectedCharacter();
+    if (!card) {
+      setCharacterStatus("Select a character first.");
+      return;
+    }
+    const sent = sendAction("persona/equip", { character_card_id: card.id });
+    if (sent) setCharacterStatus("Putting on character...");
+  }
+
+  function unequipCharacterCard() {
+    const sent = sendAction("persona/unequip");
+    if (sent) setCharacterStatus("Taking off character...");
+  }
+
+  async function setCharacterDraftPermission(revoke = false) {
+    const targetUserID = characterPermissionUser?.value.trim() || "";
+    if (!targetUserID) {
+      setCharacterStatus("Enter a cast/crew user id.");
+      return;
+    }
+
+    const url = revoke ? "/api/character-card-permissions/revoke" : "/api/character-card-permissions";
+    setCharacterStatus(revoke ? "Revoking drafting..." : "Granting drafting...");
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ target_user_id: targetUserID }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.data?.error || result?.error || `HTTP ${response.status}`);
+      }
+      setCharacterStatus(revoke ? "Drafting revoked." : "Drafting granted.");
+    } catch (err) {
+      setCharacterStatus(err.message || String(err));
+    }
+  }
+
   function canUseStageContextMenu(role) {
     return normalizeRole(role) !== "audience";
   }
@@ -2913,6 +3097,20 @@
     const chattingAllowed = canSendVenueChat(currentRole);
     chatInput.disabled = !chattingAllowed;
     chatSend.disabled = !chattingAllowed;
+    const hasCharacter = Boolean(selectedCharacterId);
+    const characterEditable = canDraftCharacters || canManageCharacterPermissions(currentRole);
+    if (characterName) characterName.disabled = !characterEditable;
+    if (characterPronouns) characterPronouns.disabled = !characterEditable;
+    if (characterPortraitURL) characterPortraitURL.disabled = !characterEditable;
+    if (characterColor) characterColor.disabled = !characterEditable;
+    if (characterTagline) characterTagline.disabled = !characterEditable;
+    if (characterPublicDescription) characterPublicDescription.disabled = !characterEditable;
+    if (characterPrivateNotes) characterPrivateNotes.disabled = !characterEditable;
+    if (characterSave) characterSave.disabled = !characterEditable;
+    if (characterNew) characterNew.disabled = !canDraftCharacters;
+    if (characterEquip) characterEquip.disabled = !hasCharacter;
+    if (characterUnequip) characterUnequip.disabled = !activePersona;
+    if (characterPermissionRow) characterPermissionRow.hidden = !canManageCharacterPermissions(currentRole);
     const canEditCards = canManageIndexCards(currentRole);
     if (indexCardFront) indexCardFront.disabled = !canEditCards;
     if (indexCardBack) indexCardBack.disabled = !canEditCards;
@@ -3130,6 +3328,15 @@
         return;
       }
 
+      if (msg.type === "presence/update") {
+        upsertPresenceUser(msg.user);
+        if (msg.user?.user_id === currentActorId) {
+          activePersona = msg.user?.persona || null;
+          applyRoleUI();
+        }
+        return;
+      }
+
       if (msg.type === "action" && msg.data) {
         const action = msg.data;
         const actionType = action.type || "";
@@ -3147,6 +3354,15 @@
         }
 
         if (actionType === "react/emote") {
+          return;
+        }
+
+        if (actionType === "persona/equip" || actionType === "persona/unequip") {
+          if (String(action?.actor?.user_id || action?.actor_id || "") === String(currentActorId || "")) {
+            activePersona = action?.persona || action?.payload?.persona || null;
+            setCharacterStatus(actionType === "persona/equip" ? "Character on." : "Character off.");
+            applyRoleUI();
+          }
           return;
         }
 
@@ -3335,6 +3551,7 @@
 
       await joinCave();
       if (!currentSessionId || !currentActorId) return;
+      await loadCharacterCards();
       connectWS();
       await refreshSnapshot();
     } catch (err) {
@@ -3361,6 +3578,20 @@
   noteCardToggle?.addEventListener("click", openNoteCardPanel);
   noteCardClose?.addEventListener("click", closeNoteCardPanel);
   speechSend?.addEventListener("click", sendStageSpeech);
+  characterSelect?.addEventListener("change", () => {
+    const card = characterCards.find((item) => item.id === characterSelect.value);
+    if (card) {
+      loadCharacterEditor(card);
+    } else {
+      clearCharacterEditor();
+    }
+  });
+  characterNew?.addEventListener("click", clearCharacterEditor);
+  characterSave?.addEventListener("click", saveCharacterCard);
+  characterEquip?.addEventListener("click", equipCharacterCard);
+  characterUnequip?.addEventListener("click", unequipCharacterCard);
+  characterPermissionGrant?.addEventListener("click", () => setCharacterDraftPermission(false));
+  characterPermissionRevoke?.addEventListener("click", () => setCharacterDraftPermission(true));
   indexCardSave?.addEventListener("click", () => {
     if (!canManageIndexCards(currentRole)) {
       setIndexCardStatus("Only producers and directors can save cards.");

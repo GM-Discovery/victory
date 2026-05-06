@@ -578,3 +578,16 @@ VALUES (
 - The Cave venue chat lives in the bottom panel.
 - `perform/speak` remains the separate stage speech lane above the fire.
 - There is no chat-above-fire configuration in Kernel 22.
+
+## Kernel 23 Story-First Character Cards
+
+- Character cards are profile-linked personas, not alternate accounts.
+- Producers and directors can draft character cards implicitly.
+- Cast and crew need a `character_card:draft` permission grant before drafting.
+- `permission_grants` is the generic capability table introduced by this kernel.
+- `current_session_personas` stores the active character card for a user in a session.
+- The Cave supports `persona/equip` and `persona/unequip` over WebSocket.
+- Equipping or unequipping broadcasts `presence/update`.
+- New actions record the active persona in `payload.actor_persona` and project it through `actor.persona`.
+- Existing actions without persona data still project `persona: null`.
+- Dice, grid, tokens, HP, initiative, and fog remain outside this kernel.

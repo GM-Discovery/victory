@@ -2,9 +2,12 @@ package characters
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -18,6 +21,17 @@ import (
 
 const DraftCapability = "character_card:draft"
 
+const maxSheetLinks = 12
+
+type SheetLink struct {
+	ID        string `json:"id"`
+	Ruleset   string `json:"ruleset"`
+	SheetType string `json:"sheet_type"`
+	Label     string `json:"label"`
+	URL       string `json:"url"`
+	CreatedAt string `json:"created_at"`
+}
+
 type CharacterCard struct {
 	ID                string `json:"id"`
 	OwnerUserID       string `json:"owner_user_id"`
@@ -30,6 +44,7 @@ type CharacterCard struct {
 	Tagline           string `json:"tagline"`
 	PublicDescription string `json:"public_description"`
 	PrivateNotes      string `json:"private_notes,omitempty"`
+	SheetLinks        []SheetLink `json:"sheet_links"`
 	CreatedAt         string `json:"created_at"`
 	UpdatedAt         string `json:"updated_at"`
 }
@@ -42,6 +57,7 @@ type CharacterCardInput struct {
 	Tagline           string `json:"tagline"`
 	PublicDescription string `json:"public_description"`
 	PrivateNotes      string `json:"private_notes"`
+	SheetLinks        *[]SheetLink `json:"sheet_links,omitempty"`
 }
 
 type PermissionInput struct {
@@ -91,10 +107,14 @@ func EnsureKernel23CharacterSurface(ctx context.Context, pool *pgxpool.Pool) err
 		  tagline TEXT NOT NULL DEFAULT '',
 		  public_description TEXT NOT NULL DEFAULT '',
 		  private_notes TEXT NOT NULL DEFAULT '',
+		  sheet_links JSONB NOT NULL DEFAULT '[]'::jsonb,
 		  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
 		  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 		  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
+
+		ALTER TABLE character_cards
+		  ADD COLUMN IF NOT EXISTS sheet_links JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 		CREATE INDEX IF NOT EXISTS idx_character_cards_owner
 		  ON character_cards(owner_user_id);
@@ -330,8 +350,14 @@ func CreateCard(ctx context.Context, pool *pgxpool.Pool, ownerUserID string, inp
 		return CharacterCard{}, err
 	}
 
+	sheetLinksJSON, err := json.Marshal(sheetLinksFromInput(input))
+	if err != nil {
+		return CharacterCard{}, err
+	}
+
 	var card CharacterCard
 	var createdAt, updatedAt time.Time
+	var sheetLinksRaw []byte
 	err = pool.QueryRow(ctx, `
 		INSERT INTO character_cards (
 			owner_user_id,
@@ -343,18 +369,20 @@ func CreateCard(ctx context.Context, pool *pgxpool.Pool, ownerUserID string, inp
 			color,
 			tagline,
 			public_description,
-			private_notes
+			private_notes,
+			sheet_links
 		)
-		VALUES ($1, $2, NULLIF($3, '')::uuid, $4, $5, $6, $7, $8, $9, $10)
-		RETURNING id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), name, pronouns, portrait_url, color, tagline, public_description, private_notes, created_at, updated_at
-	`, ownerUserID, locationID, productionID, input.Name, input.Pronouns, input.PortraitURL, input.Color, input.Tagline, input.PublicDescription, input.PrivateNotes).
-		Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &createdAt, &updatedAt)
+		VALUES ($1, $2, NULLIF($3, '')::uuid, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
+		RETURNING id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), name, pronouns, portrait_url, color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
+	`, ownerUserID, locationID, productionID, input.Name, input.Pronouns, input.PortraitURL, input.Color, input.Tagline, input.PublicDescription, input.PrivateNotes, string(sheetLinksJSON)).
+		Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
 	if err != nil {
 		return CharacterCard{}, err
 	}
 
-	card.CreatedAt = createdAt.UTC().Format(time.RFC3339)
-	card.UpdatedAt = updatedAt.UTC().Format(time.RFC3339)
+	if err := finishCharacterCard(&card, sheetLinksRaw, createdAt, updatedAt); err != nil {
+		return CharacterCard{}, err
+	}
 	return card, nil
 }
 
@@ -381,23 +409,34 @@ func UpdateCard(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID str
 		return CharacterCard{}, errors.New("forbidden")
 	}
 
+	var sheetLinksParam any
+	if input.SheetLinks != nil {
+		sheetLinksJSON, err := json.Marshal(*input.SheetLinks)
+		if err != nil {
+			return CharacterCard{}, err
+		}
+		sheetLinksParam = string(sheetLinksJSON)
+	}
+
 	var card CharacterCard
 	var createdAt, updatedAt time.Time
+	var sheetLinksRaw []byte
 	err = pool.QueryRow(ctx, `
 		UPDATE character_cards
-		SET name = $3,
-		    pronouns = $4,
-		    portrait_url = $5,
-		    color = $6,
-		    tagline = $7,
-		    public_description = $8,
-		    private_notes = $9,
+		SET name = $2,
+		    pronouns = $3,
+		    portrait_url = $4,
+		    color = $5,
+		    tagline = $6,
+		    public_description = $7,
+		    private_notes = $8,
+		    sheet_links = COALESCE($9::jsonb, sheet_links),
 		    updated_at = NOW()
 		WHERE id = $1
 		  AND is_deleted = FALSE
-		RETURNING id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), name, pronouns, portrait_url, color, tagline, public_description, private_notes, created_at, updated_at
-	`, cardID, actorUserID, input.Name, input.Pronouns, input.PortraitURL, input.Color, input.Tagline, input.PublicDescription, input.PrivateNotes).
-		Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &createdAt, &updatedAt)
+		RETURNING id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), name, pronouns, portrait_url, color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
+	`, cardID, input.Name, input.Pronouns, input.PortraitURL, input.Color, input.Tagline, input.PublicDescription, input.PrivateNotes, sheetLinksParam).
+		Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return CharacterCard{}, errors.New("character_card_not_found")
@@ -405,8 +444,9 @@ func UpdateCard(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID str
 		return CharacterCard{}, err
 	}
 
-	card.CreatedAt = createdAt.UTC().Format(time.RFC3339)
-	card.UpdatedAt = updatedAt.UTC().Format(time.RFC3339)
+	if err := finishCharacterCard(&card, sheetLinksRaw, createdAt, updatedAt); err != nil {
+		return CharacterCard{}, err
+	}
 	return card, nil
 }
 
@@ -432,7 +472,7 @@ func CanEditCard(ctx context.Context, q characterQuerier, actorUserID, cardID st
 
 func ListOwnedCards(ctx context.Context, pool *pgxpool.Pool, userID string) ([]CharacterCard, error) {
 	rows, err := pool.Query(ctx, `
-		SELECT id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), name, pronouns, portrait_url, color, tagline, public_description, private_notes, created_at, updated_at
+		SELECT id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), name, pronouns, portrait_url, color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
 		FROM character_cards
 		WHERE owner_user_id = $1
 		  AND is_deleted = FALSE
@@ -447,11 +487,13 @@ func ListOwnedCards(ctx context.Context, pool *pgxpool.Pool, userID string) ([]C
 	for rows.Next() {
 		var card CharacterCard
 		var createdAt, updatedAt time.Time
-		if err := rows.Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &createdAt, &updatedAt); err != nil {
+		var sheetLinksRaw []byte
+		if err := rows.Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt); err != nil {
 			return nil, err
 		}
-		card.CreatedAt = createdAt.UTC().Format(time.RFC3339)
-		card.UpdatedAt = updatedAt.UTC().Format(time.RFC3339)
+		if err := finishCharacterCard(&card, sheetLinksRaw, createdAt, updatedAt); err != nil {
+			return nil, err
+		}
 		out = append(out, card)
 	}
 	return out, rows.Err()
@@ -607,7 +649,98 @@ func sanitizeInput(input CharacterCardInput) CharacterCardInput {
 	input.Tagline = truncate(strings.TrimSpace(input.Tagline), 160)
 	input.PublicDescription = truncate(strings.TrimSpace(input.PublicDescription), 1000)
 	input.PrivateNotes = truncate(strings.TrimSpace(input.PrivateNotes), 2000)
+	if input.SheetLinks != nil {
+		links := sanitizeSheetLinks(*input.SheetLinks)
+		input.SheetLinks = &links
+	}
 	return input
+}
+
+func sheetLinksFromInput(input CharacterCardInput) []SheetLink {
+	if input.SheetLinks == nil {
+		return []SheetLink{}
+	}
+	return *input.SheetLinks
+}
+
+func finishCharacterCard(card *CharacterCard, sheetLinksRaw []byte, createdAt, updatedAt time.Time) error {
+	card.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+	card.UpdatedAt = updatedAt.UTC().Format(time.RFC3339)
+	card.SheetLinks = []SheetLink{}
+	if len(sheetLinksRaw) == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(sheetLinksRaw, &card.SheetLinks); err != nil {
+		return err
+	}
+	if card.SheetLinks == nil {
+		card.SheetLinks = []SheetLink{}
+	}
+	return nil
+}
+
+func sanitizeSheetLinks(links []SheetLink) []SheetLink {
+	out := make([]SheetLink, 0, len(links))
+	seen := map[string]bool{}
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	for _, link := range links {
+		if len(out) >= maxSheetLinks {
+			break
+		}
+
+		clean := SheetLink{
+			ID:        truncate(strings.TrimSpace(link.ID), 80),
+			Ruleset:   truncate(strings.TrimSpace(link.Ruleset), 80),
+			SheetType: truncate(strings.TrimSpace(link.SheetType), 80),
+			Label:     truncate(strings.TrimSpace(link.Label), 160),
+			URL:       truncate(strings.TrimSpace(link.URL), 500),
+			CreatedAt: truncate(strings.TrimSpace(link.CreatedAt), 40),
+		}
+
+		if clean.Ruleset == "" && clean.SheetType == "" && clean.Label == "" && clean.URL == "" {
+			continue
+		}
+		if clean.ID == "" || seen[clean.ID] {
+			clean.ID = newSheetLinkID()
+		}
+		for attempt := 0; seen[clean.ID]; attempt++ {
+			clean.ID = newSheetLinkID() + "_" + strconv.Itoa(attempt)
+		}
+		seen[clean.ID] = true
+		if clean.CreatedAt == "" {
+			clean.CreatedAt = now
+		} else if _, err := time.Parse(time.RFC3339, clean.CreatedAt); err != nil {
+			clean.CreatedAt = now
+		}
+		if clean.Label == "" {
+			clean.Label = sheetLinkLabel(clean.Ruleset, clean.SheetType)
+		}
+		out = append(out, clean)
+	}
+	return out
+}
+
+func sheetLinkLabel(ruleset, sheetType string) string {
+	parts := []string{}
+	if ruleset != "" {
+		parts = append(parts, ruleset)
+	}
+	if sheetType != "" {
+		parts = append(parts, sheetType)
+	}
+	if len(parts) == 0 {
+		return "Character Sheet"
+	}
+	return strings.Join(parts, " ") + " Sheet"
+}
+
+func newSheetLinkID() string {
+	var bytes [8]byte
+	if _, err := rand.Read(bytes[:]); err == nil {
+		return "sheet_" + hex.EncodeToString(bytes[:])
+	}
+	return "sheet_" + strconv.FormatInt(time.Now().UnixNano(), 10)
 }
 
 func normalizeColor(value string) string {
