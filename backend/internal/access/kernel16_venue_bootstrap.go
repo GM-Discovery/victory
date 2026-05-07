@@ -18,6 +18,14 @@ func EnsureKernel16VenueSurface(ctx context.Context, pool *pgxpool.Pool) error {
 
 	seeds := []venueSeed{
 		{
+			slug:       "library",
+			name:       "Library",
+			kind:       "library",
+			config:     `{ "surface": "public_library", "reference_only": true }`,
+			isPublic:   true,
+			isWorkshop: false,
+		},
+		{
 			slug:       "grants-cabin",
 			name:       "Grant's Cabin",
 			kind:       "cabin",
@@ -31,6 +39,22 @@ func EnsureKernel16VenueSurface(ctx context.Context, pool *pgxpool.Pool) error {
 			kind:       "plaza",
 			config:     `{ "surface": "audience", "ticketing": "planned", "permission_gate": true, "project": "Socio" }`,
 			isPublic:   false,
+			isWorkshop: false,
+		},
+		{
+			slug:       "warehouse",
+			name:       "Warehouse",
+			kind:       "warehouse",
+			config:     `{ "surface": "restricted_storage", "reference_only": true }`,
+			isPublic:   false,
+			isWorkshop: false,
+		},
+		{
+			slug:       "soil-experts",
+			name:       "Soil Experts",
+			kind:       "farm",
+			config:     `{ "surface": "public_placeholder", "reference_only": true, "project": "Soil Experts" }`,
+			isPublic:   true,
 			isWorkshop: false,
 		},
 	}

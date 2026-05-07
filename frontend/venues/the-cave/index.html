@@ -58,6 +58,48 @@
       padding: 18px;
     }
 
+    .audience-holding-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background:
+        radial-gradient(circle at center, rgba(56, 41, 24, 0.18), transparent 42%),
+        linear-gradient(180deg, rgba(17, 13, 10, 0.96) 0%, rgba(10, 8, 6, 0.98) 100%);
+      backdrop-filter: blur(2px);
+    }
+
+    .audience-holding-screen[hidden] {
+      display: none;
+    }
+
+    .audience-holding-card {
+      max-width: 680px;
+      width: 100%;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.09);
+      background: rgba(22, 18, 14, 0.88);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+      padding: 28px;
+      color: #f5efe4;
+      text-align: center;
+    }
+
+    .audience-holding-card h2 {
+      margin: 0 0 10px;
+      color: #ead7b2;
+      font-size: clamp(1.5rem, 2.4vw, 2.2rem);
+    }
+
+    .audience-holding-card p {
+      margin: 0;
+      color: #c7bba5;
+      line-height: 1.55;
+    }
+
     .stage-overlay[hidden] {
       display: none;
     }
@@ -205,6 +247,10 @@
     }
 
     .chat-panel.is-collapsed .chat-panel-body {
+      display: none;
+    }
+
+    .chat-panel.is-disabled .chat-controls {
       display: none;
     }
 
@@ -1010,6 +1056,12 @@
       <div id="speech"></div>
       <div id="stage-card-overlay" class="stage-card-overlay" aria-hidden="true"></div>
       <div id="stage-overlay" class="stage-overlay" aria-hidden="true" hidden></div>
+      <div id="audience-holding-screen" class="audience-holding-screen" aria-hidden="true" hidden>
+        <div class="audience-holding-card">
+          <h2>The curtain is down</h2>
+          <p>Audience view is off for this showing. Stay in the venue and wait here until the director opens the house.</p>
+        </div>
+      </div>
       <div id="stage-move-preview" class="stage-move-preview" aria-hidden="true" hidden></div>
       <img id="fire" src="/assets/fire.jpg" alt="Fire" hidden />    </div>
 
@@ -1238,6 +1290,7 @@
   const stageEl = document.querySelector(".stage");
   const stageCardOverlay = document.getElementById("stage-card-overlay");
   const stageOverlay = document.getElementById("stage-overlay");
+  const audienceHoldingScreen = document.getElementById("audience-holding-screen");
   const fireEl = document.getElementById("fire");
   const presenceList = document.getElementById("presence-list");
   const presenceCount = document.getElementById("presence-count");
@@ -1269,7 +1322,9 @@
   let latestSnapshotElements = [];
   let latestSnapshotActions = [];
   let latestSnapshotOverlay = null;
+  let latestSnapshotShowing = null;
   let latestSnapshotVenueConfig = {};
+  let audienceCurtainActive = false;
   let workshopVenues = [];
   let pendingIndexCardSave = null;
   let pendingIndexCardSaveTimer = null;
@@ -2807,6 +2862,19 @@
     return canSpeak(role);
   }
 
+  function updateAudienceCurtain() {
+    const showing = latestSnapshotShowing || {};
+    audienceCurtainActive =
+      normalizeRole(currentRole) === "audience" &&
+      showing &&
+      String(showing.status || "").toLowerCase() !== "closed" &&
+      showing.audience_view_enabled === false;
+
+    if (audienceHoldingScreen) {
+      audienceHoldingScreen.hidden = !audienceCurtainActive;
+    }
+  }
+
   function renderChatHistory(actions) {
     chatLog.innerHTML = "";
 
@@ -2938,6 +3006,9 @@
     const chattingAllowed = canSendVenueChat(currentRole);
     chatInput.disabled = !chattingAllowed;
     chatSend.disabled = !chattingAllowed;
+    if (chatPanel) {
+      chatPanel.classList.toggle("is-disabled", !chattingAllowed);
+    }
     const hasCharacter = Boolean(selectedCharacterId);
     if (characterSelect) characterSelect.disabled = characterCards.length === 0;
     if (characterEquip) characterEquip.disabled = !hasCharacter;
@@ -2954,6 +3025,7 @@
     if (speechInput) speechInput.disabled = !canSpeak(currentRole);
     if (speechSend) speechSend.disabled = !canSpeak(currentRole);
     updateSelectionUI();
+    updateAudienceCurtain();
   }
 
   function applySnapshot(snapshot) {
@@ -2961,6 +3033,7 @@
     const actions = Array.isArray(snapshot?.actions) ? snapshot.actions : [];
     latestSnapshotVenueConfig = snapshot?.venue?.config || {};
     latestSnapshotOverlay = snapshot?.overlay || null;
+    latestSnapshotShowing = snapshot?.showing || null;
     latestSnapshotElements = elements;
     latestSnapshotActions = actions;
 
@@ -2981,6 +3054,7 @@
     renderChatHistory(actions);
     refreshIndexCardPanels();
     applyRoleUI();
+    updateAudienceCurtain();
 
     if (selectedElement) {
       const stillVisible = elements.find((el) =>
@@ -3222,6 +3296,22 @@
           await refreshSnapshot();
           return;
         }
+      }
+
+      if (msg.type === "showing/update") {
+        if (msg.showing || msg.data) {
+          latestSnapshotShowing = msg.showing || msg.data;
+          updateAudienceCurtain();
+        }
+        return;
+      }
+
+      if (msg.type === "venue/update") {
+        if (msg.config || msg.data?.config) {
+          latestSnapshotVenueConfig = msg.config || msg.data?.config || latestSnapshotVenueConfig;
+          applyRoleUI();
+        }
+        return;
       }
 
       if (msg.type === "error") {

@@ -1,17 +1,15 @@
 # Victory Roadmap
 
 ## Purpose
-This roadmap reflects current priorities after Kernel 25.
+This roadmap reflects current priorities after Kernel 28.
 
 Kernel numbers are labels, but from here they should remain stable once assigned so planning, reportbacks, and future agents all refer to the same landmarks.
 
-## Near Roadmap: Kernels 26–35
-- `26 — Director Console v1`
-  - first explicit authority surface for live Cave management
-- `27 — Character / Persona Polish`
-  - tighten character flow after Kernel 24 behavior is stable
-- `28 — Showing Review v1`
-  - review chat, actions, reactions, and session/showing history
+## Near Roadmap: Kernels 26–40
+- `27 — Showing Review v1`
+  - review chat, stage speech, reactions, reveal/hide, overlays, cards, and persona changes
+- `28 — Director Console v1`
+  - live control surface for the current showing
 - `29 — Reaction Counts v1`
   - lightweight aggregate readback for audience/performer response
 - `30 — Cave UI Organization Pass`
@@ -26,9 +24,20 @@ Kernel numbers are labels, but from here they should remain stable once assigned
   - clearer venue-level policy toggles and controls
 - `35 — Asset Browser / Library v1`
   - browse and select reusable assets/library elements
+- `36 — Warehouse / Asset Storage Surface v1`
+  - durable storage and browsing surface for reusable assets
+- `37 — Library / Script Surface v1`
+  - browse scripts and reusable reference material by ruleset or sheet type
+- `38 — Catharsis Prep Kernel`
+  - prep surfaces for the catharsis flow without building the full experience yet
+- `39 — Socio/Catharsis v1`
+  - first public-facing catharsis experience surface
+- `40 — Documentation + Hardening Pass`
+  - reconcile docs, tighten errors, and stabilize the kernel trail
 
 Ordering note:
 - Showing Review comes before polish-only work
+- Director Console lands immediately after review
 - Cave polish and organization belongs around Kernel 30
 - template extraction follows that organization pass, not before it
 

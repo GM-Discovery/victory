@@ -272,6 +272,35 @@ func LoadBySession(ctx context.Context, q showingQuerier, sessionID string) (Sho
 	return showing, nil
 }
 
+func LoadByID(ctx context.Context, q showingQuerier, showingID string) (Showing, error) {
+	showingID = strings.TrimSpace(showingID)
+	if showingID == "" {
+		return Showing{}, errors.New("showing_id is required")
+	}
+
+	var showing Showing
+	if err := q.QueryRow(ctx, `
+		SELECT
+			id::text,
+			production_id::text,
+			venue_id::text,
+			COALESCE(run_id::text, ''),
+			status::text,
+			audience_view_enabled,
+			started_at::text,
+			COALESCE(ended_at::text, ''),
+			created_by::text,
+			session_id::text
+		FROM showings
+		WHERE id = $1::uuid
+		LIMIT 1
+	`, showingID).Scan(&showing.ID, &showing.ProductionID, &showing.VenueID, &showing.RunID, &showing.Status, &showing.AudienceViewEnabled, &showing.StartedAt, &showing.EndedAt, &showing.CreatedBy, &showing.SessionID); err != nil {
+		return Showing{}, err
+	}
+
+	return showing, nil
+}
+
 func CloseBySession(ctx context.Context, q showingQuerier, sessionID string) (Showing, error) {
 	showing, err := LoadBySession(ctx, q, sessionID)
 	if err != nil {
@@ -301,6 +330,38 @@ func CloseBySession(ctx context.Context, q showingQuerier, sessionID string) (Sh
 	}
 
 	return closed, nil
+}
+
+func UpdateAudienceViewByID(ctx context.Context, q showingQuerier, showingID string, enabled bool) (Showing, error) {
+	showing, err := LoadByID(ctx, q, showingID)
+	if err != nil {
+		return Showing{}, err
+	}
+	if strings.EqualFold(strings.TrimSpace(showing.Status), "closed") {
+		return Showing{}, errors.New("showing_closed")
+	}
+
+	var updated Showing
+	if err := q.QueryRow(ctx, `
+		UPDATE showings
+		SET audience_view_enabled = $2
+		WHERE id = $1
+		RETURNING
+			id::text,
+			production_id::text,
+			venue_id::text,
+			COALESCE(run_id::text, ''),
+			status::text,
+			audience_view_enabled,
+			started_at::text,
+			COALESCE(ended_at::text, ''),
+			created_by::text,
+			session_id::text
+	`, showing.ID, enabled).Scan(&updated.ID, &updated.ProductionID, &updated.VenueID, &updated.RunID, &updated.Status, &updated.AudienceViewEnabled, &updated.StartedAt, &updated.EndedAt, &updated.CreatedBy, &updated.SessionID); err != nil {
+		return Showing{}, err
+	}
+
+	return updated, nil
 }
 
 func backfillShowingActions(ctx context.Context, q showingQuerier, sessionID, showingID string) error {

@@ -72,18 +72,21 @@ async function loadVenues() {
     }
 
     const fallbackPositions = {
+      library: { x: 67, y: 87 },
       "the-cave": { x: 22, y: 23 },
-      "grants-cabin": { x: 29, y: 24 },
+      "grants-cabin": { x: 28, y: 21 },
       "audition-hall": { x: 24, y: 37 },
       "producers-office": { x: 39, y: 14 },
-      "directors-chair": { x: 54, y: 19 },
-      greenroom: { x: 64, y: 14 },
-      trailers: { x: 81, y: 51 },
+      "directors-chair": { x: 51, y: 24 },
+      greenroom: { x: 65, y: 14 },
+      trailers: { x: 77, y: 53 },
       catharsis: { x: 37, y: 77 },
-      "victory-theater": { x: 77, y: 77 },
-      workshop: { x: 77, y: 34 },
+      "victory-theater": { x: 82, y: 78 },
+      workshop: { x: 77, y: 38 },
+      warehouse: { x: 76, y: 27 },
+      "soil-experts": { x: 16, y: 72 },
       construction: { x: 29, y: 57 },
-      "info-booth": { x: 50, y: 92 },
+      "info-booth": { x: 50, y: 95 },
     };
 
     for (const venue of venues) {
@@ -108,6 +111,8 @@ async function loadVenues() {
 
       const icon = document.createElement("img");
       const venueIcons = {
+        library: "/assets/librarycc.png",
+        "soil-experts": "/assets/mudfarm.png",
         "info-booth": "/assets/infobooth.png",
         "audition-hall": "/assets/audition-hall.png",
         "the-cave": "/assets/cave.png",
@@ -116,6 +121,7 @@ async function loadVenues() {
         "construction": "/assets/construction.png",
         "greenroom": "/assets/Greenroom.png",
         "trailers": "/assets/trailers.png",
+        warehouse: "/assets/warehouse.png",
         "producers-office": "/assets/producersoffice.png",
         "directors-chair": "/assets/directorschair.png",
         "grants-cabin": "/assets/grantsoffice.png",
@@ -144,6 +150,21 @@ async function loadVenues() {
           if (typeof infoBoothState.open === "function") {
             infoBoothState.open();
           }
+          return;
+        }
+
+        if (venue.slug === "library") {
+          alert("Library is a public placeholder for now. The venue page will come later.");
+          return;
+        }
+
+        if (venue.slug === "warehouse") {
+          alert("Warehouse is a restricted placeholder for now. The venue page will come later.");
+          return;
+        }
+
+        if (venue.slug === "soil-experts") {
+          alert("Soil Experts is a public placeholder for now. The venue page will come later.");
           return;
         }
 
@@ -219,7 +240,15 @@ async function loadAccountLink() {
   const accountMenuToggle = document.getElementById("account-menu-toggle");
   const accountProfileLink = document.getElementById("account-profile-link");
   const accountLogoutButton = document.getElementById("account-logout-button");
+  const mapLayerEl = document.querySelector(".map-layer");
   if (!accountLink) return;
+
+  const setMapSignedInState = (signedIn) => {
+    if (!mapLayerEl) return;
+    mapLayerEl.classList.toggle("map-layer--signed-in", Boolean(signedIn));
+  };
+
+  setMapSignedInState(false);
 
   const closeMenu = () => {
     if (accountMenu) accountMenu.hidden = true;
@@ -307,6 +336,8 @@ async function loadAccountLink() {
     if (!response.ok) {
       accountLink.textContent = "Log In";
       accountLink.href = "/login/";
+      accountLink.title = "Log in";
+      setMapSignedInState(false);
       return;
     }
 
@@ -318,9 +349,7 @@ async function loadAccountLink() {
       accountLink.textContent = `Hello ${displayName}`;
       accountLink.href = "/account/";
       accountLink.title = "View your account";
-      if (mapLayerEl) {
-        mapLayerEl.classList.add("map-layer--signed-in");
-      }
+      setMapSignedInState(true);
       if (accountMenuToggle) accountMenuToggle.hidden = false;
       if (accountProfileLink) accountProfileLink.href = "/account/";
       closeMenu();
@@ -330,17 +359,14 @@ async function loadAccountLink() {
     accountLink.textContent = "Log In";
     accountLink.href = "/login/";
     accountLink.title = "Log in";
-    if (mapLayerEl) {
-      mapLayerEl.classList.remove("map-layer--signed-in");
-    }
+    setMapSignedInState(false);
     if (accountMenuToggle) accountMenuToggle.hidden = true;
     closeMenu();
   } catch (error) {
     accountLink.textContent = "Log In";
     accountLink.href = "/login/";
-    if (mapLayerEl) {
-      mapLayerEl.classList.remove("map-layer--signed-in");
-    }
+    accountLink.title = "Log in";
+    setMapSignedInState(false);
     if (accountMenuToggle) accountMenuToggle.hidden = true;
     closeMenu();
   }

@@ -126,6 +126,331 @@
       gap: 12px;
     }
 
+    .review-card {
+      display: grid;
+      gap: 18px;
+    }
+
+    .review-shell {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+      align-items: start;
+    }
+
+    .showing-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .showing-item {
+      width: 100%;
+      text-align: left;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: var(--panel-soft);
+      padding: 14px;
+      color: #edf4fa;
+      cursor: pointer;
+    }
+
+    .showing-item.selected {
+      border-color: rgba(120, 208, 255, 0.55);
+      box-shadow: inset 0 0 0 1px rgba(120, 208, 255, 0.18);
+    }
+
+    .showing-item .showing-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .showing-item .showing-meta {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .showing-item .showing-counts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .showing-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.22rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      color: #fff5df;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .review-main {
+      display: grid;
+      gap: 12px;
+    }
+
+    .review-sidebar {
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      background: var(--panel-soft);
+      padding: 16px;
+    }
+
+    .summary-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .summary-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0.5rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.09);
+      background: rgba(255,255,255,0.04);
+      color: #edf4fa;
+      font-size: 0.86rem;
+      font-weight: 700;
+    }
+
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .filter-button.active {
+      background: linear-gradient(180deg, #3c6282 0%, #243d51 100%);
+      border-color: rgba(120, 208, 255, 0.55);
+    }
+
+    .review-events {
+      display: grid;
+      gap: 12px;
+    }
+
+    .review-event {
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 14px;
+      background: var(--panel-soft);
+      display: grid;
+      gap: 8px;
+    }
+
+    .review-event.chat {
+      border-left: 3px solid rgba(120, 208, 255, 0.55);
+    }
+
+    .review-event.speech {
+      border-left: 3px solid rgba(178, 232, 141, 0.55);
+    }
+
+    .review-event.reactions {
+      border-left: 3px solid rgba(251, 200, 117, 0.55);
+    }
+
+    .review-event.reveal_hide {
+      border-left: 3px solid rgba(198, 160, 255, 0.55);
+    }
+
+    .review-event.overlay {
+      border-left: 3px solid rgba(255, 159, 203, 0.55);
+    }
+
+    .review-event.cards {
+      border-left: 3px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .review-event.persona {
+      border-left: 3px solid rgba(255, 210, 136, 0.55);
+    }
+
+    .review-event .event-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .review-event .event-title {
+      font-weight: 700;
+    }
+
+    .review-event .event-meta {
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .review-event .event-detail {
+      line-height: 1.55;
+    }
+
+    .console-card {
+      margin-bottom: 18px;
+    }
+
+    .console-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .console-head h2 {
+      margin: 0 0 6px;
+    }
+
+    .console-layout {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.9fr);
+      align-items: start;
+    }
+
+    .console-main,
+    .console-sidebar {
+      display: grid;
+      gap: 14px;
+    }
+
+    .console-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .console-section {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 14px;
+      background: var(--panel-soft);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .console-section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .console-section h3 {
+      margin: 0;
+      font-size: 1rem;
+      color: var(--accent-strong);
+    }
+
+    .console-detail {
+      line-height: 1.55;
+      color: var(--muted);
+      white-space: pre-wrap;
+    }
+
+    .console-element-list,
+    .console-presence-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .console-element-row,
+    .console-presence-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .console-element-main,
+    .console-presence-main {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .console-element-title,
+    .console-presence-title {
+      font-weight: 700;
+      color: #edf4fa;
+      word-break: break-word;
+    }
+
+    .console-element-meta,
+    .console-presence-meta {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .console-element-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .console-element-actions button {
+      padding: 8px 10px;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      color: #edf4fa;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+    }
+
+    .console-element-actions button:hover {
+      background: rgba(255,255,255,0.12);
+    }
+
+    .console-element-actions button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .console-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .console-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0.42rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.09);
+      background: rgba(255,255,255,0.04);
+      color: #edf4fa;
+      font-size: 0.84rem;
+      font-weight: 700;
+    }
+
+    .console-muted {
+      color: var(--muted);
+    }
+
     .request {
       padding: 14px;
       border-radius: 14px;
@@ -208,7 +533,9 @@
 
     @media (max-width: 900px) {
       .grid,
-      .inline {
+      .inline,
+      .review-shell,
+      .console-layout {
         grid-template-columns: 1fr;
       }
     }
@@ -238,68 +565,161 @@
       </div>
     </header>
 
-    <main class="content grid">
-      <section class="card">
-        <h2>Director Queue</h2>
-        <p class="muted small">Pending cast and crew requests appear here for review below producer level.</p>
-        <div id="incoming-status" class="status"></div>
-        <div id="incoming-requests" class="requests">
-          <div class="muted">Loading requests...</div>
+    <main class="content">
+      <section class="card console-card">
+        <div class="console-head">
+          <div>
+            <h2>Director Console</h2>
+            <p class="muted small">Live control for the current showing. No analytics, no playback, no video.</p>
+          </div>
+          <div id="console-status" class="status"></div>
+        </div>
+
+        <div id="console-summary" class="summary-strip"></div>
+
+        <div class="console-layout">
+          <div class="console-main">
+            <div class="console-actions">
+              <button id="audience-view-toggle" class="button" type="button">Audience View</button>
+              <button id="close-showing" class="chip" type="button">Close Showing</button>
+              <button id="start-showing" class="chip" type="button" disabled title="Kernel 28 defers new-showing startup.">Start New Showing</button>
+            </div>
+            <div id="start-showing-note" class="console-muted small"></div>
+
+            <div class="console-actions">
+              <button id="chat-enabled-toggle" class="chip" type="button">Chat</button>
+              <button id="talking-enabled-toggle" class="chip" type="button">Talking</button>
+              <button id="hide-overlay-button" class="chip" type="button">Hide Active Overlay</button>
+            </div>
+
+            <section class="console-section">
+              <div class="console-section-head">
+                <h3>Element Visibility</h3>
+                <div id="element-count" class="muted small"></div>
+              </div>
+              <div id="element-list" class="console-element-list">
+                <div class="muted">Loading current elements...</div>
+              </div>
+            </section>
+          </div>
+
+          <aside class="console-sidebar">
+            <section class="console-section">
+              <div class="console-section-head">
+                <h3>Overlay Status</h3>
+              </div>
+              <div id="overlay-status" class="console-detail muted">Loading overlay...</div>
+            </section>
+
+            <section class="console-section">
+              <div class="console-section-head">
+                <h3>Chat Policy</h3>
+              </div>
+              <div id="chat-policy-status" class="console-detail muted">Loading chat policy...</div>
+            </section>
+
+            <section class="console-section">
+              <div class="console-section-head">
+                <h3>Presence Roster</h3>
+                <div id="console-presence-count" class="muted small">0 connected</div>
+              </div>
+              <div id="console-presence-list" class="console-presence-list">
+                <div class="muted">Loading presence...</div>
+              </div>
+            </section>
+          </aside>
         </div>
       </section>
 
-      <section class="card">
-        <h2>Invite Below You</h2>
-        <p class="muted small">
-          Directors can invite cast and crew to the production they already belong to. Audience invites are available when you only want someone to look around a venue. The public profile name is what people will recognize here.
-        </p>
+      <div class="grid" style="margin-top: 18px;">
+        <section class="card">
+          <h2>Director Queue</h2>
+          <p class="muted small">Pending cast and crew requests appear here for review below producer level.</p>
+          <div id="incoming-status" class="status"></div>
+          <div id="incoming-requests" class="requests">
+            <div class="muted">Loading requests...</div>
+          </div>
+        </section>
 
-        <form id="invite-form">
-          <label for="target-role">Target Role</label>
-          <select id="target-role" required>
-            <option value="cast">Cast</option>
-            <option value="crew">Crew</option>
-            <option value="audience">Audience</option>
-          </select>
+        <section class="card">
+          <h2>Invite Below You</h2>
+          <p class="muted small">
+            Directors can invite cast and crew to the production they already belong to. Audience invites are available when you only want someone to look around a venue. The public profile name is what people will recognize here.
+          </p>
 
-          <div class="inline">
-            <div>
-              <label for="production-id">Current Production</label>
-              <select id="production-id">
-                <option value="">Loading productions...</option>
-              </select>
+          <form id="invite-form">
+            <label for="target-role">Target Role</label>
+            <select id="target-role" required>
+              <option value="cast">Cast</option>
+              <option value="crew">Crew</option>
+              <option value="audience">Audience</option>
+            </select>
+
+            <div class="inline">
+              <div>
+                <label for="production-id">Current Production</label>
+                <select id="production-id">
+                  <option value="">Loading productions...</option>
+                </select>
+              </div>
+              <div>
+                <label for="venue-slug">Venue</label>
+                <select id="venue-slug" required>
+                  <option value="the-cave">The Cave</option>
+                  <option value="workshop">Workshop</option>
+                  <option value="audition-hall">Audition Hall</option>
+                  <option value="greenroom">The Greenroom</option>
+                  <option value="trailers">Trailers</option>
+                  <option value="producers-office">Producer's Office</option>
+                  <option value="directors-chair">The Director's Chair</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label for="venue-slug">Venue</label>
-              <select id="venue-slug" required>
-                <option value="the-cave">The Cave</option>
-                <option value="workshop">Workshop</option>
-                <option value="audition-hall">Audition Hall</option>
-                <option value="greenroom">The Greenroom</option>
-                <option value="trailers">Trailers</option>
-                <option value="producers-office">Producer's Office</option>
-                <option value="directors-chair">The Director's Chair</option>
-              </select>
+
+            <label for="target-email">Invite Email</label>
+            <input id="target-email" type="email" placeholder="Optional email for the invite" />
+            <div class="muted small" style="margin-top:-8px; margin-bottom:14px;">
+              If you leave this blank, you still get a shareable invite code.
             </div>
-          </div>
 
-          <label for="target-email">Invite Email</label>
-          <input id="target-email" type="email" placeholder="Optional email for the invite" />
-          <div class="muted small" style="margin-top:-8px; margin-bottom:14px;">
-            If you leave this blank, you still get a shareable invite code.
-          </div>
+            <label for="invite-note">Note</label>
+            <textarea id="invite-note" placeholder="Why are you granting this permission?"></textarea>
 
-          <label for="invite-note">Note</label>
-          <textarea id="invite-note" placeholder="Why are you granting this permission?"></textarea>
+            <div class="chip-list">
+              <button class="button" type="submit">Create Invite</button>
+            </div>
+          </form>
 
-          <div class="chip-list">
-            <button class="button" type="submit">Create Invite</button>
-          </div>
-        </form>
-
-        <div id="invite-status" class="status"></div>
-      </section>
+          <div id="invite-status" class="status"></div>
+        </section>
+      </div>
     </main>
+
+    <section class="content">
+      <div class="card review-card">
+        <div class="review-header">
+          <h2>Showing Review</h2>
+          <p class="muted small">Closed showings only. Read the action record by production run.</p>
+        </div>
+        <div id="review-status" class="status"></div>
+        <div class="review-shell">
+          <aside class="review-sidebar">
+            <h3>Recent Closed Showings</h3>
+            <p class="muted small">Pick a showing from the same production family to review it.</p>
+            <div id="showing-list" class="showing-list">
+              <div class="muted">Loading showings...</div>
+            </div>
+          </aside>
+          <div class="review-main">
+            <div id="review-summary" class="summary-strip"></div>
+            <div id="review-filters" class="filter-bar"></div>
+            <div id="review-events" class="review-events">
+              <div class="muted">Select a showing to see its event record.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 
   <script>
@@ -312,10 +732,730 @@
     const targetRole = document.getElementById("target-role");
     const productionID = document.getElementById("production-id");
     const venueSlug = document.getElementById("venue-slug");
+    const consoleStatus = document.getElementById("console-status");
+    const consoleSummary = document.getElementById("console-summary");
+    const audienceViewToggle = document.getElementById("audience-view-toggle");
+    const closeShowingButton = document.getElementById("close-showing");
+    const startShowingButton = document.getElementById("start-showing");
+    const startShowingNote = document.getElementById("start-showing-note");
+    const chatEnabledToggle = document.getElementById("chat-enabled-toggle");
+    const talkingEnabledToggle = document.getElementById("talking-enabled-toggle");
+    const hideOverlayButton = document.getElementById("hide-overlay-button");
+    const elementList = document.getElementById("element-list");
+    const elementCount = document.getElementById("element-count");
+    const overlayStatus = document.getElementById("overlay-status");
+    const chatPolicyStatus = document.getElementById("chat-policy-status");
+    const consolePresenceList = document.getElementById("console-presence-list");
+    const consolePresenceCount = document.getElementById("console-presence-count");
+    const reviewStatus = document.getElementById("review-status");
+    const reviewSummary = document.getElementById("review-summary");
+    const reviewFilters = document.getElementById("review-filters");
+    const reviewEvents = document.getElementById("review-events");
+    const showingList = document.getElementById("showing-list");
+
+    const reviewFiltersConfig = [
+      { value: "all", label: "All" },
+      { value: "chat", label: "Chat" },
+      { value: "speech", label: "Speech" },
+      { value: "reactions", label: "Reactions" },
+      { value: "reveal_hide", label: "Reveal / Hide" },
+      { value: "overlay", label: "Overlay" },
+      { value: "cards", label: "Cards" },
+      { value: "persona", label: "Persona" },
+    ];
+
+    const reviewState = {
+      showings: [],
+      selectedShowingId: "",
+      detail: null,
+      filter: "all",
+    };
+
+    const consoleState = {
+      currentRole: "",
+      currentShowing: null,
+      snapshot: null,
+      presence: [],
+      chatPolicy: {
+        chat_enabled: true,
+        talking_enabled: true,
+      },
+      controls: {
+        can_start_showing: false,
+        start_showing_note: "",
+      },
+    };
+
+    let consoleWs = null;
+    let consoleSessionId = "";
+    let consoleRefreshTimer = null;
+
+    const reviewDateFormatter = new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
 
     function showForbidden() {
       if (forbiddenScreen) forbiddenScreen.hidden = false;
       if (chairShell) chairShell.hidden = true;
+    }
+
+    function setReviewStatus(text) {
+      if (reviewStatus) reviewStatus.textContent = text;
+    }
+
+    function formatReviewTime(value) {
+      if (!value) return "Not set";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return reviewDateFormatter.format(date);
+    }
+
+    function reviewCountsLabel(counts) {
+      return [
+        `Total ${counts?.total || 0}`,
+        `Chat ${counts?.chat || 0}`,
+        `Speech ${counts?.speech || 0}`,
+        `Reactions ${counts?.reactions || 0}`,
+        `Reveal/Hide ${counts?.reveal_hide || 0}`,
+        `Overlay ${counts?.overlay || 0}`,
+        `Cards ${counts?.cards || 0}`,
+        `Persona ${counts?.persona || 0}`,
+      ];
+    }
+
+    function renderReviewFilters() {
+      if (!reviewFilters) return;
+      reviewFilters.innerHTML = reviewFiltersConfig.map((item) => `
+        <button
+          type="button"
+          class="chip filter-button ${reviewState.filter === item.value ? "active" : ""}"
+          data-review-filter="${escapeHtml(item.value)}"
+        >${escapeHtml(item.label)}</button>
+      `).join("");
+    }
+
+    function selectedShowing() {
+      return reviewState.showings.find((item) => item.showing?.id === reviewState.selectedShowingId) || reviewState.showings[0] || null;
+    }
+
+    function renderShowingList() {
+      if (!showingList) return;
+      if (!reviewState.showings.length) {
+        showingList.innerHTML = `<div class="muted">No closed showings available.</div>`;
+        return;
+      }
+
+      showingList.innerHTML = reviewState.showings.map((item) => {
+        const showing = item.showing || {};
+        const selected = showing.id === reviewState.selectedShowingId;
+        const title = [showing.production_name || "Production", showing.venue_name || "Venue"].filter(Boolean).join(" · ");
+        const runLabel = showing.run_id ? `Run ${showing.run_id}` : `Session ${String(showing.session_id || "").slice(0, 8) || "unknown"}`;
+        const counts = item.counts || {};
+        return `
+          <button
+            type="button"
+            class="showing-item ${selected ? "selected" : ""}"
+            data-showing-id="${escapeHtml(showing.id || "")}"
+          >
+            <div class="showing-title">${escapeHtml(title)}</div>
+            <div class="showing-meta">
+              <div>${escapeHtml(runLabel)}</div>
+              <div>Status: ${escapeHtml(showing.status || "closed")}</div>
+              <div>Started: ${escapeHtml(formatReviewTime(showing.started_at))}</div>
+              <div>Ended: ${escapeHtml(formatReviewTime(showing.ended_at || showing.started_at))}</div>
+            </div>
+            <div class="showing-counts">
+              <span class="showing-chip">Events ${escapeHtml(String(counts.total || 0))}</span>
+              <span class="showing-chip">Chat ${escapeHtml(String(counts.chat || 0))}</span>
+              <span class="showing-chip">Speech ${escapeHtml(String(counts.speech || 0))}</span>
+            </div>
+          </button>
+        `;
+      }).join("");
+    }
+
+    function renderReviewSummary() {
+      if (!reviewSummary) return;
+      const detail = reviewState.detail;
+      if (!detail?.showing) {
+        reviewSummary.innerHTML = `<div class="muted">Select a closed showing to read its record.</div>`;
+        return;
+      }
+
+      const showing = detail.showing;
+      const counts = detail.counts || {};
+      const chips = [
+        `Status ${showing.status || "closed"}`,
+        `Venue ${showing.venue_name || "Unknown venue"}`,
+        `Production ${showing.production_name || "Unknown production"}`,
+        `Started ${formatReviewTime(showing.started_at)}`,
+        `Ended ${formatReviewTime(showing.ended_at || showing.started_at)}`,
+        ...reviewCountsLabel(counts),
+      ];
+
+      reviewSummary.innerHTML = chips.map((label) => `<span class="summary-chip">${escapeHtml(label)}</span>`).join("");
+    }
+
+    function actorMeta(event) {
+      const parts = [];
+      if (event.actor_display_name) {
+        parts.push(event.actor_display_name);
+      }
+      if (event.actor_role) {
+        parts.push(event.actor_role);
+      }
+      if (event.persona_label) {
+        parts.push(event.persona_label);
+      }
+      return parts.join(" · ");
+    }
+
+    function renderReviewEvents() {
+      if (!reviewEvents) return;
+      const detail = reviewState.detail;
+      if (!detail?.events?.length) {
+        reviewEvents.innerHTML = `<div class="muted">No recorded events in this showing.</div>`;
+        return;
+      }
+
+      const events = reviewState.filter === "all"
+        ? detail.events
+        : detail.events.filter((event) => event.category === reviewState.filter);
+
+      if (!events.length) {
+        reviewEvents.innerHTML = `<div class="muted">No events match this filter.</div>`;
+        return;
+      }
+
+      reviewEvents.innerHTML = events.map((event) => `
+        <article class="review-event ${escapeHtml(event.category || "other")}">
+          <div class="event-top">
+            <div class="event-title">${escapeHtml(event.headline || "Action")}</div>
+            <span class="badge">${escapeHtml((event.category || "other").replaceAll("_", " "))}</span>
+          </div>
+          <div class="event-meta">${escapeHtml(actorMeta(event) || "Unknown participant")} · ${escapeHtml(formatReviewTime(event.timestamp))}</div>
+          <div class="event-detail">${escapeHtml(event.detail || "(no detail)")}</div>
+          <div class="muted small">
+            ${[
+              event.element_name ? `Element: ${event.element_name}` : "",
+              event.target_layer ? `Layer: ${event.target_layer}` : "",
+              event.overlay_type ? `Overlay: ${event.overlay_type}` : "",
+              event.reaction_kind ? `Reaction: ${event.reaction_kind}` : "",
+              event.card_front ? `Front: ${event.card_front}` : "",
+            ].filter(Boolean).map(escapeHtml).join(" · ")}
+          </div>
+        </article>
+      `).join("");
+    }
+
+    function setConsoleStatus(text) {
+      if (consoleStatus) consoleStatus.textContent = text || "";
+    }
+
+    function currentConsoleShowing() {
+      return consoleState.currentShowing || null;
+    }
+
+    function currentConsoleSessionId() {
+      return String(consoleSessionId || "").trim();
+    }
+
+    function currentConsoleAudienceViewEnabled() {
+      return Boolean(currentConsoleShowing()?.audience_view_enabled);
+    }
+
+    function currentConsoleStatusLabel() {
+      const showing = currentConsoleShowing();
+      if (!showing) return "No active showing";
+      return `${showing.status || "rehearsal"} · ${showing.venue_name || "The Cave"}`;
+    }
+
+    function consoleSummaryLabels() {
+      const showing = currentConsoleShowing();
+      if (!showing) {
+        return [
+          "Status idle",
+          "Audience View off",
+          "No active showing",
+        ];
+      }
+
+      return [
+        `Status ${showing.status || "rehearsal"}`,
+        `Venue ${showing.venue_name || "The Cave"}`,
+        `Production ${showing.production_name || "Unknown production"}`,
+        `Run ${showing.run_id || "not set"}`,
+        `Audience View ${showing.audience_view_enabled ? "on" : "off"}`,
+      ];
+    }
+
+    function consolePresenceRows() {
+      const rows = Array.isArray(consoleState.presence) ? [...consoleState.presence] : [];
+      const roleOrder = {
+        producer: 0,
+        director: 1,
+        cast: 2,
+        crew: 3,
+        audience: 4,
+      };
+
+      rows.sort((a, b) => {
+        const roleA = String(a?.role || "audience").toLowerCase();
+        const roleB = String(b?.role || "audience").toLowerCase();
+        const orderA = roleOrder[roleA] ?? 99;
+        const orderB = roleOrder[roleB] ?? 99;
+        if (orderA !== orderB) return orderA - orderB;
+
+        const nameA = identityDisplayName(a || {});
+        const nameB = identityDisplayName(b || {});
+        if (nameA !== nameB) return nameA.localeCompare(nameB);
+
+        return String(a?.handle || "").localeCompare(String(b?.handle || ""));
+      });
+
+      return rows;
+    }
+
+    function consoleElementAudienceVisible(element) {
+      const visibility = element?.visibility || {};
+      const direct = visibility.audience;
+      if (typeof direct === "boolean") {
+        return direct;
+      }
+      if (typeof direct === "string") {
+        return ["true", "1", "yes", "on"].includes(direct.toLowerCase());
+      }
+
+      const toRoles = visibility.toRoles;
+      if (Array.isArray(toRoles)) {
+        return toRoles.map((item) => String(item || "").toLowerCase()).includes("audience");
+      }
+      return false;
+    }
+
+    function consoleElementContext(element) {
+      const surface = String(element?.surface || "stage").toLowerCase();
+      const contextClass = String(element?.context_class || element?.data?.context_class || element?.element_type || "element").toLowerCase();
+      return `${contextClass} · ${surface}`;
+    }
+
+    function renderConsoleSummary() {
+      if (!consoleSummary) return;
+      consoleSummary.innerHTML = consoleSummaryLabels()
+        .map((label) => `<span class="summary-chip">${escapeHtml(label)}</span>`)
+        .join("");
+    }
+
+    function renderConsoleOverlay() {
+      if (!overlayStatus) return;
+      const overlay = consoleState.snapshot?.overlay || null;
+      if (!overlay) {
+        overlayStatus.textContent = "No active overlay.";
+        if (hideOverlayButton) hideOverlayButton.disabled = true;
+        return;
+      }
+
+      const lines = [
+        `Title: ${overlay.title || overlay.element_slug || "Overlay"}`,
+        `Type: ${overlay.overlay_type || "text"}`,
+        `Source: ${overlay.element_slug || overlay.element_id || "unknown"}`,
+      ];
+      overlayStatus.textContent = lines.join("\n");
+      if (hideOverlayButton) hideOverlayButton.disabled = false;
+    }
+
+    function renderConsoleChatPolicy() {
+      if (!chatPolicyStatus) return;
+      const policy = consoleState.chatPolicy || {};
+      const lines = [
+        `Chat enabled: ${policy.chat_enabled ? "yes" : "no"}`,
+        `Talking enabled: ${policy.talking_enabled ? "yes" : "no"}`,
+      ];
+      chatPolicyStatus.textContent = lines.join("\n");
+      if (chatEnabledToggle) {
+        chatEnabledToggle.textContent = `Chat ${policy.chat_enabled ? "On" : "Off"}`;
+      }
+      if (talkingEnabledToggle) {
+        talkingEnabledToggle.textContent = `Talking ${policy.talking_enabled ? "On" : "Off"}`;
+      }
+    }
+
+    function renderConsolePresence() {
+      if (!consolePresenceList) return;
+      const rows = consolePresenceRows();
+      if (consolePresenceCount) {
+        consolePresenceCount.textContent = `${rows.length} connected`;
+      }
+
+      if (!rows.length) {
+        consolePresenceList.innerHTML = `<div class="console-muted">No one is connected right now.</div>`;
+        return;
+      }
+
+      consolePresenceList.innerHTML = rows.map((user) => {
+        const persona = user?.persona?.name || user?.persona?.display_name || "";
+        const handle = user?.handle ? `@${escapeHtml(user.handle)}` : "";
+        const role = roleBadgeHtml(user?.role || "audience");
+        return `
+          <div class="console-presence-row">
+            <div class="console-presence-main">
+              <div class="console-presence-title">${escapeHtml(identityDisplayName(user || {}))}</div>
+              <div class="console-presence-meta">${[handle, persona ? `Persona: ${persona}` : ""].filter(Boolean).map(escapeHtml).join(" · ") || "No persona equipped"}</div>
+            </div>
+            <div>${role}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderConsoleElements() {
+      if (!elementList) return;
+      const snapshot = consoleState.snapshot;
+      const elements = Array.isArray(snapshot?.elements) ? snapshot.elements : [];
+      if (elementCount) {
+        elementCount.textContent = `${elements.length} element${elements.length === 1 ? "" : "s"}`;
+      }
+
+      if (!elements.length) {
+        elementList.innerHTML = `<div class="console-muted">No live elements available.</div>`;
+        return;
+      }
+
+      const showingClosed = String(currentConsoleShowing()?.status || "").toLowerCase() === "closed";
+      elementList.innerHTML = elements.map((element) => {
+        const name = element?.name || element?.slug || "Element";
+        const surface = String(element?.surface || "stage").toLowerCase();
+        const visible = consoleElementAudienceVisible(element);
+        const context = consoleElementContext(element);
+        const canReveal = !showingClosed && !!currentConsoleSessionId();
+        const revealDisabled = !canReveal || visible;
+        const hideDisabled = !canReveal || !visible;
+        return `
+          <div class="console-element-row">
+            <div class="console-element-main">
+              <div class="console-element-title">${escapeHtml(name)}</div>
+              <div class="console-element-meta">${escapeHtml(context)} · ${escapeHtml(surface)} · audience visible ${visible ? "yes" : "no"}</div>
+            </div>
+            <div class="console-element-actions">
+              <button type="button" data-console-element="reveal" data-element-id="${escapeHtml(element.element_id || "")}" data-element-slug="${escapeHtml(element.slug || "")}" ${revealDisabled ? "disabled" : ""}>Reveal</button>
+              <button type="button" data-console-element="hide" data-element-id="${escapeHtml(element.element_id || "")}" data-element-slug="${escapeHtml(element.slug || "")}" ${hideDisabled ? "disabled" : ""}>Hide</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderConsoleButtons() {
+      const showing = currentConsoleShowing();
+      const controls = consoleState.controls || {};
+      if (audienceViewToggle) {
+        audienceViewToggle.disabled = !showing || String(showing.status || "").toLowerCase() === "closed";
+        audienceViewToggle.textContent = showing
+          ? `Audience View ${showing.audience_view_enabled ? "On" : "Off"}`
+          : "Audience View";
+      }
+      if (closeShowingButton) {
+        closeShowingButton.disabled = !showing || String(showing.status || "").toLowerCase() === "closed";
+      }
+      if (startShowingButton) {
+        startShowingButton.disabled = !controls.can_start_showing;
+        startShowingButton.title = controls.start_showing_note || "Starting a new showing is deferred for this kernel.";
+      }
+      if (startShowingNote) {
+        startShowingNote.textContent = controls.start_showing_note || "Starting a new showing is deferred for this kernel.";
+      }
+      if (chatEnabledToggle) {
+        chatEnabledToggle.disabled = !showing || String(showing.status || "").toLowerCase() === "closed";
+      }
+      if (talkingEnabledToggle) {
+        talkingEnabledToggle.disabled = !showing || String(showing.status || "").toLowerCase() === "closed";
+      }
+      if (hideOverlayButton) {
+        hideOverlayButton.disabled = !consoleState.snapshot?.overlay || !showing || String(showing.status || "").toLowerCase() === "closed";
+      }
+    }
+
+    function applyConsoleState(state) {
+      consoleState.currentRole = String(state?.current_role || "").toLowerCase();
+      consoleState.currentShowing = state?.current_showing || null;
+      consoleState.snapshot = state?.snapshot || null;
+      consoleState.presence = Array.isArray(state?.presence) ? state.presence : [];
+      consoleState.chatPolicy = state?.chat_policy || { chat_enabled: true, talking_enabled: true };
+      consoleState.controls = state?.controls || {
+        can_start_showing: false,
+        start_showing_note: "",
+      };
+      consoleSessionId = String(consoleState.snapshot?.session?.id || "").trim();
+      renderConsoleSummary();
+      renderConsoleOverlay();
+      renderConsoleChatPolicy();
+      renderConsolePresence();
+      renderConsoleElements();
+      renderConsoleButtons();
+    }
+
+    async function loadDirectorConsoleCurrent() {
+      setConsoleStatus("Loading current showing...");
+      try {
+        const response = await fetch("/api/director-console/current", { credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (response.status === 401 || response.status === 403 || payload?.error === "not_authenticated" || payload?.error === "forbidden") {
+          showForbidden();
+          return;
+        }
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Failed to load director console (HTTP ${response.status})`);
+        }
+
+        applyConsoleState(payload.data || {});
+        if (consoleSessionId) {
+          connectDirectorConsoleWS();
+        } else {
+          disconnectDirectorConsoleWS();
+        }
+        setConsoleStatus(currentConsoleShowing() ? currentConsoleStatusLabel() : "No active showing right now.");
+      } catch (error) {
+        setConsoleStatus(error.message || String(error));
+      }
+    }
+
+    function disconnectDirectorConsoleWS() {
+      if (consoleWs) {
+        try {
+          consoleWs.close();
+        } catch (err) {
+          console.debug("console ws close failed", err);
+        }
+        consoleWs = null;
+      }
+    }
+
+    function connectDirectorConsoleWS() {
+      if (!consoleSessionId) return;
+      if (consoleWs && (consoleWs.readyState === WebSocket.OPEN || consoleWs.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+
+      disconnectDirectorConsoleWS();
+
+      const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+      consoleWs = new WebSocket(`${protocol}//${location.host}/ws/the-cave`);
+
+      consoleWs.addEventListener("open", () => {
+        setConsoleStatus("Live updates connected.");
+      });
+
+      consoleWs.addEventListener("close", () => {
+        if (consoleState.currentShowing) {
+          setConsoleStatus("Live updates disconnected.");
+        }
+      });
+
+      consoleWs.addEventListener("error", () => {
+        setConsoleStatus("Live updates error.");
+      });
+
+      consoleWs.addEventListener("message", async (event) => {
+        let msg;
+        try {
+          msg = JSON.parse(event.data);
+        } catch (err) {
+          return;
+        }
+
+        if (msg.type === "snapshot" && msg.data) {
+          return;
+        }
+
+        if (msg.type === "presence/snapshot" || msg.type === "presence/join" || msg.type === "presence/leave" || msg.type === "presence/update" || msg.type === "action" || msg.type === "showing/update" || msg.type === "venue/update") {
+          await loadDirectorConsoleCurrent();
+        }
+      });
+    }
+
+    function sendDirectorConsoleAction(type, extra = {}) {
+      if (!consoleWs || consoleWs.readyState !== WebSocket.OPEN) {
+        setConsoleStatus("Live connection is not ready.");
+        return false;
+      }
+
+      consoleWs.send(JSON.stringify({
+        type,
+        session_id: currentConsoleSessionId(),
+        ...extra,
+      }));
+
+      return true;
+    }
+
+    async function postConsoleJSON(url, body) {
+      const response = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
+      return payload.data || null;
+    }
+
+    async function toggleAudienceView() {
+      const showing = currentConsoleShowing();
+      if (!showing) return;
+      setConsoleStatus("Updating audience view...");
+      try {
+        await postConsoleJSON(`/api/showings/${encodeURIComponent(showing.id)}/audience-view`, {
+          enabled: !showing.audience_view_enabled,
+        });
+        await loadDirectorConsoleCurrent();
+        setConsoleStatus(`Audience view ${!showing.audience_view_enabled ? "enabled" : "disabled"}.`);
+      } catch (error) {
+        setConsoleStatus(error.message || String(error));
+      }
+    }
+
+    async function closeCurrentShowing() {
+      const showing = currentConsoleShowing();
+      if (!showing) return;
+      if (!window.confirm("Close the current showing?")) return;
+      setConsoleStatus("Closing showing...");
+      try {
+        await postConsoleJSON(`/api/showings/${encodeURIComponent(showing.id)}/close`, {});
+        await loadDirectorConsoleCurrent();
+        setConsoleStatus("Showing closed.");
+      } catch (error) {
+        setConsoleStatus(error.message || String(error));
+      }
+    }
+
+    async function toggleChatPolicy(key) {
+      const policy = consoleState.chatPolicy || {};
+      const next = {
+        chat_enabled: Boolean(policy.chat_enabled),
+        talking_enabled: Boolean(policy.talking_enabled),
+      };
+      if (key === "chat") {
+        next.chat_enabled = !next.chat_enabled;
+      } else if (key === "talking") {
+        next.talking_enabled = !next.talking_enabled;
+      }
+
+      setConsoleStatus("Updating chat policy...");
+      try {
+        await postConsoleJSON("/api/venues/the-cave/chat-policy", next);
+        await loadDirectorConsoleCurrent();
+        setConsoleStatus("Chat policy updated.");
+      } catch (error) {
+        setConsoleStatus(error.message || String(error));
+      }
+    }
+
+    function hideActiveOverlay() {
+      const overlay = consoleState.snapshot?.overlay;
+      if (!overlay) {
+        setConsoleStatus("No active overlay to hide.");
+        return;
+      }
+
+      const sent = sendDirectorConsoleAction("act/hide_overlay", {
+        element_id: overlay.element_id || "",
+        element_slug: overlay.element_slug || "",
+        overlay_type: overlay.overlay_type || "text",
+      });
+
+      if (sent) {
+        setConsoleStatus("Overlay hide sent.");
+      }
+    }
+
+    function toggleConsoleElementVisibility(button) {
+      const action = button.getAttribute("data-console-element") || "";
+      const elementID = button.getAttribute("data-element-id") || "";
+      const elementSlug = button.getAttribute("data-element-slug") || "";
+      if (!elementID && !elementSlug) return;
+
+      const type = action === "hide" ? "act/hide_element" : "act/reveal_element";
+      const sent = sendDirectorConsoleAction(type, {
+        element_id: elementID,
+        element_slug: elementSlug,
+        layer: "audience",
+      });
+
+      if (sent) {
+        setConsoleStatus(`${action === "hide" ? "Hide" : "Reveal"} sent.`);
+      }
+    }
+
+    async function loadReviewShowings() {
+      setReviewStatus("Loading closed showings...");
+      try {
+        const response = await fetch("/api/showings", { credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Failed to load showings (HTTP ${response.status})`);
+        }
+
+        reviewState.showings = Array.isArray(payload.data?.showings) ? payload.data.showings : [];
+        if (!reviewState.selectedShowingId || !reviewState.showings.some((item) => item.showing?.id === reviewState.selectedShowingId)) {
+          reviewState.selectedShowingId = reviewState.showings[0]?.showing?.id || "";
+        }
+
+        renderShowingList();
+        renderReviewFilters();
+
+        if (reviewState.selectedShowingId) {
+          await loadReviewDetail(reviewState.selectedShowingId);
+          setReviewStatus(`${reviewState.showings.length} closed showing${reviewState.showings.length === 1 ? "" : "s"} available.`);
+        } else {
+          reviewState.detail = null;
+          renderReviewSummary();
+          renderReviewEvents();
+          setReviewStatus("No closed showings available yet.");
+        }
+      } catch (error) {
+        setReviewStatus(error.message || String(error));
+        if (showingList) {
+          showingList.innerHTML = `<div class="muted">${escapeHtml(error.message || String(error))}</div>`;
+        }
+      }
+    }
+
+    async function loadReviewDetail(showingId) {
+      if (!showingId) {
+        reviewState.detail = null;
+        renderReviewSummary();
+        renderReviewEvents();
+        renderShowingList();
+        return;
+      }
+
+      setReviewStatus(`Loading review for ${showingId.slice(0, 8)}...`);
+      try {
+        const response = await fetch(`/api/showings/${encodeURIComponent(showingId)}/review`, { credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Failed to load review (HTTP ${response.status})`);
+        }
+
+        reviewState.detail = payload.data || null;
+        reviewState.selectedShowingId = showingId;
+        renderShowingList();
+        renderReviewSummary();
+        renderReviewFilters();
+        renderReviewEvents();
+      } catch (error) {
+        reviewState.detail = null;
+        renderReviewSummary();
+        renderReviewEvents();
+        setReviewStatus(error.message || String(error));
+      }
     }
 
     function escapeHtml(value) {
@@ -490,7 +1630,7 @@
         }
 
         chairShell.hidden = false;
-        await Promise.all([loadProductions(), loadIncomingRequests()]);
+        await Promise.all([loadProductions(), loadIncomingRequests(), loadReviewShowings(), loadDirectorConsoleCurrent()]);
       } catch (error) {
         console.error("director chair bootstrap failed", error);
         showForbidden();
@@ -507,6 +1647,40 @@
       } catch (error) {
         setStatus(incomingStatus, error.message || String(error));
       }
+    });
+
+    reviewFilters?.addEventListener("click", async (event) => {
+      const button = event.target.closest("button[data-review-filter]");
+      if (!button) return;
+      const nextFilter = button.getAttribute("data-review-filter") || "all";
+      reviewState.filter = nextFilter;
+      renderReviewFilters();
+      renderReviewEvents();
+    });
+
+    showingList?.addEventListener("click", async (event) => {
+      const button = event.target.closest("button[data-showing-id]");
+      if (!button) return;
+      const showingId = button.getAttribute("data-showing-id");
+      if (!showingId || showingId === reviewState.selectedShowingId) return;
+      reviewState.selectedShowingId = showingId;
+      renderShowingList();
+      await loadReviewDetail(showingId);
+    });
+
+    audienceViewToggle?.addEventListener("click", toggleAudienceView);
+    closeShowingButton?.addEventListener("click", closeCurrentShowing);
+    chatEnabledToggle?.addEventListener("click", () => toggleChatPolicy("chat"));
+    talkingEnabledToggle?.addEventListener("click", () => toggleChatPolicy("talking"));
+    hideOverlayButton?.addEventListener("click", hideActiveOverlay);
+    elementList?.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-console-element]");
+      if (!button) return;
+      toggleConsoleElementVisibility(button);
+    });
+
+    window.addEventListener("beforeunload", () => {
+      disconnectDirectorConsoleWS();
     });
   </script>
 </body>

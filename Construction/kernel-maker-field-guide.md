@@ -43,18 +43,27 @@ Current canon references:
 - **Operator** - infrastructure authority outside ordinary app permissions.
 
 ## Current Character Kernel Baseline
-Kernel 23 added character cards and Cave persona actions. Kernel 24 moved character editing into Greenroom.
+Kernel 23 added character cards and Cave persona actions. Kernel 24 moved character editing into Greenroom. Kernel 27 added the closed-showing review surface in the Director's Chair. Kernel 28 added the live Director Console for current-showing control.
 
 Current product behavior:
 - HTTP:
   - `GET /api/character-cards/me`
   - `POST /api/character-cards`
   - `PATCH /api/character-cards/{id}`
+  - `GET /api/showings`
+  - `GET /api/showings/{id}/review`
+  - `GET /api/director-console/current`
+  - `POST /api/showings/{id}/audience-view`
+  - `POST /api/showings/{id}/close`
+  - `POST /api/showings/start`
+  - `POST /api/venues/{slug}/chat-policy`
 - WebSocket:
   - `persona/equip`
   - `persona/unequip`
 - Broadcast/update:
   - `presence/update`
+  - `showing/update`
+  - `venue/update`
 - Tables:
   - `character_cards`
   - `permission_grants`
@@ -65,6 +74,8 @@ Current authority rule:
 - legacy character permission routes still exist in code, but current Greenroom behavior does not depend on them
 
 The Greenroom owns character creation and editing. The Cave should only choose an existing character and put it on or take it off.
+The Director's Chair owns closed-showing review. It should read the durable action stream, not render video playback.
+The Director Console owns live current-showing control. It should be utilitarian, authority-gated, and tied to the current Cave session rather than to history.
 
 ## Runtime Modes
 There are two valid ways to run Victory. Do not mix them accidentally.
@@ -272,5 +283,5 @@ For Greenroom character dressing:
 - The Greenroom owns New/Edit/Save for character cards.
 
 ## Recording Language
-- Showing Review means review of actions, chat, reactions, notes, and showing/session history.
+- Showing Review means review of chat, stage speech, reactions, reveals/hides, overlays, index cards, persona changes, and showing/session history.
 - Video Recording is future work and not a near-term planning target.

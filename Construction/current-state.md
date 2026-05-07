@@ -1,13 +1,13 @@
 # Victory Current State
 
 ## Purpose
-This document is the current-state canon for Victory as of Kernel 25.
+This document is the current-state canon for Victory as of Kernel 28.
 
 Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful as history, but this file is the current source of truth when they disagree.
 
 ## Kernel State
-- Current kernel label: **Kernel 25**
-- Current kernel purpose: **Current State Canon + Documentation Reconciliation**
+- Current kernel label: **Kernel 28**
+- Current kernel purpose: **Director Console v1**
 - Product state: **active proving-ground build**
 - Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
 
@@ -47,6 +47,9 @@ Live venue rows currently present:
 - `construction` - public construction venue
 - `victory-theater` - venue
 - `audition-hall` - audition venue
+- `library` - public reference venue
+- `warehouse` - restricted storage venue
+- `soil-experts` - public placeholder venue
 
 ## Current Route / API Surface
 Auth and identity:
@@ -96,6 +99,13 @@ World, session, and venue runtime:
 - `POST /api/index-cards`
 - `POST /api/workshop/assets`
 - `GET /api/assets/{id}`
+- `GET /api/showings`
+- `GET /api/showings/{id}/review`
+- `GET /api/director-console/current`
+- `POST /api/showings/{id}/audience-view`
+- `POST /api/showings/{id}/close`
+- `POST /api/showings/start`
+- `POST /api/venues/{slug}/chat-policy`
 - `GET /health`
 
 WebSocket:
@@ -127,6 +137,8 @@ Server-to-client event shapes currently emitted:
 - `presence/join`
 - `presence/leave`
 - `presence/update`
+- `showing/update`
+- `venue/update`
 
 ## Current Database / Domain Concepts
 Identity and access:
@@ -174,6 +186,7 @@ Current visible behavior in The Cave:
 - signed-in, access-checked session join
 - live snapshot load
 - presence roster
+- audience-view curtain when the director turns audience view off
 - stage speech
 - venue chat
 - reactions
@@ -213,19 +226,22 @@ Strategy:
 - Draft and edit character cards in Greenroom
 - Attach `sheet_links` metadata to character cards
 - Equip and unequip an existing character persona in The Cave
+- Open the Director's Chair and control the current showing with live audience-view, chat-policy, presence, and overlay controls
+- Review closed showings in the Director's Chair with readable event cards
 
 ## Current Known Gaps
-- Showing Review UI does not exist yet as a dedicated review surface
 - Video recording does not exist and is not a near-term priority
 - Cave UI still exposes proving-ground tool density and needs later organization
 - Template venue extraction has not happened yet
+- Showing Review currently covers closed showings only
 - Character sheets are links/references only, not playable sheet records
 - No rules-engine execution, dice, stats, HP, initiative, grid, tokens, or fog
 - Browser-level character-sheet save confusion still needs direct front-end reproduction even though live authenticated create and PATCH both succeed against the backend
+- Starting a brand-new showing is still deferred; the live console can close a showing and control the current one, but it does not yet create a fresh run on demand
 - Some older docs still describe earlier kernel truths and are now historical
 
 ## Recording Language
 - **Showing Review** means review of actions, chat, reactions, notes, and showing/session history
 - **Video Recording** means future capture of rendered audiovisual output
 
-Victory is currently pursuing **Showing Review**, not near-term video recording.
+Victory is currently pursuing **Director Console / Showing Review / proving-ground hardening**, not near-term video recording.

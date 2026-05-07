@@ -226,10 +226,10 @@
 
   <div class="shell">
     <header class="header">
-      <p class="eyebrow">Durable Messages</p>
+      <p class="eyebrow">Backstage Invitations</p>
       <h1>Mailbox</h1>
       <p class="subtitle">
-        This is not chat. This is durable message delivery. Messages belong to the authenticated user only and stay here until you read them.
+        Victory is built for live encounters, returning casts, and shows that leave something behind. Your mailbox is where invitations, note cards, and follow-up messages wait for you after the scene changes.
       </p>
       <div class="toolbar">
         <a class="button" href="/">Back to Map</a>
@@ -254,9 +254,9 @@
       <section class="card">
         <h3>Status</h3>
         <p class="note" id="status">Loading mailbox...</p>
-        <h3 style="margin-top:18px;">Rules</h3>
+        <h3 style="margin-top:18px;">Why It Matters</h3>
         <p class="note">
-          The server decides who can write messages. The user can only read their own inbox.
+          When a show, rehearsal, or private note deserves to outlast the moment, it lands here. Mailbox gives Victory a memory you can come back to between scenes, between sessions, and between productions.
         </p>
       </section>
     </main>
@@ -293,7 +293,7 @@
       if (!state.messages.length) {
         const empty = document.createElement("p");
         empty.className = "empty-state";
-        empty.textContent = "No messages yet.";
+        empty.textContent = "No messages yet. When the world has something to hand you, it will wait here.";
         list.appendChild(empty);
         return;
       }
@@ -340,7 +340,7 @@
         if (badge) badge.textContent = "Message";
         if (subject) subject.textContent = "Select a message";
         if (meta) meta.innerHTML = "";
-        if (body) body.textContent = "Your selected message will appear here.";
+        if (body) body.textContent = "Open a message to read the latest invitation, note card, or follow-up from the world.";
         return;
       }
 
@@ -351,7 +351,7 @@
         const entries = [
           `From ${message.sender_label || "System"}`,
           `Sent ${humanTime(message.created_at)}`,
-          message.message_type === "note_card" ? "Durable note card" : (message.read ? "Marked read" : "Unread"),
+          message.message_type === "note_card" ? "Backstage note card" : (message.read ? "Opened" : "Waiting"),
         ];
         if (message.venue_slug) entries.push(`Venue ${message.venue_slug}`);
         if (message.session_id) entries.push(`Session ${message.session_id.slice(0, 8)}`);
@@ -442,7 +442,7 @@
         state.selectedId = state.messages[0]?.id || "";
         renderList();
         renderDetail(state.messages[0] || null);
-        if (status) status.textContent = `${state.messages.length} message${state.messages.length === 1 ? "" : "s"} loaded.`;
+        if (status) status.textContent = `${state.messages.length} message${state.messages.length === 1 ? "" : "s"} ready.`;
       } catch (error) {
         if (status) status.textContent = `Mailbox load failed: ${error.message}`;
       }

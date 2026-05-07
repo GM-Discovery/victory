@@ -93,6 +93,18 @@ func StorePersonaUnequip(ctx context.Context, pool *pgxpool.Pool, req PersonaReq
 		return nil, &ActionDeniedError{Reason: decision.Reason}
 	}
 
+	var persona any
+	var characterCardID string
+	if err := tx.QueryRow(ctx, `
+		SELECT character_card_id::text
+		FROM current_session_personas
+		WHERE session_id = $1
+		  AND user_id = $2
+		LIMIT 1
+	`, req.SessionID, req.ActorID).Scan(&characterCardID); err == nil {
+		persona, _ = characters.PersonaForCard(ctx, tx, req.ActorID, characterCardID)
+	}
+
 	if _, err := tx.Exec(ctx, `
 		DELETE FROM current_session_personas
 		WHERE session_id = $1
@@ -101,7 +113,7 @@ func StorePersonaUnequip(ctx context.Context, pool *pgxpool.Pool, req PersonaReq
 		return nil, err
 	}
 
-	return storePersonaAction(ctx, tx, req.SessionID, req.ActorID, "persona/unequip", nil)
+	return storePersonaAction(ctx, tx, req.SessionID, req.ActorID, "persona/unequip", persona)
 }
 
 func storePersonaAction(ctx context.Context, tx pgx.Tx, sessionID, actorID, actionType string, persona any) (*StoredAction, error) {

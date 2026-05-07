@@ -97,12 +97,12 @@
       box-sizing: border-box;
       display: grid;
       gap: 18px;
-      grid-template-columns: minmax(320px, 420px) minmax(320px, 1fr);
+      grid-template-columns: minmax(340px, 440px) minmax(340px, 1fr) minmax(320px, 420px);
       align-items: start;
     }
 
     .stage.tools-open {
-      grid-template-columns: minmax(280px, 360px) minmax(320px, 420px) minmax(320px, 1fr);
+      grid-template-columns: minmax(340px, 440px) minmax(340px, 1fr) minmax(320px, 420px);
     }
 
     [hidden] {
@@ -429,10 +429,10 @@
     </header>
 
     <main id="shell" class="stage">
-      <section class="card stack" id="greenroom-tools" hidden>
+      <section class="card stack" id="greenroom-tools">
         <div class="panel-heading">
           <h2>Performance Notes</h2>
-          <button class="text-button" id="greenroom-tools-close" type="button">Close</button>
+          <button class="text-button" id="greenroom-tools-close" type="button">Close Editor</button>
         </div>
         <div class="meta-list" id="left-panel"></div>
 
@@ -495,6 +495,26 @@
 
       </section>
 
+      <section class="card character-display">
+        <div class="panel-heading">
+          <h2>Character Dressing Room</h2>
+        </div>
+        <label class="field">
+          Character
+          <select id="character-select"></select>
+        </label>
+        <div class="action-row">
+          <button class="text-button" id="character-new" type="button">New</button>
+          <button class="text-button" id="character-edit" type="button">Edit</button>
+        </div>
+        <div id="character-display"></div>
+        <div>
+          <h3>Sheet Links</h3>
+          <div class="sheet-list" id="character-sheet-display-list"></div>
+        </div>
+        <div class="status-line" id="character-status"></div>
+      </section>
+
       <section class="card hero" id="hero-card">
         <div id="hero-visual" class="hero-empty">
           <div>
@@ -516,25 +536,6 @@
           </div>
           <p class="note" id="snapshot-note">Loading current public profile...</p>
           <div class="meta-list" id="right-panel"></div>
-        </section>
-        <section class="card character-display">
-          <div class="panel-heading">
-            <h2>Character Dressing Room</h2>
-          </div>
-          <label class="field">
-            Character
-            <select id="character-select"></select>
-          </label>
-          <div class="action-row">
-            <button class="text-button" id="character-new" type="button">New</button>
-            <button class="text-button" id="character-edit" type="button">Edit</button>
-          </div>
-          <div id="character-display"></div>
-          <div>
-            <h3>Sheet Links</h3>
-            <div class="sheet-list" id="character-sheet-display-list"></div>
-          </div>
-          <div class="status-line" id="character-status"></div>
         </section>
         <section class="card">
           <h3>Status</h3>
@@ -579,6 +580,7 @@
     const characterDisplay = document.getElementById("character-display");
     const characterStatus = document.getElementById("character-status");
     let currentRole = "audience";
+    let latestProfileView = null;
     let characterCards = [];
     let canDraftCharacters = false;
     let selectedCharacterId = "";
@@ -639,6 +641,84 @@
         item.appendChild(title);
         item.appendChild(detail);
         el.appendChild(item);
+      }
+    }
+
+    function sheetLinkSummary(links) {
+      const cleanLinks = normalizeSheetLinks(links);
+      if (cleanLinks.length === 0) return "No sheet links yet.";
+      return cleanLinks.map((link) => link.label || "Character Sheet").join(", ");
+    }
+
+    function renderCharacterPanels(profileView) {
+      const card = selectedCharacter();
+      const profile = profileView?.profile || {};
+      const owner = profileView?.owner || {};
+      const publicProfile = profile.public || {};
+
+      if (card) {
+        renderMetaList(document.getElementById("left-panel"), [
+          { label: "Name", value: profileValue(card.name) },
+          { label: "Pronouns", value: profileValue(card.pronouns) },
+          { label: "Tagline", value: profileValue(card.tagline) },
+          { label: "Public Description", value: profileValue(card.public_description) },
+          { label: "Private Notes", value: profileValue(card.private_notes) },
+          { label: "Sheet Links", value: sheetLinkSummary(card.sheet_links || []) },
+        ]);
+
+        renderMetaList(document.getElementById("right-panel"), [
+          { label: "Name", value: profileValue(card.name) },
+          { label: "Pronouns", value: profileValue(card.pronouns) },
+          { label: "Portrait URL", value: profileValue(card.portrait_url) },
+          { label: "Color", value: profileValue(card.color) },
+          { label: "Tagline", value: profileValue(card.tagline) },
+          { label: "Public Description", value: profileValue(card.public_description) },
+          { label: "Sheet Links", value: sheetLinkSummary(card.sheet_links || []) },
+          { label: "Selected", value: "Yes" },
+        ]);
+
+        const snapshotNote = document.getElementById("snapshot-note");
+        if (snapshotNote) {
+          snapshotNote.textContent = "This snapshot follows the selected character.";
+        }
+        return;
+      }
+
+      renderMetaList(document.getElementById("left-panel"), [
+        { label: "Display Name", value: identityDisplayName({
+          user_id: owner.user_id,
+          handle: owner.handle,
+          display_name: publicProfile.display_name || owner.display_name,
+          persona: owner.persona,
+        }) },
+        { label: "Role", value: roleLabel(owner.role) },
+        { label: "Pronouns", value: profileValue(publicProfile.pronouns) },
+        { label: "Age Range", value: profileValue(publicProfile.performance_age_range) },
+        { label: "Favorite Fun", value: profileValue(publicProfile.favorite_fun) },
+        { label: "Most Relaxed", value: profileValue(publicProfile.most_relaxed) },
+        { label: "Favorite Color", value: profileValue(publicProfile.favorite_color) },
+        { label: "Favorite Artist", value: profileValue(publicProfile.favorite_artist) },
+        { label: "Favorite Food", value: profileValue(publicProfile.favorite_food) },
+        { label: "Favorite Song", value: profileValue(publicProfile.favorite_song) },
+      ]);
+
+      renderMetaList(document.getElementById("right-panel"), [
+        { label: "Favorite Place", value: profileValue(publicProfile.favorite_place) },
+        { label: "Favorite Movie or Show", value: profileValue(publicProfile.favorite_movie_or_show) },
+        { label: "Hidden Talent", value: profileValue(publicProfile.hidden_talent) },
+        { label: "Ideal Day", value: profileValue(publicProfile.ideal_day) },
+        { label: "Availability", value: profileValue(publicProfile.availability) },
+        { label: "Credits", value: profileValue(publicProfile.credits) },
+        { label: "Skills", value: profileValue(publicProfile.skills) },
+        { label: "Links", value: profileValue(publicProfile.public_links) },
+        { label: "Published", value: profile.is_published ? "Yes" : "Not yet" },
+      ]);
+
+      const snapshotNote = document.getElementById("snapshot-note");
+      if (snapshotNote) {
+        snapshotNote.textContent = profile.is_published
+          ? "This is the currently published public snapshot."
+          : "Nothing public has been published yet. Trailers controls the draft.";
       }
     }
 
@@ -732,7 +812,6 @@
 
     function openTools() {
       if (!greenroomTools) return;
-      greenroomTools.hidden = false;
       shell?.classList.add("tools-open");
       applyCharacterUI();
     }
@@ -740,7 +819,6 @@
     function closeTools() {
       if (!greenroomTools) return;
       closeCharacterEditor();
-      greenroomTools.hidden = true;
       shell?.classList.remove("tools-open");
       applyCharacterUI();
     }
@@ -878,6 +956,7 @@
       }
 
       renderSheetLinks(characterSheetDisplayList, card.sheet_links || []);
+      renderCharacterPanels(latestProfileView);
     }
 
     function applyCharacterUI() {
@@ -919,6 +998,7 @@
       editingCharacterId = "";
       editingSheetLinks = [];
       if (characterEditor) characterEditor.hidden = true;
+      shell?.classList.remove("tools-open");
       renderSheetLinks(characterSheetEditorList, []);
     }
 
@@ -972,6 +1052,10 @@
         const data = result.data || {};
         canDraftCharacters = Boolean(data.can_draft) || isPerformerRole(currentRole);
         characterCards = Array.isArray(data.cards) ? data.cards : [];
+        const activePersonaId = String(data.active_persona?.character_card_id || "").trim();
+        if (activePersonaId && characterCards.some((card) => card.id === activePersonaId)) {
+          selectedCharacterId = activePersonaId;
+        }
         if (!selectedCharacterId && characterCards.length > 0) {
           selectedCharacterId = characterCards[0].id;
         }
@@ -994,23 +1078,54 @@
         return;
       }
 
-      const url = editingCharacterId ? `/api/character-cards/${encodeURIComponent(editingCharacterId)}` : "/api/character-cards";
-      const method = editingCharacterId ? "PATCH" : "POST";
       setCharacterStatus("Saving...");
 
-      try {
+      async function saveRequest(method, url) {
         const response = await fetch(url, {
           method,
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify(draft),
         });
-        const result = await response.json().catch(() => null);
-        if (!response.ok || !result?.ok) {
-          throw new Error(result?.data?.error || result?.error || `HTTP ${response.status}`);
+        const raw = await response.text();
+        let result = null;
+        if (raw) {
+          try {
+            result = JSON.parse(raw);
+          } catch (parseError) {
+            console.error("character save parse failed", {
+              method,
+              url,
+              status: response.status,
+              raw,
+              parseError,
+            });
+          }
+        }
+        return { response, raw, result, method, url };
+      }
+
+      try {
+        let saveAttempt;
+        if (editingCharacterId) {
+          const updateURL = `/api/character-cards/${encodeURIComponent(editingCharacterId)}`;
+          saveAttempt = await saveRequest("PATCH", updateURL);
+          if (saveAttempt.response.status === 404) {
+            saveAttempt = await saveRequest("POST", updateURL);
+          }
+        } else {
+          saveAttempt = await saveRequest("POST", "/api/character-cards");
         }
 
-        const saved = result.data;
+        if (!saveAttempt.response.ok || !saveAttempt.result?.ok) {
+          throw new Error(
+            saveAttempt.result?.data?.error ||
+            saveAttempt.result?.error ||
+            `${saveAttempt.method} ${saveAttempt.url} -> ${saveAttempt.raw.trim() || `HTTP ${saveAttempt.response.status}`}`
+          );
+        }
+
+        const saved = saveAttempt.result.data;
         const index = characterCards.findIndex((card) => card.id === saved.id);
         if (index >= 0) {
           characterCards[index] = saved;
@@ -1058,7 +1173,7 @@
         const payload = await response.json().catch(() => null);
 
         if (!response.ok || !payload?.ok) {
-          renderHero({
+          latestProfileView = {
             owner: {
               user_id: "",
               handle: "",
@@ -1072,10 +1187,14 @@
               draft: {},
               published: {},
             },
-          });
+          };
+          renderHero(latestProfileView);
+          renderCharacterPanels(latestProfileView);
           setStatus("Profile unavailable right now, but your session is active.");
         } else {
-          renderHero(payload.data);
+          latestProfileView = payload.data;
+          renderHero(latestProfileView);
+          renderCharacterPanels(latestProfileView);
         }
 
         await loadCharacterCards();
@@ -1087,14 +1206,13 @@
     }
 
     profileToolsToggle?.addEventListener("click", () => {
-      if (greenroomTools?.hidden) {
-        openTools();
-        closeCharacterEditor();
+      if (characterEditor?.hidden) {
+        openCharacterEditor(selectedCharacter());
       } else {
-        closeTools();
+        closeCharacterEditor();
       }
     });
-    greenroomToolsClose?.addEventListener("click", closeTools);
+    greenroomToolsClose?.addEventListener("click", closeCharacterEditor);
     characterSelect?.addEventListener("change", () => {
       selectedCharacterId = characterSelect.value;
       renderCharacterDisplay();
