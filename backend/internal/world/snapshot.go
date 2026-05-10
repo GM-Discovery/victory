@@ -168,7 +168,6 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 		JOIN elements e ON e.id = vle.element_id
 		JOIN venues v ON v.id = vle.venue_id
 		WHERE v.slug = 'the-cave'
-		  AND e.state <> 'deleted'
 		ORDER BY e.name ASC
 	`)
 	if err != nil {

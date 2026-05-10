@@ -71,10 +71,11 @@ async function loadVenues() {
       return;
     }
 
-    const fallbackPositions = {
-      library: { x: 67, y: 87 },
-      "the-cave": { x: 22, y: 23 },
-      "grants-cabin": { x: 28, y: 21 },
+      const fallbackPositions = {
+        library: { x: 67, y: 87 },
+        "first-theater": { x: 73, y: 66 },
+        "the-cave": { x: 22, y: 23 },
+        "grants-cabin": { x: 28, y: 21 },
       "audition-hall": { x: 24, y: 37 },
       "producers-office": { x: 39, y: 14 },
       "directors-chair": { x: 51, y: 24 },
@@ -112,6 +113,7 @@ async function loadVenues() {
       const icon = document.createElement("img");
       const venueIcons = {
         library: "/assets/librarycc.png",
+        "first-theater": "/assets/redirect.png",
         "soil-experts": "/assets/mudfarm.png",
         "info-booth": "/assets/infobooth.png",
         "audition-hall": "/assets/audition-hall.png",
@@ -154,17 +156,22 @@ async function loadVenues() {
         }
 
         if (venue.slug === "library") {
-          alert("Library is a public placeholder for now. The venue page will come later.");
+          window.location.href = "/venues/library/";
+          return;
+        }
+
+        if (venue.slug === "first-theater") {
+          window.location.href = "/venues/first-theater/";
           return;
         }
 
         if (venue.slug === "warehouse") {
-          alert("Warehouse is a restricted placeholder for now. The venue page will come later.");
+          window.location.href = "/venues/warehouse/";
           return;
         }
 
         if (venue.slug === "soil-experts") {
-          alert("Soil Experts is a public placeholder for now. The venue page will come later.");
+          window.location.href = "/venues/soil-experts/";
           return;
         }
 

@@ -26,6 +26,14 @@ func EnsureKernel16VenueSurface(ctx context.Context, pool *pgxpool.Pool) error {
 			isWorkshop: false,
 		},
 		{
+			slug:       "first-theater",
+			name:       "First Theater",
+			kind:       "theater",
+			config:     `{ "surface": "placeholder", "reference_only": true, "project": "First Theater" }`,
+			isPublic:   true,
+			isWorkshop: false,
+		},
+		{
 			slug:       "grants-cabin",
 			name:       "Grant's Cabin",
 			kind:       "cabin",
