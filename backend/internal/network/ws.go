@@ -42,7 +42,11 @@ var storeOverlayHideFunc = actions.StoreOverlayHide
 var storeIndexCardCreateFunc = actions.StoreIndexCardCreate
 var storeIndexCardUpdateFunc = actions.StoreIndexCardUpdate
 var storeIndexCardDeleteFunc = actions.StoreIndexCardDelete
+var storeRemoveElementFunc = actions.StoreRemoveElement
 var storePlaceElementFunc = actions.StorePlaceElement
+var storeDuplicateElementFunc = actions.StoreDuplicateElement
+var storeSetElementLockFunc = actions.StoreSetElementLock
+var storeSetNameplateVisibilityFunc = actions.StoreSetNameplateVisibility
 var storePersonaEquipFunc = actions.StorePersonaEquip
 var storePersonaUnequipFunc = actions.StorePersonaUnequip
 
@@ -451,13 +455,13 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 			venueSlug, _ := payload["venue_slug"].(string)
 			layer, _ := payload["layer"].(string)
 
-			x := 0
+			x := 0.0
 			if raw, ok := payload["x"].(float64); ok {
-				x = int(raw)
+				x = raw
 			}
-			y := 0
+			y := 0.0
 			if raw, ok := payload["y"].(float64); ok {
-				y = int(raw)
+				y = raw
 			}
 			order := 0
 			if raw, ok := payload["order"].(float64); ok {
@@ -494,6 +498,161 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 					"error": err.Error(),
 				})
 				log.Printf("place element failed: user=%s session=%s venue=%s target=%s err=%v", actorID, sessionID, venueSlug, elementSlug, err)
+				return
+			}
+
+			msgOut, _ := json.Marshal(map[string]any{
+				"type": "action",
+				"data": storedAction,
+			})
+			hub.Broadcast(msgOut)
+		}
+
+	case "act/duplicate_element":
+		{
+			sessionID, _ := payload["session_id"].(string)
+			elementID, _ := payload["element_id"].(string)
+			elementSlug, _ := payload["element_slug"].(string)
+			venueSlug, _ := payload["venue_slug"].(string)
+			layer, _ := payload["layer"].(string)
+
+			x := 0.0
+			if raw, ok := payload["x"].(float64); ok {
+				x = raw
+			}
+			y := 0.0
+			if raw, ok := payload["y"].(float64); ok {
+				y = raw
+			}
+			order := 0
+			if raw, ok := payload["order"].(float64); ok {
+				order = int(raw)
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			storedAction, err := storeDuplicateElementFunc(ctx, pool, actions.DuplicateElementRequest{
+				SessionID:   sessionID,
+				ActorID:     c.UserID,
+				ElementID:   elementID,
+				ElementSlug: elementSlug,
+				VenueSlug:   venueSlug,
+				Layer:       layer,
+				X:           x,
+				Y:           y,
+				Order:       order,
+			})
+			cancel()
+
+			if err != nil {
+				var denied *actions.ActionDeniedError
+				if errors.As(err, &denied) {
+					_ = c.Conn.WriteJSON(map[string]any{
+						"type":  "error",
+						"error": denied.Reason,
+					})
+					log.Printf("duplicate denied: user=%s session=%s venue=%s target=%s reason=%s", c.UserID, sessionID, venueSlug, elementSlug, denied.Reason)
+					return
+				}
+
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": err.Error(),
+				})
+				log.Printf("duplicate failed: user=%s session=%s venue=%s target=%s err=%v", c.UserID, sessionID, venueSlug, elementSlug, err)
+				return
+			}
+
+			msgOut, _ := json.Marshal(map[string]any{
+				"type": "action",
+				"data": storedAction,
+			})
+			hub.Broadcast(msgOut)
+		}
+
+	case "act/set_element_lock":
+		{
+			sessionID, _ := payload["session_id"].(string)
+			elementID, _ := payload["element_id"].(string)
+			elementSlug, _ := payload["element_slug"].(string)
+			locked := false
+			if v, ok := payload["locked"].(bool); ok {
+				locked = v
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			storedAction, err := storeSetElementLockFunc(ctx, pool, actions.ElementLockRequest{
+				SessionID:   sessionID,
+				ActorID:     c.UserID,
+				ElementID:   elementID,
+				ElementSlug: elementSlug,
+				Locked:      locked,
+			})
+			cancel()
+
+			if err != nil {
+				var denied *actions.ActionDeniedError
+				if errors.As(err, &denied) {
+					_ = c.Conn.WriteJSON(map[string]any{
+						"type":  "error",
+						"error": denied.Reason,
+					})
+					log.Printf("lock denied: user=%s session=%s reason=%s", c.UserID, sessionID, denied.Reason)
+					return
+				}
+
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": err.Error(),
+				})
+				log.Printf("lock store failed: user=%s session=%s err=%v", c.UserID, sessionID, err)
+				return
+			}
+
+			msgOut, _ := json.Marshal(map[string]any{
+				"type": "action",
+				"data": storedAction,
+			})
+			hub.Broadcast(msgOut)
+		}
+
+	case "act/set_nameplate_visibility":
+		{
+			sessionID, _ := payload["session_id"].(string)
+			elementID, _ := payload["element_id"].(string)
+			elementSlug, _ := payload["element_slug"].(string)
+			layer, _ := payload["layer"].(string)
+			visible := true
+			if v, ok := payload["visible"].(bool); ok {
+				visible = v
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			storedAction, err := storeSetNameplateVisibilityFunc(ctx, pool, actions.NameplateVisibilityRequest{
+				SessionID:   sessionID,
+				ActorID:     c.UserID,
+				ElementID:   elementID,
+				ElementSlug: elementSlug,
+				Visible:     visible,
+				Layer:       layer,
+			})
+			cancel()
+
+			if err != nil {
+				var denied *actions.ActionDeniedError
+				if errors.As(err, &denied) {
+					_ = c.Conn.WriteJSON(map[string]any{
+						"type":  "error",
+						"error": denied.Reason,
+					})
+					log.Printf("nameplate denied: user=%s session=%s reason=%s", c.UserID, sessionID, denied.Reason)
+					return
+				}
+
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": err.Error(),
+				})
+				log.Printf("nameplate store failed: user=%s session=%s err=%v", c.UserID, sessionID, err)
 				return
 			}
 
@@ -625,6 +784,47 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 					"error": err.Error(),
 				})
 				log.Printf("index card delete failed: user=%s session=%s err=%v", c.UserID, sessionID, err)
+				return
+			}
+
+			msgOut, _ := json.Marshal(map[string]any{
+				"type": "action",
+				"data": storedAction,
+			})
+			hub.Broadcast(msgOut)
+		}
+
+	case "act/remove_element":
+		{
+			sessionID, _ := payload["session_id"].(string)
+			elementID, _ := payload["element_id"].(string)
+			elementSlug, _ := payload["element_slug"].(string)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			storedAction, err := storeRemoveElementFunc(ctx, pool, actions.RemoveElementRequest{
+				SessionID:   sessionID,
+				ActorID:     c.UserID,
+				ElementID:   elementID,
+				ElementSlug: elementSlug,
+			})
+			cancel()
+
+			if err != nil {
+				var denied *actions.ActionDeniedError
+				if errors.As(err, &denied) {
+					_ = c.Conn.WriteJSON(map[string]any{
+						"type":  "error",
+						"error": denied.Reason,
+					})
+					log.Printf("remove element denied: user=%s session=%s action=%s reason=%s", c.UserID, sessionID, payload["type"], denied.Reason)
+					return
+				}
+
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": err.Error(),
+				})
+				log.Printf("remove element failed: user=%s session=%s err=%v", c.UserID, sessionID, err)
 				return
 			}
 

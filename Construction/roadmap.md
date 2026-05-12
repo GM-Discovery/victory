@@ -10,35 +10,35 @@ Kernel numbers are labels, but from here they should remain stable once assigned
   - review chat, stage speech, reactions, reveal/hide, overlays, cards, and persona changes
 - `28 — Director Console v1`
   - live control surface for the current showing
-- `29 — Reaction Counts v1`
-  - lightweight aggregate readback for audience/performer response
-- `30 — Cave UI Organization Pass`
-  - move proving-ground tools into cleaner drawers, overlays, and menus
-- `31 — Template Venue Extraction v1`
+- `29 — PixiJS Stage Spike v1`
+  - complete proving-ground spike for PixiJS as the stage/worldspace renderer
+- `31 — Cave Organization + Renderer Containment`
+  - keep Pixi experimental but usable, and organize Cave tools into clearer containers
+- `32 — Template Venue Extraction v1`
   - extract a cleaner reusable venue shell from The Cave after organization work
-- `32 — Stage Navigation / View Resolver v1`
+- `33 — Stage Navigation / View Resolver v1`
   - better view/surface routing inside venue runtime
-- `33 — Map/Object Movement v1`
+- `34 — Map/Object Movement v1`
   - more formal object movement and navigation behavior
-- `34 — Venue Policy Console v1`
+- `35 — Venue Policy Console v1`
   - clearer venue-level policy toggles and controls
-- `35 — Asset Browser / Library v1`
+- `36 — Asset Browser / Library v1`
   - browse and select reusable assets/library elements
-- `36 — Warehouse / Asset Storage Surface v1`
+- `37 — Warehouse / Asset Storage Surface v1`
   - durable storage and browsing surface for reusable assets
-- `37 — Library / Script Surface v1`
+- `38 — Library / Script Surface v1`
   - browse scripts and reusable reference material by ruleset or sheet type
-- `38 — Catharsis Prep Kernel`
+- `39 — Catharsis Prep Kernel`
   - prep surfaces for the catharsis flow without building the full experience yet
-- `39 — Socio/Catharsis v1`
+- `40 — Socio/Catharsis v1`
   - first public-facing catharsis experience surface
-- `40 — Documentation + Hardening Pass`
+- `41 — Documentation + Hardening Pass`
   - reconcile docs, tighten errors, and stabilize the kernel trail
 
 Ordering note:
 - Showing Review comes before polish-only work
 - Director Console lands immediately after review
-- Cave polish and organization belongs around Kernel 30
+- Cave polish and organization belongs around Kernel 31
 - template extraction follows that organization pass, not before it
 
 ## Medium Roadmap: Kernels 36–60

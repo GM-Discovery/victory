@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 	"victory/backend/internal/access"
+	"victory/backend/internal/identity"
 	"victory/backend/internal/sessions"
 
 	xdraw "golang.org/x/image/draw"
@@ -40,6 +41,10 @@ type UploadResponse struct {
 
 func HandleWorkshopUpload(pool *pgxpool.Pool, storageRoot string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			handleWorkshopAssetList(w, r, pool)
+			return
+		}
 		if r.Method != http.MethodPost {
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
 				"ok":    false,
@@ -305,6 +310,126 @@ func HandleWorkshopUpload(pool *pgxpool.Pool, storageRoot string) http.HandlerFu
 			},
 		})
 	}
+}
+
+func handleWorkshopAssetList(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool) {
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	rawSession, err := sessions.ReadSessionCookie(r)
+	if err != nil || strings.TrimSpace(rawSession) == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{
+			"ok":    false,
+			"error": "not_authenticated",
+		})
+		return
+	}
+
+	rec, err := sessions.GetSessionByRawToken(ctx, pool, rawSession)
+	if err != nil || strings.TrimSpace(rec.UserID) == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{
+			"ok":    false,
+			"error": "not_authenticated",
+		})
+		return
+	}
+
+	sessionID, err := identity.ResolveActiveCaveSessionID(ctx, pool, rec.UserID)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{
+			"ok":    false,
+			"error": "no_active_session",
+		})
+		return
+	}
+
+	var locationID string
+	err = pool.QueryRow(ctx, `
+		SELECT l.id::text
+		FROM sessions s
+		JOIN venues v ON v.id = s.venue_id
+		JOIN lots lo ON lo.id = v.lot_id
+		JOIN locations l ON l.id = lo.location_id
+		WHERE s.id = $1
+		LIMIT 1
+	`, sessionID).Scan(&locationID)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{
+			"ok":    false,
+			"error": "session_not_found",
+		})
+		return
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT
+			e.id::text,
+			e.slug,
+			e.name,
+			e.element_type,
+			COALESCE(NULLIF(e.context_class, ''), '') AS context_class,
+			e.data
+		FROM libraries l
+		JOIN elements e ON e.library_id = l.id
+		WHERE l.location_id = $1
+		  AND COALESCE(e.state::text, '') <> 'deleted'
+		  AND e.element_type IN ('index_card', 'prop', 'scenery', 'surface', 'actor', 'media')
+		ORDER BY e.element_type, e.name
+	`, locationID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"ok":    false,
+			"error": "asset_lookup_failed",
+		})
+		return
+	}
+	defer rows.Close()
+
+	type workshopAsset struct {
+		ElementID    string         `json:"element_id"`
+		Slug         string         `json:"slug"`
+		Name         string         `json:"name"`
+		ElementType  string         `json:"element_type"`
+		ContextClass string         `json:"context_class"`
+		ThumbnailURL string         `json:"thumbnail_url"`
+		Data         map[string]any `json:"data"`
+	}
+
+	assets := make([]workshopAsset, 0)
+	for rows.Next() {
+		var item workshopAsset
+		var dataRaw []byte
+		if err := rows.Scan(&item.ElementID, &item.Slug, &item.Name, &item.ElementType, &item.ContextClass, &dataRaw); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"ok":    false,
+				"error": "asset_scan_failed",
+			})
+			return
+		}
+		if err := json.Unmarshal(dataRaw, &item.Data); err != nil {
+			item.Data = map[string]any{}
+		}
+		if item.ContextClass == "" {
+			if item.ElementType == "index_card" {
+				item.ContextClass = "card"
+			} else {
+				item.ContextClass = item.ElementType
+			}
+		}
+		assets = append(assets, item)
+	}
+	if err := rows.Err(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"ok":    false,
+			"error": "asset_lookup_failed",
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":   true,
+		"data": assets,
+	})
 }
 
 func resolveProducerScope(ctx context.Context, pool *pgxpool.Pool, userID string) (bool, string, string, error) {

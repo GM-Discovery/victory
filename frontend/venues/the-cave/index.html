@@ -18,6 +18,76 @@
       flex-direction: column;
     }
 
+    .venue-shell--signed-in .header {
+      position: fixed;
+      inset: 0 0 auto 0;
+      width: 100vw;
+      max-width: none;
+      margin: 0;
+      padding: 0;
+      min-height: 4px;
+      overflow: visible;
+      background: linear-gradient(
+        to bottom,
+        rgba(10, 8, 7, 0.5) 0,
+        rgba(10, 8, 7, 0.16) 2px,
+        rgba(10, 8, 7, 0) 4px
+      );
+      box-shadow: none;
+      backdrop-filter: blur(1px);
+    }
+
+    .venue-shell--signed-in .header::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      height: 110px;
+      z-index: 0;
+      opacity: 0;
+      background: linear-gradient(
+        to bottom,
+        rgba(10, 8, 7, 0.92),
+        rgba(10, 8, 7, 0.72),
+        rgba(10, 8, 7, 0)
+      );
+      backdrop-filter: blur(12px);
+      pointer-events: none;
+      transition: opacity 160ms ease;
+    }
+
+    .venue-shell--signed-in .header:hover::before,
+    .venue-shell--signed-in .header:focus-within::before {
+      opacity: 1;
+    }
+
+    .venue-shell--signed-in .header > * {
+      position: absolute;
+      left: 24px;
+      right: 24px;
+      z-index: 1;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-0.35rem);
+      transition:
+        opacity 140ms ease,
+        transform 180ms ease;
+    }
+
+    .venue-shell--signed-in .header:hover > *,
+    .venue-shell--signed-in .header:focus-within > * {
+      opacity: 1;
+      pointer-events: auto;
+      transform: none;
+    }
+
+    .venue-shell--signed-in .header > :nth-child(1) {
+      top: 16px;
+    }
+
+    .venue-shell--signed-in .header > :nth-child(2) {
+      top: 56px;
+    }
+
     .header {
       padding: 20px 24px 0;
     }
@@ -198,6 +268,183 @@
       image-rendering: pixelated;
       position: relative;
       z-index: 3;
+    }
+
+    .stage-object {
+      position: relative;
+      display: grid;
+      justify-items: center;
+      align-items: center;
+      gap: 8px;
+      z-index: 3;
+    }
+
+    .stage-nameplate {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(15, 12, 10, 0.75);
+      color: #fff1d8;
+      font-size: 0.78rem;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      backdrop-filter: blur(4px);
+    }
+
+    .stage-nameplate[hidden] {
+      display: none;
+    }
+
+    .stage-nameplate--locked::after {
+      content: "Lock";
+      font-size: 0.68rem;
+      color: #f5c56b;
+    }
+
+    .debug-panel {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+      padding: 14px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      background: rgba(11, 9, 7, 0.74);
+      color: #f5efe4;
+    }
+
+    .debug-panel h2 {
+      margin: 0;
+      font-size: 1rem;
+      color: #ead7b2;
+    }
+
+    .debug-grid {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+
+    .debug-item {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      min-height: 58px;
+    }
+
+    .debug-item strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #f0d7a6;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .debug-item pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font: inherit;
+      color: #f5efe4;
+      line-height: 1.35;
+    }
+
+    .asset-picker {
+      position: fixed;
+      inset: 0;
+      z-index: 85;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(5, 4, 3, 0.52);
+      backdrop-filter: blur(4px);
+    }
+
+    .asset-picker[hidden] {
+      display: none;
+    }
+
+    .asset-picker-panel {
+      width: min(920px, calc(100vw - 32px));
+      max-height: min(80vh, 800px);
+      overflow: auto;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(18, 14, 11, 0.98);
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+      padding: 18px;
+      color: #f5efe4;
+    }
+
+    .asset-picker-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .asset-picker-head h2 {
+      margin: 0;
+      color: #ead7b2;
+      font-size: 1.08rem;
+    }
+
+    .asset-picker-close {
+      border: 0;
+      border-radius: 999px;
+      width: 36px;
+      height: 36px;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .asset-picker-status {
+      margin: 0 0 12px;
+      color: #b9a78a;
+      font-size: 0.95rem;
+    }
+
+    .asset-picker-list {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .asset-picker-card {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+    }
+
+    .asset-picker-card strong {
+      color: #f5efe4;
+    }
+
+    .asset-picker-card small {
+      color: #b9a78a;
+    }
+
+    .asset-picker-card button {
+      justify-self: start;
+      padding: 8px 12px;
+      border: 0;
+      border-radius: 999px;
+      background: #4f6b38;
+      color: white;
+      cursor: pointer;
+    }
+
+    .asset-picker-card button:hover {
+      background: #618645;
     }
 
     .chat-panel {
@@ -436,6 +683,10 @@
 
     .element-context-menu button:hover {
       background: rgba(255, 255, 255, 0.08);
+    }
+
+    .element-context-menu button.is-destructive {
+      color: #f0b0a8;
     }
 
     .element-context-menu .menu-separator {
@@ -846,6 +1097,25 @@
       overflow: hidden;
     }
 
+    .index-card-lock-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(16, 12, 8, 0.72);
+      color: #f3c56f;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .index-card-lock-badge[hidden] {
+      display: none;
+    }
+
     .index-card-item::before {
       content: "";
       position: absolute;
@@ -1063,7 +1333,11 @@
         </div>
       </div>
       <div id="stage-move-preview" class="stage-move-preview" aria-hidden="true" hidden></div>
-      <img id="fire" src="/assets/fire.jpg" alt="Fire" hidden />    </div>
+      <div id="fire-stage-object" class="stage-object" hidden>
+        <div id="fire-nameplate" class="stage-nameplate" hidden>first-fire</div>
+        <img id="fire" src="/assets/fire.jpg" alt="Fire" />
+      </div>
+    </div>
 
     <div id="chat-panel" class="chat-panel">
       <div class="character-panel" id="character-panel">
@@ -1104,6 +1378,40 @@
             <input id="speech-input" type="text" placeholder="Type stage speech..." maxlength="250" />
           </div>
           <button id="speech-send" type="button">Speak</button>
+        </div>
+      </div>
+
+      <div id="stage-debug-panel" class="debug-panel">
+        <h2>Stage Debug</h2>
+        <div class="debug-grid">
+          <div class="debug-item">
+            <strong>Connection</strong>
+            <pre id="debug-connection">disconnected</pre>
+          </div>
+          <div class="debug-item">
+            <strong>Scene</strong>
+            <pre id="debug-scene">snapshot pending</pre>
+          </div>
+          <div class="debug-item">
+            <strong>Selected</strong>
+            <pre id="debug-selected">none</pre>
+          </div>
+          <div class="debug-item">
+            <strong>Pointer</strong>
+            <pre id="debug-pointer">screen: -, stage: -</pre>
+          </div>
+          <div class="debug-item">
+            <strong>Movement</strong>
+            <pre id="debug-movement">idle</pre>
+          </div>
+          <div class="debug-item">
+            <strong>Last Action</strong>
+            <pre id="debug-last-action">none</pre>
+          </div>
+          <div class="debug-item">
+            <strong>Lock</strong>
+            <pre id="debug-lock">none</pre>
+          </div>
         </div>
       </div>
 
@@ -1216,8 +1524,9 @@
       </div>
     </div>
 
-    <div id="element-context-menu" class="element-context-menu" hidden></div>
-    <div id="element-info-popup" class="element-info-popup" hidden>
+  <div id="element-context-menu" class="element-context-menu" hidden></div>
+  <div id="stage-context-menu" class="element-context-menu" hidden></div>
+  <div id="element-info-popup" class="element-info-popup" hidden>
       <div class="element-info-head">
         <strong id="element-info-title">Element</strong>
         <button id="element-info-close" class="element-info-close" type="button" aria-label="Close info">×</button>
@@ -1233,6 +1542,16 @@
       <div id="presence-list" class="presence-list">
         <div class="presence-empty">Waiting for presence...</div>
       </div>
+    </div>
+  </div>
+  <div id="workshop-asset-picker" class="asset-picker" hidden>
+    <div class="asset-picker-panel">
+      <div class="asset-picker-head">
+        <h2>Add From Workshop</h2>
+        <button id="workshop-asset-picker-close" class="asset-picker-close" type="button">×</button>
+      </div>
+      <p id="workshop-asset-picker-status" class="asset-picker-status">Choose an asset to place on the stage.</p>
+      <div id="workshop-asset-picker-list" class="asset-picker-list"></div>
     </div>
   </div>
 
@@ -1259,11 +1578,16 @@
   const speechInput = document.getElementById("speech-input");
   const speechSend = document.getElementById("speech-send");
   const elementContextMenu = document.getElementById("element-context-menu");
+  const stageContextMenu = document.getElementById("stage-context-menu");
   const elementInfoPopup = document.getElementById("element-info-popup");
   const elementInfoTitle = document.getElementById("element-info-title");
   const elementInfoContent = document.getElementById("element-info-content");
   const elementInfoClose = document.getElementById("element-info-close");
   const stageMovePreview = document.getElementById("stage-move-preview");
+  const workshopAssetPicker = document.getElementById("workshop-asset-picker");
+  const workshopAssetPickerClose = document.getElementById("workshop-asset-picker-close");
+  const workshopAssetPickerStatus = document.getElementById("workshop-asset-picker-status");
+  const workshopAssetPickerList = document.getElementById("workshop-asset-picker-list");
   const indexCardPanel = document.getElementById("index-card-panel");
   const indexCardWorkshopTools = document.getElementById("index-card-workshop-tools");
   const workshopVenueSelect = document.getElementById("workshop-venue-select");
@@ -1288,10 +1612,12 @@
   const connectionStatus = document.getElementById("connection-status");
   const speechEl = document.getElementById("speech");
   const stageEl = document.querySelector(".stage");
+  const fireObject = document.getElementById("fire-stage-object");
   const stageCardOverlay = document.getElementById("stage-card-overlay");
   const stageOverlay = document.getElementById("stage-overlay");
   const audienceHoldingScreen = document.getElementById("audience-holding-screen");
   const fireEl = document.getElementById("fire");
+  const fireNameplate = document.getElementById("fire-nameplate");
   const presenceList = document.getElementById("presence-list");
   const presenceCount = document.getElementById("presence-count");
   const isWorkshopMode = new URLSearchParams(window.location.search).get("mode") === "workshop";
@@ -1307,6 +1633,13 @@
   const revealSelectedBtn = document.getElementById("reveal-selected");
   const hideSelectedBtn = document.getElementById("hide-selected");
   const clearSelectionBtn = document.getElementById("clear-selection");
+  const debugConnection = document.getElementById("debug-connection");
+  const debugScene = document.getElementById("debug-scene");
+  const debugSelected = document.getElementById("debug-selected");
+  const debugPointer = document.getElementById("debug-pointer");
+  const debugMovement = document.getElementById("debug-movement");
+  const debugLastAction = document.getElementById("debug-last-action");
+  const debugLock = document.getElementById("debug-lock");
 
   let ws = null;
   let currentSessionId = null;
@@ -1326,11 +1659,30 @@
   let latestSnapshotVenueConfig = {};
   let audienceCurtainActive = false;
   let workshopVenues = [];
+  let workshopAssets = [];
   let pendingIndexCardSave = null;
   let pendingIndexCardSaveTimer = null;
   let contextMenuTarget = null;
+  let contextMenuMode = "object";
+  let pendingStagePlacement = null;
+  let stageContextPoint = { screenX: 0, screenY: 0, stageX: 0, stageY: 0 };
   let activeMoveElement = null;
   let activeMovePointer = { x: 0, y: 0 };
+  let pointerState = {
+    screenX: 0,
+    screenY: 0,
+    stageX: 0,
+    stageY: 0,
+    rightClickTarget: "empty-stage",
+  };
+  let movementState = "idle";
+  let lastActionState = {
+    type: "",
+    target: "",
+    sentAt: "",
+    status: "",
+    error: "",
+  };
   let chatPanelExpanded = true;
   let chatCollapseTimer = null;
   let lastChatActivityAt = 0;
@@ -1441,6 +1793,155 @@
     return `<span class="role-badge role-badge--${normalized}">${escapeHtml(roleLabel(normalized))}</span>`;
   }
 
+  function stagePointFromClient(clientX, clientY) {
+    const rect = stageEl?.getBoundingClientRect();
+    if (!rect) {
+      return { stageX: 0, stageY: 0 };
+    }
+
+    const stageX = (((Number(clientX) - rect.left) / Math.max(rect.width, 1)) * 100) - 50;
+    const stageY = (((Number(clientY) - rect.top) / Math.max(rect.height, 1)) * 100) - 50;
+    return {
+      stageX: Math.max(-50, Math.min(50, Number.isFinite(stageX) ? stageX : 0)),
+      stageY: Math.max(-50, Math.min(50, Number.isFinite(stageY) ? stageY : 0)),
+    };
+  }
+
+  function updatePointerState(event, rightClickTarget = null) {
+    const clientX = Number(event?.clientX || 0);
+    const clientY = Number(event?.clientY || 0);
+    const stagePoint = stagePointFromClient(clientX, clientY);
+    pointerState = {
+      screenX: clientX,
+      screenY: clientY,
+      stageX: stagePoint.stageX,
+      stageY: stagePoint.stageY,
+      rightClickTarget: rightClickTarget || pointerState.rightClickTarget || "empty-stage",
+    };
+    updateDebugPanel();
+  }
+
+  function elementStateValue(element, key, fallback) {
+    if (!element) return fallback;
+    if (element.state && Object.prototype.hasOwnProperty.call(element.state, key)) {
+      return element.state[key];
+    }
+    if (element.visibility && Object.prototype.hasOwnProperty.call(element.visibility, key)) {
+      return element.visibility[key];
+    }
+    return fallback;
+  }
+
+  function isLockedElement(element) {
+    return Boolean(elementStateValue(element, "locked", false));
+  }
+
+  function isNameplateVisible(element) {
+    return Boolean(elementStateValue(element, "nameplate_visible", true));
+  }
+
+  function isElementVisible(element) {
+    return Boolean(elementStateValue(element, "visible", true));
+  }
+
+  function elementSummaryText(element) {
+    if (!element) return "none";
+
+    const parts = [
+      `${element.name || element.slug || "Element"} (${element.element_type || "element"})`,
+      `context=${element.context_class || element?.data?.context_class || contextClassForElement(element)}`,
+      `id=${element.element_id || "?"}`,
+      `slug=${element.slug || "?"}`,
+      `x=${Number(element?.position?.x ?? 0).toFixed(2)}`,
+      `y=${Number(element?.position?.y ?? 0).toFixed(2)}`,
+      `locked=${isLockedElement(element)}`,
+      `nameplate_visible=${isNameplateVisible(element)}`,
+    ];
+
+    return parts.join("\n");
+  }
+
+  function updateSelectedDebug() {
+    if (!debugSelected) return;
+    debugSelected.textContent = elementSummaryText(selectedElement);
+  }
+
+  function updateDebugPanel() {
+    if (debugConnection) {
+      debugConnection.textContent = [
+        `status: ${connectionStatus?.textContent || "unknown"}`,
+        `session: ${currentSessionId || "none"}`,
+        `user: ${currentActorId || "none"}`,
+        `role: ${currentRole || "none"}`,
+      ].join("\n");
+    }
+
+    if (debugScene) {
+      const renderedCards = stageCardOverlay?.querySelectorAll(".index-card-item").length || 0;
+      const liveObjects = (fireObject && !fireObject.hidden ? 1 : 0) + renderedCards;
+      const snapshotAt = latestSnapshotActions?.[0]?.ts || "unknown";
+      debugScene.textContent = [
+        `snapshot: ${snapshotAt}`,
+        `snapshot elements: ${latestSnapshotElements.length}`,
+        `rendered objects: ${renderedCards}`,
+        `live dom objects: ${liveObjects}`,
+      ].join("\n");
+    }
+
+    updateSelectedDebug();
+
+    if (debugPointer) {
+      debugPointer.textContent = [
+        `screen: ${Math.round(pointerState.screenX)}, ${Math.round(pointerState.screenY)}`,
+        `stage: ${pointerState.stageX.toFixed(2)}, ${pointerState.stageY.toFixed(2)}`,
+        `right-click: ${pointerState.rightClickTarget}`,
+      ].join("\n");
+    }
+
+    if (debugMovement) {
+      debugMovement.textContent = movementState;
+    }
+
+    if (debugLastAction) {
+      debugLastAction.textContent = [
+        `type: ${lastActionState.type || "none"}`,
+        `target: ${lastActionState.target || "none"}`,
+        `sent: ${lastActionState.sentAt || "never"}`,
+        `status: ${lastActionState.status || "none"}`,
+        `error: ${lastActionState.error || "none"}`,
+      ].join("\n");
+    }
+
+    if (debugLock) {
+      debugLock.textContent = selectedElement
+        ? `selected locked=${isLockedElement(selectedElement)}\nselected nameplate=${isNameplateVisible(selectedElement)}`
+        : "none";
+    }
+  }
+
+  function setMovementState(nextState) {
+    movementState = nextState;
+    updateDebugPanel();
+  }
+
+  function setLastActionState(type, target, status, error = "") {
+    lastActionState = {
+      type,
+      target,
+      sentAt: new Date().toISOString(),
+      status,
+      error,
+    };
+    updateDebugPanel();
+  }
+
+  function setConnectionStatus(text) {
+    if (connectionStatus) {
+      connectionStatus.textContent = text;
+    }
+    updateDebugPanel();
+  }
+
   function renderPresencePanel(users) {
     if (!presenceList) return;
 
@@ -1518,8 +2019,21 @@
   }
 
   function canManageIndexCards(role) {
+    return canManageStageObjects(role);
+  }
+
+  function canManageStageObjects(role) {
     const normalized = normalizeRole(role);
     return normalized === "producer" || normalized === "director";
+  }
+
+  function canEditStageCard(role, element) {
+    return canManageStageObjects(role) && isIndexCardElement(element);
+  }
+
+  function canDuplicateStageElement(role, element) {
+    if (!canManageStageObjects(role)) return false;
+    return ["card", "prop"].includes(contextClassForElement(element));
   }
 
   function setCharacterStatus(text) {
@@ -1629,8 +2143,8 @@
   }
 
   function canMoveStageElement(role, element) {
-    if (!canManageIndexCards(role)) return false;
-    return contextClassForElement(element) === "card";
+    if (!canManageStageObjects(role)) return false;
+    return ["card", "prop", "scenery", "surface", "media"].includes(contextClassForElement(element));
   }
 
   function canRemoveStageElement(role, element) {
@@ -1716,47 +2230,61 @@
     if (normalizedRole === "audience") return [];
 
     const contextClass = contextClassForElement(element);
+    const locked = isLockedElement(element);
     const canReveal = canRevealHide(role);
-    const canManageCards = canManageIndexCards(role);
+    const canManageCards = canManageStageObjects(role);
     const canOverlay = canShowOverlay(role, element);
     const overlayActive = currentOverlayMatches(element);
     const actions = [];
+    const isCard = isIndexCardElement(element);
+    const isProp = contextClass === "prop";
 
-    if (contextClass === "card") {
+    const addAction = (action) => {
+      if (!actions.includes(action)) {
+        actions.push(action);
+      }
+    };
+
+    if (locked) {
+      if (canManageCards) {
+        addAction("unlock");
+      }
+      addAction("info");
+      return actions;
+    }
+
+    if (isCard || isProp) {
+      if (isCard && canEditStageCard(role, element)) {
+        addAction("edit");
+      }
+      if (canDuplicateStageElement(role, element)) {
+        addAction("duplicate");
+      }
       if (canMoveStageElement(role, element)) {
-        actions.push("move");
+        addAction("move");
       }
       if (canReveal) {
-        actions.push("reveal", "hide");
+        addAction("reveal");
+        addAction("hide");
+      }
+      addAction(isNameplateVisible(element) ? "hide-nameplate" : "show-nameplate");
+      if (canOverlay) {
+        addAction(overlayActive ? "hide-overlay" : "show-overlay");
       }
       if (canRemoveStageElement(role, element)) {
-        actions.push("remove");
+        addAction("remove");
       }
       if (canManageCards) {
-        actions.push("delete");
+        addAction("lock");
       }
-      if (canOverlay) {
-        actions.push(overlayActive ? "hide-overlay" : "show-overlay");
+      if (isCard && canManageCards) {
+        addAction("delete");
       }
-      actions.push("info");
-      if (canManageCards) {
-        actions.push("create-card");
-      }
+      addAction("info");
       return actions;
     }
 
-    if (["prop", "scenery", "surface", "actor", "media"].includes(contextClass)) {
-      if (canReveal) {
-        actions.push("reveal", "hide");
-      }
-      if (canOverlay) {
-        actions.push(overlayActive ? "hide-overlay" : "show-overlay");
-      }
-      actions.push("info");
-      return actions;
-    }
-
-    actions.push("info");
+    addAction("info");
     return actions;
   }
 
@@ -1766,20 +2294,6 @@
     const y = Number(pos.y ?? 0);
     const order = Number(pos.order ?? 0);
     return `x: ${Number.isFinite(x) ? x : 0}, y: ${Number.isFinite(y) ? y : 0}, order: ${Number.isFinite(order) ? order : 0}`;
-  }
-
-  function closeElementContextMenu() {
-    if (elementContextMenu) {
-      elementContextMenu.hidden = true;
-      elementContextMenu.innerHTML = "";
-    }
-    contextMenuTarget = null;
-  }
-
-  function closeElementInfoPopup() {
-    if (elementInfoPopup) {
-      elementInfoPopup.hidden = true;
-    }
   }
 
   function renderElementInfoContent(element) {
@@ -1792,6 +2306,9 @@
     parts.push(`Context class: ${contextClass}`);
     parts.push(`Surface: ${surface}`);
     parts.push(`Position: ${elementPositionString(element)}`);
+    parts.push(`Locked: ${isLockedElement(element)}`);
+    parts.push(`Nameplate visible: ${isNameplateVisible(element)}`);
+    parts.push(`Visible: ${isElementVisible(element)}`);
 
     if (isIndexCardElement(element)) {
       const front = indexCardTextFromData(element, "front_text");
@@ -1806,6 +2323,25 @@
       title: name,
       content: parts.join("\n"),
     };
+  }
+
+  function closeElementContextMenu() {
+    if (elementContextMenu) {
+      elementContextMenu.hidden = true;
+      elementContextMenu.innerHTML = "";
+    }
+    if (stageContextMenu) {
+      stageContextMenu.hidden = true;
+      stageContextMenu.innerHTML = "";
+    }
+    contextMenuMode = "object";
+    contextMenuTarget = null;
+  }
+
+  function closeElementInfoPopup() {
+    if (elementInfoPopup) {
+      elementInfoPopup.hidden = true;
+    }
   }
 
   function openElementInfo(element) {
@@ -1826,6 +2362,7 @@
 
   function cancelMoveMode(reason = "Move canceled.") {
     clearMoveMode();
+    setMovementState("idle");
     setConnectionStatus(reason);
   }
 
@@ -1851,6 +2388,7 @@
   function startMoveMode(element) {
     if (!canMoveStageElement(currentRole, element)) {
       setConnectionStatus("Move denied.");
+      setMovementState("rejected");
       return;
     }
 
@@ -1859,6 +2397,7 @@
       activeMovePointer = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     }
     renderMovePreview(element);
+    setMovementState("moving");
     setConnectionStatus("Click the stage to drop. Escape cancels.");
     closeElementContextMenu();
   }
@@ -1891,6 +2430,9 @@
     const x = (((event.clientX - stageBounds.left) / stageBounds.width) * 100) - 50;
     const y = (((event.clientY - stageBounds.top) / stageBounds.height) * 100) - 50;
 
+    updatePointerState(event);
+    setMovementState("dropped");
+
     const ok = sendAction("act/place_element", {
       element_id: activeMoveElement.element_id || "",
       element_slug: activeMoveElement.slug || "",
@@ -1903,11 +2445,158 @@
 
     if (!ok) {
       setConnectionStatus("Move failed to send.");
+      setMovementState("rejected");
       return;
     }
 
     setConnectionStatus("Move sent.");
+    setMovementState("persisted");
     clearMoveMode();
+  }
+
+  function stagePlacementPoint() {
+    return {
+      x: Number(stageContextPoint.stageX || 0),
+      y: Number(stageContextPoint.stageY || 0),
+      screenX: Number(stageContextPoint.screenX || 0),
+      screenY: Number(stageContextPoint.screenY || 0),
+    };
+  }
+
+  function setPendingStagePlacement(point, mode = "create") {
+    pendingStagePlacement = {
+      x: Number(point?.x || 0),
+      y: Number(point?.y || 0),
+      screenX: Number(point?.screenX || 0),
+      screenY: Number(point?.screenY || 0),
+      mode,
+    };
+  }
+
+  function clearPendingStagePlacement() {
+    pendingStagePlacement = null;
+    stageContextPoint = { screenX: 0, screenY: 0, stageX: 0, stageY: 0 };
+  }
+
+  function openWorkshopAssetPicker(point) {
+    if (!workshopAssetPicker || !workshopAssetPickerList) return;
+    setPendingStagePlacement(point || stagePlacementPoint(), "workshop");
+    workshopAssetPicker.hidden = false;
+    workshopAssetPickerStatus.textContent = "Loading workshop assets...";
+    workshopAssetPickerList.innerHTML = "";
+    fetch("/api/workshop/assets", { credentials: "include" })
+      .then((response) => response.json().catch(() => null).then((payload) => ({ response, payload })))
+      .then(({ response, payload }) => {
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || `HTTP ${response.status}`);
+        }
+        workshopAssets = Array.isArray(payload.data) ? payload.data : [];
+        if (workshopAssets.length === 0) {
+          workshopAssetPickerStatus.textContent = "No workshop assets available.";
+          workshopAssetPickerList.innerHTML = `<div class="index-card-empty">Nothing eligible for this venue yet.</div>`;
+          return;
+        }
+
+        workshopAssetPickerStatus.textContent = "Choose an asset to place at the clicked point.";
+        workshopAssetPickerList.innerHTML = workshopAssets
+          .map((asset) => {
+            const name = escapeHtml(asset.name || asset.slug || "Asset");
+            const type = escapeHtml(asset.element_type || "element");
+            const slug = escapeHtml(asset.slug || "");
+            const contextClass = escapeHtml(asset.context_class || "");
+            return `
+              <div class="asset-picker-card" data-asset-id="${escapeHtml(asset.element_id || "")}">
+                <strong>${name}</strong>
+                <small>${type}${contextClass ? ` · ${contextClass}` : ""}</small>
+                <small>${slug}</small>
+                <button type="button" data-asset-place="${escapeHtml(asset.element_id || "")}">Place Here</button>
+              </div>
+            `;
+          })
+          .join("");
+
+        for (const button of workshopAssetPickerList.querySelectorAll("[data-asset-place]")) {
+          button.addEventListener("click", () => {
+            const assetId = button.getAttribute("data-asset-place");
+            const asset = workshopAssets.find((item) => item.element_id === assetId);
+            if (asset) {
+              placeWorkshopAsset(asset, pendingStagePlacement || stagePlacementPoint());
+            }
+          });
+        }
+      })
+      .catch((err) => {
+        workshopAssetPickerStatus.textContent = err.message || String(err);
+      });
+  }
+
+  function closeWorkshopAssetPicker() {
+    if (workshopAssetPicker) {
+      workshopAssetPicker.hidden = true;
+    }
+    clearPendingStagePlacement();
+  }
+
+  function placeWorkshopAsset(asset, point) {
+    if (!asset?.element_id) return;
+    if (!canManageIndexCards(currentRole)) {
+      setWorkshopPlacementStatus("Only producers and directors can place assets.");
+      return;
+    }
+
+    const stagePoint = point || stagePlacementPoint();
+    const ok = sendAction("act/place_element", {
+      element_id: asset.element_id,
+      element_slug: asset.slug || "",
+      venue_slug: "the-cave",
+      layer: "stage",
+      x: Number(stagePoint.x || 0),
+      y: Number(stagePoint.y || 0),
+      order: 0,
+    });
+
+    if (!ok) {
+      setWorkshopPlacementStatus("Unable to place asset.");
+      setMovementState("rejected");
+      return;
+    }
+
+    setWorkshopPlacementStatus(`Placed ${asset.name || asset.slug || "asset"} on stage.`);
+    setLastActionState("act/place_element", asset.slug || asset.element_id || "", "sent");
+    closeWorkshopAssetPicker();
+    clearPendingStagePlacement();
+  }
+
+  function sendLockToggle(element, locked) {
+    if (!element?.element_id && !element?.slug) return false;
+    const ok = sendAction("act/set_element_lock", {
+      element_id: element.element_id || "",
+      element_slug: element.slug || "",
+      locked: !!locked,
+    });
+    if (ok) {
+      setLastActionState("act/set_element_lock", element.slug || element.element_id || "", "sent");
+      setMovementState("idle");
+    }
+    return ok;
+  }
+
+  function sendNameplateToggle(element, visible) {
+    if (!element?.element_id && !element?.slug) return false;
+    const ok = sendAction("act/set_nameplate_visibility", {
+      element_id: element.element_id || "",
+      element_slug: element.slug || "",
+      visible: !!visible,
+      layer: "audience",
+    });
+    if (ok) {
+      setLastActionState("act/set_nameplate_visibility", element.slug || element.element_id || "", "sent");
+    }
+    return ok;
+  }
+
+  function stageContextMenuActions() {
+    return ["add-workshop", "create-card"];
   }
 
   function scrollToIndexCardPanel() {
@@ -1919,16 +2608,87 @@
       setIndexCardStatus("Only producers and directors can create cards.");
       return;
     }
+    if (!pendingStagePlacement) {
+      setPendingStagePlacement(stagePlacementPoint(), "create");
+    }
     clearIndexCardEditor();
     scrollToIndexCardPanel();
     indexCardFront?.focus();
+    if (pendingStagePlacement) {
+      setIndexCardStatus("Save this card and it will be placed at the clicked point.");
+    }
     closeElementContextMenu();
+  }
+
+  function createCardAtStagePoint() {
+    if (!canManageIndexCards(currentRole)) {
+      setIndexCardStatus("Only producers and directors can create cards.");
+      return;
+    }
+    clearIndexCardEditor();
+    scrollToIndexCardPanel();
+    indexCardFront?.focus();
+    setPendingStagePlacement(stagePlacementPoint(), "create");
+    setIndexCardStatus("Create a card, then save it to place it where you clicked.");
+    closeStageContextMenu();
+  }
+
+  function openWorkshopFromStageMenu() {
+    if (!canManageIndexCards(currentRole)) {
+      setWorkshopPlacementStatus("Only producers and directors can place workshop assets.");
+      return;
+    }
+    openWorkshopAssetPicker(stagePlacementPoint());
+    closeStageContextMenu();
   }
 
   function moveContextElement() {
     const element = contextMenuTarget;
     if (!element) return;
     startMoveMode(element);
+  }
+
+  function editContextElement() {
+    const element = contextMenuTarget;
+    if (!element) return;
+    if (!isIndexCardElement(element)) {
+      openElementInfo(element);
+      closeElementContextMenu();
+      return;
+    }
+
+    loadIndexCardEditor(element);
+    scrollToIndexCardPanel();
+    indexCardFront?.focus();
+    closeElementContextMenu();
+  }
+
+  function duplicateContextElement() {
+    const element = contextMenuTarget;
+    if (!element) return;
+    if (!canDuplicateStageElement(currentRole, element)) {
+      setConnectionStatus("Duplicate denied.");
+      return;
+    }
+
+    const point = stagePlacementPoint();
+    const ok = sendAction("act/duplicate_element", {
+      element_id: element.element_id || "",
+      element_slug: element.slug || "",
+      venue_slug: "the-cave",
+      layer: "stage",
+      x: Number(point.x || 0),
+      y: Number(point.y || 0),
+      order: Number(element?.position?.order ?? 0),
+    });
+
+    if (!ok) {
+      setConnectionStatus("Duplicate failed to send.");
+      return;
+    }
+
+    setConnectionStatus("Duplicate sent.");
+    closeElementContextMenu();
   }
 
   function removeContextElementFromStage() {
@@ -1955,6 +2715,66 @@
     }
 
     setConnectionStatus("Removed from stage.");
+    closeElementContextMenu();
+  }
+
+  function lockContextElement() {
+    const element = contextMenuTarget;
+    if (!element) return;
+    if (!canManageIndexCards(currentRole)) {
+      setConnectionStatus("Lock denied.");
+      return;
+    }
+    if (!sendLockToggle(element, true)) {
+      setConnectionStatus("Lock failed to send.");
+      return;
+    }
+    setConnectionStatus("Lock sent.");
+    closeElementContextMenu();
+  }
+
+  function unlockContextElement() {
+    const element = contextMenuTarget;
+    if (!element) return;
+    if (!canManageIndexCards(currentRole)) {
+      setConnectionStatus("Unlock denied.");
+      return;
+    }
+    if (!sendLockToggle(element, false)) {
+      setConnectionStatus("Unlock failed to send.");
+      return;
+    }
+    setConnectionStatus("Unlock sent.");
+    closeElementContextMenu();
+  }
+
+  function hideNameplateContextElement() {
+    const element = contextMenuTarget;
+    if (!element) return;
+    if (!canManageIndexCards(currentRole)) {
+      setConnectionStatus("Hide nameplate denied.");
+      return;
+    }
+    if (!sendNameplateToggle(element, false)) {
+      setConnectionStatus("Hide nameplate failed to send.");
+      return;
+    }
+    setConnectionStatus("Nameplate hide sent.");
+    closeElementContextMenu();
+  }
+
+  function showNameplateContextElement() {
+    const element = contextMenuTarget;
+    if (!element) return;
+    if (!canManageIndexCards(currentRole)) {
+      setConnectionStatus("Show nameplate denied.");
+      return;
+    }
+    if (!sendNameplateToggle(element, true)) {
+      setConnectionStatus("Show nameplate failed to send.");
+      return;
+    }
+    setConnectionStatus("Nameplate show sent.");
     closeElementContextMenu();
   }
 
@@ -2056,13 +2876,22 @@
     closeElementContextMenu();
   }
 
-  function openElementContextMenu(event, element) {
+  function openElementContextMenu(event, element, targetMode = "object") {
     if (!element || !canUseStageContextMenu(currentRole)) return;
     event.preventDefault();
     event.stopPropagation();
 
+    updatePointerState(event, targetMode);
+    stageContextPoint = {
+      screenX: Number(event.clientX || 0),
+      screenY: Number(event.clientY || 0),
+      stageX: pointerState.stageX,
+      stageY: pointerState.stageY,
+    };
+
+    contextMenuMode = "object";
     contextMenuTarget = element;
-    selectedElement = {
+    setSelectedElement({
       element_id: element.element_id || "",
       slug: element.slug || "",
       name: element.name || element.slug || "Element",
@@ -2070,31 +2899,42 @@
       element_type: element.element_type || "",
       position: element.position || {},
       data: element.data || {},
-    };
-    updateSelectionUI();
+      visibility: element.visibility || {},
+      state: element.state || {},
+    });
 
     if (!elementContextMenu) return;
 
     const menuItems = contextMenuActionsForElement(currentRole, element).map((action) => {
       switch (action) {
+        case "edit":
+          return `<button type="button" data-menu-action="edit">Edit</button>`;
+        case "duplicate":
+          return `<button type="button" data-menu-action="duplicate">Duplicate on Stage</button>`;
         case "move":
           return `<button type="button" data-menu-action="move">Move</button>`;
+        case "unlock":
+          return `<button type="button" data-menu-action="unlock">Unlock</button>`;
         case "reveal":
           return `<button type="button" data-menu-action="reveal">Reveal</button>`;
         case "hide":
           return `<button type="button" data-menu-action="hide">Hide</button>`;
+        case "hide-nameplate":
+          return `<button type="button" data-menu-action="hide-nameplate">Hide Nameplate</button>`;
+        case "show-nameplate":
+          return `<button type="button" data-menu-action="show-nameplate">Show Nameplate</button>`;
         case "remove":
           return `<button type="button" data-menu-action="remove">Remove from Stage</button>`;
         case "delete":
-          return `<button type="button" data-menu-action="delete">Delete Card</button>`;
+          return `<button type="button" data-menu-action="delete" class="is-destructive">Delete Card</button>`;
         case "show-overlay":
           return `<button type="button" data-menu-action="show-overlay">Show as Overlay</button>`;
         case "hide-overlay":
           return `<button type="button" data-menu-action="hide-overlay">Hide Overlay</button>`;
+        case "lock":
+          return `<button type="button" data-menu-action="lock">Lock</button>`;
         case "info":
           return `<button type="button" data-menu-action="info">Info</button>`;
-        case "create-card":
-          return `<div class="menu-separator"></div><button type="button" data-menu-action="create-card">Create Index Card</button>`;
         default:
           return "";
       }
@@ -2116,6 +2956,43 @@
     const top = Math.max(8, Math.min(event.clientY, maxY));
     elementContextMenu.style.left = `${left}px`;
     elementContextMenu.style.top = `${top}px`;
+  }
+
+  function openStageContextMenu(event) {
+    if (!canUseStageContextMenu(currentRole)) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    contextMenuMode = "empty";
+    contextMenuTarget = null;
+    updatePointerState(event, "empty-stage");
+    stageContextPoint = {
+      screenX: Number(event.clientX || 0),
+      screenY: Number(event.clientY || 0),
+      stageX: pointerState.stageX,
+      stageY: pointerState.stageY,
+    };
+
+    if (!stageContextMenu) return;
+
+    stageContextMenu.innerHTML = `
+      <button type="button" data-stage-menu-action="add-workshop">Add from Workshop</button>
+      <button type="button" data-stage-menu-action="create-card">Create / Place Index Card</button>
+    `;
+    stageContextMenu.hidden = false;
+    stageContextMenu.style.left = "0px";
+    stageContextMenu.style.top = "0px";
+    const rect = stageContextMenu.getBoundingClientRect();
+    const maxX = Math.max(8, window.innerWidth - rect.width - 8);
+    const maxY = Math.max(8, window.innerHeight - rect.height - 8);
+    const left = Math.max(8, Math.min(event.clientX, maxX));
+    const top = Math.max(8, Math.min(event.clientY, maxY));
+    stageContextMenu.style.left = `${left}px`;
+    stageContextMenu.style.top = `${top}px`;
+  }
+
+  function closeStageContextMenu() {
+    closeElementContextMenu();
   }
 
   function indexCardTextFromData(element, key) {
@@ -2187,6 +3064,10 @@
     });
 
     finalizePendingIndexCardSave(card || null);
+
+    if (card && pendingStagePlacement && pendingStagePlacement.mode === "create") {
+      placeIndexCardOnStage(card, pendingStagePlacement);
+    }
   }
 
   function clearIndexCardEditor() {
@@ -2199,6 +3080,7 @@
     setIndexCardStatus("Ready for a new card.");
     updateSelectionUI();
     refreshIndexCardPanels();
+    updateDebugPanel();
   }
 
   function loadIndexCardEditor(card) {
@@ -2214,6 +3096,9 @@
       name: card.name || card.data?.front_text || "Index Card",
       element_type: card.element_type,
       surface: card.surface,
+      position: card.position || {},
+      visibility: card.visibility || {},
+      state: card.state || {},
       data: card.data || {},
     };
 
@@ -2314,8 +3199,10 @@
         const surfaceLabel = escapeHtml(indexCardSurface(card));
         const flipped = isIndexCardFlipped(card.element_id);
         const moving = activeMoveElement && activeMoveElement.element_id === card.element_id ? " hidden" : "";
+        const locked = isLockedElement(card);
         return `
           <div class="index-card-item${selected}" data-card-id="${escapeHtml(card.element_id || "")}"${moving} style="--card-accent:${color};">
+            <div class="index-card-lock-badge" ${locked ? "" : "hidden"}>Locked</div>
             <div class="index-card-face index-card-face--front" ${flipped ? "hidden" : ""}>
               <div class="index-card-front">${front || "Untitled card"}</div>
             </div>
@@ -2348,7 +3235,7 @@
         const cardId = cardEl.getAttribute("data-card-id");
         const card = cards.find((item) => item.element_id === cardId);
         if (card) {
-          openElementContextMenu(event, card);
+          openElementContextMenu(event, card, "object");
         }
       });
     }
@@ -2379,46 +3266,69 @@
     }
   }
 
-  function renderStageIndexCards(container, cards) {
+  function renderStageIndexCards(container, elements) {
     if (!container) return;
 
-    if (cards.length === 0) {
+    if (elements.length === 0) {
       container.innerHTML = "";
       return;
     }
 
-    const mid = (cards.length - 1) / 2;
+    const mid = (elements.length - 1) / 2;
     const baseLeft = 50;
     const baseTop = 50;
     const spreadX = 8;
     const spreadY = 5;
 
-    container.innerHTML = cards
-      .map((card, index) => {
-        const front = escapeHtml(indexCardTextFromData(card, "front_text"));
-        const back = escapeHtml(indexCardTextFromData(card, "back_text"));
-        const color = escapeHtml(indexCardColorFromData(card));
-        const flipped = isIndexCardFlipped(card.element_id);
-        const pos = card?.position || {};
+    container.innerHTML = elements
+      .map((element, index) => {
+        const isCard = isIndexCardElement(element);
+        const contextClass = contextClassForElement(element);
+        const label = escapeHtml(element?.name || element?.slug || "Element");
+        const color = escapeHtml(isCard ? indexCardColorFromData(element) : String(element?.data?.color || "#8b7b63"));
+        const flipped = isCard ? isIndexCardFlipped(element.element_id) : false;
+        const pos = element?.position || {};
         const order = Number(pos.order || index);
         const left = baseLeft + ((index - mid) * spreadX) + Number(pos.x || 0);
         const top = baseTop + Math.floor(index / 2) * spreadY + Number(pos.y || 0);
         const tilt = Math.max(-10, Math.min(10, (index % 2 === 0 ? -1 : 1) * (4 + order)));
         const zIndex = 20 + index;
+        const locked = isLockedElement(element);
+        if (isCard) {
+          const front = escapeHtml(indexCardTextFromData(element, "front_text"));
+          const back = escapeHtml(indexCardTextFromData(element, "back_text"));
+          return `
+            <div
+              class="index-card-item"
+              data-card-id="${escapeHtml(element.element_id || "")}"
+              data-surface="stage"
+              style="--card-accent:${color}; left:${left}%; top:${top}%; --card-tilt:${tilt}deg; z-index:${zIndex};"
+            >
+              <div class="index-card-lock-badge" ${locked ? "" : "hidden"}>Locked</div>
+              <div class="index-card-face index-card-face--front" ${flipped ? "hidden" : ""}>
+                <div class="index-card-front">${front || "Untitled card"}</div>
+              </div>
+              <div class="index-card-face index-card-face--back" ${flipped ? "" : "hidden"}>
+                <div class="index-card-back">${back || "No back text yet."}</div>
+              </div>
+              <button type="button" class="index-card-flip-button" data-card-back="${escapeHtml(element.element_id || "")}" aria-label="${flipped ? "Show front" : "Show back"}">${flipped ? "↺" : "↩"}</button>
+            </div>
+          `;
+        }
+
         return `
           <div
-            class="index-card-item"
-            data-card-id="${escapeHtml(card.element_id || "")}"
+            class="index-card-item index-card-item--prop"
+            data-card-id="${escapeHtml(element.element_id || "")}"
             data-surface="stage"
+            data-context-class="${escapeHtml(contextClass)}"
             style="--card-accent:${color}; left:${left}%; top:${top}%; --card-tilt:${tilt}deg; z-index:${zIndex};"
           >
-            <div class="index-card-face index-card-face--front" ${flipped ? "hidden" : ""}>
-              <div class="index-card-front">${front || "Untitled card"}</div>
+            <div class="index-card-lock-badge" ${locked ? "" : "hidden"}>Locked</div>
+            <div class="index-card-face index-card-face--front">
+              <div class="index-card-front">${label || "Unnamed prop"}</div>
+              <div class="index-card-back">${escapeHtml(contextClass || "prop")}</div>
             </div>
-            <div class="index-card-face index-card-face--back" ${flipped ? "" : "hidden"}>
-              <div class="index-card-back">${back || "No back text yet."}</div>
-            </div>
-            <button type="button" class="index-card-flip-button" data-card-back="${escapeHtml(card.element_id || "")}" aria-label="${flipped ? "Show front" : "Show back"}">${flipped ? "↺" : "↩"}</button>
           </div>
         `;
       })
@@ -2427,18 +3337,38 @@
     for (const cardEl of container.querySelectorAll(".index-card-item")) {
       cardEl.addEventListener("click", (event) => {
         if (event.target.closest("button")) return;
-        const cardId = cardEl.getAttribute("data-card-id");
-        const card = cards.find((item) => item.element_id === cardId);
-        if (card) {
-          loadIndexCardEditor(card);
+        if (activeMoveElement) {
+          event.stopPropagation();
+          dropMoveElement(event);
+          return;
         }
+
+        const cardId = cardEl.getAttribute("data-card-id");
+        const card = elements.find((item) => item.element_id === cardId);
+        if (!card) return;
+        if (isIndexCardElement(card)) {
+          loadIndexCardEditor(card);
+          return;
+        }
+
+        setSelectedElement({
+          element_id: card.element_id,
+          slug: card.slug,
+          name: card.name || card.slug || "Element",
+          surface: card.surface,
+          element_type: card.element_type,
+          position: card.position || {},
+          visibility: card.visibility || {},
+          state: card.state || {},
+          data: card.data || {},
+        });
       });
 
       cardEl.addEventListener("contextmenu", (event) => {
         const cardId = cardEl.getAttribute("data-card-id");
-        const card = cards.find((item) => item.element_id === cardId);
+        const card = elements.find((item) => item.element_id === cardId);
         if (card) {
-          openElementContextMenu(event, card);
+          openElementContextMenu(event, card, "object");
         }
       });
     }
@@ -2488,12 +3418,42 @@
       .join("");
   }
 
+  function findSnapshotElementByRef(elementOrRef) {
+    const ref = elementOrRef || {};
+    return latestSnapshotElements.find((el) => {
+      if (!el) return false;
+      return (
+        (ref.element_id && el.element_id === ref.element_id) ||
+        (ref.slug && el.slug === ref.slug)
+      );
+    }) || null;
+  }
+
+  function syncFireStageObject(fireElement) {
+    if (!fireObject || !fireEl || !fireNameplate) return;
+    fireObject.hidden = !fireElement;
+    fireEl.hidden = !fireElement;
+    fireEl.dataset.elementId = fireElement?.element_id || "";
+    fireEl.dataset.elementSlug = fireElement?.slug || "";
+    fireEl.dataset.elementName = fireElement?.name || "";
+    fireEl.dataset.elementType = fireElement?.element_type || "";
+    fireEl.dataset.locked = fireElement ? String(isLockedElement(fireElement)) : "false";
+    fireEl.dataset.nameplateVisible = fireElement ? String(isNameplateVisible(fireElement)) : "true";
+    fireNameplate.hidden = !fireElement || !isNameplateVisible(fireElement);
+    fireNameplate.textContent = fireElement?.name || fireElement?.slug || "first-fire";
+    fireNameplate.classList.toggle("stage-nameplate--locked", fireElement ? isLockedElement(fireElement) : false);
+  }
+
   function refreshIndexCardPanels() {
     const cards = sortIndexCards(latestSnapshotElements);
     const workshopCards = cards.filter((card) => indexCardSurface(card) === "workshop");
     const venueCards = cards.filter((card) => indexCardSurface(card) === "tray");
-    const stageCards = cards
-      .filter((card) => indexCardSurface(card) === "stage")
+    const stageElements = latestSnapshotElements
+      .filter((element) => {
+        if (indexCardSurface(element) !== "stage") return false;
+        const contextClass = contextClassForElement(element);
+        return isIndexCardElement(element) || contextClass === "prop";
+      })
       .sort((a, b) => {
         const orderA = Number(a?.position?.order ?? a?.data?.position?.order ?? 0);
         const orderB = Number(b?.position?.order ?? b?.data?.position?.order ?? 0);
@@ -2516,8 +3476,8 @@
     }
     renderIndexCardSurface(indexCardWorkshopTray, workshopCards, "No workshop cards yet.", "workshop");
     renderIndexCardSurface(indexCardVenueTray, venueCards, "No venue tray cards yet.", "venue");
-    renderIndexCardSurface(indexCardStage, stageCards, "No staged cards yet.", "stage");
-    renderStageIndexCards(stageCardOverlay, stageCards);
+    renderIndexCardSurface(indexCardStage, stageElements.filter(isIndexCardElement), "No staged cards yet.", "stage");
+    renderStageIndexCards(stageCardOverlay, stageElements);
     renderIndexCardHistory(latestSnapshotActions);
   }
 
@@ -2685,7 +3645,7 @@
     setWorkshopPlacementStatus(layer === "stage" ? "Placement sent to stage." : "Placement sent to venue tray.");
   }
 
-  function placeIndexCardOnStage(card) {
+  function placeIndexCardOnStage(card, point = null) {
     if (!card?.element_id) return;
     if (!canManageIndexCards(currentRole)) {
       setIndexCardStatus("Only producers and directors can place cards on stage.");
@@ -2693,22 +3653,26 @@
     }
 
     setIndexCardStatus("Placing on stage...");
+    const placementPoint = point || pendingStagePlacement || stagePlacementPoint();
     const ok = sendAction("act/place_element", {
       element_id: card.element_id,
       element_slug: card.slug || "",
       venue_slug: "the-cave",
       layer: "stage",
-      x: 0,
-      y: 0,
+      x: Number(placementPoint.x || 0),
+      y: Number(placementPoint.y || 0),
       order: 0,
     });
 
     if (!ok) {
       setIndexCardStatus("Unable to place card on stage.");
+      setMovementState("rejected");
       return;
     }
 
     setIndexCardStatus("Placement sent to stage.");
+    setLastActionState("act/place_element", card.slug || card.element_id || "", "sent");
+    clearPendingStagePlacement();
   }
 
   function setPresenceUsers(users) {
@@ -2928,10 +3892,6 @@
     chatLog.scrollTop = chatLog.scrollHeight;
   }
 
-  function setConnectionStatus(text) {
-    connectionStatus.textContent = text;
-  }
-
   function setNoteCardStatus(text) {
     if (noteCardStatus) {
       noteCardStatus.textContent = text;
@@ -2960,22 +3920,29 @@
 
   function setSelectedElement(element) {
     selectedElement = element || null;
-    if (!element || String(element.element_type || "").toLowerCase() !== "index_card") {
+    if (element && isIndexCardElement(element)) {
+      selectedIndexCard = element;
+      refreshIndexCardPanels();
+    } else {
       selectedIndexCard = null;
       if (indexCardSave) indexCardSave.textContent = "Save Card";
       refreshIndexCardPanels();
     }
     updateSelectionUI();
+    updateDebugPanel();
   }
 
   function clearSelectedElement() {
     selectedElement = null;
     updateSelectionUI();
+    updateDebugPanel();
   }
 
   function updateSelectionUI() {
     if (selectedLabel) {
-      selectedLabel.textContent = selectedElement?.name || selectedElement?.slug || "None";
+      const selectedName = selectedElement?.name || selectedElement?.slug || "None";
+      const lockText = selectedElement ? (isLockedElement(selectedElement) ? "locked" : "unlocked") : "";
+      selectedLabel.textContent = selectedElement ? `${selectedName}${lockText ? ` · ${lockText}` : ""}` : "None";
     }
 
     const hasSelection = !!selectedElement;
@@ -3000,6 +3967,7 @@
       selectionLayer.disabled = !revealHideAllowed || !hasSelection;
       selectionLayer.hidden = !revealHideAllowed;
     }
+    updateSelectedDebug();
   }
 
   function applyRoleUI() {
@@ -3026,6 +3994,7 @@
     if (speechSend) speechSend.disabled = !canSpeak(currentRole);
     updateSelectionUI();
     updateAudienceCurtain();
+    updateDebugPanel();
   }
 
   function applySnapshot(snapshot) {
@@ -3038,10 +4007,7 @@
     latestSnapshotActions = actions;
 
     const fireElement = elements.find((el) => el && el.slug === "first-fire");
-    fireEl.hidden = !fireElement;
-    fireEl.dataset.elementId = fireElement?.element_id || "";
-    fireEl.dataset.elementSlug = fireElement?.slug || "";
-    fireEl.dataset.elementName = fireElement?.name || "";
+    syncFireStageObject(fireElement || null);
 
     const latestSpeech = actions.find((a) => a?.type === "perform/speak");
     const latestSpeechText =
@@ -3055,15 +4021,10 @@
     refreshIndexCardPanels();
     applyRoleUI();
     updateAudienceCurtain();
+    updateDebugPanel();
 
     if (selectedElement) {
-      const stillVisible = elements.find((el) =>
-        el &&
-        (
-          (selectedElement.element_id && el.element_id === selectedElement.element_id) ||
-          (selectedElement.slug && el.slug === selectedElement.slug)
-        )
-      );
+      const stillVisible = findSnapshotElementByRef(selectedElement);
 
       if (!stillVisible) {
         clearSelectedElement();
@@ -3073,13 +4034,17 @@
           slug: stillVisible.slug,
           name: stillVisible.name,
           surface: stillVisible.surface,
-          element_type: stillVisible.element_type
+          element_type: stillVisible.element_type,
+          position: stillVisible.position,
+          visibility: stillVisible.visibility,
+          state: stillVisible.state,
+          data: stillVisible.data,
         });
       }
     }
 
     if (selectedIndexCard) {
-      const stillVisibleCard = elements.find((el) => el && el.element_id === selectedIndexCard.element_id);
+      const stillVisibleCard = findSnapshotElementByRef(selectedIndexCard);
       if (!stillVisibleCard) {
         clearIndexCardEditor();
       } else {
@@ -3105,6 +4070,13 @@
       }
       setChatPanelExpanded(true);
       clearChatCollapseTimer();
+    }
+
+    if (pendingStagePlacement && pendingStagePlacement.mode === "workshop" && pendingStagePlacement.element_id) {
+      const waitingAsset = elements.find((el) => el.element_id === pendingStagePlacement.element_id);
+      if (waitingAsset) {
+        pendingStagePlacement.element = waitingAsset;
+      }
     }
   }
 
@@ -3246,6 +4218,10 @@
         const action = msg.data;
         const actionType = action.type || "";
         const actionText = action.payload?.text || action.text || "";
+        const actorUserID = String(action?.actor?.user_id || action?.actor_id || "");
+        const actionTargetLabel =
+          String(action?.target?.element_slug || action?.target?.slug || action?.target?.element_id || actionType || "");
+        const isOwnAction = actorUserID && actorUserID === String(currentActorId || "");
 
         if (actionType === "perform/speak" && actionText) {
           speechEl.textContent = actionText;
@@ -3263,7 +4239,7 @@
         }
 
         if (actionType === "persona/equip" || actionType === "persona/unequip") {
-          if (String(action?.actor?.user_id || action?.actor_id || "") === String(currentActorId || "")) {
+          if (isOwnAction) {
             activePersona = action?.persona || action?.payload?.persona || null;
             setCharacterStatus(actionType === "persona/equip" ? "Character on." : "Character off.");
             applyRoleUI();
@@ -3271,12 +4247,32 @@
           return;
         }
 
-        if (actionType === "act/reveal_element" || actionType === "act/hide_element" || actionType === "create/index_card" || actionType === "update/index_card" || actionType === "delete/index_card") {
+        if (actionType === "act/reveal_element" || actionType === "act/hide_element" || actionType === "act/set_element_lock" || actionType === "act/set_nameplate_visibility" || actionType === "act/duplicate_element" || actionType === "create/index_card" || actionType === "update/index_card" || actionType === "delete/index_card") {
           await refreshSnapshot();
+          if (isOwnAction) {
+            setLastActionState(actionType, actionTargetLabel, "accepted");
+          }
+          if (actionType === "act/duplicate_element") {
+            const newElementId = String(action?.payload?.new_element_id || action?.target?.new_element_id || "");
+            const newElementSlug = String(action?.payload?.new_element_slug || action?.target?.new_element_slug || "");
+            const duplicatedElement = latestSnapshotElements.find((el) => {
+              if (!el) return false;
+              if (newElementId && String(el.element_id || "") === newElementId) return true;
+              if (newElementSlug && String(el.slug || "") === newElementSlug) return true;
+              return false;
+            });
+            if (duplicatedElement) {
+              if (isIndexCardElement(duplicatedElement)) {
+                loadIndexCardEditor(duplicatedElement);
+              } else {
+                setSelectedElement(duplicatedElement);
+              }
+            }
+          }
           if (
             pendingIndexCardSave &&
             actionType === pendingIndexCardSave.type &&
-            String(action?.actor?.user_id || action?.actor_id || "") === String(currentActorId || "")
+            isOwnAction
           ) {
             const targetId = String(action?.target?.element_id || "");
             const targetSlug = String(action?.target?.element_slug || "");
@@ -3294,6 +4290,9 @@
 
         if (actionType === "act/place_element") {
           await refreshSnapshot();
+          if (isOwnAction) {
+            setLastActionState(actionType, actionTargetLabel, "accepted");
+          }
           return;
         }
       }
@@ -3320,6 +4319,7 @@
           clearPendingIndexCardSave();
           setIndexCardStatus(`Save failed: ${errorText}`);
         }
+        setLastActionState(lastActionState.type || "error", lastActionState.target || "", "rejected", errorText);
         setConnectionStatus(`Action denied: ${errorText}`);
         addChatMessage(`Action denied: ${errorText}`, formatTime(), "system");
         console.error("WS error:", msg.error);
@@ -3330,9 +4330,11 @@
   function sendAction(type, extra = {}) {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       addChatMessage("(not connected)", formatTime(), "system");
+      setLastActionState(type, extra.element_slug || extra.element_id || extra.target || "", "rejected", "not connected");
       return false;
     }
 
+    setLastActionState(type, extra.element_slug || extra.element_id || extra.target || "", "sent");
     ws.send(JSON.stringify({
       type,
       session_id: currentSessionId,
@@ -3466,6 +4468,16 @@
       clearSelectedElement();
       updateSelectionUI();
 
+      try {
+        const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
+        const sessionPayload = await sessionResponse.json().catch(() => null);
+        if (sessionResponse.ok && sessionPayload?.ok && sessionPayload?.signed_in) {
+          document.querySelector(".shell")?.classList.add("venue-shell--signed-in");
+        }
+      } catch (error) {
+        console.error("session lookup failed", error);
+      }
+
       if (isWorkshopMode) {
         await loadWorkshopVenues();
       }
@@ -3573,46 +4585,58 @@
     });
   }
 
-  fireEl.addEventListener("click", (event) => {
+  const handleFireSelect = (event, targetMode = "object") => {
     if (activeMoveElement) {
       event.stopPropagation();
       dropMoveElement(event);
       return;
     }
     if (fireEl.hidden) return;
+    event.stopPropagation();
 
-    const elementId = fireEl.dataset.elementId || "";
-    const elementSlug = fireEl.dataset.elementSlug || "";
-    const elementName = fireEl.dataset.elementName || "Selected element";
-
-    if (!elementId && !elementSlug) return;
-
-    setSelectedElement({
-      element_id: elementId,
-      slug: elementSlug,
-      name: elementName
+    const fireElement = findSnapshotElementByRef({
+      element_id: fireEl.dataset.elementId || "",
+      slug: fireEl.dataset.elementSlug || "",
     });
-  });
+    if (!fireElement) return;
 
-  fireEl.addEventListener("contextmenu", (event) => {
+    selectedElement = {
+      ...fireElement,
+    };
+    updateSelectionUI();
+    updateDebugPanel();
+    pointerState.rightClickTarget = targetMode;
+  };
+
+  const handleFireContextMenu = (event, targetMode = "object") => {
     if (activeMoveElement) {
       event.preventDefault();
       event.stopPropagation();
       return;
     }
     if (fireEl.hidden) return;
-    const elementId = fireEl.dataset.elementId || "";
-    const elementSlug = fireEl.dataset.elementSlug || "";
-    const elementName = fireEl.dataset.elementName || "Fire";
-    if (!elementId && !elementSlug) return;
-    openElementContextMenu(event, {
-      element_id: elementId,
-      slug: elementSlug,
-      name: elementName,
-      surface: "stage",
-      element_type: "element",
+    const fireElement = findSnapshotElementByRef({
+      element_id: fireEl.dataset.elementId || "",
+      slug: fireEl.dataset.elementSlug || "",
     });
+    if (!fireElement) return;
+    pointerState.rightClickTarget = targetMode;
+    updatePointerState(event, targetMode);
+    openElementContextMenu(event, fireElement, targetMode);
+  };
+
+  fireObject?.addEventListener("click", (event) => handleFireSelect(event, "object"));
+  fireObject?.addEventListener("contextmenu", (event) => handleFireContextMenu(event, "object"));
+  fireNameplate?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    handleFireSelect(event, "nameplate");
   });
+  fireNameplate?.addEventListener("contextmenu", (event) => {
+    event.stopPropagation();
+    handleFireContextMenu(event, "nameplate");
+  });
+
+  stageEl?.addEventListener("contextmenu", openStageContextMenu);
 
   revealSelectedBtn?.addEventListener("click", () => {
     if (!selectedElement) return;
@@ -3646,6 +4670,14 @@
       moveContextElement();
       return;
     }
+    if (action === "edit") {
+      editContextElement();
+      return;
+    }
+    if (action === "duplicate") {
+      duplicateContextElement();
+      return;
+    }
     if (action === "reveal") {
       revealContextElement();
       return;
@@ -3675,16 +4707,56 @@
       hideOverlayContextElement();
       return;
     }
+    if (action === "lock") {
+      lockContextElement();
+      return;
+    }
+    if (action === "unlock") {
+      unlockContextElement();
+      return;
+    }
+    if (action === "hide-nameplate") {
+      hideNameplateContextElement();
+      return;
+    }
+    if (action === "show-nameplate") {
+      showNameplateContextElement();
+      return;
+    }
+  });
+
+  stageContextMenu?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-stage-menu-action]");
+    if (!button) return;
+    const action = button.getAttribute("data-stage-menu-action");
+    if (action === "add-workshop") {
+      openWorkshopFromStageMenu();
+      return;
+    }
     if (action === "create-card") {
-      createIndexCardFromMenu();
+      createCardAtStagePoint();
       return;
     }
   });
 
   elementInfoClose?.addEventListener("click", closeElementInfoPopup);
+  workshopAssetPickerClose?.addEventListener("click", closeWorkshopAssetPicker);
+  workshopAssetPicker?.addEventListener("click", (event) => {
+    if (event.target === workshopAssetPicker) {
+      closeWorkshopAssetPicker();
+    }
+  });
   document.addEventListener("click", (event) => {
     if (elementContextMenu && !elementContextMenu.hidden && !elementContextMenu.contains(event.target)) {
       closeElementContextMenu();
+    }
+    if (stageContextMenu && !stageContextMenu.hidden && !stageContextMenu.contains(event.target)) {
+      closeStageContextMenu();
+    }
+    if (workshopAssetPicker && !workshopAssetPicker.hidden && !workshopAssetPicker.contains(event.target)) {
+      if (!event.target.closest?.("#workshop-asset-picker")) {
+        closeWorkshopAssetPicker();
+      }
     }
   });
   document.addEventListener("keydown", (event) => {
@@ -3694,11 +4766,16 @@
         return;
       }
       closeElementContextMenu();
+      closeStageContextMenu();
+      closeWorkshopAssetPicker();
       closeElementInfoPopup();
     }
   });
 
-  document.addEventListener("pointermove", updateMovePreviewPosition);
+  document.addEventListener("pointermove", (event) => {
+    updatePointerState(event);
+    updateMovePreviewPosition(event);
+  });
   stageEl?.addEventListener("click", (event) => {
     if (!activeMoveElement) return;
     dropMoveElement(event);

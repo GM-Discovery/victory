@@ -311,54 +311,22 @@ func StoreIndexCardDelete(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 		return nil, err
 	}
 
-	var (
-		existingData []byte
-		existingName string
-	)
-	if err := tx.QueryRow(ctx, `
-		SELECT
-			e.data,
-			e.name
-		FROM elements e
-		WHERE e.id = $1
-		  AND e.element_type = 'index_card'
-		LIMIT 1
-	`, resolvedID).Scan(&existingData, &existingName); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errors.New("index_card_not_found")
-		}
-		return nil, err
-	}
-	_ = existingName
-
 	displayName, handle, role, persona, err := loadActorIdentity(ctx, tx, req.SessionID, req.ActorID)
 	if err != nil {
 		return nil, err
 	}
 
-	deletedAt := time.Now().UTC().Format(time.RFC3339)
-	var existing map[string]any
-	_ = json.Unmarshal(existingData, &existing)
-	if existing == nil {
-		existing = map[string]any{}
-	}
-	existing["deleted_at"] = deletedAt
-	existing["deleted_by"] = req.ActorID
-	existing["deleted_by_display_name"] = displayName
-	existing["deleted_by_handle"] = handle
-	existing["deleted_by_role"] = role
-	existing["deleted_reason"] = "delete/index_card"
-	existing["state"] = "deleted"
-
-	deletedJSON, _ := json.Marshal(existing)
-
 	if _, err := tx.Exec(ctx, `
-		UPDATE elements
-		SET state = 'deleted',
-		    data = $2
-		WHERE id = $1
-		  AND element_type = 'index_card'
-	`, resolvedID, deletedJSON); err != nil {
+		DELETE FROM venue_layout_elements
+		WHERE element_id = $1
+		  AND venue_id = (
+			SELECT v.id
+			FROM sessions s
+			JOIN venues v ON v.id = s.venue_id
+			WHERE s.id = $2
+			LIMIT 1
+		)
+	`, resolvedID, req.SessionID); err != nil {
 		return nil, err
 	}
 
@@ -377,7 +345,7 @@ func StoreIndexCardDelete(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 		"element_slug": resolvedSlug,
 	}
 	payload := map[string]any{
-		"deleted_at":    deletedAt,
+		"deleted_at":    time.Now().UTC().Format(time.RFC3339),
 		"deleted_by":    req.ActorID,
 		"actor_persona": persona,
 	}

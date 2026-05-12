@@ -15,15 +15,15 @@ import (
 )
 
 type PlaceElementRequest struct {
-	SessionID   string `json:"session_id"`
-	ActorID     string `json:"actor_id"`
-	ElementID   string `json:"element_id"`
-	ElementSlug string `json:"element_slug"`
-	VenueSlug   string `json:"venue_slug"`
-	Layer       string `json:"layer"`
-	X           int    `json:"x"`
-	Y           int    `json:"y"`
-	Order       int    `json:"order"`
+	SessionID   string  `json:"session_id"`
+	ActorID     string  `json:"actor_id"`
+	ElementID   string  `json:"element_id"`
+	ElementSlug string  `json:"element_slug"`
+	VenueSlug   string  `json:"venue_slug"`
+	Layer       string  `json:"layer"`
+	X           float64 `json:"x"`
+	Y           float64 `json:"y"`
+	Order       int     `json:"order"`
 }
 
 func StorePlaceElement(ctx context.Context, pool *pgxpool.Pool, req PlaceElementRequest) (*StoredAction, error) {
@@ -51,7 +51,7 @@ func StorePlaceElement(ctx context.Context, pool *pgxpool.Pool, req PlaceElement
 	defer tx.Rollback(ctx)
 
 	decision, err := CanAct(ctx, tx, req.ActorID, "act/place_element", req.SessionID, ActionTarget{
-		Kind:        "index_card",
+		Kind:        "element",
 		ElementID:   req.ElementID,
 		ElementSlug: req.ElementSlug,
 		VenueSlug:   req.VenueSlug,
@@ -69,7 +69,7 @@ func StorePlaceElement(ctx context.Context, pool *pgxpool.Pool, req PlaceElement
 		return nil, err
 	}
 
-	elementID, elementSlug, err := resolveIndexCardElement(ctx, tx, req.ElementID, req.ElementSlug)
+	elementID, elementSlug, err := resolvePlaceableElement(ctx, tx, req.ElementID, req.ElementSlug)
 	if err != nil {
 		return nil, err
 	}
@@ -88,19 +88,33 @@ func StorePlaceElement(ctx context.Context, pool *pgxpool.Pool, req PlaceElement
 		return nil, &ActionDeniedError{Reason: "unknown_target"}
 	}
 
+	existingVisibility := map[string]any{}
+	if err := tx.QueryRow(ctx, `
+		SELECT COALESCE(vle.visibility, '{}'::jsonb)
+		FROM venue_layout_elements vle
+		WHERE vle.venue_id = $1
+		  AND vle.element_id = $2
+		LIMIT 1
+	`, venueID, elementID).Scan(&existingVisibility); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
 	placementPosition := map[string]any{
 		"anchor": req.Layer,
 		"x":      req.X,
 		"y":      req.Y,
 		"z":      0,
 		"order":  req.Order,
+		"frame":  "top-left",
 	}
-	placementVisibility := map[string]any{
-		"toRoles":   []string{"director", "producer"},
-		"privateTo": []string{},
-	}
+	placementVisibility := mergeVisibilityState(existingVisibility, map[string]any{
+		"toRoles":           []string{"director", "producer"},
+		"privateTo":         []string{},
+		"visible":           true,
+		"nameplate_visible": visibilityBool(existingVisibility, "nameplate_visible", true),
+		"locked":            visibilityBool(existingVisibility, "locked", false),
+	})
 	positionJSON, _ := json.Marshal(placementPosition)
-	visibilityJSON, _ := json.Marshal(placementVisibility)
+	visibilityJSON := marshalVisibilityState(placementVisibility)
 
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO venue_layout_elements (
@@ -145,7 +159,7 @@ func StorePlaceElement(ctx context.Context, pool *pgxpool.Pool, req PlaceElement
 	}
 
 	target := map[string]any{
-		"kind":         "index_card",
+		"kind":         "element",
 		"element_id":   elementID,
 		"element_slug": elementSlug,
 		"venue_slug":   req.VenueSlug,
@@ -237,31 +251,6 @@ func sanitizePlaceElementRequest(req PlaceElementRequest) PlaceElementRequest {
 		req.Layer = "tray"
 	}
 	return req
-}
-
-func resolveIndexCardElement(ctx context.Context, tx pgx.Tx, elementID, elementSlug string) (resolvedID, resolvedSlug string, err error) {
-	base := `
-		SELECT e.id::text, e.slug
-		FROM elements e
-		WHERE e.element_type = 'index_card'
-	`
-
-	switch {
-	case elementID != "":
-		err = tx.QueryRow(ctx, base+` AND e.id = $1 LIMIT 1`, elementID).Scan(&resolvedID, &resolvedSlug)
-	case elementSlug != "":
-		err = tx.QueryRow(ctx, base+` AND e.slug = $1 LIMIT 1`, elementSlug).Scan(&resolvedID, &resolvedSlug)
-	default:
-		return "", "", errors.New("element_id or element_slug is required")
-	}
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", "", errors.New("index_card_not_found")
-		}
-		return "", "", err
-	}
-
-	return resolvedID, resolvedSlug, nil
 }
 
 func resolvePlacementVenue(ctx context.Context, tx pgx.Tx, venueSlug string) (venueID string, enabled bool, err error) {

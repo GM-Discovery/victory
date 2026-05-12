@@ -1,14 +1,14 @@
 # Victory Current State
 
 ## Purpose
-This document is the current-state canon for Victory as of Kernel 28.
+This document is the current-state canon for Victory as of Kernel 29.
 
 Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful as history, but this file is the current source of truth when they disagree.
 
 ## Kernel State
-- Current kernel label: **Kernel 28**
-- Current kernel purpose: **Director Console v1**
-- Product state: **active proving-ground build**
+- Current kernel label: **Kernel 29**
+- Current kernel purpose: **PixiJS Stage Spike v1**
+- Product state: **kernel closed; Kernel 31 is next**
 - Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
 
 ## Current Stack
@@ -194,6 +194,13 @@ Current visible behavior in The Cave:
 - reveal/hide and overlay actions
 - persona equip/unequip from existing character cards
 - history replay through snapshot + action stream
+
+Current Pixi proving-ground behavior:
+- First Theater is the PixiJS stage spike venue
+- live Cave snapshot and session actions can be used to judge renderer coexistence
+- DOM overlays remain separate from the Pixi canvas so controls stay outside the stage layer
+- Kernel 29 is complete as a proving-ground spike
+- Kernel 31 will focus on organizing the proving-ground UI and cleaning up the remaining affordances
 
 Strategy:
 - tools may be built visibly in The Cave first

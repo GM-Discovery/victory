@@ -113,7 +113,7 @@ async function loadVenues() {
       const icon = document.createElement("img");
       const venueIcons = {
         library: "/assets/librarycc.png",
-        "first-theater": "/assets/redirect.png",
+        "first-theater": "/assets/default.png",
         "soil-experts": "/assets/mudfarm.png",
         "info-booth": "/assets/infobooth.png",
         "audition-hall": "/assets/audition-hall.png",
@@ -247,10 +247,14 @@ async function loadAccountLink() {
   const accountMenuToggle = document.getElementById("account-menu-toggle");
   const accountProfileLink = document.getElementById("account-profile-link");
   const accountLogoutButton = document.getElementById("account-logout-button");
+  const appShell = document.querySelector(".app-shell");
   const mapLayerEl = document.querySelector(".map-layer");
   if (!accountLink) return;
 
   const setMapSignedInState = (signedIn) => {
+    if (appShell) {
+      appShell.classList.toggle("app-shell--signed-in", Boolean(signedIn));
+    }
     if (!mapLayerEl) return;
     mapLayerEl.classList.toggle("map-layer--signed-in", Boolean(signedIn));
   };

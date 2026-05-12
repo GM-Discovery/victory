@@ -8,133 +8,2539 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg: #13110f;
-      --panel: rgba(28, 22, 18, 0.94);
+      --bg: #0f0d0b;
+      --panel: rgba(22, 18, 14, 0.94);
+      --panel-soft: rgba(17, 14, 11, 0.82);
       --line: rgba(255, 235, 209, 0.1);
+      --line-strong: rgba(255, 235, 209, 0.16);
       --text: #f5ead7;
       --muted: #d2c0aa;
       --accent: #dfc08a;
+      --accent-strong: #f0d49b;
+      --stage-top: #1a1713;
+      --stage-bottom: #0b0907;
     }
 
     body {
       margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
+      min-height: 100vh;
+      font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
       background:
-        radial-gradient(circle at 18% 6%, rgba(143, 94, 54, 0.16), transparent 30%),
-        linear-gradient(180deg, #1a1613 0%, #0c0a08 100%);
+        radial-gradient(circle at 14% 8%, rgba(143, 94, 54, 0.12), transparent 28%),
+        radial-gradient(circle at 82% 0%, rgba(112, 84, 44, 0.08), transparent 24%),
+        linear-gradient(180deg, #15110f 0%, #0a0806 100%);
       color: var(--text);
     }
 
     .shell {
       min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 24px;
+      padding: 0;
       box-sizing: border-box;
     }
 
-    .card {
-      width: min(100%, 900px);
+    .page {
+      width: 100%;
+      margin: 0;
+      display: grid;
+      gap: 0;
+    }
+
+    .panel {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 18px;
-      padding: 22px;
-      box-sizing: border-box;
       box-shadow: 0 20px 64px rgba(0, 0, 0, 0.3);
+      box-sizing: border-box;
     }
 
     .hero {
-      display: grid;
-      gap: 18px;
-      grid-template-columns: minmax(260px, 360px) 1fr;
-      align-items: start;
+      display: none;
     }
 
-    .hero img {
+    .hero-visual {
       width: 100%;
-      border-radius: 16px;
       display: block;
-      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
       background: #221b17;
     }
 
-    h1 {
-      margin: 0 0 10px;
-      font-size: clamp(2rem, 4vw, 3rem);
+    .hero-copy {
+      display: grid;
+      gap: 12px;
+      align-content: start;
     }
 
-    p {
-      margin: 0 0 12px;
+    .hero-copy h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3rem);
+      line-height: 1.05;
+    }
+
+    .hero-copy p {
+      margin: 0;
       line-height: 1.55;
       color: var(--muted);
-    }
-
-    .note {
-      margin-top: 18px;
-      padding: 14px 16px;
-      border-radius: 14px;
-      border: 1px solid rgba(223, 192, 138, 0.22);
-      background: rgba(106, 74, 38, 0.18);
-      color: #f7e6c9;
-    }
-
-    .button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 11px 16px;
-      border-radius: 999px;
-      color: #fff5dd;
-      text-decoration: none;
-      background: linear-gradient(180deg, #6a4b26 0%, #4a341d 100%);
-      margin-top: 14px;
     }
 
     .hidden {
       display: none;
     }
 
-    @media (max-width: 760px) {
-      .hero {
+    .corner-controls {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 40;
+      display: flex;
+      gap: 8px;
+      opacity: 0.18;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .corner-controls:hover,
+    .corner-controls:focus-within {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
+
+    .corner-control {
+      width: 2.5rem;
+      height: 2.5rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(12, 10, 8, 0.35);
+      color: #f7efe5;
+      text-decoration: none;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+      transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+    }
+
+    .corner-control:hover,
+    .corner-control:focus-visible {
+      background: rgba(20, 16, 12, 0.72);
+      border-color: rgba(255, 255, 255, 0.28);
+      transform: scale(1.04);
+      outline: none;
+    }
+
+    .stage-section {
+      padding: 0;
+    }
+
+    .stage-shell {
+      position: relative;
+      min-height: 100vh;
+      overflow: hidden;
+      border-radius: 0;
+      border: 0;
+      background:
+        radial-gradient(circle at center, rgba(73, 46, 24, 0.2), transparent 44%),
+        linear-gradient(180deg, var(--stage-top) 0%, var(--stage-bottom) 100%);
+      box-shadow: none;
+    }
+
+    .stage-status {
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      z-index: 8;
+      padding: 12px 14px;
+      max-width: min(380px, calc(100vw - 64px));
+      border-radius: 14px;
+      background: rgba(18, 14, 11, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #f8eedf;
+      line-height: 1.45;
+      backdrop-filter: blur(6px);
+    }
+
+    .stage-summary {
+      position: absolute;
+      right: 16px;
+      top: 16px;
+      z-index: 8;
+      width: min(360px, calc(100vw - 64px));
+      display: grid;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .stage-summary-card {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(18, 14, 11, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #f8eedf;
+      line-height: 1.45;
+      backdrop-filter: blur(6px);
+    }
+
+    .stage-summary-card strong {
+      display: block;
+      color: var(--accent-strong);
+      margin-bottom: 4px;
+    }
+
+    .stage-summary-line {
+      color: #d8c9b0;
+      font-size: 0.94rem;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .pixi-stage-host {
+      position: absolute;
+      inset: 0;
+      touch-action: none;
+    }
+
+    .pixi-stage-host canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .stage-dom-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .overlay-panel {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      width: min(380px, calc(100vw - 32px));
+      border-radius: 18px;
+      padding: 16px;
+      background: rgba(16, 12, 10, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+      pointer-events: auto;
+      backdrop-filter: blur(6px);
+    }
+
+    .overlay-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      color: #d8c9b0;
+      font-size: 0.94rem;
+      line-height: 1.45;
+    }
+
+    .overlay-row strong {
+      color: #f4e3c1;
+      font-size: 0.92rem;
+      flex: 0 0 auto;
+    }
+
+    .overlay-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .overlay-actions button {
+      padding: 8px 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.06);
+      color: #f6efe2;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .overlay-actions button:hover {
+      background: rgba(255, 255, 255, 0.11);
+    }
+
+    .overlay-note {
+      margin-top: 10px;
+      color: #c7bba5;
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .selected-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .selected-actions button {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.06);
+      color: #f6efe2;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+
+    .selected-actions button:hover {
+      background: rgba(255, 255, 255, 0.11);
+    }
+
+    .selected-actions button[disabled] {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .selected-actions .action-separator {
+      flex: 0 0 100%;
+      height: 0;
+      margin: 0;
+    }
+
+    .card-editor {
+      position: absolute;
+      left: 16px;
+      top: 220px;
+      z-index: 18;
+      width: min(420px, calc(100vw - 32px));
+      border-radius: 18px;
+      padding: 16px;
+      background: rgba(16, 12, 10, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+      pointer-events: auto;
+      backdrop-filter: blur(8px);
+      display: grid;
+      gap: 10px;
+      touch-action: none;
+    }
+
+    .card-editor-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: move;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .card-editor-header strong {
+      color: #f4e3c1;
+      font-size: 0.96rem;
+    }
+
+    .card-editor-grip {
+      color: #cdb892;
+      font-size: 0.88rem;
+      letter-spacing: 0.1em;
+    }
+
+    .editor-field {
+      display: grid;
+      gap: 6px;
+      color: #dac8af;
+      font-size: 0.88rem;
+    }
+
+    .editor-field span {
+      color: #f4e3c1;
+      font-weight: 700;
+    }
+
+    .editor-field textarea,
+    .editor-field input {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(8, 7, 6, 0.78);
+      color: #f7efe5;
+      font: inherit;
+      padding: 10px 12px;
+      resize: vertical;
+      min-height: 44px;
+    }
+
+    .editor-field textarea {
+      min-height: 92px;
+    }
+
+    .editor-status {
+      color: #cdb892;
+      font-size: 0.86rem;
+      line-height: 1.45;
+    }
+
+    .smoke-tools {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.12);
+      display: grid;
+      gap: 10px;
+    }
+
+    .smoke-tools code {
+      color: #f5ead7;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 1px 5px;
+      border-radius: 999px;
+    }
+
+    .context-menu {
+      position: fixed;
+      z-index: 24;
+      min-width: 240px;
+      border-radius: 16px;
+      background: rgba(18, 14, 11, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.36);
+      padding: 8px;
+      pointer-events: auto;
+    }
+
+    .context-menu[hidden] {
+      display: none;
+    }
+
+    .context-menu button {
+      width: 100%;
+      display: block;
+      text-align: left;
+      padding: 10px 12px;
+      margin: 0;
+      border: 0;
+      background: transparent;
+      color: #f5efe4;
+      border-radius: 10px;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .context-menu button:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .context-menu .menu-separator {
+      height: 1px;
+      margin: 6px 4px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .report-grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+    }
+
+    .report-card {
+      padding: 18px 20px;
+      border-radius: 18px;
+    }
+
+    .report-card h2 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+      color: #ead7b2;
+    }
+
+    .report-card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .report-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .report-line {
+      color: #d8c9b0;
+      line-height: 1.5;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .report-figure {
+      margin: 0;
+      display: grid;
+      gap: 12px;
+    }
+
+    .report-figure img {
+      width: 100%;
+      display: block;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: #1f1814;
+    }
+
+    @media (max-width: 980px) {
+      .hero,
+      .report-grid {
         grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .shell {
+        padding: 0;
+      }
+
+      .report-card {
+        padding: 14px;
+      }
+
+      .stage-shell {
+        min-height: 100vh;
+      }
+
+      .stage-summary {
+        right: 12px;
+        left: 12px;
+        width: auto;
+      }
+
+      .overlay-panel {
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        width: auto;
       }
     }
   </style>
 </head>
 <body>
+  <div class="corner-controls" aria-label="Quick navigation">
+    <a class="corner-control" href="/" aria-label="Back to map">←</a>
+    <a class="corner-control" href="/venues/trailers/" aria-label="Profile">◉</a>
+  </div>
+
   <div id="forbidden-screen" class="forbidden-screen" hidden>
     <div class="forbidden-card">
       <img src="/assets/redirect.png" alt="Security redirect" />
       <h1>Error: Forbidden Access Entry</h1>
       <p>Security redirects you to the pathway.</p>
-      <a href="/" class="back-map-button">← Back to Map</a>
+      <a href="/" class="back-map-button">Back to Map</a>
     </div>
   </div>
 
   <div class="shell">
-    <div class="card">
-      <div class="hero">
-        <img src="/assets/redirect.png" alt="First Theater placeholder" />
-        <div>
-          <h1>First Theater</h1>
-          <p>
-            This theater is reserved as Victory’s first PixiJS proving ground, but the stage work has not been built yet.
-            For now it is only a placeholder on the map, waiting for the renderer conversation to begin.
-          </p>
-          <p id="access-line">Checking access...</p>
-          <div id="access-note" class="note hidden">
-            This venue is only a placeholder right now. The stage will come later.
+    <div class="page">
+      <section class="stage-section panel">
+        <div class="stage-shell" id="stage-shell">
+          <div id="stage-status" class="stage-status">Waiting for session join...</div>
+          <div class="stage-summary">
+            <div class="stage-summary-card">
+              <strong>Live Feed</strong>
+              <div id="live-feed-line" class="stage-summary-line">No live data yet.</div>
+            </div>
+            <div class="stage-summary-card">
+              <strong>Selected</strong>
+              <div id="selection-line" class="stage-summary-line">None</div>
+              <div id="selected-actions" class="selected-actions"></div>
+            </div>
+            <div class="stage-summary-card">
+              <strong>Pointer</strong>
+              <div id="pointer-line" class="stage-summary-line">Screen n/a | Stage n/a</div>
+            </div>
+            <div class="stage-summary-card">
+              <strong>Movement</strong>
+              <div id="movement-line" class="stage-summary-line">Idle</div>
+            </div>
           </div>
-          <a href="/" class="button">← Back to Map</a>
+          <div id="pixi-stage-host" class="pixi-stage-host" aria-label="First Theater stage"></div>
+          <div class="stage-dom-overlay">
+            <div class="overlay-panel">
+              <div class="overlay-row">
+                <strong>Session</strong>
+                <span id="session-line">Not joined</span>
+              </div>
+              <div class="overlay-row">
+                <strong>Role</strong>
+                <span id="role-line">Unknown</span>
+              </div>
+              <div class="overlay-row">
+                <strong>Objects</strong>
+                <span id="object-count-line">0</span>
+              </div>
+              <div class="overlay-actions">
+                <button id="refresh-world" type="button" title="Reload the latest world snapshot from the server and re-render the stage.">Reload snapshot</button>
+                <button id="clear-selection" type="button">Clear</button>
+              </div>
+              <div class="overlay-note">
+                Right-click the stage to create a real index card. Right-click a live Pixi object for its menu;
+                dragging a live object still uses the existing <code>act/place_element</code> path.
+                Reload snapshot fetches the latest world state from the server and re-renders the stage.
+                Smoke mode adds <code>g</code> for grid and <code>d</code> for drop test card.
+              </div>
+              <div id="smoke-panel" class="smoke-tools" hidden>
+                <div class="overlay-row">
+                  <strong>Smoke</strong>
+                  <span id="smoke-line">Open this page with <code>?smoke=1</code>.</span>
+                </div>
+                <div class="overlay-actions">
+                  <button id="smoke-toggle-grid" type="button">Grid: Off</button>
+                  <button id="smoke-drop-card" type="button">Drop Test Card</button>
+                </div>
+              </div>
+            </div>
+            <div id="card-editor" class="card-editor" hidden>
+              <div id="card-editor-header" class="card-editor-header">
+                <strong>Inspect Card</strong>
+                <span class="card-editor-grip">drag</span>
+              </div>
+              <div id="card-editor-status" class="editor-status">Select a live index card.</div>
+              <label class="editor-field" for="card-editor-front">
+                <span>Front Text</span>
+                <textarea id="card-editor-front" rows="4"></textarea>
+              </label>
+              <label class="editor-field" for="card-editor-back">
+                <span>Back Text</span>
+                <textarea id="card-editor-back" rows="3"></textarea>
+              </label>
+              <label class="editor-field" for="card-editor-color">
+                <span>Color</span>
+                <input id="card-editor-color" type="color" />
+              </label>
+              <div class="overlay-actions">
+                <button id="card-editor-save" type="button">Save</button>
+                <button id="card-editor-cancel" type="button">Close</button>
+              </div>
+            </div>
+            <div id="pixi-context-menu" class="context-menu" hidden></div>
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   </div>
 
   <script src="/lib/forbidden.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.3/dist/pixi.min.js"></script>
   <script>
-    const accessLine = document.getElementById("access-line");
-    const accessNote = document.getElementById("access-note");
+    const stageShell = document.getElementById("stage-shell");
+    const stageHost = document.getElementById("pixi-stage-host");
+    const stageStatus = document.getElementById("stage-status");
+    const liveFeedLine = document.getElementById("live-feed-line");
+    const selectionLine = document.getElementById("selection-line");
+    const pointerLine = document.getElementById("pointer-line");
+    const movementLine = document.getElementById("movement-line");
+    const sessionLine = document.getElementById("session-line");
+    const roleLine = document.getElementById("role-line");
+    const objectCountLine = document.getElementById("object-count-line");
+    const snapshotSummary = document.getElementById("snapshot-summary");
+    const refreshWorldButton = document.getElementById("refresh-world");
+    const clearSelectionButton = document.getElementById("clear-selection");
+    const selectedActions = document.getElementById("selected-actions");
+    const contextMenu = document.getElementById("pixi-context-menu");
+    const smokePanel = document.getElementById("smoke-panel");
+    const smokeLine = document.getElementById("smoke-line");
+    const smokeToggleGridButton = document.getElementById("smoke-toggle-grid");
+    const smokeDropCardButton = document.getElementById("smoke-drop-card");
+    const cardEditorPanel = document.getElementById("card-editor");
+    const cardEditorHeader = document.getElementById("card-editor-header");
+    const cardEditorStatus = document.getElementById("card-editor-status");
+    const cardEditorFront = document.getElementById("card-editor-front");
+    const cardEditorBack = document.getElementById("card-editor-back");
+    const cardEditorColor = document.getElementById("card-editor-color");
+    const cardEditorSave = document.getElementById("card-editor-save");
+    const cardEditorCancel = document.getElementById("card-editor-cancel");
+
+    let ws = null;
+    let currentSessionId = "";
+    let currentActorId = "";
+    let currentRole = "audience";
+    let currentSnapshot = null;
+    let currentObjects = [];
+    let currentSelection = null;
+    let currentNodeMap = new Map();
+    let dragState = null;
+    let lastPointerReport = "Screen n/a | Stage n/a";
+    let lastStagePoint = null;
+    let contextMenuTarget = null;
+    let suppressStageContextMenu = false;
+    let stagePlacementCandidate = null;
+    let pendingStageCardPlacement = null;
+    let recentPlacementMarker = null;
+    let cardEditorTargetKey = "";
+    let cardEditorDirty = false;
+    let cardEditorDragState = null;
+    let cardFaceState = new Map();
+    const smokeMode = new URLSearchParams(location.search).has("smoke");
+    let smokeGridEnabled = smokeMode;
+    let pixiApp = null;
+    let sceneRoot = null;
+    let backgroundLayer = null;
+    let objectLayer = null;
+    let uiLayer = null;
+    let resizeObserver = null;
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function normalizeRole(role) {
+      const value = String(role || "audience").trim().toLowerCase();
+      if (["producer", "director", "cast", "crew", "audience", "actor"].includes(value)) {
+        return value;
+      }
+      return "audience";
+    }
+
+    function roleLabel(role) {
+      switch (normalizeRole(role)) {
+        case "producer":
+          return "Producer";
+        case "director":
+          return "Director";
+        case "cast":
+        case "actor":
+          return "Cast";
+        case "crew":
+          return "Crew";
+        default:
+          return "Audience";
+      }
+    }
+
+    function canManageIndexCards(role) {
+      const normalized = normalizeRole(role);
+      return normalized === "producer" || normalized === "director";
+    }
+
+    function formatShortId(value) {
+      const text = String(value || "").trim();
+      if (!text) return "n/a";
+      return text.length > 10 ? `${text.slice(0, 10)}…` : text;
+    }
+
+    function formatStagePosition(position) {
+      const x = Number(position?.x ?? 0);
+      const y = Number(position?.y ?? 0);
+      const order = Number(position?.order ?? 0);
+      const frame = String(position?.frame || position?.anchor_frame || position?.coordinate_frame || "").trim().toLowerCase() || "legacy-centered";
+      return `x ${Number.isFinite(x) ? x : 0}, y ${Number.isFinite(y) ? y : 0}, order ${Number.isFinite(order) ? order : 0}, frame ${frame}`;
+    }
+
+    function setStageStatus(text) {
+      if (stageStatus) stageStatus.textContent = text || "";
+    }
+
+    function setMovementLine(text) {
+      if (movementLine) movementLine.textContent = text || "";
+    }
+
+    function setPointerLine(text) {
+      lastPointerReport = text || "Screen n/a | Stage n/a";
+      if (pointerLine) pointerLine.textContent = lastPointerReport;
+    }
+
+    function setSmokeLine(text) {
+      if (smokeLine) smokeLine.textContent = text || "";
+    }
+
+    function setLastStagePoint(point) {
+      if (!point) return;
+      lastStagePoint = {
+        x: Math.round(Number(point.x || 0)),
+        y: Math.round(Number(point.y || 0)),
+      };
+    }
+
+    function currentStagePointLabel() {
+      if (!lastStagePoint) return "n/a";
+      return `${lastStagePoint.x}, ${lastStagePoint.y}`;
+    }
+
+    function currentSelectionSummary() {
+      if (!currentSelection) return "none";
+      const position = currentSelection.position || {};
+      const frame = String(position.frame || position.anchor_frame || position.coordinate_frame || "").trim().toLowerCase() || "legacy-centered";
+      const state = objectState(currentSelection);
+      return `${currentSelection.label || "selection"} · ${currentSelection.kind || "object"} · ${frame} · ${Number(position.x ?? 0)}, ${Number(position.y ?? 0)} · locked ${state.locked ? "yes" : "no"} · nameplate ${state.nameplateVisible ? "visible" : "hidden"}`;
+    }
+
+    function updateSmokeUI() {
+      if (smokePanel) {
+        smokePanel.hidden = !smokeMode;
+      }
+      if (smokeToggleGridButton) {
+        smokeToggleGridButton.textContent = smokeGridEnabled ? "Grid: On" : "Grid: Off";
+      }
+      if (smokeMode && smokeLine && !smokeLine.textContent) {
+        setSmokeLine("Smoke mode ready. Use buttons or g/d.");
+      }
+    }
+
+    function setSelectionLine(text) {
+      if (selectionLine) selectionLine.textContent = text || "";
+    }
+
+    function setLiveFeedLine(text) {
+      if (liveFeedLine) liveFeedLine.textContent = text || "";
+    }
+
+    function setSnapshotSummary(text) {
+      if (snapshotSummary) snapshotSummary.textContent = text || "";
+    }
+
+    function setSessionLine(text) {
+      if (sessionLine) sessionLine.textContent = text || "";
+    }
+
+    function setRoleLine(text) {
+      if (roleLine) roleLine.textContent = text || "";
+    }
+
+    function setObjectCountLine(text) {
+      if (objectCountLine) objectCountLine.textContent = text || "";
+    }
+
+    function updateStatusSummary() {
+      setSessionLine(currentSessionId ? formatShortId(currentSessionId) : "Not joined");
+      setRoleLine(roleLabel(currentRole));
+      setObjectCountLine(String(currentObjects.length));
+      setPointerLine(lastPointerReport);
+      updateSmokeUI();
+    }
+
+    function closeContextMenu() {
+      if (contextMenu) {
+        contextMenu.hidden = true;
+        contextMenu.innerHTML = "";
+      }
+      contextMenuTarget = null;
+      stagePlacementCandidate = null;
+    }
+
+    function setRecentPlacementMarker(point, label = "") {
+      if (!point) {
+        recentPlacementMarker = null;
+        return;
+      }
+      recentPlacementMarker = {
+        x: Math.round(Number(point.x || 0)),
+        y: Math.round(Number(point.y || 0)),
+        label: String(label || "").trim(),
+        at: Date.now(),
+      };
+    }
+
+    function venueConfigFlag(key, fallback = false) {
+      const config = currentSnapshot?.venue?.config || {};
+      const value = config[key];
+      if (typeof value === "boolean") return value;
+      if (typeof value === "string") {
+        const lowered = value.trim().toLowerCase();
+        if (["true", "1", "yes", "on"].includes(lowered)) return true;
+        if (["false", "0", "no", "off"].includes(lowered)) return false;
+      }
+      return fallback;
+    }
+
+    function objectKind(model) {
+      return String(model?.kind || model?.contextClass || model?.elementType || "").trim().toLowerCase();
+    }
+
+    function objectState(model) {
+      const source = model?.source || {};
+      const state = model?.state || source?.state || {};
+      const visibility = model?.visibility || source?.visibility || {};
+      return {
+        locked: Boolean(state.locked ?? visibility.locked ?? false),
+        nameplateVisible: Boolean(state.nameplate_visible ?? visibility.nameplate_visible ?? true),
+        visible: Boolean(state.visible ?? visibility.visible ?? true),
+      };
+    }
+
+    function canActorRevealHideStageObjects() {
+      const role = normalizeRole(currentRole);
+      if (role === "producer" || role === "director") {
+        return true;
+      }
+      return (role === "cast" || role === "actor") && venueConfigFlag("actors_can_reveal", false);
+    }
+
+    function isCardObject(model) {
+      return objectKind(model) === "card";
+    }
+
+    function isLiveStageObject(model) {
+      return !!model?.live && ["card", "prop", "fire"].includes(objectKind(model));
+    }
+
+    function canEditLiveCard(model) {
+      return isCardObject(model) && model?.live && !objectState(model).locked && canManageIndexCards(currentRole);
+    }
+
+    function canMoveLiveStageObject(model) {
+      return isLiveStageObject(model) && !objectState(model).locked && canManageIndexCards(currentRole);
+    }
+
+    function canDuplicateLiveStageObject(model) {
+      return isLiveStageObject(model) && !objectState(model).locked && canManageIndexCards(currentRole);
+    }
+
+    function canRemoveLiveStageObject(model) {
+      return isLiveStageObject(model) && !objectState(model).locked && canManageIndexCards(currentRole);
+    }
+
+    function canDeleteLiveCard(model) {
+      return isCardObject(model) && model?.live && !objectState(model).locked && canManageIndexCards(currentRole);
+    }
+
+    function cardFaceForModel(model) {
+      const cardKey = String(model?.elementId || model?.elementSlug || model?.key || "");
+      return String(cardFaceState.get(cardKey) || "front").toLowerCase() === "back" ? "back" : "front";
+    }
+
+    function truncateCardText(text, maxChars = 24) {
+      const value = String(text || "").replace(/\s+/g, " ").trim();
+      if (!value) return "";
+      if (value.length <= maxChars) return value;
+      return `${value.slice(0, Math.max(1, maxChars - 1)).trimEnd()}…`;
+    }
+
+    function canToggleLiveVisibility(model) {
+      return isLiveStageObject(model) && !objectState(model).locked && canActorRevealHideStageObjects();
+    }
+
+    function canToggleNameplate(model) {
+      return isLiveStageObject(model) && !objectState(model).locked && canManageIndexCards(currentRole);
+    }
+
+    function canToggleLock(model) {
+      return isLiveStageObject(model) && canManageIndexCards(currentRole);
+    }
+
+    function cardEditorDraftFromModel(model) {
+      const source = model?.source || {};
+      const data = source?.data || {};
+      return {
+        elementId: String(model?.elementId || source?.element_id || ""),
+        elementSlug: String(model?.elementSlug || source?.slug || ""),
+        label: String(model?.label || source?.name || data.front_text || "Index card"),
+        frontText: String(model?.frontText || data.front_text || source?.name || "").trim(),
+        backText: String(model?.backText || data.back_text || "").trim(),
+        color: String(model?.color || data.color || "#d9c7a6").trim() || "#d9c7a6",
+      };
+    }
+
+    function stageContextMenuModel() {
+      return {
+        key: "stage:canvas",
+        kind: "stage",
+        live: false,
+        elementId: "",
+        elementSlug: "",
+        label: "Stage",
+        position: { x: 0, y: 0, order: 0 },
+      };
+    }
+
+    function resolveStageObjectActions(objectModel) {
+      const kind = objectKind(objectModel);
+      const state = objectState(objectModel);
+      const actions = [];
+
+      const push = (action, label, group, options = {}) => {
+        actions.push({
+          action,
+          label,
+          group,
+          requiresPoint: Boolean(options.requiresPoint),
+          disabled: Boolean(options.disabled),
+        });
+      };
+
+      if (kind === "stage") {
+        if (canManageIndexCards(currentRole)) {
+          push("create-card", "Create Index Card", "create");
+        }
+        push("inspect", "Inspect Stage", "info");
+        if (currentSelection) {
+          push("clear", "Clear selection", "clear");
+        }
+        return actions;
+      }
+
+      if (kind === "fire") {
+        push("select", "Select", "info");
+        push("info", "Info", "info");
+        if (canManageIndexCards(currentRole)) {
+          push("create-card", "Create Index Card", "create");
+        }
+        if (canRemoveLiveStageObject(objectModel)) {
+          push("remove", "Remove from Stage", "remove");
+        }
+        if (currentSelection) {
+          push("clear", "Clear selection", "clear");
+        }
+        return actions;
+      }
+
+      if (!objectModel?.live) {
+        push("select", "Select", "info");
+        push("info", "Info", "info");
+        if (currentSelection) {
+          push("clear", "Clear selection", "clear");
+        }
+        return actions;
+      }
+
+      if (state.locked) {
+        if (canToggleLock(objectModel)) {
+          push("unlock", "Unlock", "lock");
+        }
+        push("info", "Info", "info");
+        return actions;
+      }
+
+      push("info", "Info", "info");
+
+      if (kind === "card" && canEditLiveCard(objectModel)) {
+        push("inspect", "Inspect", "edit");
+        push("edit", "Edit", "edit");
+        push("flip", cardFaceForModel(objectModel) === "back" ? "Show Front" : "Flip", "face");
+      }
+
+      if (canMoveLiveStageObject(objectModel)) {
+        push("move-here", "Move here", "move", { requiresPoint: true });
+      }
+
+      if (canToggleLiveVisibility(objectModel)) {
+        push(state.visible ? "hide" : "show", state.visible ? "Hide" : "Show", "visibility");
+      }
+
+      if (kind === "card" && canToggleNameplate(objectModel)) {
+        push(state.nameplateVisible ? "hide-nameplate" : "show-nameplate", state.nameplateVisible ? "Hide Nameplate" : "Show Nameplate", "visibility");
+      }
+
+      if (kind === "card" && canDuplicateLiveStageObject(objectModel)) {
+        push("duplicate", "Duplicate on stage", "duplicate", { requiresPoint: true });
+      }
+
+      if ((kind === "card" || kind === "prop" || kind === "fire") && canRemoveLiveStageObject(objectModel)) {
+        push("remove", "Remove from Stage", "remove");
+      }
+
+      if (kind === "card" && canDeleteLiveCard(objectModel)) {
+        push("delete-card", "Delete Card", "remove");
+      }
+
+      if ((kind === "card" || kind === "fire") && canToggleLock(objectModel)) {
+        push("lock", "Lock", "lock");
+      }
+
+      return actions;
+    }
+
+    function syncSelectedActions() {
+      if (!selectedActions) return;
+      selectedActions.innerHTML = "";
+      if (!currentSelection) return;
+
+      const actions = resolveStageObjectActions(currentSelection);
+      const hasPoint = !!(stagePlacementCandidate || lastStagePoint);
+
+      actions.forEach((item, index) => {
+        if (index > 0 && actions[index - 1].group !== item.group) {
+          const separator = document.createElement("div");
+          separator.className = "action-separator";
+          selectedActions.appendChild(separator);
+        }
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = item.label;
+
+        const shouldDisable = item.requiresPoint && !hasPoint;
+        button.disabled = shouldDisable || item.disabled;
+
+        button.addEventListener("click", () => {
+          if (shouldDisable) {
+            setStageStatus("Move and duplicate actions need a pointer point on the stage.");
+            return;
+          }
+          performStageObjectAction(item.action, currentSelection);
+        });
+
+        selectedActions.appendChild(button);
+      });
+    }
+
+    function showCardEditorFor(model) {
+      if (!cardEditorPanel || !cardEditorFront || !cardEditorBack || !cardEditorColor) return;
+      if (!model || !model.live || !isCardObject(model) || objectState(model).locked) {
+        cardEditorTargetKey = "";
+        cardEditorDirty = false;
+        cardEditorPanel.hidden = true;
+        if (cardEditorStatus) {
+          cardEditorStatus.textContent = "Select a live index card.";
+        }
+        return;
+      }
+
+      const draft = cardEditorDraftFromModel(model);
+      cardEditorTargetKey = model.key;
+      cardEditorDirty = false;
+      if (cardEditorPanel.hidden) {
+        setCardEditorPosition(24, 24);
+      }
+      cardEditorPanel.hidden = false;
+      cardEditorFront.value = draft.frontText;
+      cardEditorBack.value = draft.backText;
+      cardEditorColor.value = draft.color || "#d9c7a6";
+      if (cardEditorStatus) {
+        cardEditorStatus.textContent = `${draft.label} ready to inspect.`;
+      }
+    }
+
+    function hideCardEditor() {
+      cardEditorTargetKey = "";
+      cardEditorDirty = false;
+      if (cardEditorPanel) {
+        cardEditorPanel.hidden = true;
+      }
+      if (cardEditorStatus) {
+        cardEditorStatus.textContent = "Select a live index card.";
+      }
+    }
+
+    function syncCardEditorWithSelection() {
+      if (!cardEditorPanel || cardEditorPanel.hidden) {
+        return;
+      }
+
+      const target = getCardEditorTarget();
+      if (!target || !target.live || !isCardObject(target) || objectState(target).locked) {
+        hideCardEditor();
+        return;
+      }
+
+      if (currentSelection && currentSelection.key !== target.key) {
+        hideCardEditor();
+        return;
+      }
+
+      if (cardEditorDirty) {
+        return;
+      }
+
+      showCardEditorFor(target);
+    }
+
+    function currentLiveSelection() {
+      if (!currentSelection) return null;
+      return currentObjects.find((item) => item.key === currentSelection.key) || currentSelection;
+    }
+
+    function getCardEditorTarget() {
+      if (!cardEditorTargetKey) return null;
+      return currentObjects.find((item) => item.key === cardEditorTargetKey) || null;
+    }
+
+    function clampCardEditorPosition(left, top) {
+      const shellRect = stageShell?.getBoundingClientRect?.();
+      const panelRect = cardEditorPanel?.getBoundingClientRect?.();
+      const panelWidth = Number(panelRect?.width || 420);
+      const panelHeight = Number(panelRect?.height || 420);
+      const shellWidth = Number(shellRect?.width || 0);
+      const shellHeight = Number(shellRect?.height || 0);
+      const maxLeft = Math.max(8, shellWidth - panelWidth - 8);
+      const maxTop = Math.max(8, shellHeight - panelHeight - 8);
+      return {
+        left: Math.max(8, Math.min(Math.round(left), maxLeft)),
+        top: Math.max(8, Math.min(Math.round(top), maxTop)),
+      };
+    }
+
+    function setCardEditorPosition(left, top) {
+      if (!cardEditorPanel) return;
+      const position = clampCardEditorPosition(left, top);
+      cardEditorPanel.style.left = `${position.left}px`;
+      cardEditorPanel.style.top = `${position.top}px`;
+      cardEditorPanel.style.right = "auto";
+      cardEditorPanel.style.bottom = "auto";
+    }
+
+    function openCardEditor(model = null) {
+      const target = model || currentLiveSelection();
+      if (!target || !isCardObject(target) || !target.live) {
+        setStageStatus("Select a live index card to edit it.");
+        return;
+      }
+      if (objectState(target).locked) {
+        setStageStatus("This card is locked.");
+        return;
+      }
+      showCardEditorFor(target);
+      selectObject(target, `${target.label} selected.`);
+      if (cardEditorFront) {
+        cardEditorFront.focus({ preventScroll: true });
+      }
+    }
+
+    function saveCardEditor() {
+      const target = currentLiveSelection();
+      if (!target || !isCardObject(target) || !target.live) {
+        setStageStatus("Select a live index card to save edits.");
+        return;
+      }
+      if (objectState(target).locked) {
+        setStageStatus("This card is locked.");
+        return;
+      }
+      const frontText = String(cardEditorFront?.value || "").trim();
+      const backText = String(cardEditorBack?.value || "").trim();
+      const color = String(cardEditorColor?.value || "").trim() || target.color || "#d9c7a6";
+      const sent = sendAction("update/index_card", {
+        element_id: target.elementId || "",
+        element_slug: target.elementSlug || "",
+        front_text: frontText,
+        back_text: backText,
+        color,
+      });
+      if (!sent) {
+        setStageStatus("Socket unavailable.");
+        if (cardEditorStatus) {
+          cardEditorStatus.textContent = "Save failed: socket unavailable.";
+        }
+        return;
+      }
+      cardEditorDirty = false;
+      setStageStatus(`Saved ${target.label}.`);
+      if (cardEditorStatus) {
+        cardEditorStatus.textContent = `${target.label} save sent.`;
+      }
+      setMovementLine(`update/index_card sent for ${target.label}.`);
+    }
+
+    function toggleCardEditorFromSelection() {
+      if (!currentSelection || !isCardObject(currentSelection) || !currentSelection.live) {
+        return;
+      }
+      if (cardEditorPanel && cardEditorPanel.hidden) {
+        openCardEditor(currentSelection);
+      } else {
+        hideCardEditor();
+      }
+    }
+
+    function isSecondaryPointerEvent(event) {
+      const button = Number(event?.button ?? event?.data?.button ?? -1);
+      const buttons = Number(event?.buttons ?? event?.data?.buttons ?? 0);
+      return button === 2 || (buttons & 2) === 2;
+    }
+
+    function markContextMenuHandled(event) {
+      if (!event) return;
+      event.__firstTheaterContextMenuHandled = true;
+      if (event.data?.originalEvent) {
+        event.data.originalEvent.__firstTheaterContextMenuHandled = true;
+      }
+    }
+
+    function wasContextMenuHandled(event) {
+      return !!(event?.__firstTheaterContextMenuHandled || event?.data?.originalEvent?.__firstTheaterContextMenuHandled);
+    }
+
+    function stagePlacementFromEvent(event) {
+      if (!pixiApp) {
+        return null;
+      }
+      const clientPoint = eventClientPoint(event);
+      return stagePointFromClient(clientPoint.clientX, clientPoint.clientY);
+    }
+
+    function stagePointFromClient(clientX, clientY) {
+      if (!pixiApp) {
+        return { x: 0, y: 0 };
+      }
+      const rect = stageHost?.getBoundingClientRect();
+      const point = {
+        x: rect ? Number(clientX || 0) - rect.left : Number(clientX || 0),
+        y: rect ? Number(clientY || 0) - rect.top : Number(clientY || 0),
+      };
+      const size = getStageSize();
+
+      return {
+        x: Math.max(0, Math.min(Math.round(size.width), Math.round(point.x))),
+        y: Math.max(0, Math.min(Math.round(size.height), Math.round(point.y))),
+      };
+    }
+
+    function hitTestContextMenuTarget(stagePoint) {
+      for (let index = currentObjects.length - 1; index >= 0; index -= 1) {
+        const model = currentObjects[index];
+        const node = currentNodeMap.get(model.key);
+        const bounds = node?.container?.getBounds?.();
+        if (!bounds) {
+          continue;
+        }
+        if (bounds.contains(stagePoint.x, stagePoint.y)) {
+          return model;
+        }
+      }
+      return null;
+    }
+
+    function resolveContextMenuTargetFromClient(clientX, clientY) {
+      const stagePoint = stagePointFromClient(clientX, clientY);
+      const objectModel = hitTestContextMenuTarget(stagePoint) || stageContextMenuModel();
+      return { objectModel, stagePoint };
+    }
+
+    function eventClientPoint(event) {
+      if (!event) {
+        return { clientX: 0, clientY: 0 };
+      }
+
+      const clientX = Number(event.clientX ?? event.x ?? 0);
+      const clientY = Number(event.clientY ?? event.y ?? 0);
+      if (Number.isFinite(clientX) && Number.isFinite(clientY) && (clientX !== 0 || clientY !== 0)) {
+        return { clientX, clientY };
+      }
+
+      const stagePoint = event.data?.global || event.global || null;
+      if (stagePoint && pixiApp?.renderer) {
+        const rect = stageHost?.getBoundingClientRect();
+        const screenWidth = Number(pixiApp.renderer.screen?.width || rect?.width || 1);
+        const screenHeight = Number(pixiApp.renderer.screen?.height || rect?.height || 1);
+        const domX = rect ? rect.left + (Number(stagePoint.x || 0) * (rect.width / screenWidth)) : Number(stagePoint.x || 0);
+        const domY = rect ? rect.top + (Number(stagePoint.y || 0) * (rect.height / screenHeight)) : Number(stagePoint.y || 0);
+        return { clientX: domX, clientY: domY };
+      }
+
+      return { clientX: 0, clientY: 0 };
+    }
+
+    function updatePointerReadout(screenX, screenY, stagePoint, note = "") {
+      if (stagePoint) {
+        setLastStagePoint(stagePoint);
+      }
+      const resolved = stagePoint || lastStagePoint || { x: 0, y: 0 };
+      const screenLabel = `Screen ${Math.round(screenX || 0)}, ${Math.round(screenY || 0)}`;
+      const stageLabel = `Stage ${resolved.x}, ${resolved.y}`;
+      const text = `${screenLabel} | ${stageLabel}`;
+      setPointerLine(text);
+      if (smokeMode) {
+        const prefix = note ? `${note} · ` : "";
+        setSmokeLine(`${prefix}${stageLabel} · selection ${currentSelectionSummary()}`);
+      }
+    }
+
+    function cancelContextMenuEvent(event) {
+      event?.stopPropagation?.();
+      event?.preventDefault?.();
+      event?.stopImmediatePropagation?.();
+      event?.data?.originalEvent?.preventDefault?.();
+      event?.data?.originalEvent?.stopPropagation?.();
+      event?.data?.originalEvent?.stopImmediatePropagation?.();
+    }
+
+    function handleNativeStageContextMenu(event) {
+      if (!event) return;
+      if (!pixiApp || !stageHost) return;
+      const target = event.target;
+      const composedPath = typeof event.composedPath === "function" ? event.composedPath() : [];
+      const isStageEvent = target === pixiApp.view || stageHost.contains(target) || composedPath.includes(pixiApp.view) || composedPath.includes(stageHost);
+      if (!isStageEvent) return;
+      if (event.type !== "contextmenu" && !isSecondaryPointerEvent(event)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      const clientPoint = eventClientPoint(event);
+      const resolved = resolveContextMenuTargetFromClient(clientPoint.clientX, clientPoint.clientY);
+      const nativeEvent = event?.originalEvent || event?.data?.originalEvent || event;
+      markContextMenuHandled(nativeEvent);
+      openContextMenu(nativeEvent, resolved.objectModel);
+    }
+
+    function openResolvedContextMenu(event) {
+      if (!event || !contextMenu || !pixiApp) return;
+      const clientPoint = eventClientPoint(event);
+      const resolved = resolveContextMenuTargetFromClient(clientPoint.clientX, clientPoint.clientY);
+      const nativeEvent = event?.data?.originalEvent || event?.originalEvent || event;
+      markContextMenuHandled(nativeEvent);
+      openContextMenu(nativeEvent, resolved.objectModel);
+    }
+
+    function performStageObjectAction(action, objectModel) {
+      if (!objectModel || !action) return;
+
+      const kind = objectKind(objectModel);
+      const state = objectState(objectModel);
+      const targetPoint = stagePlacementCandidate || lastStagePoint || null;
+      const point = targetPoint ? { x: Math.round(targetPoint.x), y: Math.round(targetPoint.y) } : null;
+
+      if (action === "select") {
+        selectObject(objectModel, `${objectModel.label} selected.`);
+        closeContextMenu();
+        return;
+      }
+
+      if (action === "info" || action === "inspect") {
+        selectObject(objectModel, describeObject(objectModel));
+        if (action === "inspect" && kind === "card" && objectModel.live) {
+          showCardEditorFor(objectModel);
+        }
+        closeContextMenu();
+        return;
+      }
+
+      if (action === "edit") {
+        openCardEditor(objectModel);
+        closeContextMenu();
+        return;
+      }
+
+      if (action === "flip") {
+        if (state.locked) {
+          setStageStatus(`${objectModel.label} is locked.`);
+          closeContextMenu();
+          return;
+        }
+        const key = String(objectModel.elementId || objectModel.elementSlug || objectModel.key || "");
+        const nextFace = cardFaceForModel(objectModel) === "back" ? "front" : "back";
+        if (key) {
+          cardFaceState.set(key, nextFace);
+          renderPixiScene();
+        }
+        setStageStatus(`${objectModel.label} flipped to ${nextFace}.`);
+        closeContextMenu();
+        return;
+      }
+
+      if (action === "create-card") {
+        createIndexCardFromMenu();
+        return;
+      }
+
+      if (action === "clear") {
+        selectObject(null, "Selection cleared.");
+        hideCardEditor();
+        closeContextMenu();
+        return;
+      }
+
+      if (action === "unlock" || action === "lock") {
+        const locked = action === "lock";
+        const sent = sendAction("act/set_element_lock", {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+          locked,
+        });
+        setStageStatus(sent ? `${locked ? "Locking" : "Unlocking"} ${objectModel.label}...` : "Socket unavailable.");
+        if (!sent && cardEditorStatus) {
+          cardEditorStatus.textContent = "Socket unavailable.";
+        }
+        closeContextMenu();
+        return;
+      }
+
+      if (action === "hide-nameplate" || action === "show-nameplate") {
+        const visible = action === "show-nameplate";
+        const sent = sendAction("act/set_nameplate_visibility", {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+          layer: "audience",
+          visible,
+        });
+        setStageStatus(sent ? `${visible ? "Showing" : "Hiding"} nameplate for ${objectModel.label}...` : "Socket unavailable.");
+        closeContextMenu();
+        return;
+      }
+
+      if (action === "hide" || action === "show") {
+        const type = action === "show" ? "act/reveal_element" : "act/hide_element";
+        const sent = sendAction(type, {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+        });
+        setStageStatus(sent ? `${action === "show" ? "Showing" : "Hiding"} ${objectModel.label}...` : "Socket unavailable.");
+        closeContextMenu();
+        return;
+      }
+
+      if (action === "move-here") {
+        if (!point) {
+          setStageStatus("Move here needs a stage point.");
+          return;
+        }
+        const sent = sendAction("act/place_element", {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+          venue_slug: "the-cave",
+          layer: "stage",
+          x: point.x,
+          y: point.y,
+          order: Number(objectModel.position?.order ?? 0),
+        });
+        setMovementLine(sent ? `Move sent to x ${point.x}, y ${point.y}.` : "Socket unavailable.");
+        setStageStatus(sent ? `Moving ${objectModel.label} to x ${point.x}, y ${point.y}.` : "Socket unavailable.");
+        closeContextMenu();
+        return;
+      }
+
+      if (action === "duplicate") {
+        if (!point) {
+          setStageStatus("Duplicate on stage needs a stage point.");
+          return;
+        }
+        const sent = sendAction("act/duplicate_element", {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+          venue_slug: "the-cave",
+          layer: "stage",
+          x: point.x,
+          y: point.y,
+          order: Number(objectModel.position?.order ?? 0),
+        });
+        setMovementLine(sent ? `Duplicate sent to x ${point.x}, y ${point.y}.` : "Socket unavailable.");
+        setStageStatus(sent ? `Duplicating ${objectModel.label} to x ${point.x}, y ${point.y}.` : "Socket unavailable.");
+        closeContextMenu();
+        return;
+      }
+
+      if (action === "remove") {
+        const sent = sendAction("act/remove_element", {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+          venue_slug: "the-cave",
+          layer: "stage",
+        });
+        setMovementReport(sent ? `Remove sent for ${objectModel.label}.` : "Socket unavailable.");
+        setStageStatus(sent ? `Removing ${objectModel.label} from the stage...` : "Socket unavailable.");
+        closeContextMenu();
+        return;
+      }
+
+      if (action === "delete-card") {
+        const sent = sendAction("delete/index_card", {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+        });
+        setMovementReport(sent ? `Delete sent for ${objectModel.label}.` : "Socket unavailable.");
+        setStageStatus(sent ? `Deleting ${objectModel.label}...` : "Socket unavailable.");
+        closeContextMenu();
+        return;
+      }
+
+      if (action === "place") {
+        if (kind === "card" && objectModel.live && point) {
+          const sent = sendAction("act/place_element", {
+            element_id: objectModel.elementId || "",
+            element_slug: objectModel.elementSlug || "",
+            venue_slug: "the-cave",
+            layer: "stage",
+            x: point.x,
+            y: point.y,
+            order: Number(objectModel.position?.order ?? 0),
+          });
+          setMovementLine(sent ? `Placement sent to x ${point.x}, y ${point.y}.` : "Socket unavailable.");
+        }
+        closeContextMenu();
+      }
+    }
+
+    function openContextMenu(event, objectModel) {
+      if (!contextMenu || !objectModel) return;
+      contextMenuTarget = objectModel;
+      const clientPoint = eventClientPoint(event);
+      const stagePoint = stagePlacementFromEvent(event);
+      if (objectModel.kind === "stage" || objectModel.kind === "fire" || (objectModel.live && isLiveStageObject(objectModel))) {
+        stagePlacementCandidate = stagePoint;
+        if (stagePlacementCandidate) {
+          updatePointerReadout(clientPoint.clientX || 0, clientPoint.clientY || 0, stagePlacementCandidate, `${objectModel.kind === "fire" ? "Fire" : "Stage"} menu`);
+        }
+      }
+
+      const items = resolveStageObjectActions(objectModel);
+      contextMenu.innerHTML = items
+        .map((item, index) => {
+          let separator = "";
+          if (index > 0 && items[index - 1].group !== item.group) {
+            separator = '<div class="menu-separator"></div>';
+          }
+          return `${separator}<button type="button" data-menu-action="${escapeHtml(item.action)}">${escapeHtml(item.label)}</button>`;
+        })
+        .join("");
+
+      contextMenu.hidden = false;
+      contextMenu.style.left = "0px";
+      contextMenu.style.top = "0px";
+      const rect = contextMenu.getBoundingClientRect();
+      const maxX = Math.max(8, window.innerWidth - rect.width - 8);
+      const maxY = Math.max(8, window.innerHeight - rect.height - 8);
+      contextMenu.style.left = `${Math.max(8, Math.min(clientPoint.clientX || 0, maxX))}px`;
+      contextMenu.style.top = `${Math.max(8, Math.min(clientPoint.clientY || 0, maxY))}px`;
+      contextMenu.dataset.objectKey = objectModel.key;
+    }
+
+    function getStageSize() {
+      const rect = stageShell?.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) {
+        return { width: 960, height: 640 };
+      }
+      return { width: rect.width, height: rect.height };
+    }
+
+    function toStagePoint(model, size, options = {}) {
+      const position = model?.position || {};
+      const frame = String(position.frame || position.anchor_frame || position.coordinate_frame || "").trim().toLowerCase();
+      const normX = Number(position.x ?? 0);
+      const normY = Number(position.y ?? 0);
+      const order = Number(position.order ?? 0);
+      const width = Number(size?.width || 960);
+      const height = Number(size?.height || 640);
+      if (frame === "top-left" || frame === "topleft") {
+        return {
+          x: Math.max(0, Math.min(width, Math.round(normX))),
+          y: Math.max(0, Math.min(height, Math.round(normY))),
+        };
+      }
+      const baseY = options.baseY ?? (model?.kind === "fire" ? 0.62 : 0.52);
+      const xScale = width * 0.006;
+      const yScale = height * 0.006;
+      return {
+        x: width * 0.5 + (normX * xScale),
+        y: height * baseY + (normY * yScale) + (options.orderOffset ? order * options.orderOffset : 0),
+      };
+    }
+
+    function describeObject(model) {
+      const state = objectState(model);
+      const lines = [
+        `Type: ${model.kind || "object"}`,
+        `Live: ${model.live ? "yes" : "no"}`,
+        `ID: ${model.elementId || "(local)"}`,
+        `Slug: ${model.elementSlug || "(local)"}`,
+        `Position: ${formatStagePosition(model.position)}`,
+        `Locked: ${state.locked ? "yes" : "no"}`,
+        `Nameplate: ${state.nameplateVisible ? "visible" : "hidden"}`,
+        `Visible: ${state.visible ? "yes" : "no"}`,
+      ];
+
+      if (model.kind === "card") {
+        lines.push(`Front: ${model.frontText || "(blank)"}`);
+        lines.push(`Back: ${model.backText || "(blank)"}`);
+        lines.push(`Color: ${model.color || "#d9c7a6"}`);
+      }
+
+      return lines.join("\n");
+    }
+
+    function selectObject(objectModel, reason = "") {
+      currentSelection = objectModel || null;
+      if (currentSelection) {
+        setSelectionLine(`${currentSelection.label} ${currentSelection.live ? "(live)" : "(local)"}`);
+        setLiveFeedLine(describeObject(currentSelection));
+        setStageStatus(reason || `${currentSelection.label} selected.`);
+      } else {
+        setSelectionLine("None");
+        setLiveFeedLine("No live object selected.");
+        setStageStatus(reason || "Selection cleared.");
+      }
+
+      syncSelectedActions();
+      syncCardEditorWithSelection();
+
+      for (const [key, node] of currentNodeMap.entries()) {
+        node.updateSelected?.(currentSelection?.key === key);
+      }
+    }
+
+    function setMovementReport(text) {
+      setMovementLine(text || "Idle");
+    }
+
+    function objectFromSnapshotElement(element, index = 0) {
+      const data = element?.data || {};
+      const state = element?.state || {};
+      const visibility = element?.visibility || {};
+      return {
+        key: `live:${String(element?.element_id || element?.slug || index)}`,
+        kind: "card",
+        live: true,
+        elementId: String(element?.element_id || ""),
+        elementSlug: String(element?.slug || ""),
+        elementType: String(element?.element_type || ""),
+        contextClass: String(element?.context_class || data.context_class || "card"),
+        label: String(element?.name || data.front_text || element?.slug || "Index card"),
+        frontText: String(data.front_text || element?.name || "").trim(),
+        backText: String(data.back_text || "").trim(),
+        color: String(data.color || "#d9c7a6").trim() || "#d9c7a6",
+        position: element?.position || data.position || {},
+        state,
+        visibility,
+        source: element,
+      };
+    }
+
+    function fireObjectFromSnapshot(element) {
+      return {
+        key: `fire:${String(element?.element_id || element?.slug || "fire")}`,
+        kind: "fire",
+        live: true,
+        elementId: String(element?.element_id || ""),
+        elementSlug: String(element?.slug || "first-fire"),
+        label: String(element?.name || "Fire"),
+        position: element?.position || element?.data?.position || {},
+        state: element?.state || {},
+        visibility: element?.visibility || {},
+        source: element,
+      };
+    }
+
+    function buildObjects(snapshot) {
+      const elements = Array.isArray(snapshot?.elements) ? snapshot.elements : [];
+      const fireElement = elements.find((element) => element?.slug === "first-fire") || null;
+      const stageCards = elements
+        .filter((element) => String(element?.element_type || "").toLowerCase() === "index_card")
+        .filter((element) => String(element?.surface || element?.data?.surface || "tray").toLowerCase() === "stage")
+        .sort((a, b) => {
+          const orderA = Number(a?.position?.order ?? a?.data?.position?.order ?? 0);
+          const orderB = Number(b?.position?.order ?? b?.data?.position?.order ?? 0);
+          if (orderA !== orderB) return orderA - orderB;
+          const nameA = String(a?.name || a?.slug || "");
+          const nameB = String(b?.name || b?.slug || "");
+          return nameA.localeCompare(nameB);
+        })
+        .map((element, index) => objectFromSnapshotElement(element, index));
+
+      const out = [];
+      if (fireElement) {
+        out.push(fireObjectFromSnapshot(fireElement));
+      }
+      if (stageCards.length > 0) {
+        out.push(...stageCards);
+      }
+
+      return out;
+    }
+
+    function clearSceneNodes() {
+      currentNodeMap = new Map();
+      if (objectLayer) {
+        objectLayer.removeChildren();
+      }
+    }
+
+    function refreshNodeSelection() {
+      for (const [key, node] of currentNodeMap.entries()) {
+        node.updateSelected?.(currentSelection?.key === key);
+      }
+    }
+
+    function makeCardNode(model) {
+      const container = new PIXI.Container();
+      container.sortableChildren = true;
+      const cardKey = String(model.elementId || model.elementSlug || model.key || "");
+      const face = cardFaceForModel(model);
+      const titleText = face === "back"
+        ? truncateCardText(model.backText || "Back", 22) || "Back"
+        : truncateCardText(model.frontText || model.label || "Untitled card", 22) || "Untitled card";
+
+      const shadow = new PIXI.Graphics();
+      shadow.beginFill(0x000000, 0.28);
+      shadow.drawRoundedRect(8, 10, 192, 132, 16);
+      shadow.endFill();
+
+      const body = new PIXI.Graphics();
+      body.beginFill(PIXI.utils.string2hex(model.color || "#d9c7a6"), 1);
+      body.lineStyle(2, 0x5d4327, 0.52);
+      body.drawRoundedRect(0, 0, 192, 132, 16);
+      body.endFill();
+
+      const titleStyle = new PIXI.TextStyle({
+        fontFamily: "Arial",
+        fontSize: 14,
+        fontWeight: "700",
+        fill: 0x2f2112,
+        wordWrap: true,
+        wordWrapWidth: 144,
+      });
+
+      const title = new PIXI.Text(titleText, titleStyle);
+      title.position.set(18, 18);
+      title.alpha = 0.98;
+      title.eventMode = "static";
+      title.cursor = "text";
+
+      const faceButtonBg = new PIXI.Graphics();
+      faceButtonBg.beginFill(0x000000, 0.18);
+      faceButtonBg.drawRoundedRect(0, 0, 26, 26, 13);
+      faceButtonBg.endFill();
+      faceButtonBg.position.set(160, 104);
+      faceButtonBg.alpha = canEditLiveCard(model) || canToggleLock(model) ? 1 : 0.34;
+
+      const faceButton = new PIXI.Text(face === "back" ? "↻" : "↺", new PIXI.TextStyle({
+        fontFamily: "Arial",
+        fontSize: 15,
+        fontWeight: "700",
+        fill: 0x5d4327,
+      }));
+      faceButton.position.set(168, 108);
+      faceButton.eventMode = "static";
+      faceButton.cursor = "pointer";
+      faceButton.on("pointerdown", (event) => {
+        event.stopPropagation();
+        if (objectState(model).locked) {
+          selectObject(model, `${model.label} is locked.`);
+          return;
+        }
+        if (!canEditLiveCard(model) && !canManageIndexCards(currentRole)) {
+          return;
+        }
+        cardFaceState.set(cardKey, face === "back" ? "front" : "back");
+        renderPixiScene();
+      });
+
+      const focus = new PIXI.Graphics();
+      focus.lineStyle(0, 0x000000, 0);
+      focus.drawRoundedRect(0, 0, 200, 140, 18);
+
+      container.addChild(shadow, body, title, faceButtonBg, faceButton, focus);
+      container.eventMode = "static";
+      container.cursor = "pointer";
+      container.interactive = true;
+
+      const node = {
+        model,
+        container,
+        updateSelected(selected) {
+          focus.clear();
+          if (selected) {
+            focus.lineStyle(3, 0xf0d49b, 0.9);
+            focus.drawRoundedRect(0, 0, 200, 140, 18);
+            container.zIndex = 50;
+          } else {
+            focus.lineStyle(0, 0x000000, 0);
+            focus.drawRoundedRect(0, 0, 200, 140, 18);
+            container.zIndex = 10;
+          }
+        },
+      };
+
+      const openCardContextMenu = (event) => {
+        if (wasContextMenuHandled(event)) {
+          return;
+        }
+        cancelContextMenuEvent(event);
+        openResolvedContextMenu(event);
+      };
+
+      container.on("pointerdown", (event) => {
+        event.stopPropagation();
+        selectObject(model, `${model.label} selected.`);
+
+        if (model.live) {
+          if (objectState(model).locked) {
+            setStageStatus(`${model.label} is locked.`);
+            setMovementReport("Locked objects cannot be dragged.");
+            return;
+          }
+          const local = event.data.getLocalPosition(sceneRoot);
+          dragState = {
+            node: container,
+            model,
+            offsetX: local.x - container.x,
+            offsetY: local.y - container.y,
+          };
+          setMovementReport("Dragging live object...");
+          setStageStatus("Release to try act/place_element.");
+        }
+      });
+
+      const inspectFromText = (event) => {
+        event?.stopPropagation?.();
+        event?.stopImmediatePropagation?.();
+        selectObject(model, `${model.label} selected.`);
+        openCardEditor(model);
+      };
+
+      title.on("click", inspectFromText);
+      title.on("contextmenu", openCardContextMenu);
+      faceButton.on("contextmenu", openCardContextMenu);
+      container.on("contextmenu", openCardContextMenu);
+
+      return node;
+    }
+
+    function makeFireNode(model) {
+      const container = new PIXI.Container();
+      const glow = new PIXI.Graphics();
+      glow.beginFill(0xff8b36, 0.14);
+      glow.drawCircle(62, 62, 78);
+      glow.endFill();
+
+      const halo = new PIXI.Graphics();
+      halo.beginFill(0xffc16f, 0.22);
+      halo.drawCircle(62, 62, 40);
+      halo.endFill();
+
+      const sprite = PIXI.Sprite.from("/assets/fire.jpg");
+      sprite.anchor.set(0, 0);
+      sprite.position.set(0, 0);
+      sprite.width = 124;
+      sprite.height = 124;
+
+      const base = new PIXI.Graphics();
+      base.beginFill(0x000000, 0.2);
+      base.drawEllipse(62, 118, 54, 14);
+      base.endFill();
+
+      const labelStyle = new PIXI.TextStyle({
+        fontFamily: "Arial",
+        fontSize: 12,
+        fontWeight: "700",
+        fill: 0xf4dfb4,
+      });
+      const label = new PIXI.Text(model.label || "Fire", labelStyle);
+      label.anchor.set(0, 0);
+      label.position.set(0, 130);
+
+      container.addChild(glow, halo, base, sprite, label);
+      container.eventMode = "static";
+      container.cursor = "pointer";
+      container.interactive = true;
+
+      const focus = new PIXI.Graphics();
+      focus.lineStyle(0, 0x000000, 0);
+      focus.drawRoundedRect(0, 0, 124, 150, 18);
+      container.addChild(focus);
+
+      const node = {
+        model,
+        container,
+        updateSelected(selected) {
+          focus.clear();
+          if (selected) {
+            focus.lineStyle(3, 0xf0d49b, 0.95);
+            focus.drawRoundedRect(0, 0, 124, 150, 18);
+          } else {
+            focus.lineStyle(0, 0x000000, 0);
+            focus.drawRoundedRect(0, 0, 124, 150, 18);
+          }
+        },
+      };
+
+      container.on("pointerdown", (event) => {
+        event.stopPropagation();
+        selectObject(model, "Fire selected.");
+      });
+
+      container.on("contextmenu", (event) => {
+        if (wasContextMenuHandled(event)) {
+          return;
+        }
+        cancelContextMenuEvent(event);
+        openResolvedContextMenu(event);
+      });
+
+      return node;
+    }
+
+    function makePlaceholderNode(model) {
+      const node = makeCardNode(model);
+      return node;
+    }
+
+    function createIndexCardFromMenu() {
+      if (!canManageIndexCards(currentRole)) {
+        setStageStatus("Only producers and directors can create cards.");
+        return;
+      }
+
+      if (!stagePlacementCandidate) {
+        setStageStatus("No stage placement point available.");
+        return;
+      }
+
+      pendingStageCardPlacement = stagePlacementCandidate;
+      stagePlacementCandidate = null;
+      const placementLabel = `x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}`;
+
+      const sent = sendAction("create/index_card", {
+        front_text: "New Index Card",
+        back_text: "",
+        color: "#d9c7a6",
+      });
+      if (!sent) {
+        pendingStageCardPlacement = null;
+        setStageStatus("Socket unavailable.");
+        closeContextMenu();
+        return;
+      }
+
+      setStageStatus(`Index card created. Placing at ${placementLabel}...`);
+      setMovementReport(`Awaiting placement at ${placementLabel}.`);
+      if (smokeMode) {
+        setSmokeLine(`Create sent for ${placementLabel}.`);
+      }
+      closeContextMenu();
+    }
+
+    function placeCreatedIndexCard(action) {
+      if (!pendingStageCardPlacement) return;
+
+      const targetId = String(action?.target?.element_id || "");
+      const targetSlug = String(action?.target?.element_slug || "");
+      const snapshotElements = Array.isArray(currentSnapshot?.elements) ? currentSnapshot.elements : [];
+      const createdCard = snapshotElements.find((el) =>
+        el &&
+        String(el.element_type || "").toLowerCase() === "index_card" &&
+        (
+          (targetId && String(el.element_id || "") === targetId) ||
+          (targetSlug && String(el.slug || "") === targetSlug)
+        )
+      );
+
+      const elementId = targetId || createdCard?.element_id || "";
+      const elementSlug = targetSlug || createdCard?.slug || "";
+
+      if (!elementId && !elementSlug) {
+        return;
+      }
+
+      selectObject({
+        key: `live:${elementId || elementSlug}`,
+        kind: "card",
+        live: true,
+        elementId,
+        elementSlug,
+        label: createdCard?.name || createdCard?.data?.front_text || "Index card",
+        frontText: String(createdCard?.data?.front_text || createdCard?.name || "").trim(),
+        backText: String(createdCard?.data?.back_text || "").trim(),
+        color: String(createdCard?.data?.color || "#d9c7a6").trim() || "#d9c7a6",
+        position: {
+          ...(createdCard?.position || createdCard?.data?.position || {}),
+          x: pendingStageCardPlacement.x,
+          y: pendingStageCardPlacement.y,
+          frame: "top-left",
+        },
+      }, `Index card created at x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}.`);
+      setRecentPlacementMarker(pendingStageCardPlacement, createdCard?.name || createdCard?.data?.front_text || "Index card");
+
+      const ok = sendAction("act/place_element", {
+        element_id: elementId,
+        element_slug: elementSlug,
+        venue_slug: "the-cave",
+        layer: "stage",
+        x: pendingStageCardPlacement.x,
+        y: pendingStageCardPlacement.y,
+        order: Number(createdCard?.position?.order ?? 0),
+      });
+
+      if (!ok) {
+        setStageStatus(`Card created but the placement could not be sent from x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}.`);
+        if (smokeMode) {
+          setSmokeLine(`Create succeeded, placement failed at ${pendingStageCardPlacement.x}, ${pendingStageCardPlacement.y}.`);
+        }
+        return;
+      }
+
+      setStageStatus(`Index card placed at x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}.`);
+      setMovementReport(`Index card placed at x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}.`);
+      if (smokeMode) {
+        setSmokeLine(`Placed smoke card at ${pendingStageCardPlacement.x}, ${pendingStageCardPlacement.y}.`);
+      }
+      pendingStageCardPlacement = null;
+    }
+
+    function renderPixiScene() {
+      if (!pixiApp || !sceneRoot || !backgroundLayer || !objectLayer) return;
+
+      clearSceneNodes();
+
+      const size = getStageSize();
+      const width = Math.max(320, size.width);
+      const height = Math.max(320, size.height);
+
+      backgroundLayer.removeChildren();
+      const backdrop = new PIXI.Graphics();
+      backdrop.beginFill(0x1b1712, 1);
+      backdrop.drawRect(0, 0, width, height);
+      backdrop.endFill();
+      backgroundLayer.addChild(backdrop);
+
+      const glow = new PIXI.Graphics();
+      glow.beginFill(0x8a5d2f, 0.12);
+      glow.drawCircle(width * 0.52, height * 0.48, Math.min(width, height) * 0.24);
+      glow.endFill();
+      backgroundLayer.addChild(glow);
+
+      if (smokeGridEnabled) {
+        const grid = new PIXI.Graphics();
+        grid.lineStyle(1, 0xffffff, 0.06);
+        const spacing = 100;
+        for (let x = 0; x <= width; x += spacing) {
+          grid.moveTo(x, 0);
+          grid.lineTo(x, height);
+        }
+        for (let y = 0; y <= height; y += spacing) {
+          grid.moveTo(0, y);
+          grid.lineTo(width, y);
+        }
+        grid.lineStyle(2, 0xf0d49b, 0.16);
+        grid.moveTo(0, 0);
+        grid.lineTo(Math.min(width, 80), 0);
+        grid.moveTo(0, 0);
+        grid.lineTo(0, Math.min(height, 80));
+        const origin = new PIXI.Graphics();
+        origin.beginFill(0xf0d49b, 0.7);
+        origin.drawCircle(0, 0, 4);
+        origin.endFill();
+        const originLabelStyle = new PIXI.TextStyle({
+          fontFamily: "Arial",
+          fontSize: 11,
+          fill: 0xf0d49b,
+          fontWeight: "700",
+        });
+        const originLabel = new PIXI.Text("(0,0)", originLabelStyle);
+        originLabel.position.set(8, 6);
+        backgroundLayer.addChild(grid, origin, originLabel);
+      }
+
+      const footlight = new PIXI.Graphics();
+      footlight.beginFill(0x000000, 0.18);
+      footlight.drawRect(0, height * 0.68, width, height * 0.32);
+      footlight.endFill();
+      backgroundLayer.addChild(footlight);
+
+      if (recentPlacementMarker && Date.now() - recentPlacementMarker.at < 15000) {
+        const marker = new PIXI.Graphics();
+        marker.lineStyle(2, 0xf0d49b, 0.9);
+        marker.drawCircle(0, 0, 14);
+        marker.moveTo(-20, 0);
+        marker.lineTo(20, 0);
+        marker.moveTo(0, -20);
+        marker.lineTo(0, 20);
+        marker.beginFill(0xf0d49b, 0.12);
+        marker.drawCircle(0, 0, 24);
+        marker.endFill();
+        marker.position.set(recentPlacementMarker.x, recentPlacementMarker.y);
+
+        const markerLabelStyle = new PIXI.TextStyle({
+          fontFamily: "Arial",
+          fontSize: 11,
+          fontWeight: "700",
+          fill: 0xf0d49b,
+        });
+        const markerLabel = new PIXI.Text(recentPlacementMarker.label ? `${recentPlacementMarker.label} @ ${recentPlacementMarker.x}, ${recentPlacementMarker.y}` : `${recentPlacementMarker.x}, ${recentPlacementMarker.y}`, markerLabelStyle);
+        markerLabel.position.set(recentPlacementMarker.x + 18, recentPlacementMarker.y - 28);
+        backgroundLayer.addChild(marker, markerLabel);
+      }
+
+      let liveCount = 0;
+      currentObjects.forEach((model, index) => {
+        let node;
+        if (model.kind === "fire") {
+          node = makeFireNode(model);
+        } else if (model.kind === "card" && model.live) {
+          node = makeCardNode(model);
+        } else {
+          node = makePlaceholderNode(model);
+        }
+
+        const pos = toStagePoint(model, { width, height }, { baseY: model.kind === "fire" ? 0.6 : 0.5, orderOffset: 12 });
+        node.container.position.set(pos.x, pos.y);
+        node.container.zIndex = 10 + index;
+        objectLayer.addChild(node.container);
+        currentNodeMap.set(model.key, node);
+        node.updateSelected(currentSelection?.key === model.key);
+
+        if (model.live) {
+          liveCount += 1;
+        }
+      });
+
+      if (objectCountLine) {
+        objectCountLine.textContent = String(currentObjects.length);
+      }
+      setLiveFeedLine(`${liveCount} live object${liveCount === 1 ? "" : "s"} in the Pixi scene.`);
+      const renderedFire = currentObjects.some((object) => object.kind === "fire");
+      const renderedCards = currentObjects.filter((object) => object.kind === "card").length;
+      setSnapshotSummary(`${renderedFire ? "Fire" : "No fire"} and ${renderedCards} card object${renderedCards === 1 ? "" : "s"} are rendered from the live Cave snapshot.`);
+      updateStatusSummary();
+      refreshNodeSelection();
+    }
+
+    function layoutPixiScene() {
+      if (!pixiApp) return;
+      const size = getStageSize();
+      pixiApp.renderer.resize(size.width, size.height);
+      if (sceneRoot) {
+        sceneRoot.hitArea = new PIXI.Rectangle(0, 0, size.width, size.height);
+      }
+      renderPixiScene();
+    }
+
+    async function initializePixi() {
+      if (!window.PIXI) {
+        setStageStatus("PixiJS failed to load.");
+        setMovementReport("Pixi unavailable");
+        return;
+      }
+
+      const size = getStageSize();
+      pixiApp = new PIXI.Application({
+        width: size.width,
+        height: size.height,
+        backgroundAlpha: 0,
+        antialias: true,
+        resolution: window.devicePixelRatio || 1,
+        autoDensity: true,
+      });
+
+      stageHost.innerHTML = "";
+      stageHost.appendChild(pixiApp.view);
+      pixiApp.stage.sortableChildren = true;
+
+      pixiApp.view.addEventListener("contextmenu", handleNativeStageContextMenu, true);
+      stageHost.addEventListener("contextmenu", handleNativeStageContextMenu, true);
+
+      sceneRoot = new PIXI.Container();
+      sceneRoot.sortableChildren = true;
+      sceneRoot.eventMode = "static";
+      sceneRoot.hitArea = new PIXI.Rectangle(0, 0, size.width, size.height);
+      sceneRoot.on("pointerdown", (event) => {
+        if (event.target === sceneRoot) {
+          selectObject(null, "Selection cleared.");
+          closeContextMenu();
+        }
+      });
+      sceneRoot.on("contextmenu", (event) => {
+        if (wasContextMenuHandled(event)) {
+          return;
+        }
+        handleNativeStageContextMenu(event);
+      });
+      backgroundLayer = new PIXI.Container();
+      backgroundLayer.zIndex = 0;
+      objectLayer = new PIXI.Container();
+      objectLayer.zIndex = 10;
+      uiLayer = new PIXI.Container();
+      uiLayer.zIndex = 20;
+      pixiApp.stage.addChild(sceneRoot);
+      sceneRoot.addChild(backgroundLayer, objectLayer, uiLayer);
+
+      stageHost.addEventListener("pointermove", (event) => {
+        const point = stagePointFromClient(event.clientX, event.clientY);
+        const stageX = Math.round(point.x);
+        const stageY = Math.round(point.y);
+        if (dragState) {
+          dragState.lastStagePoint = { x: stageX, y: stageY };
+        }
+        updatePointerReadout(event.clientX || 0, event.clientY || 0, { x: stageX, y: stageY }, dragState ? "Dragging" : "Pointer");
+        if (currentSelection) {
+          syncSelectedActions();
+        }
+        if (!dragState || !dragState.node) return;
+        dragState.node.position.set(point.x - dragState.offsetX, point.y - dragState.offsetY);
+        const dropX = Math.round(point.x - dragState.offsetX);
+        const dropY = Math.round(point.y - dragState.offsetY);
+        setMovementReport(`Dragging to x ${dropX}, y ${dropY}`);
+      });
+
+      window.addEventListener("pointerup", finishDrag, true);
+      window.addEventListener("pointercancel", finishDrag, true);
+      cardEditorHeader?.addEventListener("pointerdown", beginCardEditorDrag);
+      window.addEventListener("pointermove", moveCardEditorDrag, true);
+      window.addEventListener("pointerup", endCardEditorDrag, true);
+      window.addEventListener("pointercancel", endCardEditorDrag, true);
+
+      resizeObserver = new ResizeObserver(() => layoutPixiScene());
+      resizeObserver.observe(stageShell);
+      window.addEventListener("resize", layoutPixiScene);
+      layoutPixiScene();
+    }
+
+    function toStageCoordinates(x, y) {
+      return {
+        x: Math.round(Number(x || 0)),
+        y: Math.round(Number(y || 0)),
+      };
+    }
+
+    function finishDrag(event) {
+      if (!dragState) return;
+
+      const { model, node } = dragState;
+      dragState = null;
+
+      const stagePoint = toStageCoordinates(node.x, node.y);
+      setMovementReport(`Dropped at x ${stagePoint.x}, y ${stagePoint.y}`);
+
+      if (!model.live) {
+        setStageStatus("Non-live object moved only in Pixi.");
+        return;
+      }
+
+      const sent = sendAction("act/place_element", {
+        element_id: model.elementId || "",
+        element_slug: model.elementSlug || "",
+        venue_slug: "the-cave",
+        layer: "stage",
+        x: stagePoint.x,
+        y: stagePoint.y,
+        order: Number(model.position?.order ?? 0),
+      });
+
+      if (sent) {
+        setStageStatus("Move sent through act/place_element.");
+        if (smokeMode) {
+          setSmokeLine(`Drop sent at ${stagePoint.x}, ${stagePoint.y}.`);
+        }
+      } else {
+        setStageStatus("Move could not be sent. Socket unavailable.");
+        if (smokeMode) {
+          setSmokeLine(`Drop failed at ${stagePoint.x}, ${stagePoint.y}.`);
+        }
+      }
+    }
+
+    function beginCardEditorDrag(event) {
+      if (!cardEditorPanel || cardEditorPanel.hidden || !cardEditorHeader) return;
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const rect = cardEditorPanel.getBoundingClientRect();
+      cardEditorDragState = {
+        offsetX: event.clientX - rect.left,
+        offsetY: event.clientY - rect.top,
+      };
+      cardEditorHeader.setPointerCapture?.(event.pointerId);
+      cardEditorHeader.style.cursor = "grabbing";
+    }
+
+    function moveCardEditorDrag(event) {
+      if (!cardEditorDragState || !cardEditorPanel) return;
+      const shellRect = stageShell?.getBoundingClientRect?.();
+      if (!shellRect) return;
+      setCardEditorPosition(
+        event.clientX - shellRect.left - cardEditorDragState.offsetX,
+        event.clientY - shellRect.top - cardEditorDragState.offsetY,
+      );
+    }
+
+    function endCardEditorDrag() {
+      if (!cardEditorDragState) return;
+      cardEditorDragState = null;
+      if (cardEditorHeader) {
+        cardEditorHeader.style.cursor = "move";
+      }
+    }
+
+    function canSendStageAction() {
+      return !!ws && ws.readyState === WebSocket.OPEN;
+    }
+
+    function sendAction(type, extra = {}) {
+      if (!canSendStageAction()) {
+        return false;
+      }
+
+      ws.send(JSON.stringify({
+        type,
+        session_id: currentSessionId,
+        ...extra,
+      }));
+      return true;
+    }
+
+    function applySnapshot(snapshot) {
+      currentSnapshot = snapshot || null;
+      const elements = Array.isArray(snapshot?.elements) ? snapshot.elements : [];
+      const overlay = snapshot?.overlay || null;
+      const showing = snapshot?.showing || null;
+      const latestFire = elements.find((element) => element?.slug === "first-fire") || null;
+      const stageCards = elements.filter((element) =>
+        String(element?.element_type || "").toLowerCase() === "index_card" &&
+        String(element?.surface || element?.data?.surface || "tray").toLowerCase() === "stage"
+      );
+
+      currentObjects = buildObjects(snapshot);
+      updateStatusSummary();
+      setStageStatus(`Snapshot loaded. ${currentObjects.length} rendered object${currentObjects.length === 1 ? "" : "s"}.`);
+      setMovementLine("Idle");
+
+      const showingState = showing && String(showing.status || "").toLowerCase() !== "closed"
+        ? "active"
+        : "closed";
+      const overlayState = overlay ? `${overlay.overlay_type || "text"} overlay active` : "no overlay";
+      setSnapshotSummary(`Showing is ${showingState}; ${overlayState}; fire ${latestFire ? "is present" : "not present"}; staged cards ${stageCards.length}.`);
+
+      if (!pixiApp) {
+        return;
+      }
+
+      if (currentSelection && !currentObjects.find((object) => object.key === currentSelection.key)) {
+        currentSelection = null;
+      }
+      if (currentSelection) {
+        const refreshedSelection = currentObjects.find((object) => object.key === currentSelection.key);
+        if (refreshedSelection) {
+          currentSelection = refreshedSelection;
+        }
+      }
+
+      if (!currentSelection) {
+        setSelectionLine("None");
+        setLiveFeedLine("No live object selected.");
+      }
+
+      renderPixiScene();
+      syncSelectedActions();
+      syncCardEditorWithSelection();
+    }
+
+    async function refreshWorld() {
+      try {
+        const response = await fetch("/api/world/the-cave", {
+          method: "GET",
+          credentials: "include",
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok || !payload?.data) {
+          throw new Error(payload?.error || `HTTP ${response.status}`);
+        }
+        applySnapshot(payload.data);
+      } catch (error) {
+        console.error("refreshWorld failed", error);
+        setStageStatus(`Snapshot refresh failed: ${error.message || String(error)}`);
+      }
+    }
+
+    async function joinCave() {
+      setStageStatus("Joining the live Cave session...");
+
+      let sessionHandle = "web";
+      let sessionDisplayName = "Friend";
+      try {
+        const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
+        const sessionPayload = await sessionResponse.json().catch(() => null);
+        const session = sessionPayload?.data || {};
+        sessionHandle = String(session.handle || sessionHandle).trim() || sessionHandle;
+        sessionDisplayName = String(session.display_name || sessionDisplayName).trim() || sessionDisplayName;
+      } catch (err) {
+        console.warn("session identity lookup failed", err);
+      }
+
+      const response = await fetch("/api/session/the-cave/join", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          handle: sessionHandle,
+          display_name: sessionDisplayName,
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || `Join failed (HTTP ${response.status})`);
+      }
+
+      const data = payload.data || {};
+      currentRole = data.role || data.participant?.role || "audience";
+      currentSessionId = data.session_id || data.session?.id || data.sessionId || "";
+      currentActorId = data.actor_id || data.participant?.actor_id || data.participant?.user_id || data.user_id || "";
+
+      if (!currentSessionId || !currentActorId) {
+        throw new Error("Join succeeded but did not return session_id and actor_id.");
+      }
+
+      updateStatusSummary();
+      setStageStatus(`Joined as ${roleLabel(currentRole)}.`);
+    }
+
+    function connectSocket() {
+      const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+      ws = new WebSocket(`${protocol}//${location.host}/ws/the-cave`);
+
+      ws.addEventListener("open", () => {
+        setStageStatus("Connected to the Cave WebSocket.");
+      });
+
+      ws.addEventListener("close", () => {
+        setStageStatus("WebSocket closed.");
+        setMovementLine("Socket closed");
+      });
+
+      ws.addEventListener("error", () => {
+        setStageStatus("WebSocket error.");
+      });
+
+      ws.addEventListener("message", async (event) => {
+        let msg;
+        try {
+          msg = JSON.parse(event.data);
+        } catch (error) {
+          return;
+        }
+
+        if (msg.type === "snapshot" && msg.data) {
+          applySnapshot(msg.data);
+          return;
+        }
+
+        if (msg.type === "action" && msg.data) {
+          const actionType = msg.data.type || "";
+          if (
+            actionType === "act/place_element" ||
+            actionType === "act/remove_element" ||
+            actionType === "act/set_element_lock" ||
+            actionType === "act/set_nameplate_visibility" ||
+            actionType === "create/index_card" ||
+            actionType === "update/index_card" ||
+            actionType === "delete/index_card"
+          ) {
+            await refreshWorld();
+            if (actionType === "create/index_card") {
+              placeCreatedIndexCard(msg.data);
+            }
+            if (actionType === "act/place_element") {
+              setMovementLine("act/place_element accepted by the live action stream.");
+            }
+            if (actionType === "act/remove_element") {
+              setMovementLine("act/remove_element accepted by the live action stream.");
+            }
+            if (actionType === "act/set_element_lock") {
+              setMovementLine("act/set_element_lock accepted by the live action stream.");
+            }
+            if (actionType === "act/set_nameplate_visibility") {
+              setMovementLine("act/set_nameplate_visibility accepted by the live action stream.");
+            }
+            return;
+          }
+        }
+
+        if (msg.type === "error") {
+          setStageStatus(`Action denied: ${msg.error || "action_denied"}`);
+          setMovementLine(`Denied: ${msg.error || "action_denied"}`);
+          pendingStageCardPlacement = null;
+          stagePlacementCandidate = null;
+        }
+      });
+    }
 
     async function bootstrapFirstTheater() {
       try {
@@ -152,20 +2558,140 @@
           ? visibilityPayload.data.some((venue) => venue?.slug === "first-theater")
           : false;
 
-        if (visible) {
-          accessLine.textContent = "Access granted";
-          accessLine.style.color = "#e8d19a";
-          accessNote.classList.add("hidden");
-        } else {
-          accessLine.textContent = "Placeholder venue";
-          accessLine.style.color = "#d2c0aa";
-          accessNote.classList.remove("hidden");
+        if (!visible) {
+          setStageStatus("Venue is not visible yet.");
+          setMovementLine("Unavailable");
+          setSnapshotSummary("The First Theater Pixi stage is hidden until this venue becomes visible.");
+          showForbiddenScreen();
+          return;
         }
+
+        await initializePixi();
+        await joinCave();
+        connectSocket();
+        await refreshWorld();
       } catch (error) {
         console.error("first theater bootstrap failed", error);
+        setStageStatus(error.message || String(error));
         showForbiddenScreen();
       }
     }
+
+    refreshWorldButton?.addEventListener("click", () => {
+      refreshWorld();
+    });
+
+    clearSelectionButton?.addEventListener("click", () => {
+      selectObject(null, "Selection cleared.");
+      closeContextMenu();
+    });
+
+    cardEditorFront?.addEventListener("input", () => {
+      cardEditorDirty = true;
+      if (cardEditorStatus) {
+        cardEditorStatus.textContent = "Unsaved changes.";
+      }
+    });
+
+    cardEditorBack?.addEventListener("input", () => {
+      cardEditorDirty = true;
+      if (cardEditorStatus) {
+        cardEditorStatus.textContent = "Unsaved changes.";
+      }
+    });
+
+    cardEditorColor?.addEventListener("input", () => {
+      cardEditorDirty = true;
+      if (cardEditorStatus) {
+        cardEditorStatus.textContent = "Unsaved changes.";
+      }
+    });
+
+    cardEditorSave?.addEventListener("click", () => {
+      saveCardEditor();
+    });
+
+    cardEditorCancel?.addEventListener("click", () => {
+      hideCardEditor();
+      if (currentSelection && isCardObject(currentSelection)) {
+        setStageStatus(`${currentSelection.label} selected.`);
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      if (contextMenu && !contextMenu.hidden && !contextMenu.contains(event.target)) {
+        closeContextMenu();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (smokeMode && event.key && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        const tag = String(event.target?.tagName || "").toLowerCase();
+        if (tag !== "input" && tag !== "textarea" && tag !== "select" && tag !== "button") {
+          if (event.key.toLowerCase() === "g") {
+            event.preventDefault();
+            smokeToggleGridButton?.click();
+            return;
+          }
+          if (event.key.toLowerCase() === "d") {
+            event.preventDefault();
+            smokeDropCardButton?.click();
+            return;
+          }
+        }
+      }
+      if (event.key === "Escape") {
+        closeContextMenu();
+        if (currentSelection) {
+          selectObject(null, "Selection cleared.");
+        }
+      }
+    });
+
+    contextMenu?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-menu-action]");
+      if (!button) return;
+      const action = button.getAttribute("data-menu-action");
+      const objectKey = contextMenu.dataset.objectKey || "";
+      const objectModel = contextMenuTarget || currentObjects.find((item) => item.key === objectKey) || null;
+      if (!objectModel) {
+        closeContextMenu();
+        return;
+      }
+      performStageObjectAction(action, objectModel);
+    });
+
+    smokeToggleGridButton?.addEventListener("click", () => {
+      smokeGridEnabled = !smokeGridEnabled;
+      setSmokeLine(smokeGridEnabled ? `Grid on · Last pointer ${currentStagePointLabel()}` : `Grid off · Last pointer ${currentStagePointLabel()}`);
+      updateSmokeUI();
+      renderPixiScene();
+    });
+
+    smokeDropCardButton?.addEventListener("click", () => {
+      if (!smokeMode) return;
+      if (!lastStagePoint) {
+        setSmokeLine("Move the pointer over the stage first.");
+        return;
+      }
+      if (!canManageIndexCards(currentRole)) {
+        setSmokeLine("Smoke card creation needs producer or director access.");
+        return;
+      }
+      pendingStageCardPlacement = { ...lastStagePoint };
+      stagePlacementCandidate = { ...lastStagePoint };
+      setSmokeLine(`Spawning smoke card at ${currentStagePointLabel()}.`);
+      const sent = sendAction("create/index_card", {
+        front_text: "Smoke Test Card",
+        back_text: "Drag me to test pointer math.",
+        color: "#d9c7a6",
+      });
+      if (!sent) {
+        pendingStageCardPlacement = null;
+        stagePlacementCandidate = null;
+        setSmokeLine("Socket unavailable.");
+      }
+    });
 
     bootstrapFirstTheater();
   </script>

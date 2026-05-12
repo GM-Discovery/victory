@@ -48,6 +48,7 @@ type PlacedElement struct {
 	Surface      string         `json:"surface"`
 	Position     map[string]any `json:"position"`
 	Visibility   map[string]any `json:"visibility"`
+	State        map[string]any `json:"state,omitempty"`
 	Data         map[string]any `json:"data"`
 }
 
@@ -195,6 +196,11 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 
 		item.Position = decodeJSONMap(posRaw)
 		item.Visibility = decodeJSONMap(visRaw)
+		item.State = map[string]any{
+			"locked":            visibilityBool(item.Visibility, "locked", false),
+			"nameplate_visible": visibilityBool(item.Visibility, "nameplate_visible", true),
+			"visible":           visibilityBool(item.Visibility, "visible", true),
+		}
 		item.Data = decodeJSONMap(dataRaw)
 		if value := strings.TrimSpace(item.ContextClass); value != "" {
 			item.ContextClass = strings.ToLower(value)
@@ -582,4 +588,26 @@ func elementVisibilityForLayer(visibility map[string]bool, el PlacedElement, lay
 		}
 	}
 	return defaultVisible
+}
+
+func visibilityBool(visibility map[string]any, key string, fallback bool) bool {
+	if visibility == nil {
+		return fallback
+	}
+	raw, ok := visibility[key]
+	if !ok {
+		return fallback
+	}
+	switch value := raw.(type) {
+	case bool:
+		return value
+	case string:
+		switch strings.ToLower(strings.TrimSpace(value)) {
+		case "true", "1", "yes", "on":
+			return true
+		case "false", "0", "no", "off":
+			return false
+		}
+	}
+	return fallback
 }

@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -32,6 +33,13 @@ func (r fakeRow) Scan(dest ...any) error {
 				*d = v
 				continue
 			}
+		case *[]byte:
+			switch v := r.values[i].(type) {
+			case []byte:
+				*d = append((*d)[:0], v...)
+			case string:
+				*d = []byte(v)
+			}
 		}
 	}
 	return nil
@@ -42,6 +50,8 @@ type fakeQuerier struct {
 	venueSlug     string
 	venueEnabled  bool
 	showingStatus string
+	layoutFound   bool
+	locked        bool
 }
 
 func (q fakeQuerier) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
@@ -54,6 +64,12 @@ func (q fakeQuerier) QueryRow(ctx context.Context, sql string, args ...any) pgx.
 			status = "live"
 		}
 		return fakeRow{values: []any{status}}
+	case strings.Contains(sql, "JOIN venue_layout_elements"):
+		if !q.layoutFound {
+			return fakeRow{err: pgx.ErrNoRows}
+		}
+		visibility := `{"locked":` + strings.ToLower(strconv.FormatBool(q.locked)) + `,"nameplate_visible":true,"visible":true}`
+		return fakeRow{values: []any{"venue-1", q.venueSlug, "card-1", "index-card-director", "index_card", "card", "stage", []byte(visibility)}}
 	case strings.Contains(sql, "COALESCE((v.config ->> 'index_cards_enabled')::boolean, FALSE)"):
 		return fakeRow{values: []any{q.venueSlug, q.venueEnabled}}
 	case strings.Contains(sql, "FROM session_participants sp") && strings.Contains(sql, "SELECT sp.role::text"):
@@ -178,6 +194,43 @@ func TestCanActPlaceElement(t *testing.T) {
 	}
 }
 
+func TestCanActDuplicateElement(t *testing.T) {
+	tests := []struct {
+		name         string
+		role         string
+		locked       bool
+		venueEnabled bool
+		want         bool
+		wantReason   string
+	}{
+		{name: "producer allowed", role: "producer", locked: false, venueEnabled: true, want: true, wantReason: "allowed"},
+		{name: "director allowed", role: "director", locked: false, venueEnabled: true, want: true, wantReason: "allowed"},
+		{name: "cast denied", role: "cast", locked: false, venueEnabled: true, want: false, wantReason: "insufficient_role"},
+		{name: "locked denied", role: "producer", locked: true, venueEnabled: true, want: false, wantReason: "locked"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q := fakeQuerier{role: tt.role, venueSlug: "the-cave", venueEnabled: tt.venueEnabled, layoutFound: true, locked: tt.locked}
+			decision, err := CanAct(context.Background(), q, "user-1", "act/duplicate_element", "session-1", ActionTarget{
+				Kind:      "element",
+				ElementID: "card-1",
+				VenueSlug: "the-cave",
+				Layer:     "stage",
+			})
+			if err != nil {
+				t.Fatalf("CanAct act/duplicate_element returned error: %v", err)
+			}
+			if decision.Allowed != tt.want {
+				t.Fatalf("CanAct act/duplicate_element allowed=%v, want %v", decision.Allowed, tt.want)
+			}
+			if decision.Reason != tt.wantReason {
+				t.Fatalf("CanAct act/duplicate_element reason=%q, want %q", decision.Reason, tt.wantReason)
+			}
+		})
+	}
+}
+
 func TestCanActBlockedWhenShowingClosed(t *testing.T) {
 	decision, err := CanAct(context.Background(), fakeQuerier{role: "producer", venueSlug: "the-cave", venueEnabled: true, showingStatus: "closed"}, "user-1", "chat/message", "session-1", ActionTarget{Kind: "session"})
 	if err != nil {
@@ -185,5 +238,33 @@ func TestCanActBlockedWhenShowingClosed(t *testing.T) {
 	}
 	if decision.Allowed {
 		t.Fatalf("expected chat/message to be blocked when showing is closed")
+	}
+}
+
+func TestCanActLockedElementBlocksManipulation(t *testing.T) {
+	q := fakeQuerier{role: "producer", venueSlug: "the-cave", venueEnabled: true, layoutFound: true, locked: true}
+
+	decision, err := CanAct(context.Background(), q, "user-1", "act/place_element", "session-1", ActionTarget{
+		Kind:      "element",
+		ElementID: "card-1",
+		VenueSlug: "the-cave",
+		Layer:     "stage",
+	})
+	if err != nil {
+		t.Fatalf("CanAct act/place_element returned error: %v", err)
+	}
+	if decision.Allowed || decision.Reason != "locked" {
+		t.Fatalf("expected locked place_element denial, got %+v", decision)
+	}
+
+	decision, err = CanAct(context.Background(), q, "user-1", "act/set_nameplate_visibility", "session-1", ActionTarget{
+		Kind:      "element",
+		ElementID: "card-1",
+	})
+	if err != nil {
+		t.Fatalf("CanAct act/set_nameplate_visibility returned error: %v", err)
+	}
+	if decision.Allowed || decision.Reason != "locked" {
+		t.Fatalf("expected locked nameplate denial, got %+v", decision)
 	}
 }

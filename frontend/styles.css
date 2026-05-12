@@ -1,15 +1,38 @@
+:root {
+  color-scheme: dark;
+  --bg-top: #1a1613;
+  --bg-bottom: #0b0908;
+  --panel: rgba(21, 18, 15, 0.82);
+  --panel-strong: rgba(17, 14, 11, 0.9);
+  --line: rgba(255, 240, 220, 0.1);
+  --line-strong: rgba(255, 240, 220, 0.18);
+  --text: #f7efe5;
+  --muted: #cbb9a4;
+  --accent: #e0bf86;
+  --accent-strong: #f4ddaf;
+  --shadow: 0 22px 48px rgba(0, 0, 0, 0.28);
+}
+
 html,
 body {
   margin: 0;
   padding: 0;
   min-height: 100%;
+  box-sizing: border-box;
+}
+
+*, *::before, *::after {
+  box-sizing: inherit;
 }
 
 body {
   min-height: 100vh;
-  font-family: sans-serif;
-  background: #111;
-  color: #fff;
+  font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(142, 94, 54, 0.12), transparent 24%),
+    radial-gradient(circle at 88% 0%, rgba(122, 92, 49, 0.1), transparent 22%),
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+  color: var(--text);
   overflow-x: hidden;
 }
 
@@ -29,13 +52,78 @@ body {
   left: 0;
   right: 0;
   z-index: 20;
-  padding: 1rem 1.25rem;
+  padding: 1rem 1.25rem 1.25rem;
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.65),
-    rgba(0, 0, 0, 0.18),
-    rgba(0, 0, 0, 0)
+    rgba(10, 8, 7, 0.88),
+    rgba(10, 8, 7, 0.58),
+    rgba(10, 8, 7, 0)
   );
+  backdrop-filter: blur(14px);
+}
+
+.app-shell--signed-in .app-header {
+  position: fixed;
+  inset: 0 0 auto 0;
+  width: 100vw;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  min-height: 4px;
+  overflow: visible;
+  background: linear-gradient(
+    to bottom,
+    rgba(10, 8, 7, 0.5) 0,
+    rgba(10, 8, 7, 0.16) 2px,
+    rgba(10, 8, 7, 0) 4px
+  );
+  box-shadow: none;
+  backdrop-filter: blur(1px);
+}
+
+.app-shell--signed-in .app-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  height: 110px;
+  z-index: 0;
+  opacity: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(10, 8, 7, 0.92),
+    rgba(10, 8, 7, 0.7),
+    rgba(10, 8, 7, 0)
+  );
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.app-shell--signed-in .app-header:hover::before,
+.app-shell--signed-in .app-header:focus-within::before {
+  opacity: 1;
+}
+
+.app-shell--signed-in .brand-row {
+  opacity: 0;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 1.25rem;
+  align-items: center;
+  pointer-events: none;
+  transition:
+    opacity 140ms ease,
+    transform 180ms ease;
+}
+
+.app-shell--signed-in .app-header:hover .brand-row,
+.app-shell--signed-in .app-header:focus-within .brand-row {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .brand-row {
@@ -111,17 +199,18 @@ body {
 
 .login-link {
   display: inline-block;
-  color: #fff;
+  color: var(--text);
   text-decoration: none;
   padding: 0.6rem 0.9rem;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.05);
   white-space: nowrap;
+  box-shadow: var(--shadow);
 }
 
 .login-link:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .account-menu-toggle {
@@ -131,14 +220,15 @@ body {
   width: 2.25rem;
   height: 2.25rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(0, 0, 0, 0.25);
-  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
   cursor: pointer;
+  box-shadow: var(--shadow);
 }
 
 .account-menu-toggle:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .account-menu {
@@ -149,7 +239,7 @@ body {
   padding: 0.45rem;
   border-radius: 1rem;
   background: rgba(16, 15, 14, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
   display: grid;
   gap: 0.35rem;
@@ -186,7 +276,9 @@ body {
   position: relative;
   width: 100%;
   height: 100vh;
-  background-image: url("/assets/mapbackgroundbackup.png");
+  background-image:
+    linear-gradient(180deg, rgba(10, 8, 7, 0.08), rgba(10, 8, 7, 0.22)),
+    url("/assets/mapbackgroundbackup.png");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -194,7 +286,9 @@ body {
 }
 
 .map-layer.map-layer--signed-in {
-  background-image: url("/assets/mapbackground.png");
+  background-image:
+    linear-gradient(180deg, rgba(10, 8, 7, 0.08), rgba(10, 8, 7, 0.22)),
+    url("/assets/mapbackground.png");
 }
 
 .status {
@@ -202,19 +296,21 @@ body {
   top: 5.5rem;
   left: 1rem;
   z-index: 15;
-  padding: 0.5rem 0.75rem;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
+  padding: 0.6rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(9, 8, 7, 0.62);
+  backdrop-filter: blur(8px);
   font-size: 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .tool-panel {
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
   background: rgba(255,255,255,0.04);
   padding: 12px;
   margin-bottom: 12px;
+  box-shadow: var(--shadow);
 }
 
 .tool-row {
@@ -232,10 +328,10 @@ body {
 .tool-row button {
   padding: 8px 12px;
   font-size: 0.95rem;
-  border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.15);
-  background: #2a231d;
-  color: white;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
   cursor: pointer;
 }
 
@@ -286,8 +382,8 @@ body {
   width: clamp(64px, 6vw, 88px);
   height: auto;
   object-fit: contain;
-  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.45));
-  transition: transform 0.15s ease, filter 0.15s ease;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5));
+  transition: transform 0.18s ease, filter 0.18s ease;
 }
 
 .venue-pin:hover img,
@@ -298,11 +394,13 @@ body {
 .venue-label {
   padding: 0.35rem 1rem;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.49);
-  color: #fff;
+  background: rgba(9, 8, 7, 0.58);
+  color: var(--text);
   font-size: 0.9rem;
   line-height: 1.3;
   white-space: nowrap;
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(8px);
 }
 
 .venue-pin:focus-visible {
@@ -337,7 +435,7 @@ body {
 .venue-pin--theater .venue-label {
   position: relative;
   z-index: 2;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(9, 8, 7, 0.72);
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -355,7 +453,7 @@ body {
   justify-content: center;
   padding: 24px;
   background: rgba(8, 10, 12, 0.72);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
 }
 
 .booth-sheet {
@@ -363,7 +461,9 @@ body {
   width: min(1120px, 100%);
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(180deg, rgba(34, 28, 24, 0.98), rgba(18, 14, 12, 0.98));
+  background:
+    radial-gradient(circle at top, rgba(232, 192, 121, 0.16), transparent 34%),
+    linear-gradient(180deg, rgba(34, 28, 24, 0.98), rgba(18, 14, 12, 0.98));
   color: #f7efe3;
   padding: 24px;
   box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
@@ -463,6 +563,7 @@ body {
   color: #fff2d0;
   text-decoration: none;
   font-weight: 700;
+  box-shadow: var(--shadow);
 }
 
 @keyframes theaterPulse {
