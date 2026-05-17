@@ -74,6 +74,7 @@ async function loadVenues() {
       const fallbackPositions = {
         library: { x: 67, y: 87 },
         "first-theater": { x: 73, y: 66 },
+        "middle-school-stage": { x: 58, y: 61 },
         "the-cave": { x: 22, y: 23 },
         "grants-cabin": { x: 28, y: 21 },
       "audition-hall": { x: 24, y: 37 },
@@ -114,6 +115,7 @@ async function loadVenues() {
       const venueIcons = {
         library: "/assets/librarycc.png",
         "first-theater": "/assets/default.png",
+        "middle-school-stage": "/assets/default.png",
         "soil-experts": "/assets/mudfarm.png",
         "info-booth": "/assets/infobooth.png",
         "audition-hall": "/assets/audition-hall.png",
@@ -162,6 +164,11 @@ async function loadVenues() {
 
         if (venue.slug === "first-theater") {
           window.location.href = "/venues/first-theater/";
+          return;
+        }
+
+        if (venue.slug === "middle-school-stage") {
+          window.location.href = "/venues/middle-school-stage/";
           return;
         }
 

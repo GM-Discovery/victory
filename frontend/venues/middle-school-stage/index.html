@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Middle School Stage</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    :root {
+      --bg: #0d1624;
+      --bg-2: #16253b;
+      --panel: rgba(13, 23, 38, 0.92);
+      --panel-strong: rgba(22, 34, 53, 0.96);
+      --border: rgba(186, 205, 233, 0.16);
+      --text: #eef4ff;
+      --muted: #b5c5de;
+      --accent: #f0c96b;
+      --accent-2: #8cc7ff;
+      --drawer: #132131;
+      --shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+      --left-drawer-width: 64px;
+      --right-drawer-width: 64px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(120, 178, 255, 0.16), transparent 32%),
+        radial-gradient(circle at 80% 20%, rgba(240, 201, 107, 0.18), transparent 28%),
+        linear-gradient(180deg, #0b1320 0%, var(--bg) 46%, #09111a 100%);
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 14px;
+      padding: 18px;
+    }
+
+    .top-bar,
+    .bottom-shell {
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(30, 39, 56, 0.95), rgba(18, 24, 35, 0.95));
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .top-bar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(220px, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      padding: 6px 18px;
+      max-height: 38px;
+      overflow: hidden;
+      transition:
+        max-height 180ms ease,
+        padding 180ms ease;
+    }
+
+    .top-bar:hover,
+    .top-bar:focus-within {
+      padding: 16px 18px;
+      max-height: 220px;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.35rem;
+      letter-spacing: 0.03em;
+    }
+
+    .brand p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .header-left {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+      opacity: 0;
+      transform: translateY(-6px);
+      pointer-events: none;
+      transition:
+        opacity 140ms ease,
+        transform 180ms ease;
+    }
+
+    .status-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .header-center {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-width: 0;
+      opacity: 0;
+      transform: translateY(-6px);
+      pointer-events: none;
+      transition:
+        opacity 140ms ease,
+        transform 180ms ease;
+    }
+
+    .chip--target {
+      align-items: center;
+      gap: 10px;
+      min-width: min(100%, 340px);
+      justify-content: space-between;
+    }
+
+    .chip-stack {
+      display: grid;
+      gap: 2px;
+    }
+
+    .chip-stack span {
+      display: block;
+      line-height: 1.15;
+    }
+
+    .chip-action {
+      border: 0;
+      background: transparent;
+      color: var(--accent-2);
+      cursor: help;
+      padding: 0;
+      line-height: 1;
+      font-size: 1rem;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      font-size: 0.88rem;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .chip strong {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .header-right {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      position: relative;
+      opacity: 0;
+      transform: translateY(-6px);
+      pointer-events: none;
+      transition:
+        opacity 140ms ease,
+        transform 180ms ease;
+    }
+
+    .top-bar:hover .header-left,
+    .top-bar:hover .header-center,
+    .top-bar:hover .header-right,
+    .top-bar:focus-within .header-left,
+    .top-bar:focus-within .header-center,
+    .top-bar:focus-within .header-right {
+      opacity: 1;
+      transform: none;
+      pointer-events: auto;
+    }
+
+    .account-menu-wrap {
+      position: relative;
+    }
+
+    .account-chip {
+      min-width: 160px;
+      justify-content: space-between;
+    }
+
+    .account-avatar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, rgba(240, 201, 107, 0.22), rgba(140, 199, 255, 0.16));
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 0.82rem;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .account-menu {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 10px);
+      min-width: 180px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: rgba(11, 18, 29, 0.98);
+      box-shadow: var(--shadow);
+      padding: 8px;
+      display: grid;
+      gap: 6px;
+      z-index: 9;
+    }
+
+    .account-menu[hidden] {
+      display: none;
+    }
+
+    .account-menu a,
+    .account-menu button {
+      border: 0;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      text-decoration: none;
+      text-align: left;
+      padding: 10px 12px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .account-menu a:hover,
+    .account-menu button:hover {
+      background: rgba(240, 201, 107, 0.14);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: var(--left-drawer-width) minmax(0, 1fr) var(--right-drawer-width);
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .drawer {
+      min-height: 0;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--drawer);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      position: relative;
+      opacity: var(--drawer-opacity, 1);
+      transition: width 180ms ease, opacity 180ms ease, transform 180ms ease;
+    }
+
+    .drawer-inner {
+      min-height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .drawer-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 14px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      user-select: none;
+    }
+
+    .drawer-head__copy {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+      transition: opacity 140ms ease, transform 180ms ease;
+    }
+
+    .drawer-head strong {
+      font-size: 0.95rem;
+      letter-spacing: 0.02em;
+    }
+
+    .drawer-head span {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .drawer-head__actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .drawer-settings-button {
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--accent);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .drawer-settings-button:hover {
+      background: rgba(240, 201, 107, 0.14);
+    }
+
+    .drawer[data-open="false"] .drawer-head__copy {
+      opacity: 0;
+      transform: translateX(-6px);
+      pointer-events: none;
+    }
+
+    .drawer[data-open="false"] .drawer-body {
+      display: none;
+    }
+
+    .drawer-settings-panel {
+      position: absolute;
+      top: 56px;
+      left: 12px;
+      right: 12px;
+      z-index: 6;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(11, 18, 29, 0.98);
+      box-shadow: var(--shadow);
+      padding: 12px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .drawer-settings-panel[hidden] {
+      display: none;
+    }
+
+    .drawer-settings-panel h3 {
+      margin: 0;
+      font-size: 0.92rem;
+      letter-spacing: 0.02em;
+    }
+
+    .drawer-settings-panel .drawer-settings-group {
+      padding: 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .drawer-settings-group {
+      display: grid;
+      gap: 8px;
+    }
+
+    .drawer-settings-group label {
+      display: grid;
+      gap: 4px;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .drawer-settings-group select,
+    .drawer-settings-group input[type="range"] {
+      width: 100%;
+    }
+
+    .drawer-settings-group select {
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(8, 13, 20, 0.86);
+      color: var(--text);
+      padding: 9px 10px;
+    }
+
+    .drawer-settings-group input[type="range"] {
+      accent-color: var(--accent);
+    }
+
+    .drawer-settings-helper {
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+
+    .drawer-settings-value {
+      color: var(--text);
+      font-size: 0.84rem;
+    }
+
+    .drawer-body {
+      padding: 14px 12px 16px;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .drawer--collapsed {
+      width: 64px;
+    }
+
+    .drawer--expanded {
+      width: auto;
+      min-width: 0;
+    }
+
+    .drawer[data-open-mode="always-open"] {
+      width: auto;
+      min-width: 0;
+    }
+
+    .drawer[data-open-mode="hover"]:not(:hover):not(:focus-within) {
+      width: 64px;
+    }
+
+    .stage-shell {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .stage-panel,
+    .chat-panel {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .stage-head,
+    .chat-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .stage-head h2,
+    .chat-head h2 {
+      margin: 0;
+      font-size: 1.02rem;
+      letter-spacing: 0.03em;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .stage-surface {
+      position: relative;
+      min-height: 520px;
+      padding: 20px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
+        radial-gradient(circle at 50% 30%, rgba(240, 201, 107, 0.12), transparent 22%),
+        linear-gradient(180deg, rgba(12, 21, 34, 0.98), rgba(8, 12, 20, 0.98));
+    }
+
+    .stage-grid {
+      position: absolute;
+      inset: 20px;
+      border-radius: 16px;
+      border: 1px dashed rgba(255, 255, 255, 0.08);
+      background:
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 42px 42px;
+      opacity: 0.8;
+    }
+
+    .stage-card {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 16px;
+      min-height: 440px;
+    }
+
+    .stage-viewport {
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      border-radius: 16px;
+      background:
+        linear-gradient(180deg, rgba(140, 199, 255, 0.08), transparent),
+        linear-gradient(180deg, rgba(19, 29, 47, 0.96), rgba(10, 16, 27, 0.96));
+      padding: 18px;
+      display: grid;
+      gap: 16px;
+      align-content: start;
+    }
+
+    .stage-object {
+      width: min(100%, 280px);
+      padding: 16px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: linear-gradient(180deg, rgba(240, 201, 107, 0.2), rgba(140, 199, 255, 0.08));
+      color: var(--text);
+      text-align: left;
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+      cursor: context-menu;
+    }
+
+    .stage-object strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 1rem;
+    }
+
+    .stage-object span {
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.4;
+    }
+
+    .stage-note {
+      max-width: 500px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .hint-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .hint-card {
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+      padding: 12px;
+    }
+
+    .hint-card strong {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--accent);
+    }
+
+    .hint-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    .drawer-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .drawer-item {
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+      padding: 12px;
+      display: grid;
+      gap: 4px;
+    }
+
+    .drawer-item strong {
+      color: var(--accent);
+      font-size: 0.92rem;
+    }
+
+    .drawer-item span {
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.4;
+    }
+
+    .presence-preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .presence-avatar {
+      width: var(--portrait-size, 36px);
+      height: var(--portrait-size, 36px);
+      border-radius: 50%;
+      overflow: hidden;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: linear-gradient(180deg, rgba(240, 201, 107, 0.16), rgba(140, 199, 255, 0.1));
+      color: var(--text);
+      font-size: 0.78rem;
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+
+    .presence-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .presence-avatar--fallback {
+      background: linear-gradient(180deg, rgba(25, 40, 62, 0.96), rgba(14, 22, 35, 0.96));
+    }
+
+    .portrait-preview {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .portrait-chip {
+      width: var(--portrait-size, 36px);
+      height: var(--portrait-size, 36px);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, rgba(240, 201, 107, 0.2), rgba(140, 199, 255, 0.12));
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text);
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .drawer-portrait-note {
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
+
+    .chat-panel {
+      max-height: 52px;
+      transition: max-height 180ms ease;
+    }
+
+    .chat-panel:hover,
+    .chat-panel:focus-within {
+      max-height: 280px;
+    }
+
+    .chat-head {
+      justify-content: flex-start;
+      gap: 10px;
+    }
+
+    .chat-head__label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.02em;
+    }
+
+    .chat-head__badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chat-head__meta {
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .chat-panel .chat-head {
+      cursor: pointer;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(140, 199, 255, 0.18);
+      color: var(--text);
+      font-size: 0.78rem;
+      border: 1px solid rgba(140, 199, 255, 0.24);
+    }
+
+    .chat-body {
+      padding: 14px 16px 16px;
+      display: none;
+      gap: 12px;
+    }
+
+    .chat-panel:hover .chat-body,
+    .chat-panel:focus-within .chat-body {
+      display: grid;
+    }
+
+    .chat-log {
+      min-height: 86px;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--muted);
+      overflow: auto;
+    }
+
+    .chat-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .chat-row input {
+      width: 100%;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(9, 12, 18, 0.8);
+      color: var(--text);
+      padding: 10px 14px;
+    }
+
+    .chat-row button {
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      padding: 10px 14px;
+    }
+
+    .context-menu {
+      position: absolute;
+      z-index: 4;
+      min-width: 210px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(12, 16, 24, 0.96);
+      box-shadow: var(--shadow);
+      padding: 8px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .context-menu[hidden] { display: none; }
+
+    .context-menu button {
+      border: 0;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      text-align: left;
+      padding: 10px 12px;
+    }
+
+    .context-menu button:hover {
+      background: rgba(240, 201, 107, 0.14);
+    }
+
+    .bottom-shell {
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .access-status {
+      margin-top: 8px;
+      color: var(--accent);
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 1200px) {
+      .top-bar {
+        grid-template-columns: 1fr;
+        max-height: 42px;
+      }
+
+      .header-center,
+      .header-right {
+        justify-content: flex-start;
+      }
+
+      .chip--target,
+      .account-chip {
+        min-width: 0;
+        width: 100%;
+      }
+
+      .top-bar:hover,
+      .top-bar:focus-within {
+        max-height: 320px;
+      }
+    }
+
+    @media (max-width: 1100px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .drawer--collapsed {
+        width: 100%;
+      }
+
+      .drawer--expanded {
+        width: 100%;
+      }
+
+      .drawer[data-open-mode="hover"]:not(:hover):not(:focus-within) {
+        width: 100%;
+      }
+
+      .stage-card {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Forbidden Access Entry</h1>
+      <p>This shell is producer-only for now.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div id="stage-shell" class="shell" hidden>
+    <header class="top-bar">
+      <div class="header-left">
+        <div class="brand">
+          <h1>Middle School Stage</h1>
+          <p>Clean stage-shell grammar with drawers at the edges and the stage in the middle.</p>
+        </div>
+        <div class="status-strip">
+          <div class="chip"><strong>User</strong> <span id="identity-value">Unknown User</span></div>
+          <div class="chip"><strong>Role</strong> <span id="role-value">Unknown Role</span></div>
+          <div class="chip"><strong>Character</strong> <span id="character-value">No Character</span></div>
+          <div class="chip"><strong>Viewing As</strong> <span id="view-value">Self</span></div>
+          <div class="chip"><strong>Ping</strong> <span id="ping-value">—</span></div>
+        </div>
+      </div>
+      <div class="header-center">
+        <div class="chip chip--target">
+          <div class="chip-stack">
+            <strong>Target</strong>
+            <span id="target-value">No Target</span>
+            <span id="target-class-value" class="muted">Unknown Class</span>
+          </div>
+          <button id="target-info" class="chip-action" type="button" title="Target info" aria-label="Target info">i</button>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="account-menu-wrap">
+          <button id="account-menu-toggle" class="chip account-chip" type="button" aria-haspopup="menu" aria-expanded="false">
+            <span class="account-avatar" aria-hidden="true">◉</span>
+            <span id="account-label">Account</span>
+          </button>
+          <div id="account-menu" class="account-menu" hidden>
+            <a href="/venues/trailers/" id="account-trailers-link">Open Trailers</a>
+            <button id="account-logout-button" type="button">Log Out</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout">
+    <aside id="left-drawer" class="drawer drawer--collapsed" data-open-mode="hover" data-open="false">
+        <div class="drawer-inner">
+          <div class="drawer-head">
+            <div class="drawer-head__copy">
+              <strong>Network &amp; Tools</strong>
+              <span>Presence / future slots</span>
+            </div>
+            <div class="drawer-head__actions">
+              <button id="left-settings-button" class="drawer-settings-button" type="button" aria-label="Left drawer settings" aria-expanded="false">⚙</button>
+            </div>
+          </div>
+          <div id="left-settings-panel" class="drawer-settings-panel" hidden>
+            <h3>Left drawer settings</h3>
+            <div class="drawer-settings-group">
+              <label for="left-open-mode">Open mode
+                <select id="left-open-mode">
+                  <option value="hover">Hover open</option>
+                  <option value="always-open">Always open</option>
+                  <option value="always-closed">Always closed</option>
+                </select>
+              </label>
+              <label for="left-opacity">Window opacity
+                <input id="left-opacity" type="range" min="70" max="100" step="5" value="96" />
+                <span id="left-opacity-value" class="drawer-settings-value">96%</span>
+              </label>
+              <label for="left-portrait-size">Portrait size
+                <select id="left-portrait-size">
+                  <option value="small">Small</option>
+                  <option value="medium">Medium</option>
+                  <option value="large">Large</option>
+                </select>
+              </label>
+            </div>
+            <div class="drawer-settings-helper">Open mode controls how the drawer behaves. Opacity and portrait size are stored locally for this user on this device.</div>
+          </div>
+          <div class="drawer-body">
+            <div class="drawer-item">
+              <strong>Network</strong>
+              <span id="network-state">Waiting on future live transport.</span>
+            </div>
+            <div class="drawer-item">
+              <strong>Presence</strong>
+              <div id="presence-preview" class="presence-preview" aria-label="Current room presence preview">
+                <span class="presence-avatar presence-avatar--fallback">?</span>
+                <span class="presence-avatar presence-avatar--fallback">?</span>
+                <span class="presence-avatar presence-avatar--fallback">?</span>
+              </div>
+              <span id="presence-state">No roster yet. This is where presence will dock.</span>
+            </div>
+            <div class="drawer-item">
+              <strong>Portrait Preview</strong>
+              <div class="portrait-preview" aria-label="Portrait size preview">
+                <span class="portrait-chip">A</span>
+                <span class="portrait-chip">B</span>
+                <span class="portrait-chip">C</span>
+              </div>
+              <span class="drawer-portrait-note">Portrait size will be used later for room presence and speaking indicators.</span>
+            </div>
+            <div class="drawer-item">
+              <strong>Future Tools</strong>
+              <span>Keep this drawer intentionally sparse until a later kernel proves more portable controls.</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="stage-shell">
+        <section class="stage-panel">
+          <div class="stage-head">
+            <div>
+              <h2>Stage Area</h2>
+              <div class="muted" style="font-size: 0.9rem;">Center content stays clean; object controls should live in context menus.</div>
+            </div>
+            <div class="chip">Producer-only shell</div>
+          </div>
+          <div class="stage-surface" id="stage-surface">
+            <div class="stage-grid" aria-hidden="true"></div>
+            <div class="stage-card">
+              <div class="stage-viewport">
+                <button id="stage-object" class="stage-object" type="button">
+                  <strong>Placeholder stage object</strong>
+                  <span>Right-click me to preview the shell menu. This is a layout proof, not the final runtime object model.</span>
+                </button>
+                <div class="stage-note">
+                  This venue is the first clean copyable stage shell. The Cave stays messy on purpose while this surface proves the future drawer grammar.
+                </div>
+                <div class="hint-grid">
+                  <div class="hint-card">
+                    <strong>Top bar</strong>
+                    <p>Identity, role, character, view, target, and ping are surfaced up here so the stage itself can stay uncluttered.</p>
+                  </div>
+                  <div class="hint-card">
+                    <strong>Context menu</strong>
+                    <p>Object control should feel local and direct. The shell menu here is a placeholder for portable controls later.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="stage-viewport">
+                <div class="drawer-item">
+                  <strong>Shell Notes</strong>
+                  <span>Keep controls hidden until needed. Drawers should collapse aggressively and reopen only when the producer asks.</span>
+                </div>
+                <div class="drawer-item">
+                  <strong>Portable Primitives</strong>
+                  <span>Anything proven in The Cave can graduate here if it is simple enough to reuse without dragging the clutter along.</span>
+                </div>
+                <div class="drawer-item">
+                  <strong>Not Here Yet</strong>
+                  <span>Pixi, ticketing, analytics, and a full game layer are intentionally out of scope for this shell.</span>
+                </div>
+              </div>
+            </div>
+            <div id="stage-context-menu" class="context-menu" hidden>
+              <button type="button" data-context-action="inspect">Inspect</button>
+              <button type="button" data-context-action="reveal">Reveal</button>
+              <button type="button" data-context-action="hide">Hide</button>
+              <button type="button" data-context-action="move">Move</button>
+              <button type="button" data-context-action="remove">Remove</button>
+              <button type="button" data-context-action="lock">Lock</button>
+              <button type="button" data-context-action="unlock">Unlock</button>
+              <button type="button" data-context-action="hide-nameplate">Hide Nameplate</button>
+              <button type="button" data-context-action="show-nameplate">Show Nameplate</button>
+              <button type="button" data-context-action="show-overlay">Show Overlay</button>
+              <button type="button" data-context-action="hide-overlay">Hide Overlay</button>
+              <button type="button" data-context-action="handout">Send to Handouts</button>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <aside id="right-drawer" class="drawer drawer--collapsed" data-open-mode="hover" data-open="false">
+        <div class="drawer-inner">
+          <div class="drawer-head">
+            <div class="drawer-head__copy">
+              <strong>Character / Game</strong>
+              <span>persona / handouts later</span>
+            </div>
+            <div class="drawer-head__actions">
+              <button id="right-settings-button" class="drawer-settings-button" type="button" aria-label="Right drawer settings" aria-expanded="false">⚙</button>
+            </div>
+          </div>
+          <div id="right-settings-panel" class="drawer-settings-panel" hidden>
+            <h3>Right drawer settings</h3>
+            <div class="drawer-settings-group">
+              <label for="right-open-mode">Open mode
+                <select id="right-open-mode">
+                  <option value="hover">Hover open</option>
+                  <option value="always-open">Always open</option>
+                  <option value="always-closed">Always closed</option>
+                </select>
+              </label>
+              <label for="right-opacity">Window opacity
+                <input id="right-opacity" type="range" min="70" max="100" step="5" value="96" />
+                <span id="right-opacity-value" class="drawer-settings-value">96%</span>
+              </label>
+            </div>
+            <div class="drawer-settings-helper">Right drawer settings are stored locally per user and kept intentionally small for now.</div>
+          </div>
+          <div class="drawer-body">
+                <div class="drawer-item">
+                  <strong>Character</strong>
+                  <span id="right-character-value">No Character</span>
+                </div>
+                <div class="drawer-item">
+                  <strong>Game</strong>
+                  <span>Keep the rules layer separate from the shell. This venue should stay stage-first, not system-first.</span>
+                </div>
+            <div class="drawer-item">
+              <strong>Handouts Later</strong>
+              <span>Scripts, sheets, and classroom-style handouts should remain hidden until the venue actually needs them.</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <section id="chat-panel" class="chat-panel">
+      <div class="chat-head">
+        <div class="chat-head__label">Chat <span id="chat-badge" class="badge" hidden>0</span></div>
+        <div class="chat-head__meta">Hover to open</div>
+      </div>
+      <div class="chat-body">
+        <div class="chat-log" id="chat-log">
+          The chat drawer is intentionally quiet for now. Later kernels can wire in the live venue chat pattern here.
+        </div>
+        <div class="chat-row">
+          <input id="chat-input" type="text" placeholder="Chat stays hidden until a later kernel proves it here." disabled />
+          <button type="button" disabled>Send</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script>
+    const stageShell = document.getElementById("stage-shell");
+    const forbiddenScreen = document.getElementById("forbidden-screen");
+    const leftDrawer = document.getElementById("left-drawer");
+    const rightDrawer = document.getElementById("right-drawer");
+    const chatPanel = document.getElementById("chat-panel");
+    const chatBadge = document.getElementById("chat-badge");
+    const stageSurface = document.getElementById("stage-surface");
+    const stageObject = document.getElementById("stage-object");
+    const stageContextMenu = document.getElementById("stage-context-menu");
+    const identityValue = document.getElementById("identity-value");
+    const roleValue = document.getElementById("role-value");
+    const characterValue = document.getElementById("character-value");
+    const rightCharacterValue = document.getElementById("right-character-value");
+    const viewValue = document.getElementById("view-value");
+    const targetValue = document.getElementById("target-value");
+    const targetClassValue = document.getElementById("target-class-value");
+    const pingValue = document.getElementById("ping-value");
+    const networkState = document.getElementById("network-state");
+    const presenceState = document.getElementById("presence-state");
+    const presencePreview = document.getElementById("presence-preview");
+    const targetInfo = document.getElementById("target-info");
+    const accountMenuToggle = document.getElementById("account-menu-toggle");
+    const accountMenu = document.getElementById("account-menu");
+    const accountLogoutButton = document.getElementById("account-logout-button");
+    const accountLabel = document.getElementById("account-label");
+    const leftSettingsButton = document.getElementById("left-settings-button");
+    const leftSettingsPanel = document.getElementById("left-settings-panel");
+    const leftOpenMode = document.getElementById("left-open-mode");
+    const leftOpacity = document.getElementById("left-opacity");
+    const leftOpacityValue = document.getElementById("left-opacity-value");
+    const leftPortraitSize = document.getElementById("left-portrait-size");
+    const rightSettingsButton = document.getElementById("right-settings-button");
+    const rightSettingsPanel = document.getElementById("right-settings-panel");
+    const rightOpenMode = document.getElementById("right-open-mode");
+    const rightOpacity = document.getElementById("right-opacity");
+    const rightOpacityValue = document.getElementById("right-opacity-value");
+    let presenceRefreshTimer = null;
+
+    const drawerState = {
+      left: { hover: false, focus: false, settingsOpen: false },
+      right: { hover: false, focus: false, settingsOpen: false },
+    };
+
+    const drawerDefaults = {
+      left: { mode: "hover", opacity: 96, portraitSize: "medium" },
+      right: { mode: "hover", opacity: 96 },
+    };
+
+    const uiPreferenceKeyPrefix = "victory.middle-school-stage.ui.v1:";
+    let uiPreferenceKey = "";
+    let uiPreferences = {
+      left: { ...drawerDefaults.left },
+      right: { ...drawerDefaults.right },
+    };
+
+    function clampNumber(value, min, max, fallback) {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return fallback;
+      return Math.max(min, Math.min(max, parsed));
+    }
+
+    function normalizeDrawerMode(value) {
+      const mode = String(value || "").trim();
+      if (mode === "always-open" || mode === "always-closed") return mode;
+      return "hover";
+    }
+
+    function normalizePortraitSize(value) {
+      const size = String(value || "").trim();
+      if (size === "small" || size === "large") return size;
+      return "medium";
+    }
+
+    function getDefaultPrefs() {
+      return {
+        left: { ...drawerDefaults.left },
+        right: { ...drawerDefaults.right },
+      };
+    }
+
+    function loadUiPreferences(identityKey) {
+      const base = getDefaultPrefs();
+      if (!identityKey) return base;
+      try {
+        const raw = localStorage.getItem(`${uiPreferenceKeyPrefix}${identityKey}`);
+        if (!raw) return base;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          if (parsed.left) {
+            base.left.mode = normalizeDrawerMode(parsed.left.mode);
+            base.left.opacity = clampNumber(parsed.left.opacity, 70, 100, base.left.opacity);
+            base.left.portraitSize = normalizePortraitSize(parsed.left.portraitSize);
+          }
+          if (parsed.right) {
+            base.right.mode = normalizeDrawerMode(parsed.right.mode);
+            base.right.opacity = clampNumber(parsed.right.opacity, 70, 100, base.right.opacity);
+          }
+        }
+      } catch (error) {
+        console.warn("failed to load middle school stage prefs", error);
+      }
+      return base;
+    }
+
+    function saveUiPreferences() {
+      if (!uiPreferenceKey) return;
+      try {
+        localStorage.setItem(`${uiPreferenceKeyPrefix}${uiPreferenceKey}`, JSON.stringify(uiPreferences));
+      } catch (error) {
+        console.warn("failed to save middle school stage prefs", error);
+      }
+    }
+
+    function getDrawerElements(side) {
+      if (side === "left") {
+        return {
+          drawer: leftDrawer,
+          button: leftSettingsButton,
+          panel: leftSettingsPanel,
+          mode: leftOpenMode,
+          opacity: leftOpacity,
+          opacityValue: leftOpacityValue,
+          portraitSize: leftPortraitSize,
+        };
+      }
+
+      return {
+        drawer: rightDrawer,
+        button: rightSettingsButton,
+        panel: rightSettingsPanel,
+        mode: rightOpenMode,
+        opacity: rightOpacity,
+        opacityValue: rightOpacityValue,
+        portraitSize: null,
+      };
+    }
+
+    function isDrawerEffectivelyOpen(side) {
+      const prefs = uiPreferences?.[side] || {};
+      if (prefs.mode === "always-open") return true;
+      if (prefs.mode === "always-closed") return false;
+      const state = drawerState[side];
+      return Boolean(state?.hover || state?.focus);
+    }
+
+    function updateDrawerPresentation(side) {
+      const elements = getDrawerElements(side);
+      if (!elements.drawer) return;
+
+      const prefs = uiPreferences?.[side] || drawerDefaults[side];
+      const open = isDrawerEffectivelyOpen(side);
+
+      elements.drawer.dataset.openMode = prefs.mode;
+      elements.drawer.dataset.open = open ? "true" : "false";
+      elements.drawer.classList.toggle("drawer--expanded", open);
+      elements.drawer.classList.toggle("drawer--collapsed", !open);
+      elements.drawer.style.setProperty("--drawer-opacity", `${clampNumber(prefs.opacity, 70, 100, 96) / 100}`);
+
+      if (side === "left") {
+        const sizeMap = { small: "30px", medium: "36px", large: "44px" };
+        elements.drawer.style.setProperty("--portrait-size", sizeMap[prefs.portraitSize] || "36px");
+      }
+
+      if (elements.button) {
+        elements.button.setAttribute("aria-expanded", elements.panel && !elements.panel.hidden ? "true" : "false");
+      }
+
+      if (elements.mode) {
+        elements.mode.value = prefs.mode;
+      }
+
+      if (elements.opacity) {
+        elements.opacity.value = String(prefs.opacity);
+      }
+
+      if (elements.opacityValue) {
+        elements.opacityValue.textContent = `${prefs.opacity}%`;
+      }
+
+      if (elements.portraitSize) {
+        elements.portraitSize.value = prefs.portraitSize || "medium";
+      }
+    }
+
+    function syncDrawerWidths() {
+      if (!stageShell) return;
+      const leftOpen = isDrawerEffectivelyOpen("left");
+      const rightOpen = isDrawerEffectivelyOpen("right");
+      stageShell.style.setProperty("--left-drawer-width", leftOpen ? "clamp(260px, 24vw, 360px)" : "64px");
+      stageShell.style.setProperty("--right-drawer-width", rightOpen ? "clamp(260px, 24vw, 360px)" : "64px");
+    }
+
+    function applyDrawerState(side) {
+      updateDrawerPresentation(side);
+      syncDrawerWidths();
+    }
+
+    function setDrawerSetting(side, field, value) {
+      if (!uiPreferences[side]) return;
+      if (field === "mode") {
+        uiPreferences[side].mode = normalizeDrawerMode(value);
+      } else if (field === "opacity") {
+        uiPreferences[side].opacity = clampNumber(value, 70, 100, uiPreferences[side].opacity);
+      } else if (field === "portraitSize" && side === "left") {
+        uiPreferences[side].portraitSize = normalizePortraitSize(value);
+      }
+
+      saveUiPreferences();
+      applyDrawerState(side);
+    }
+
+    function setDrawerHoverState(side, key, value) {
+      if (!drawerState[side]) return;
+      drawerState[side][key] = Boolean(value);
+      applyDrawerState(side);
+    }
+
+    function closeDrawerSettings(exceptSide = null) {
+      for (const side of ["left", "right"]) {
+        const elements = getDrawerElements(side);
+        if (!elements.panel || !elements.button) continue;
+        if (exceptSide && side === exceptSide) continue;
+        elements.panel.hidden = true;
+        elements.button.setAttribute("aria-expanded", "false");
+        drawerState[side].settingsOpen = false;
+      }
+    }
+
+    function toggleDrawerSettings(side) {
+      const elements = getDrawerElements(side);
+      if (!elements.panel || !elements.button) return;
+      const open = elements.panel.hidden;
+      closeDrawerSettings(side);
+      elements.panel.hidden = !open;
+      elements.button.setAttribute("aria-expanded", String(open));
+      drawerState[side].settingsOpen = open;
+    }
+
+    function displayNameForPresence(user) {
+      return user?.display_name || user?.handle || "Unknown Participant";
+    }
+
+    function presenceInitials(user) {
+      const label = displayNameForPresence(user).trim();
+      if (!label) return "?";
+      const parts = label.split(/\s+/).filter(Boolean);
+      if (parts.length === 1) {
+        return parts[0].slice(0, 2).toUpperCase();
+      }
+      return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
+    }
+
+    function renderPresencePreview(users) {
+      if (!presencePreview || !presenceState) return;
+
+      const rows = Array.isArray(users) ? users : [];
+      const visibleRows = rows.slice(0, 6);
+
+      if (visibleRows.length === 0) {
+        presencePreview.innerHTML = `
+          <span class="presence-avatar presence-avatar--fallback" aria-hidden="true">?</span>
+          <span class="presence-avatar presence-avatar--fallback" aria-hidden="true">?</span>
+          <span class="presence-avatar presence-avatar--fallback" aria-hidden="true">?</span>
+        `;
+        presenceState.textContent = "No one is currently in the room.";
+        return;
+      }
+
+      presencePreview.innerHTML = "";
+      for (const user of visibleRows) {
+        const avatar = document.createElement("span");
+        avatar.className = "presence-avatar";
+        avatar.title = `${displayNameForPresence(user)}${user?.role ? ` · ${String(user.role)}` : ""}`;
+
+        const portraitURL = String(user?.persona?.portrait_url || user?.portrait_url || "").trim();
+        if (portraitURL) {
+          const img = document.createElement("img");
+          img.src = portraitURL;
+          img.alt = displayNameForPresence(user);
+          avatar.appendChild(img);
+        } else {
+          avatar.classList.add("presence-avatar--fallback");
+          avatar.textContent = presenceInitials(user);
+        }
+
+        presencePreview.appendChild(avatar);
+      }
+
+      const names = visibleRows.map((user) => displayNameForPresence(user));
+      const extraCount = Math.max(0, rows.length - visibleRows.length);
+      presenceState.textContent = extraCount > 0
+        ? `${rows.length} connected: ${names.slice(0, 3).join(", ")} +${extraCount} more`
+        : `${rows.length} connected: ${names.join(", ")}`;
+    }
+
+    async function refreshPresencePreview() {
+      try {
+        const response = await fetch("/api/director-console/current", { credentials: "include" });
+        if (!response.ok) return;
+        const payload = await response.json().catch(() => null);
+        const presence = Array.isArray(payload?.data?.presence) ? payload.data.presence : [];
+        renderPresencePreview(presence);
+      } catch (error) {
+        console.warn("failed to refresh middle school stage presence", error);
+      }
+    }
+
+    function setChatOpen(open) {
+      if (!chatPanel) return;
+      chatPanel.classList.toggle("is-open", open);
+      if (chatBadge) {
+        chatBadge.hidden = !open && Number(chatBadge.textContent || 0) === 0;
+      }
+    }
+
+    function hideContextMenu() {
+      if (stageContextMenu) stageContextMenu.hidden = true;
+    }
+
+    function openContextMenu(x, y) {
+      if (!stageContextMenu || !stageSurface) return;
+      const rect = stageSurface.getBoundingClientRect();
+      stageContextMenu.hidden = false;
+      stageContextMenu.style.left = `${Math.max(18, x - rect.left)}px`;
+      stageContextMenu.style.top = `${Math.max(18, y - rect.top)}px`;
+    }
+
+    async function bootstrapMiddleSchoolStage() {
+      try {
+        const pingStartedAt = performance.now();
+        const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
+        const pingMs = Math.max(0, Math.round(performance.now() - pingStartedAt));
+        const sessionPayload = await sessionResponse.json().catch(() => null);
+        if (!sessionPayload?.signed_in) {
+          showForbiddenScreen();
+          return;
+        }
+
+        const data = sessionPayload.data || {};
+        const role = String(data.role || "audience").toLowerCase();
+        const isOperator = Boolean(data.is_operator);
+        if (role !== "producer" && !isOperator) {
+          showForbiddenScreen();
+          return;
+        }
+
+        uiPreferenceKey = String(data.user_id || data.handle || data.display_name || "unknown-user");
+        uiPreferences = loadUiPreferences(uiPreferenceKey);
+
+        const visibilityResponse = await fetch("/api/map/visibility", { credentials: "include" });
+        const visibilityPayload = await visibilityResponse.json().catch(() => null);
+        const visible = Array.isArray(visibilityPayload?.data)
+          ? visibilityPayload.data.some((venue) => venue?.slug === "middle-school-stage")
+          : false;
+
+        if (!visible) {
+          showForbiddenScreen();
+          return;
+        }
+
+        if (identityValue) identityValue.textContent = data.display_name || data.handle || "Producer";
+        if (roleValue) roleValue.textContent = isOperator ? "Operator" : "Producer";
+        if (accountLabel) accountLabel.textContent = data.display_name || data.handle || "Account";
+        if (characterValue) characterValue.textContent = "No Character";
+        if (rightCharacterValue) rightCharacterValue.textContent = "No Character";
+        if (viewValue) viewValue.textContent = "Self";
+        if (targetValue) targetValue.textContent = "No Target";
+        if (targetClassValue) targetClassValue.textContent = "Unknown Class";
+        if (pingValue) pingValue.textContent = Number.isFinite(pingMs) ? `${pingMs}ms` : "—";
+        if (networkState) networkState.textContent = "Visible, but intentionally quiet until a later kernel adds live transport.";
+        if (presenceState) presenceState.textContent = "Edge drawer reserved for presence and network tools.";
+
+        if (stageShell) stageShell.hidden = false;
+        if (forbiddenScreen) forbiddenScreen.hidden = true;
+        applyDrawerState("left");
+        applyDrawerState("right");
+        renderPresencePreview([]);
+        await refreshPresencePreview();
+        if (presenceRefreshTimer) {
+          window.clearInterval(presenceRefreshTimer);
+        }
+        presenceRefreshTimer = window.setInterval(refreshPresencePreview, 15000);
+      } catch (error) {
+        console.error("middle school stage bootstrap failed", error);
+        showForbiddenScreen();
+      }
+    }
+
+    function closeAccountMenu() {
+      if (!accountMenu || !accountMenuToggle) return;
+      accountMenu.hidden = true;
+      accountMenuToggle.setAttribute("aria-expanded", "false");
+    }
+
+    function toggleAccountMenu() {
+      if (!accountMenu || !accountMenuToggle) return;
+      const open = accountMenu.hidden;
+      accountMenu.hidden = !open;
+      accountMenuToggle.setAttribute("aria-expanded", String(open));
+    }
+
+    leftDrawer?.addEventListener("pointerenter", () => setDrawerHoverState("left", "hover", true));
+    leftDrawer?.addEventListener("pointerleave", () => setDrawerHoverState("left", "hover", false));
+    leftDrawer?.addEventListener("focusin", () => setDrawerHoverState("left", "focus", true));
+    leftDrawer?.addEventListener("focusout", (event) => {
+      if (!leftDrawer?.contains(event.relatedTarget)) {
+        setDrawerHoverState("left", "focus", false);
+      }
+    });
+
+    rightDrawer?.addEventListener("pointerenter", () => setDrawerHoverState("right", "hover", true));
+    rightDrawer?.addEventListener("pointerleave", () => setDrawerHoverState("right", "hover", false));
+    rightDrawer?.addEventListener("focusin", () => setDrawerHoverState("right", "focus", true));
+    rightDrawer?.addEventListener("focusout", (event) => {
+      if (!rightDrawer?.contains(event.relatedTarget)) {
+        setDrawerHoverState("right", "focus", false);
+      }
+    });
+
+    leftSettingsButton?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleDrawerSettings("left");
+    });
+
+    rightSettingsButton?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleDrawerSettings("right");
+    });
+
+    leftOpenMode?.addEventListener("change", () => setDrawerSetting("left", "mode", leftOpenMode.value));
+    leftOpacity?.addEventListener("input", () => setDrawerSetting("left", "opacity", leftOpacity.value));
+    leftPortraitSize?.addEventListener("change", () => setDrawerSetting("left", "portraitSize", leftPortraitSize.value));
+    rightOpenMode?.addEventListener("change", () => setDrawerSetting("right", "mode", rightOpenMode.value));
+    rightOpacity?.addEventListener("input", () => setDrawerSetting("right", "opacity", rightOpacity.value));
+
+    accountMenuToggle?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleAccountMenu();
+    });
+
+    accountLogoutButton?.addEventListener("click", async () => {
+      closeAccountMenu();
+      try {
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          credentials: "include",
+        });
+      } catch (error) {
+        console.warn("logout request failed", error);
+      } finally {
+        window.location.href = "/";
+      }
+    });
+
+    stageObject?.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      hideContextMenu();
+      openContextMenu(event.clientX, event.clientY);
+    });
+
+    stageSurface?.addEventListener("click", (event) => {
+      if (event.target === stageSurface || event.target === stageShell) {
+        hideContextMenu();
+      }
+    });
+
+    stageSurface?.addEventListener("contextmenu", (event) => {
+      if (event.target !== stageObject) {
+        event.preventDefault();
+        hideContextMenu();
+      }
+    });
+
+    stageContextMenu?.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-context-action]");
+      if (!button) return;
+      const action = button.getAttribute("data-context-action") || "";
+      const messageMap = {
+        inspect: "Inspect selected.",
+        reveal: "Reveal previewed.",
+        hide: "Hide previewed.",
+        move: "Move focus previewed.",
+        remove: "Remove previewed.",
+        lock: "Lock previewed.",
+        unlock: "Unlock previewed.",
+        "hide-nameplate": "Hide nameplate previewed.",
+        "show-nameplate": "Show nameplate previewed.",
+        "show-overlay": "Show overlay previewed.",
+        "hide-overlay": "Hide overlay previewed.",
+        handout: "Handout routing reserved for later.",
+      };
+      if (chatBadge) chatBadge.hidden = true;
+      hideContextMenu();
+    });
+
+    targetInfo?.addEventListener("click", () => {
+      if (chatBadge) chatBadge.hidden = true;
+    });
+
+    document.addEventListener("click", (event) => {
+      if (event.target.closest("#account-menu") || event.target.closest("#account-menu-toggle")) return;
+      if (event.target.closest("#left-settings-panel") || event.target.closest("#left-settings-button")) return;
+      if (event.target.closest("#right-settings-panel") || event.target.closest("#right-settings-button")) return;
+      if (stageContextMenu && !stageContextMenu.hidden) {
+        if (event.target.closest("#stage-context-menu") || event.target.closest("#stage-object")) return;
+        hideContextMenu();
+      }
+      closeAccountMenu();
+      if (event.target.closest("#chat-panel")) return;
+      closeDrawerSettings();
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        hideContextMenu();
+        closeAccountMenu();
+        closeDrawerSettings();
+      }
+    });
+
+    window.addEventListener("beforeunload", () => {
+      if (presenceRefreshTimer) {
+        window.clearInterval(presenceRefreshTimer);
+      }
+    });
+
+    syncDrawerWidths();
+    setChatOpen(false);
+    bootstrapMiddleSchoolStage();
+  </script>
+</body>
+</html>

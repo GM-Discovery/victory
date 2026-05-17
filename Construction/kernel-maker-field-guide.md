@@ -209,6 +209,7 @@ Do not:
 - A clean template venue should later be extracted from the organized Cave surface.
 - Future venues should descend from that cleaned template.
 - PixiJS, when present, is a client-side renderer only. Do not let Pixi state become app truth.
+- Middle School Stage is the first clean stage-shell venue. Keep it simple, producer-only, and drawer-first.
 - The Greenroom is public profile display plus character dressing room.
 - Trailers owns performer profile drafting and publishing.
 - Avoid putting full editors into The Cave unless the kernel explicitly says the live table owns that workflow.

@@ -51,6 +51,8 @@ Current confirmed capabilities:
 - Kernel 24 moves character drafting/editing into The Greenroom and leaves The Cave with only live character selection plus Put On / Take Off
 - Character card sheet links are metadata on `character_cards`; they are not playable sheets, macros, dice, stats, or rules execution yet
 - The Cave is now explicitly the full-feature proving-ground venue. Tools may appear there first, then later move into overlays, drawers, and context menus before template extraction.
+- Middle School Stage is the first clean stage-shell experiment. It should stay producer-only, drawer-first, and center-stage-primary.
+- Pixi remains outside The Cave and is not automatically part of the stage shell.
 - Showing Review means review of actions/chat/reactions/logs. Video recording is future-only and not a near-term priority.
 
 Not yet complete:

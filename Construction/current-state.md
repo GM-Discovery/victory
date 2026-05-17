@@ -1,14 +1,14 @@
 # Victory Current State
 
 ## Purpose
-This document is the current-state canon for Victory as of Kernel 30.
+This document is the current-state canon for Victory as of Kernel 31.
 
 Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful as history, but this file is the current source of truth when they disagree.
 
 ## Kernel State
-- Current kernel label: **Kernel 30**
-- Current kernel purpose: **Cave Organization + Renderer Containment**
-- Product state: **kernel active; Kernel 30 is in progress**
+- Current kernel label: **Kernel 31**
+- Current kernel purpose: **Middle School Stage + Edge Drawer Layout v1**
+- Product state: **kernel active; Kernel 31 is in progress**
 - Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
 
 ## Current Stack
@@ -201,13 +201,14 @@ Current Pixi proving-ground behavior:
 - live Cave snapshot and session actions can be used to judge renderer coexistence
 - DOM overlays remain separate from the Pixi canvas so controls stay outside the stage layer
 - Kernel 29 is complete as a proving-ground spike
-- Kernel 30 is now organizing the proving-ground UI and cleaning up the remaining affordances
+- Kernel 30 organized the proving-ground UI and cleaned up the remaining affordances
 
 Strategy:
 - tools may be built visibly in The Cave first
 - once stable, they should be hidden into overlays, drawers, context menus, or cleaner surfaces
 - a clean template venue will later be extracted from The Cave
 - future venues should descend from that cleaned template rather than re-inventing runtime behavior separately
+- Middle School Stage is the first clean copyable stage shell and should prove the edge-drawer grammar without dragging The Cave clutter along
 
 ## Current Greenroom / Trailers Split
 - Greenroom:
@@ -224,6 +225,7 @@ Strategy:
 - Sign in and resolve a session-backed account identity
 - Load map visibility
 - Open The Cave, load snapshot, join the active session, receive presence
+- Open Middle School Stage as a producer-only shell with top bar, edge drawers, and collapsed chat drawer
 - Send stage speech with server-resolved actor attribution
 - Send venue chat with server-side storage and authority checks
 - Send reactions and see them broadcast and persisted
@@ -241,8 +243,9 @@ Strategy:
 - Video recording does not exist and is not a near-term priority
 - Cave UI still exposes proving-ground tool density and needs later organization
 - Template venue extraction has not happened yet
+- Middle School Stage is shell-first, not a full theater product
 - Showing Review currently covers closed showings only
-- Kernel 30.2 is a consolidation pass for scraps, drift, and unfinished work; it should document more than it invents
+- Kernel 30.2 was a consolidation pass for scraps, drift, and unfinished work; it documented more than it invented
 - Character sheets are links/references only, not playable sheet records
 - No rules-engine execution, dice, stats, HP, initiative, grid, tokens, or fog
 - Browser-level character-sheet save confusion still needs direct front-end reproduction even though live authenticated create and PATCH both succeed against the backend

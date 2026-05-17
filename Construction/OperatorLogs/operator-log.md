@@ -275,3 +275,20 @@ Implement `perform/speak` using the same action pipeline:
 - Added `Construction/roadmap.md` as active roadmap
 - Added placeholder kernel docs for 22–25 naming reconciliation
 - Older notes are being marked historical/superseded instead of silently overwritten
+
+## 2026-05-17 — Kernel 31 Middle School Stage shell
+
+### Backend
+- Seeded `middle-school-stage` as a producer-only venue surface
+- Added producer visibility for `middle-school-stage`
+
+### Frontend
+- Added `frontend/venues/middle-school-stage/index.html`
+- Added `middle-school-stage` routing in the map app
+- Added a top status bar, left/right edge drawers, a collapsed bottom chat drawer, and a center-first stage shell layout
+- Added a placeholder right-click context menu on a targetable stage object
+
+### Operational Notes
+- The Cave remains untouched and continues to serve as the proving ground
+- Pixi remains outside The Cave
+- Full live control parity is still Cave-specific; Middle School Stage is currently a shell-first proof

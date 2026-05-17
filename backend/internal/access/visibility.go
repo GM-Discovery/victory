@@ -137,14 +137,14 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 3 AS reason_rank, 'producer_surface'::text AS visible_because
-			FROM venues v
-			JOIN lots l ON l.id = v.lot_id
-			JOIN location_memberships lm ON lm.location_id = l.location_id
-			WHERE v.slug = 'producers-office'
-			  AND lm.user_id = $1
-			  AND lm.active = TRUE
-			  AND lm.role = 'producer'
+				SELECT v.id, v.slug, v.name, v.kind, 3 AS reason_rank, 'producer_surface'::text AS visible_because
+				FROM venues v
+				JOIN lots l ON l.id = v.lot_id
+				JOIN location_memberships lm ON lm.location_id = l.location_id
+				WHERE v.slug IN ('producers-office', 'middle-school-stage')
+				  AND lm.user_id = $1
+				  AND lm.active = TRUE
+				  AND lm.role = 'producer'
 
 			UNION
 
