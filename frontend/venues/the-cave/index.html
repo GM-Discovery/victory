@@ -315,10 +315,26 @@
       color: #f5efe4;
     }
 
+    .debug-panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
     .debug-panel h2 {
       margin: 0;
       font-size: 1rem;
       color: #ead7b2;
+    }
+
+    .debug-panel-body {
+      display: grid;
+      gap: 10px;
+    }
+
+    .debug-panel.is-collapsed .debug-panel-body {
+      display: none;
     }
 
     .debug-grid {
@@ -1382,8 +1398,12 @@
       </div>
 
       <div id="stage-debug-panel" class="debug-panel">
-        <h2>Stage Debug</h2>
-        <div class="debug-grid">
+        <div class="debug-panel-head">
+          <h2>Stage Debug</h2>
+          <button id="stage-debug-toggle" type="button" class="chat-panel-toggle" aria-expanded="true">Collapse</button>
+        </div>
+        <div id="stage-debug-body" class="debug-panel-body">
+          <div class="debug-grid">
           <div class="debug-item">
             <strong>Connection</strong>
             <pre id="debug-connection">disconnected</pre>
@@ -1412,6 +1432,7 @@
             <strong>Lock</strong>
             <pre id="debug-lock">none</pre>
           </div>
+        </div>
         </div>
       </div>
 
@@ -1589,6 +1610,8 @@
   const workshopAssetPickerStatus = document.getElementById("workshop-asset-picker-status");
   const workshopAssetPickerList = document.getElementById("workshop-asset-picker-list");
   const indexCardPanel = document.getElementById("index-card-panel");
+  const stageDebugPanel = document.getElementById("stage-debug-panel");
+  const stageDebugToggle = document.getElementById("stage-debug-toggle");
   const indexCardWorkshopTools = document.getElementById("index-card-workshop-tools");
   const workshopVenueSelect = document.getElementById("workshop-venue-select");
   const workshopSendTray = document.getElementById("workshop-send-tray");
@@ -1686,6 +1709,7 @@
   let chatPanelExpanded = true;
   let chatCollapseTimer = null;
   let lastChatActivityAt = 0;
+  let stageDebugExpanded = true;
   const indexCardFlipState = new Map();
   const indexCardTrayPage = {
     workshop: 0,
@@ -1922,6 +1946,17 @@
   function setMovementState(nextState) {
     movementState = nextState;
     updateDebugPanel();
+  }
+
+  function setStageDebugExpanded(expanded) {
+    stageDebugExpanded = Boolean(expanded);
+    if (stageDebugPanel) {
+      stageDebugPanel.classList.toggle("is-collapsed", !stageDebugExpanded);
+    }
+    if (stageDebugToggle) {
+      stageDebugToggle.textContent = stageDebugExpanded ? "Collapse" : "Expand";
+      stageDebugToggle.setAttribute("aria-expanded", stageDebugExpanded ? "true" : "false");
+    }
   }
 
   function setLastActionState(type, target, status, error = "") {
@@ -4466,6 +4501,7 @@
       fireEl.hidden = true;
       speechEl.textContent = "";
       clearSelectedElement();
+      setStageDebugExpanded(true);
       updateSelectionUI();
 
       try {
@@ -4506,6 +4542,9 @@
     } else {
       clearChatCollapseTimer();
     }
+  });
+  stageDebugToggle?.addEventListener("click", () => {
+    setStageDebugExpanded(!stageDebugExpanded);
   });
   noteCardSend?.addEventListener("click", sendNoteCard);
   noteCardToggle?.addEventListener("click", openNoteCardPanel);

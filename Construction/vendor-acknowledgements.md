@@ -20,6 +20,10 @@ The older [historical copy](/opt/victory/Construction/OperatorLogs/vendor-acknow
 - `golang.org/x/crypto`
 - `golang.org/x/image`
 
+## Client / Renderer Dependencies
+- PixiJS `7.4.3`
+- loaded from `https://cdn.jsdelivr.net/npm/pixi.js@7.4.3/dist/pixi.min.js`
+
 Indirect dependencies currently present in `go.mod`:
 - `github.com/jackc/pgpassfile`
 - `github.com/jackc/pgservicefile`
@@ -33,6 +37,7 @@ Indirect dependencies currently present in `go.mod`:
 - `pgx` and `pgxpool` power Postgres access
 - `x/crypto` provides Argon2 password hashing
 - `x/image` is available for current asset/image handling work
+- PixiJS is an experimental stage/worldspace renderer in First Theater only; it is not the source of app truth
 - PostgreSQL `pgcrypto` remains relevant for `gen_random_uuid()`
 
 ## Dependency Philosophy

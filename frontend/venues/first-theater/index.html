@@ -193,6 +193,37 @@
       white-space: pre-wrap;
     }
 
+    .renderer-fallback {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      z-index: 9;
+      width: min(380px, calc(100vw - 32px));
+      border-radius: 16px;
+      padding: 14px 16px;
+      background: rgba(18, 14, 11, 0.86);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+      backdrop-filter: blur(6px);
+    }
+
+    .renderer-fallback[hidden] {
+      display: none;
+    }
+
+    .renderer-fallback strong {
+      display: block;
+      color: var(--accent-strong);
+      margin-bottom: 4px;
+    }
+
+    .renderer-fallback p {
+      margin: 0;
+      color: #d8c9b0;
+      line-height: 1.45;
+      font-size: 0.94rem;
+    }
+
     .pixi-stage-host {
       position: absolute;
       inset: 0;
@@ -543,6 +574,10 @@
               <div id="live-feed-line" class="stage-summary-line">No live data yet.</div>
             </div>
             <div class="stage-summary-card">
+              <strong>Snapshot</strong>
+              <div id="snapshot-summary" class="stage-summary-line">No snapshot summary yet.</div>
+            </div>
+            <div class="stage-summary-card">
               <strong>Selected</strong>
               <div id="selection-line" class="stage-summary-line">None</div>
               <div id="selected-actions" class="selected-actions"></div>
@@ -557,6 +592,11 @@
             </div>
           </div>
           <div id="pixi-stage-host" class="pixi-stage-host" aria-label="First Theater stage"></div>
+          <div id="renderer-fallback" class="renderer-fallback" hidden>
+            <strong>Renderer fallback</strong>
+            <p id="renderer-fallback-line">PixiJS has not loaded yet.</p>
+            <p>The stage remains usable in DOM mode while the latest snapshot and controls stay available.</p>
+          </div>
           <div class="stage-dom-overlay">
             <div class="overlay-panel">
               <div class="overlay-row">
@@ -636,6 +676,8 @@
     const roleLine = document.getElementById("role-line");
     const objectCountLine = document.getElementById("object-count-line");
     const snapshotSummary = document.getElementById("snapshot-summary");
+    const rendererFallback = document.getElementById("renderer-fallback");
+    const rendererFallbackLine = document.getElementById("renderer-fallback-line");
     const refreshWorldButton = document.getElementById("refresh-world");
     const clearSelectionButton = document.getElementById("clear-selection");
     const selectedActions = document.getElementById("selected-actions");
@@ -794,6 +836,15 @@
 
     function setSnapshotSummary(text) {
       if (snapshotSummary) snapshotSummary.textContent = text || "";
+    }
+
+    function setRendererFallback(visible, text = "") {
+      if (rendererFallback) {
+        rendererFallback.hidden = !visible;
+      }
+      if (rendererFallbackLine && text) {
+        rendererFallbackLine.textContent = text;
+      }
     }
 
     function setSessionLine(text) {
@@ -2193,10 +2244,13 @@
 
     async function initializePixi() {
       if (!window.PIXI) {
+        setRendererFallback(true, "PixiJS failed to load. The stage stays readable in DOM-only mode.");
         setStageStatus("PixiJS failed to load.");
         setMovementReport("Pixi unavailable");
         return;
       }
+
+      setRendererFallback(false);
 
       const size = getStageSize();
       pixiApp = new PIXI.Application({

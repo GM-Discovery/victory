@@ -30,7 +30,7 @@ What remains rough:
 Decision:
 - retain PixiJS for the stage spike and follow-up organization work
 - do not treat the current First Theater implementation as the final polished venue shell
-- use Kernel 31 to clean up the proving-ground UI and straighten the remaining affordances
+- use Kernel 30 to clean up the proving-ground UI and straighten the remaining affordances
 
 ## Evidence Source
 - [first-theater/index.html](/opt/victory/frontend/venues/first-theater/index.html)
@@ -38,4 +38,4 @@ Decision:
 - [current-state.md](/opt/victory/Construction/current-state.md)
 
 ## TODO
-- Carry the remaining nameplate and audience hide/show validation into Kernel 31.
+- Carry the remaining nameplate and audience hide/show validation into Kernel 30.

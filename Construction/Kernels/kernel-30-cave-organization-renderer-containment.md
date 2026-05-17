@@ -1,4 +1,4 @@
-# Kernel 31 - Cave Organization + Renderer Containment
+# Kernel 30 - Cave Organization + Renderer Containment
 
 ## Purpose
 Clean the proving ground without changing the spine.
@@ -29,4 +29,4 @@ Clean the proving ground without changing the spine.
 The Cave still contains all the tools, but the stage view becomes readable and the tools feel organized instead of piled on.
 
 ## Short Blurb
-Renderer decision: Pixi is adopted experimentally, but not yet promoted to final/default stage truth. Kernel 31 will focus on organization, containment, and interaction cleanup so the proving ground stays usable while the spine remains server-authoritative.
+Renderer decision: Pixi is adopted experimentally, but not yet promoted to final/default stage truth. Kernel 30 will focus on organization, containment, and interaction cleanup so the proving ground stays usable while the spine remains server-authoritative.

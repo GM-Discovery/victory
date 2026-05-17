@@ -220,6 +220,10 @@ The venue-access and map-visibility notes below describe the early access model 
   - uses membership role if authenticated
   - allows unauthenticated join as `audience`
 
+Historical note:
+- this section preserves an older security model discussion and should not be read as the live canonical state
+- the current join code still creates audience users for unauthenticated joins, so any “remove anonymous audience join” note here is a pending recommendation, not a completed fact
+
 ### Problem
 - Violates intended gate model:
   - “no ticket = no venue access”

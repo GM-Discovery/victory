@@ -53,6 +53,8 @@ git diff --check
 ## Current Route Checks Worth Knowing
 - Cave snapshot: `/api/world/the-cave`
 - Cave WebSocket: `/ws/the-cave`
+- First Theater Pixi spike: `/venues/first-theater/`
+- The Cave proving ground: `/venues/the-cave/`
 - Greenroom character cards: `/api/character-cards/me`
 - Trailers profile draft: `/api/profiles/me`
 - Mailbox: `/api/messages`
@@ -76,6 +78,7 @@ Do:
 - verify whether `8081` is host-Go or Docker before debugging routes
 - hard refresh venue pages after frontend changes
 - test both HTTP and WebSocket surfaces for Cave-facing kernels
+- treat PixiJS as a renderer-only experiment unless a kernel explicitly proves otherwise
 
 Do not:
 - assume the backend serving `8081` is the newest process

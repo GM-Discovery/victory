@@ -12,33 +12,33 @@ Kernel numbers are labels, but from here they should remain stable once assigned
   - live control surface for the current showing
 - `29 — PixiJS Stage Spike v1`
   - complete proving-ground spike for PixiJS as the stage/worldspace renderer
-- `31 — Cave Organization + Renderer Containment`
+- `30 — Cave Organization + Renderer Containment`
   - keep Pixi experimental but usable, and organize Cave tools into clearer containers
-- `32 — Template Venue Extraction v1`
+- `31 — Template Venue Extraction v1`
   - extract a cleaner reusable venue shell from The Cave after organization work
-- `33 — Stage Navigation / View Resolver v1`
+- `32 — Stage Navigation / View Resolver v1`
   - better view/surface routing inside venue runtime
-- `34 — Map/Object Movement v1`
+- `33 — Map/Object Movement v1`
   - more formal object movement and navigation behavior
-- `35 — Venue Policy Console v1`
+- `34 — Venue Policy Console v1`
   - clearer venue-level policy toggles and controls
-- `36 — Asset Browser / Library v1`
+- `35 — Asset Browser / Library v1`
   - browse and select reusable assets/library elements
-- `37 — Warehouse / Asset Storage Surface v1`
+- `36 — Warehouse / Asset Storage Surface v1`
   - durable storage and browsing surface for reusable assets
-- `38 — Library / Script Surface v1`
+- `37 — Library / Script Surface v1`
   - browse scripts and reusable reference material by ruleset or sheet type
-- `39 — Catharsis Prep Kernel`
+- `38 — Catharsis Prep Kernel`
   - prep surfaces for the catharsis flow without building the full experience yet
-- `40 — Socio/Catharsis v1`
+- `39 — Socio/Catharsis v1`
   - first public-facing catharsis experience surface
-- `41 — Documentation + Hardening Pass`
+- `40 — Documentation + Hardening Pass`
   - reconcile docs, tighten errors, and stabilize the kernel trail
 
 Ordering note:
 - Showing Review comes before polish-only work
 - Director Console lands immediately after review
-- Cave polish and organization belongs around Kernel 31
+- Cave polish and organization belongs around Kernel 30
 - template extraction follows that organization pass, not before it
 
 ## Medium Roadmap: Kernels 36–60

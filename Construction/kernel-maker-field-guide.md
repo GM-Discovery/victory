@@ -8,6 +8,7 @@ Victory is a browser-based VTT and venue system. The current live table is The C
 Current canon references:
 - [current-state.md](/opt/victory/Construction/current-state.md)
 - [roadmap.md](/opt/victory/Construction/roadmap.md)
+- PixiJS is currently experimental and lives in First Theater, not The Cave; The Cave remains the proving ground for tool clutter and server-authoritative staging
 
 ## Repo Map
 - `/opt/victory/backend/` - Go service, HTTP APIs, WebSocket handlers, domain packages.
@@ -207,6 +208,7 @@ Do not:
 - Once stable, move them into cleaner overlays, drawers, context menus, or secondary surfaces.
 - A clean template venue should later be extracted from the organized Cave surface.
 - Future venues should descend from that cleaned template.
+- PixiJS, when present, is a client-side renderer only. Do not let Pixi state become app truth.
 - The Greenroom is public profile display plus character dressing room.
 - Trailers owns performer profile drafting and publishing.
 - Avoid putting full editors into The Cave unless the kernel explicitly says the live table owns that workflow.
