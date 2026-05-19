@@ -39,6 +39,9 @@ Current confirmed capabilities:
 - The Cave client renders speech and reactions with attribution badges
 - Multiple tabs for the same user are deduped in the visible presence roster
 - Presence messages now use explicit `presence/snapshot`, `presence/join`, and `presence/leave` event types
+- Discord OAuth is now wired as the primary login path alongside local handle/password login
+- The Victory session cookie model remains authoritative after Discord login
+- Discord login does not grant producer/director authority by itself
 - Kernel 7 evidence is covered by `go test ./internal/network -run TestKernel7PresenceAndAttributionEvidence -v`
 - Kernel 8 adds a shared identity surface and `persona: null` in action/presence payloads
 - The Cave does not allow anonymous presence
@@ -68,6 +71,8 @@ Status notes for newer kernels:
 - `persona` is reserved for future production characters and is `null` for Kernels 8 and 9
 - The profile surface now includes expressive fields like favorite fun, favorite color, favorite artist, favorite food, favorite song, favorite place, favorite movie or show, hidden talent, and ideal day
 - `OPERATOR_HANDLE` and `OPERATOR_USER_ID` provide an infrastructure-only permission seam and do not create a production membership
+- Discord OAuth state must remain single-use and short-lived
+- Discord access tokens and client secrets must not be logged
 
 ---
 

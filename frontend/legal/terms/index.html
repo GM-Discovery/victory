@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Victory Theater Terms of Service</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1216;
+      --panel: #171b20;
+      --line: rgba(255,255,255,0.08);
+      --text: #f4f7fb;
+      --muted: #aeb7c1;
+      --accent: #8fb2ff;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .page {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    header {
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #15191f 0%, #111419 100%);
+      padding: 18px 20px;
+    }
+
+    .header-inner {
+      width: min(1120px, calc(100vw - 32px));
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      line-height: 1.1;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .links a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .frame-wrap {
+      width: min(1120px, calc(100vw - 32px));
+      margin: 20px auto 24px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+      overflow: hidden;
+      min-height: calc(100vh - 116px);
+    }
+
+    iframe {
+      display: block;
+      width: 100%;
+      height: calc(100vh - 148px);
+      min-height: 900px;
+      border: 0;
+      background: white;
+    }
+
+    .fallback {
+      margin: 0;
+      padding: 14px 16px 18px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+    }
+
+    .fallback a {
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="header-inner">
+        <div>
+          <h1>Victory Theater Terms of Service</h1>
+          <div class="meta">A hosted mirror of the published Google Doc.</div>
+        </div>
+        <div class="links">
+          <a href="https://docs.google.com/document/d/e/2PACX-1vQWIY1Ee9QXdGD4uqJDGN-MjhGK9ilbIEe3kSLcQBZUVzenB3gYychLxiBkymiT_BAj2IdwuaR2xHFk/pub" target="_blank" rel="noreferrer">Open source</a>
+          <a href="/legal/privacy/">Privacy Policy</a>
+          <a href="/">Back to map</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="frame-wrap">
+      <iframe
+        title="Victory Theater Terms of Service"
+        src="https://docs.google.com/document/d/e/2PACX-1vQWIY1Ee9QXdGD4uqJDGN-MjhGK9ilbIEe3kSLcQBZUVzenB3gYychLxiBkymiT_BAj2IdwuaR2xHFk/pub?embedded=true"
+        loading="lazy"
+      ></iframe>
+      <p class="fallback">
+        If the embed does not load, open the
+        <a href="https://docs.google.com/document/d/e/2PACX-1vQWIY1Ee9QXdGD4uqJDGN-MjhGK9ilbIEe3kSLcQBZUVzenB3gYychLxiBkymiT_BAj2IdwuaR2xHFk/pub?embedded=true" target="_blank" rel="noreferrer">original published document</a>.
+      </p>
+    </main>
+  </div>
+</body>
+</html>

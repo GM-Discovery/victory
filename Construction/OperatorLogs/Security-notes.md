@@ -238,6 +238,15 @@ Historical note:
 
 ## 8. Data Integrity Protections
 
+### Discord OAuth Security Notes
+- Discord OAuth uses the authorization-code flow only
+- OAuth state is random, hashed before storage, short-lived, and single-use
+- callback rejects missing, invalid, expired, or reused state
+- Discord access tokens are fetched server-side and are not stored for Kernel 32
+- Discord client secrets and access tokens must not be logged
+- Discord identity is only an authentication proof; Victory still authorizes roles, memberships, and venue access
+- email is optional and must not be used as an automatic account-merge key
+
 ---
 
 ## 9. Presence + Attribution (Kernel 7)

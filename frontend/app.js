@@ -121,7 +121,7 @@ async function loadVenues() {
         "audition-hall": "/assets/audition-hall.png",
         "the-cave": "/assets/cave.png",
         "workshop": "/assets/workshop.png",
-        "victory-theater": "/assets/victorytheater.png",
+        "victory-theater": "/assets/favicon.png",
         "construction": "/assets/construction.png",
         "greenroom": "/assets/Greenroom.png",
         "trailers": "/assets/trailers.png",

@@ -39,6 +39,8 @@ Indirect dependencies currently present in `go.mod`:
 - `x/image` is available for current asset/image handling work
 - PixiJS is an experimental stage/worldspace renderer in First Theater only; it is not the source of app truth
 - PostgreSQL `pgcrypto` remains relevant for `gen_random_uuid()`
+- Discord OAuth is an external platform/API integration, not a bundled runtime dependency
+- Kernel 32 uses the Go standard library for OAuth requests, so no new Go OAuth package was added
 
 ## Dependency Philosophy
 - keep external dependencies small and intentional

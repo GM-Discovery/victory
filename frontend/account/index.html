@@ -4,6 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Account</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />
   <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
   <style>
     :root {
@@ -70,6 +72,25 @@
       flex-wrap: wrap;
       gap: 10px;
       margin-top: 18px;
+    }
+
+    .provider {
+      margin-top: 16px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.03);
+      display: grid;
+      gap: 12px;
+    }
+
+    .provider h2 {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+
+    .provider p {
+      margin: 0;
     }
 
     .button,
@@ -221,6 +242,15 @@
         <a class="chip" href="/">Back to Map</a>
         <button id="logout-button" class="chip" type="button">Logout</button>
       </div>
+
+      <section class="provider">
+        <h2>Discord</h2>
+        <p class="note">Use Discord as your Victory sign-in path. Victory still owns your sessions and permissions.</p>
+        <div class="toolbar" style="margin-top:0;">
+          <a class="button" href="/auth/discord/start">Log in with Discord</a>
+          <a class="chip" href="/login/">Back to login</a>
+        </div>
+      </section>
 
       <div class="grid">
         <section class="panel">

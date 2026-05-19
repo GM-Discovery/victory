@@ -4,6 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Login — Victory</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />
   <style>
     body {
       margin: 0;
@@ -71,6 +73,54 @@
       background: #955b24;
     }
 
+    .provider-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 18px 0 14px;
+      color: #8e7a62;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .provider-divider::before,
+    .provider-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.08);
+    }
+
+    .discord-button {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #5865f2;
+      color: white;
+      font-size: 1rem;
+      font-weight: 600;
+      text-align: center;
+      text-decoration: none;
+    }
+
+    .discord-button:hover {
+      background: #6a77f4;
+    }
+
+    .discord-button[aria-disabled="true"] {
+      opacity: 0.55;
+      pointer-events: none;
+    }
+
+    .provider-note {
+      margin-top: 8px;
+      color: #8e7a62;
+      font-size: 0.92rem;
+    }
+
     .status {
       margin-top: 14px;
       min-height: 1.2em;
@@ -104,6 +154,10 @@
       <button type="submit">Log In</button>
     </form>
 
+    <div class="provider-divider">Or</div>
+    <a id="discord-login" class="discord-button" href="/auth/discord/start">Log in with Discord</a>
+    <div id="provider-note" class="provider-note"></div>
+
     <p style="margin-top:16px;">
     Need an account? <a href="/signup/" style="color:#f3d18b;">Sign up</a>
     </p>
@@ -116,6 +170,39 @@
   <script>
     const form = document.getElementById("login-form");
     const statusEl = document.getElementById("status");
+    const discordLogin = document.getElementById("discord-login");
+    const providerNote = document.getElementById("provider-note");
+
+    function safeReturnTo(raw) {
+      const value = String(raw || "").trim();
+      if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("://")) {
+        return "/";
+      }
+      return value;
+    }
+
+    async function loadAuthProviders() {
+      try {
+        const response = await fetch("/api/auth/providers", { credentials: "include" });
+        const payload = await response.json();
+        const enabled = Boolean(payload && payload.ok && payload.data && payload.data.discord_enabled);
+        if (!enabled) {
+          discordLogin.setAttribute("aria-disabled", "true");
+          discordLogin.removeAttribute("href");
+          providerNote.textContent = "Discord login is not configured on this server.";
+          return;
+        }
+
+        const returnTo = safeReturnTo(new URL(window.location.href).searchParams.get("return_to"));
+        discordLogin.href = `/auth/discord/start?return_to=${encodeURIComponent(returnTo)}`;
+      } catch (error) {
+        discordLogin.setAttribute("aria-disabled", "true");
+        discordLogin.removeAttribute("href");
+        providerNote.textContent = "Discord login is temporarily unavailable.";
+      }
+    }
+
+    loadAuthProviders();
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();

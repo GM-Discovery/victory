@@ -43,6 +43,7 @@ func main() {
 	databaseURL := getenv("DATABASE_URL", "postgres://victory:REDACTED@victory-postgres:5432/victory?sslmode=disable")
 	secureCookie := getenv("COOKIE_SECURE", "false") == "true"
 	storageRoot := getenv("STORAGE_ROOT", "/opt/victory/storage")
+	discordOAuthConfig := discordOAuthConfigFromEnv()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -84,6 +85,11 @@ func main() {
 	mux.HandleFunc("/api/auth/signup", identity.HandleSignup(pool, secureCookie))
 	mux.HandleFunc("/api/auth/login", identity.HandleLogin(pool, secureCookie))
 	mux.HandleFunc("/api/auth/logout", identity.HandleLogout(pool, secureCookie))
+	mux.HandleFunc("/api/auth/providers", identity.HandleDiscordOAuthProviders(discordOAuthConfig))
+	mux.HandleFunc("GET /auth/discord/start", identity.HandleDiscordOAuthStart(pool, discordOAuthConfig))
+	mux.HandleFunc("GET /auth/discord/callback", identity.HandleDiscordOAuthCallback(pool, discordOAuthConfig, secureCookie))
+	mux.HandleFunc("GET /api/auth/discord/start", identity.HandleDiscordOAuthStart(pool, discordOAuthConfig))
+	mux.HandleFunc("GET /api/auth/discord/callback", identity.HandleDiscordOAuthCallback(pool, discordOAuthConfig, secureCookie))
 	mux.HandleFunc("/api/auth/password-reset/request", identity.HandleForgotPassword(pool))
 	mux.HandleFunc("/api/auth/password-reset/confirm", identity.HandleResetPassword(pool, secureCookie))
 	mux.HandleFunc("/api/invites", identity.HandleCreateInvite(pool))
@@ -414,6 +420,45 @@ func getenv(key, fallback string) string {
 		return fallback
 	}
 	return v
+}
+
+func discordOAuthConfigFromEnv() identity.DiscordOAuthConfig {
+	scopes := parseDiscordOAuthScopes(getenv("DISCORD_OAUTH_SCOPES", "identify email"))
+	enabledValue, enabledSet := os.LookupEnv("DISCORD_OAUTH_ENABLED")
+	enabled := false
+	if strings.TrimSpace(enabledValue) == "" {
+		enabled = strings.TrimSpace(os.Getenv("DISCORD_CLIENT_ID")) != "" &&
+			strings.TrimSpace(os.Getenv("DISCORD_CLIENT_SECRET")) != "" &&
+			strings.TrimSpace(os.Getenv("DISCORD_REDIRECT_URL")) != ""
+	} else if enabledSet {
+		enabled = parseBoolish(enabledValue)
+	}
+
+	return identity.DiscordOAuthConfig{
+		ClientID:     strings.TrimSpace(os.Getenv("DISCORD_CLIENT_ID")),
+		ClientSecret: strings.TrimSpace(os.Getenv("DISCORD_CLIENT_SECRET")),
+		RedirectURL:  strings.TrimSpace(os.Getenv("DISCORD_REDIRECT_URL")),
+		Scopes:       scopes,
+		Enabled:      enabled,
+	}
+}
+
+func parseDiscordOAuthScopes(raw string) []string {
+	raw = strings.ReplaceAll(strings.TrimSpace(raw), ",", " ")
+	parts := strings.Fields(raw)
+	if len(parts) == 0 {
+		return []string{"identify", "email"}
+	}
+	return parts
+}
+
+func parseBoolish(raw string) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "t", "yes", "y", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

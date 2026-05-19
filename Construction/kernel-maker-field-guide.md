@@ -45,9 +45,13 @@ Current canon references:
 
 ## Current Character Kernel Baseline
 Kernel 23 added character cards and Cave persona actions. Kernel 24 moved character editing into Greenroom. Kernel 27 added the closed-showing review surface in the Director's Chair. Kernel 28 added the live Director Console for current-showing control.
+Kernel 32 adds Discord OAuth as the primary login path while keeping Victory sessions, users, and role authority authoritative.
 
 Current product behavior:
 - HTTP:
+  - `GET /api/auth/providers`
+  - `GET /auth/discord/start`
+  - `GET /auth/discord/callback`
   - `GET /api/character-cards/me`
   - `POST /api/character-cards`
   - `PATCH /api/character-cards/{id}`
@@ -67,6 +71,8 @@ Current product behavior:
   - `venue/update`
 - Tables:
   - `character_cards`
+  - `auth.discord_identities`
+  - `auth.oauth_states`
   - `permission_grants`
   - `current_session_personas`
 

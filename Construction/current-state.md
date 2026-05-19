@@ -7,8 +7,8 @@ Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful 
 
 ## Kernel State
 - Current kernel label: **Kernel 32**
-- Current kernel purpose: **Template Venue Extraction v1**
-- Product state: **kernel active; Kernel 32 is in progress**
+- Current kernel purpose: **Discord OAuth Primary Login v1**
+- Product state: **kernel active; Kernel 32 is complete**
 - Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
 
 ## Current Stack
@@ -54,6 +54,11 @@ Live venue rows currently present:
 
 ## Current Route / API Surface
 Auth and identity:
+- `GET /api/auth/providers`
+- `GET /auth/discord/start`
+- `GET /auth/discord/callback`
+- `GET /api/auth/discord/start`
+- `GET /api/auth/discord/callback`
 - `POST /api/auth/signup`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
@@ -147,6 +152,8 @@ Identity and access:
 - `auth.sessions`
 - `auth.password_credentials`
 - `auth.password_reset_tokens`
+- `auth.discord_identities`
+- `auth.oauth_states`
 - `invites`
 - `memberships`
 - `location_memberships`

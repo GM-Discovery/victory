@@ -11,6 +11,31 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-05-19 — Kernel 32 Discord OAuth Primary Login
+
+### Backend
+- Added Discord OAuth start/callback routes:
+  - `GET /auth/discord/start`
+  - `GET /auth/discord/callback`
+  - API aliases at `GET /api/auth/discord/start` and `GET /api/auth/discord/callback`
+- Added provider discovery route:
+  - `GET /api/auth/providers`
+- Added Discord identity linking and OAuth state storage helpers
+- Preserved the existing Victory session cookie model for post-OAuth login
+
+### Database
+- Added `auth.discord_identities`
+- Added `auth.oauth_states`
+
+### Frontend
+- Added a Discord login button on `/login/`
+- Kept local handle/password login intact
+
+### Notes
+- Discord OAuth authenticates identity only
+- Victory still authorizes users through its own sessions, memberships, and roles
+- No Discord bot, guild, channel, or voice integration was added
+
 ## 2026-03-25 — Foundation stood up
 
 ### Infrastructure

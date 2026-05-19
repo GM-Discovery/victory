@@ -24,6 +24,11 @@ services:
       DATABASE_URL: postgres://victory:REDACTED@victory-postgres:5432/victory?sslmode=disable
       STORAGE_ROOT: /opt/victory/storage
       OPERATOR_HANDLE: straturli
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
+      DISCORD_REDIRECT_URL: ${DISCORD_REDIRECT_URL:-}
+      DISCORD_OAUTH_SCOPES: ${DISCORD_OAUTH_SCOPES:-identify email}
+      DISCORD_OAUTH_ENABLED: ${DISCORD_OAUTH_ENABLED:-}
     depends_on:
       - postgres
     volumes:

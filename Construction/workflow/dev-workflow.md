@@ -29,6 +29,14 @@ cd /opt/victory/backend
 PORT=8081 DATABASE_URL='postgres://victory:REDACTED@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory
 ```
 
+Optional Discord OAuth environment for Kernel 32:
+```bash
+DISCORD_CLIENT_ID='<client id>'
+DISCORD_CLIENT_SECRET='<client secret>'
+DISCORD_REDIRECT_URL='http://127.0.0.1:8081/auth/discord/callback'
+DISCORD_OAUTH_SCOPES='identify email'
+```
+
 If `8081` is occupied:
 ```bash
 PORT=18081 DATABASE_URL='postgres://victory:REDACTED@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory
@@ -51,6 +59,9 @@ git diff --check
 ```
 
 ## Current Route Checks Worth Knowing
+- Discord OAuth start: `/auth/discord/start`
+- Discord OAuth callback: `/auth/discord/callback`
+- Auth providers: `/api/auth/providers`
 - Cave snapshot: `/api/world/the-cave`
 - Cave WebSocket: `/ws/the-cave`
 - First Theater Pixi spike: `/venues/first-theater/`
@@ -64,6 +75,11 @@ Apply migrations manually:
 ```bash
 cd /opt/victory
 docker exec -i victory-postgres psql -U victory -d victory < database/migrations/XXX.sql
+```
+
+Kernel 32 migration:
+```bash
+docker exec -i victory-postgres psql -U victory -d victory < database/migrations/018_kernel32_discord_oauth.sql
 ```
 
 Inspect tables:
