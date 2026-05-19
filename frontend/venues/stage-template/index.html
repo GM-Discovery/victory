@@ -3,20 +3,20 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Middle School Stage</title>
+  <title>Stage Template</title>
   <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
   <style>
     :root {
-      --bg: #0d1624;
-      --bg-2: #16253b;
-      --panel: rgba(13, 23, 38, 0.92);
-      --panel-strong: rgba(22, 34, 53, 0.96);
-      --border: rgba(186, 205, 233, 0.16);
-      --text: #eef4ff;
-      --muted: #b5c5de;
+      --bg: #0c1522;
+      --bg-2: #15243b;
+      --panel: rgba(13, 22, 36, 0.94);
+      --panel-soft: rgba(18, 28, 45, 0.9);
+      --border: rgba(186, 208, 239, 0.14);
+      --text: #eef5ff;
+      --muted: #b7c7df;
       --accent: #f0c96b;
-      --accent-2: #8cc7ff;
-      --drawer: #132131;
+      --accent-2: #8ec7ff;
+      --drawer: #132234;
       --shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
       --left-drawer-width: 64px;
       --right-drawer-width: 64px;
@@ -30,9 +30,9 @@
       color: var(--text);
       font-family: "Trebuchet MS", "Segoe UI", sans-serif;
       background:
-        radial-gradient(circle at top left, rgba(120, 178, 255, 0.16), transparent 32%),
-        radial-gradient(circle at 80% 20%, rgba(240, 201, 107, 0.18), transparent 28%),
-        linear-gradient(180deg, #0b1320 0%, var(--bg) 46%, #09111a 100%);
+        radial-gradient(circle at 12% 10%, rgba(132, 183, 255, 0.16), transparent 28%),
+        radial-gradient(circle at 82% 18%, rgba(240, 201, 107, 0.16), transparent 28%),
+        linear-gradient(180deg, #0b1320 0%, var(--bg) 48%, #08111a 100%);
     }
 
     .shell {
@@ -67,8 +67,7 @@
     }
 
     .brand {
-      display: flex;
-      flex-direction: column;
+      display: grid;
       gap: 4px;
     }
 
@@ -85,12 +84,6 @@
       transition: opacity 160ms ease, transform 160ms ease;
     }
 
-    .header-left {
-      display: grid;
-      gap: 12px;
-      align-content: start;
-    }
-
     .status-strip {
       display: flex;
       flex-wrap: wrap;
@@ -100,12 +93,59 @@
       transition: opacity 160ms ease, transform 160ms ease;
     }
 
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      font-size: 0.88rem;
+    }
+
+    .chip strong,
+    .chip-action {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .chip-action {
+      border: 0;
+      background: transparent;
+      padding: 0;
+      cursor: help;
+    }
+
     .header-center {
       display: flex;
       justify-content: center;
       align-items: center;
       min-width: 0;
       transition: opacity 160ms ease, transform 160ms ease;
+    }
+
+    .chip--target {
+      min-width: min(100%, 340px);
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .chip-stack {
+      display: grid;
+      gap: 2px;
+    }
+
+    .chip-stack span {
+      line-height: 1.15;
+    }
+
+    .header-right {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      position: relative;
     }
 
     .top-bar:not([data-open="true"]) .brand p,
@@ -122,67 +162,6 @@
       opacity: var(--header-body-opacity, 1);
       transform: none;
       pointer-events: auto;
-    }
-
-    .top-bar[data-open="true"] .brand p,
-    .top-bar[data-open="true"] .status-strip,
-    .top-bar[data-open="true"] .header-center {
-      opacity: var(--header-body-opacity, 1);
-      transform: none;
-      pointer-events: auto;
-    }
-
-    .chip--target {
-      align-items: center;
-      gap: 10px;
-      min-width: min(100%, 340px);
-      justify-content: space-between;
-    }
-
-    .chip-stack {
-      display: grid;
-      gap: 2px;
-    }
-
-    .chip-stack span {
-      display: block;
-      line-height: 1.15;
-    }
-
-    .chip-action {
-      border: 0;
-      background: transparent;
-      color: var(--accent-2);
-      cursor: help;
-      padding: 0;
-      line-height: 1;
-      font-size: 1rem;
-    }
-
-    .chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--text);
-      font-size: 0.88rem;
-      text-decoration: none;
-      cursor: pointer;
-    }
-
-    .chip strong {
-      color: var(--accent);
-      font-weight: 700;
-    }
-
-    .header-right {
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      position: relative;
     }
 
     .header-controls {
@@ -207,9 +186,7 @@
       flex-shrink: 0;
     }
 
-    .header-pill:hover {
-      background: rgba(240, 201, 107, 0.14);
-    }
+    .header-pill:hover { background: rgba(240, 201, 107, 0.14); }
 
     .header-pill.is-active {
       background: rgba(140, 199, 255, 0.16);
@@ -255,8 +232,15 @@
       z-index: 9;
     }
 
-    .account-menu[hidden] {
-      display: none;
+    .account-menu[hidden] { display: none; }
+
+    .account-menu a,
+    .account-menu button,
+    .drawer-settings-button,
+    .overlay-actions button,
+    .chat-row button,
+    .context-menu button {
+      font: inherit;
     }
 
     .account-menu a,
@@ -268,7 +252,6 @@
       text-decoration: none;
       text-align: left;
       padding: 10px 12px;
-      font: inherit;
       cursor: pointer;
     }
 
@@ -288,13 +271,12 @@
       min-height: 0;
       border: 1px solid var(--border);
       border-radius: 18px;
-      background:
-        linear-gradient(180deg, rgba(24, 40, 63, 0.92), rgba(14, 24, 38, 0.78));
+      background: linear-gradient(180deg, rgba(19, 34, 52, 0.88), rgba(16, 27, 44, 0.72));
       backdrop-filter: blur(10px);
       box-shadow: var(--shadow);
       overflow: hidden;
       position: relative;
-      transition: width 180ms ease, opacity 180ms ease, transform 180ms ease;
+      transition: width 180ms ease, transform 180ms ease;
     }
 
     .drawer-inner {
@@ -320,15 +302,8 @@
       transition: opacity 140ms ease, transform 180ms ease;
     }
 
-    .drawer-head strong {
-      font-size: 0.95rem;
-      letter-spacing: 0.02em;
-    }
-
-    .drawer-head span {
-      color: var(--muted);
-      font-size: 0.82rem;
-    }
+    .drawer-head strong { font-size: 0.95rem; letter-spacing: 0.02em; }
+    .drawer-head span { color: var(--muted); font-size: 0.82rem; }
 
     .drawer-head__actions {
       display: inline-flex;
@@ -351,19 +326,18 @@
       flex-shrink: 0;
     }
 
-    .drawer-settings-button:hover {
-      background: rgba(240, 201, 107, 0.14);
-    }
+    .drawer-settings-button:hover { background: rgba(240, 201, 107, 0.14); }
 
     .drawer[data-open="false"] .drawer-head__copy {
-      opacity: 0.54;
+      opacity: 0.46;
       transform: translateX(-2px);
+      pointer-events: none;
     }
 
     .drawer[data-open="false"] .drawer-body {
       display: grid;
-      opacity: calc(var(--drawer-body-opacity, 1) * 0.16);
-      filter: saturate(0.82);
+      opacity: calc(var(--drawer-body-opacity, 1) * 0.14);
+      filter: saturate(0.85);
       pointer-events: none;
     }
 
@@ -382,26 +356,15 @@
       gap: 12px;
     }
 
-    .drawer-settings-panel[hidden] {
-      display: none;
-    }
-
-    .drawer-settings-panel h3 {
-      margin: 0;
-      font-size: 0.92rem;
-      letter-spacing: 0.02em;
-    }
-
-    .drawer-settings-panel .drawer-settings-group {
+    .drawer-settings-panel[hidden] { display: none; }
+    .drawer-settings-panel h3 { margin: 0; font-size: 0.92rem; letter-spacing: 0.02em; }
+    .drawer-settings-group {
+      display: grid;
+      gap: 8px;
       padding: 10px;
       border-radius: 12px;
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid rgba(255, 255, 255, 0.06);
-    }
-
-    .drawer-settings-group {
-      display: grid;
-      gap: 8px;
     }
 
     .drawer-settings-group label {
@@ -424,20 +387,8 @@
       padding: 9px 10px;
     }
 
-    .drawer-settings-group input[type="range"] {
-      accent-color: var(--accent);
-    }
-
-    .drawer-settings-helper {
-      color: var(--muted);
-      font-size: 0.78rem;
-      line-height: 1.35;
-    }
-
-    .drawer-settings-value {
-      color: var(--text);
-      font-size: 0.84rem;
-    }
+    .drawer-settings-helper { color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
+    .drawer-settings-value { color: var(--text); font-size: 0.84rem; }
 
     .drawer-body {
       padding: 14px 12px 16px;
@@ -448,29 +399,18 @@
       transition: opacity 180ms ease;
     }
 
-    .drawer--collapsed {
-      width: 88px;
-    }
-
-    .drawer--expanded {
-      width: auto;
-      min-width: 0;
-    }
-
-    .drawer[data-open-mode="always-open"] {
-      width: auto;
-      min-width: 0;
-    }
-
-    .drawer[data-open-mode="hover"]:not(:hover):not(:focus-within) {
-      width: 88px;
-    }
+    .drawer--collapsed { width: 88px; }
+    .drawer--expanded { width: auto; min-width: 0; }
+    .drawer[data-open-mode="always-open"] { width: auto; min-width: 0; }
+    .drawer[data-open-mode="hover"]:not(:hover):not(:focus-within) { width: 88px; }
 
     .stage-shell {
+      position: relative;
       display: grid;
       grid-template-rows: auto 1fr;
       gap: 14px;
       min-height: 0;
+      isolation: isolate;
     }
 
     .stage-panel,
@@ -500,9 +440,7 @@
       letter-spacing: 0.03em;
     }
 
-    .muted {
-      color: var(--muted);
-    }
+    .muted { color: var(--muted); }
 
     .stage-surface {
       position: relative;
@@ -530,7 +468,7 @@
       position: relative;
       z-index: 1;
       display: grid;
-      grid-template-columns: 1.15fr 0.85fr;
+      grid-template-columns: 1.05fr 0.95fr;
       gap: 16px;
       min-height: 440px;
     }
@@ -559,23 +497,9 @@
       cursor: context-menu;
     }
 
-    .stage-object strong {
-      display: block;
-      margin-bottom: 6px;
-      font-size: 1rem;
-    }
-
-    .stage-object span {
-      color: var(--muted);
-      font-size: 0.88rem;
-      line-height: 1.4;
-    }
-
-    .stage-note {
-      max-width: 500px;
-      color: var(--muted);
-      line-height: 1.55;
-    }
+    .stage-object strong { display: block; margin-bottom: 6px; font-size: 1rem; }
+    .stage-object span { color: var(--muted); font-size: 0.88rem; line-height: 1.4; }
+    .stage-note { color: var(--muted); line-height: 1.55; }
 
     .hint-grid {
       display: grid;
@@ -583,31 +507,7 @@
       gap: 12px;
     }
 
-    .hint-card {
-      border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.03);
-      padding: 12px;
-    }
-
-    .hint-card strong {
-      display: block;
-      margin-bottom: 5px;
-      color: var(--accent);
-    }
-
-    .hint-card p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.9rem;
-      line-height: 1.4;
-    }
-
-    .drawer-list {
-      display: grid;
-      gap: 10px;
-    }
-
+    .hint-card,
     .drawer-item {
       border-radius: 14px;
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -617,29 +517,33 @@
       gap: 4px;
     }
 
+    .hint-card strong,
     .drawer-item strong {
       color: var(--accent);
       font-size: 0.92rem;
     }
 
+    .hint-card p,
     .drawer-item span {
+      margin: 0;
       color: var(--muted);
       font-size: 0.86rem;
       line-height: 1.4;
     }
 
-    .presence-preview {
+    .presence-preview,
+    .portrait-preview {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
       align-items: center;
     }
 
-    .presence-avatar {
+    .presence-avatar,
+    .portrait-chip {
       width: var(--portrait-size, 36px);
       height: var(--portrait-size, 36px);
       border-radius: 50%;
-      overflow: hidden;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -649,6 +553,7 @@
       font-size: 0.78rem;
       font-weight: 700;
       flex: 0 0 auto;
+      overflow: hidden;
     }
 
     .presence-avatar img {
@@ -660,27 +565,6 @@
 
     .presence-avatar--fallback {
       background: linear-gradient(180deg, rgba(25, 40, 62, 0.96), rgba(14, 22, 35, 0.96));
-    }
-
-    .portrait-preview {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .portrait-chip {
-      width: var(--portrait-size, 36px);
-      height: var(--portrait-size, 36px);
-      border-radius: 50%;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(180deg, rgba(240, 201, 107, 0.2), rgba(140, 199, 255, 0.12));
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: var(--text);
-      font-size: 0.8rem;
-      font-weight: 700;
     }
 
     .drawer-portrait-note {
@@ -695,14 +579,13 @@
       right: 18px;
       bottom: 18px;
       z-index: 40;
-      margin: 0;
+      overflow: hidden;
+      transition: transform 180ms ease;
+      transform: translateY(calc(100% - 52px));
+      border-radius: 18px 18px 0 0;
       border: 1px solid var(--border);
-      border-radius: 18px;
       background: linear-gradient(180deg, rgba(24, 40, 63, 0.94), rgba(14, 22, 35, 0.92));
       box-shadow: var(--shadow);
-      overflow: hidden;
-      transform: translateY(calc(100% - 52px));
-      transition: transform 180ms ease, opacity 180ms ease;
     }
 
     .chat-panel.is-open {
@@ -729,21 +612,6 @@
       letter-spacing: 0.02em;
     }
 
-    .chat-head__badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .chat-head__meta {
-      color: var(--muted);
-      font-size: 0.84rem;
-    }
-
-    .chat-panel .chat-head {
-      cursor: pointer;
-    }
-
     .badge {
       display: inline-flex;
       align-items: center;
@@ -757,17 +625,13 @@
       border: 1px solid rgba(140, 199, 255, 0.24);
     }
 
-    .chat-body {
-      padding: 14px 16px 16px;
-      display: none;
-      gap: 12px;
-      opacity: var(--chat-body-opacity, 1);
-      transition: opacity 180ms ease;
+    .chat-head__meta {
+      color: var(--muted);
+      font-size: 0.84rem;
     }
 
-    .chat-panel:hover .chat-body,
-    .chat-panel:focus-within .chat-body {
-      display: grid;
+    .chat-panel .chat-head {
+      cursor: pointer;
     }
 
     .chat-entry {
@@ -784,6 +648,17 @@
       color: var(--accent);
       font-size: 0.85rem;
     }
+
+    .chat-body {
+      padding: 14px 16px 16px;
+      display: none;
+      gap: 12px;
+      opacity: var(--chat-body-opacity, 1);
+      transition: opacity 180ms ease;
+    }
+
+    .chat-panel:hover .chat-body,
+    .chat-panel:focus-within .chat-body { display: grid; }
 
     .chat-log {
       min-height: 86px;
@@ -833,7 +708,6 @@
     }
 
     .context-menu[hidden] { display: none; }
-
     .context-menu button {
       border: 0;
       border-radius: 12px;
@@ -850,6 +724,7 @@
     .bottom-shell {
       padding: 0;
       overflow: hidden;
+      min-height: 52px;
     }
 
     .header-settings-panel {
@@ -867,16 +742,8 @@
       gap: 12px;
     }
 
-    .header-settings-panel[hidden] {
-      display: none;
-    }
-
-    .header-settings-panel h3 {
-      margin: 0;
-      font-size: 0.92rem;
-      letter-spacing: 0.02em;
-    }
-
+    .header-settings-panel[hidden] { display: none; }
+    .header-settings-panel h3 { margin: 0; font-size: 0.92rem; letter-spacing: 0.02em; }
     .header-settings-group {
       display: grid;
       gap: 8px;
@@ -885,70 +752,176 @@
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid rgba(255, 255, 255, 0.06);
     }
-
     .header-settings-group label {
       display: grid;
       gap: 4px;
       font-size: 0.82rem;
       color: var(--muted);
     }
-
     .header-settings-group input[type="range"] {
       width: 100%;
       accent-color: var(--accent);
     }
+    .header-settings-helper { color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
+    .header-settings-value { color: var(--text); font-size: 0.84rem; }
 
-    .header-settings-helper {
-      color: var(--muted);
-      font-size: 0.78rem;
-      line-height: 1.35;
+    .stage-dom-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
     }
 
-    .header-settings-value {
-      color: var(--text);
-      font-size: 0.84rem;
+    .overlay-anchor {
+      position: fixed;
+      left: 16px;
+      top: 16px;
+      z-index: 10000;
+      pointer-events: none;
+      display: grid;
+      gap: 8px;
+      justify-items: start;
     }
 
-    .access-status {
-      margin-top: 8px;
-      color: var(--accent);
-      font-size: 0.95rem;
+    .overlay-anchor__badge {
+      pointer-events: auto;
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: linear-gradient(180deg, rgba(240, 201, 107, 0.98), rgba(140, 199, 255, 0.96));
+      color: #122033;
+      font-weight: 800;
+      border: 2px solid rgba(255, 255, 255, 0.9);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
     }
 
-    @media (max-width: 1200px) {
-      .top-bar {
-        grid-template-columns: 1fr;
-      }
-
-      .chip--target,
-      .account-chip {
-        min-width: 0;
-        width: 100%;
-      }
+    .overlay-panel {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      width: min(380px, calc(100vw - 32px));
+      border-radius: 18px;
+      padding: 16px;
+      background: rgba(16, 12, 10, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+      pointer-events: auto;
+      backdrop-filter: blur(6px);
     }
+
+    .overlay-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      color: #d8c9b0;
+      font-size: 0.94rem;
+      line-height: 1.45;
+    }
+
+    .overlay-row strong {
+      color: #f4e3c1;
+      font-size: 0.92rem;
+      flex: 0 0 auto;
+    }
+
+    .overlay-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .overlay-actions button {
+      padding: 8px 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.06);
+      color: #f6efe2;
+      cursor: pointer;
+    }
+
+    .overlay-note {
+      margin-top: 10px;
+      color: #c7bba5;
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .card-editor {
+      position: absolute;
+      left: 16px;
+      top: 220px;
+      z-index: 18;
+      width: min(420px, calc(100vw - 32px));
+      border-radius: 18px;
+      padding: 16px;
+      background: rgba(16, 12, 10, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+      pointer-events: auto;
+      backdrop-filter: blur(8px);
+      display: grid;
+      gap: 10px;
+      touch-action: none;
+    }
+
+    .card-editor-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: move;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .card-editor-header strong {
+      color: #f4e3c1;
+      font-size: 0.96rem;
+    }
+
+    .card-editor-grip {
+      color: #cdb892;
+      font-size: 0.88rem;
+      letter-spacing: 0.1em;
+    }
+
+    .editor-field {
+      display: grid;
+      gap: 6px;
+      color: #dac8af;
+      font-size: 0.88rem;
+    }
+
+    .editor-field span {
+      color: #f4e3c1;
+      font-weight: 700;
+    }
+
+    .editor-field textarea,
+    .editor-field input {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(8, 7, 6, 0.78);
+      color: #f7efe5;
+      font: inherit;
+      padding: 10px 12px;
+      resize: vertical;
+      min-height: 44px;
+    }
+
+    .editor-field textarea { min-height: 92px; }
+    .editor-status { color: #cdb892; font-size: 0.86rem; line-height: 1.45; }
 
     @media (max-width: 1100px) {
-      .layout {
-        grid-template-columns: 1fr;
-      }
-
-      .drawer--collapsed {
-        width: 100%;
-      }
-
-      .drawer--expanded {
-        width: 100%;
-      }
-
-      .drawer[data-open-mode="hover"]:not(:hover):not(:focus-within) {
-        width: 100%;
-      }
-
-      .stage-card {
-        grid-template-columns: 1fr;
-      }
-
-      .chat-panel {
+      .layout { grid-template-columns: 1fr; }
+      .drawer--collapsed,
+      .drawer--expanded { width: 100%; }
+      .drawer[data-open-mode="hover"]:not(:hover):not(:focus-within) { width: 100%; }
+      .stage-card { grid-template-columns: 1fr; }
+    .chat-panel {
         left: 12px;
         right: 12px;
         bottom: 12px;
@@ -962,7 +935,7 @@
     <div class="forbidden-card">
       <img src="/assets/redirect.png" alt="Security redirect" />
       <h1>Forbidden Access Entry</h1>
-      <p>This shell is producer-only for now.</p>
+      <p>This shell is hidden and producer-only for now.</p>
       <a href="/" class="back-map-button">← Back to Map</a>
     </div>
   </div>
@@ -971,8 +944,8 @@
     <header id="top-bar" class="top-bar" data-open="false" data-pinned="false">
       <div class="header-left">
         <div class="brand">
-          <h1>Middle School Stage</h1>
-          <p>Clean stage-shell grammar with drawers at the edges and the stage in the middle.</p>
+          <h1>Stage Template</h1>
+          <p>Reusable shell grammar for future stage venues. Hidden internal scaffold.</p>
         </div>
         <div class="status-strip">
           <div class="chip"><strong>User</strong> <span id="identity-value">Unknown User</span></div>
@@ -1029,7 +1002,7 @@
     </header>
 
     <div class="layout">
-    <aside id="left-drawer" class="drawer drawer--collapsed" data-open-mode="hover" data-open="false">
+      <aside id="left-drawer" class="drawer drawer--collapsed" data-open-mode="hover" data-open="false">
         <div class="drawer-inner">
           <div class="drawer-head">
             <div class="drawer-head__copy">
@@ -1062,7 +1035,7 @@
                 </select>
               </label>
             </div>
-            <div class="drawer-settings-helper">Open mode, opacity, and portrait size are stored locally for this user on this device.</div>
+            <div class="drawer-settings-helper">Settings are stored locally for this user on this device.</div>
           </div>
           <div class="drawer-body">
             <div class="drawer-item">
@@ -1079,15 +1052,6 @@
               <span id="presence-state">No roster yet. This is where presence will dock.</span>
             </div>
             <div class="drawer-item">
-              <strong>Portrait Preview</strong>
-              <div class="portrait-preview" aria-label="Portrait size preview">
-                <span class="portrait-chip">A</span>
-                <span class="portrait-chip">B</span>
-                <span class="portrait-chip">C</span>
-              </div>
-              <span class="drawer-portrait-note">Portrait size will be used later for room presence and speaking indicators.</span>
-            </div>
-            <div class="drawer-item">
               <strong>Future Tools</strong>
               <span>Keep this drawer intentionally sparse until a later kernel proves more portable controls.</span>
             </div>
@@ -1100,45 +1064,50 @@
           <div class="stage-head">
             <div>
               <h2>Stage Area</h2>
-              <div class="muted" style="font-size: 0.9rem;">Center content stays clean; object controls should live in context menus.</div>
+              <div class="muted" style="font-size: 0.9rem;">Reusable shell base with the center kept primary.</div>
             </div>
-            <div class="chip">Producer-only shell</div>
+            <div class="chip">Hidden template</div>
           </div>
           <div class="stage-surface" id="stage-surface">
             <div class="stage-grid" aria-hidden="true"></div>
             <div class="stage-card">
               <div class="stage-viewport">
                 <button id="stage-object" class="stage-object" type="button">
-                  <strong>Placeholder stage object</strong>
-                  <span>Right-click me to preview the shell menu. This is a layout proof, not the final runtime object model.</span>
+                  <strong>Template object</strong>
+                  <span>Right-click to preview the portable object menu. The center stays clear while controls live at the edges.</span>
                 </button>
                 <div class="stage-note">
-                  This venue is the first clean copyable stage shell. The Cave stays messy on purpose while this surface proves the future drawer grammar.
+                  This is the reusable shell sketch: top status rail, edge drawers, and a portable DOM overlay that future stage venues can inherit.
                 </div>
                 <div class="hint-grid">
                   <div class="hint-card">
                     <strong>Top bar</strong>
-                    <p>Identity, role, character, view, target, and ping are surfaced up here so the stage itself can stay uncluttered.</p>
+                    <p>Identity, role, character, view, target, and ping stay out of the stage center.</p>
                   </div>
                   <div class="hint-card">
-                    <strong>Context menu</strong>
-                    <p>Object control should feel local and direct. The shell menu here is a placeholder for portable controls later.</p>
+                    <strong>Overlay</strong>
+                    <p>The portable overlay is mounted from the shared venue shell helper so First Theater can show it above Pixi too.</p>
                   </div>
                 </div>
               </div>
               <div class="stage-viewport">
                 <div class="drawer-item">
                   <strong>Shell Notes</strong>
-                  <span>Keep controls hidden until needed. Drawers should collapse aggressively and reopen only when the producer asks.</span>
+                  <span>The Cave remains the proving ground. This venue is the cleaner template descendant.</span>
                 </div>
                 <div class="drawer-item">
                   <strong>Portable Primitives</strong>
-                  <span>Anything proven in The Cave can graduate here if it is simple enough to reuse without dragging the clutter along.</span>
+                  <span>Edge drawers, hover-open chrome, and overlay presentation are the reusable parts.</span>
                 </div>
                 <div class="drawer-item">
-                  <strong>Not Here Yet</strong>
-                  <span>Pixi, ticketing, analytics, and a full game layer are intentionally out of scope for this shell.</span>
+                  <strong>Deferred</strong>
+                  <span>Pixi, ticketing, analytics, and game-specific surfaces stay out of this template.</span>
                 </div>
+              </div>
+            </div>
+            <div id="overlay-root" class="stage-dom-overlay">
+              <div class="overlay-anchor" aria-label="Overlay status">
+                <div class="overlay-anchor__badge">Overlay active</div>
               </div>
             </div>
             <div id="stage-context-menu" class="context-menu" hidden>
@@ -1153,7 +1122,6 @@
               <button type="button" data-context-action="show-nameplate">Show Nameplate</button>
               <button type="button" data-context-action="show-overlay">Show Overlay</button>
               <button type="button" data-context-action="hide-overlay">Hide Overlay</button>
-              <button type="button" data-context-action="handout">Send to Handouts</button>
             </div>
           </div>
         </section>
@@ -1184,17 +1152,17 @@
             <div class="drawer-settings-helper">Right drawer settings are stored locally per user and kept intentionally small for now. Opacity is controlled from the shell settings in the header.</div>
           </div>
           <div class="drawer-body">
-                <div class="drawer-item">
-                  <strong>Character</strong>
-                  <span id="right-character-value">No Character</span>
-                </div>
-                <div class="drawer-item">
-                  <strong>Game</strong>
-                  <span>No game pieces loaded. Keep the rules layer separate from the shell for now.</span>
-                </div>
+            <div class="drawer-item">
+              <strong>Character</strong>
+              <span id="right-character-value">No Character</span>
+            </div>
+            <div class="drawer-item">
+              <strong>Game</strong>
+              <span>Keep the rules layer separate from the shell. This venue should stay stage-first, not system-first.</span>
+            </div>
             <div class="drawer-item">
               <strong>Handouts Later</strong>
-              <span>Scripts, sheets, and classroom-style handouts stay hidden until a later kernel actually needs them.</span>
+              <span>Scripts, sheets, and classroom-style handouts should remain hidden until the venue actually needs them.</span>
             </div>
           </div>
         </div>
@@ -1210,7 +1178,7 @@
         <div class="chat-log" id="chat-log">
           <div class="chat-entry">
             <strong>Shell note</strong>
-            <span>The chat drawer is intentionally quiet for now. Later kernels can wire in the live venue chat pattern here.</span>
+            <span>The template keeps chat as a hover-open shell placeholder until a later kernel wires live venue chat here.</span>
           </div>
         </div>
         <div class="chat-row">
@@ -1223,6 +1191,12 @@
 
   <script src="/lib/forbidden.js"></script>
   <script src="/venues/shared/venue-shell.js"></script>
+  <script>
+    window.VictoryVenueShell?.mountOverlay(
+      document.getElementById("overlay-root"),
+      { smokeEnabled: false }
+    );
+  </script>
   <script>
     const stageShell = document.getElementById("stage-shell");
     const topBar = document.getElementById("top-bar");
@@ -1271,15 +1245,13 @@
     const rightOpacityValue = document.getElementById("right-opacity-value");
     const chatOpacity = document.getElementById("chat-opacity");
     const chatOpacityValue = document.getElementById("chat-opacity-value");
-    let presenceRefreshTimer = null;
     const VenueShell = window.VictoryVenueShell || {};
-    const uiPreferenceStoragePrefix = "victory.middle-school-stage.ui.v1:";
-
+    let presenceRefreshTimer = null;
+    const uiPreferenceStoragePrefix = "victory.stage-template.ui.v1:";
     const drawerState = {
       left: { hover: false, focus: false, settingsOpen: false },
       right: { hover: false, focus: false, settingsOpen: false },
     };
-
     const drawerDefaults = {
       left: { mode: "hover", opacity: 96, portraitSize: "medium" },
       right: { mode: "hover", opacity: 96 },
@@ -1289,26 +1261,22 @@
       header: { pinned: false, opacity: 100 },
       chat: { opacity: 96 },
     };
-
     let uiPreferenceKey = "";
     let uiPreferences = {
       ...shellDefaults,
       left: { ...drawerDefaults.left },
       right: { ...drawerDefaults.right },
     };
-
     const clampNumber = VenueShell.clampNumber || ((value, min, max, fallback) => {
       const parsed = Number(value);
       if (!Number.isFinite(parsed)) return fallback;
       return Math.max(min, Math.min(max, parsed));
     });
-
     const normalizeDrawerMode = VenueShell.normalizeDrawerMode || ((value) => {
       const mode = String(value || "").trim();
       if (mode === "always-open" || mode === "always-closed") return mode;
       return "hover";
     });
-
     const normalizePortraitSize = VenueShell.normalizePortraitSize || ((value) => {
       const size = String(value || "").trim();
       if (size === "small" || size === "large") return size;
@@ -1347,7 +1315,6 @@
           portraitSize: leftPortraitSize,
         };
       }
-
       return {
         drawer: rightDrawer,
         button: rightSettingsButton,
@@ -1379,40 +1346,24 @@
     function updateDrawerPresentation(side) {
       const elements = getDrawerElements(side);
       if (!elements.drawer) return;
-
       const prefs = uiPreferences?.[side] || drawerDefaults[side];
       const open = isDrawerEffectivelyOpen(side);
-
       elements.drawer.dataset.openMode = prefs.mode;
       elements.drawer.dataset.open = open ? "true" : "false";
       elements.drawer.classList.toggle("drawer--expanded", open);
       elements.drawer.classList.toggle("drawer--collapsed", !open);
       elements.drawer.style.setProperty("--drawer-body-opacity", `${clampNumber(prefs.opacity, 0, 100, 96) / 100}`);
-
       if (side === "left") {
         const sizeMap = { small: "30px", medium: "36px", large: "44px" };
         elements.drawer.style.setProperty("--portrait-size", sizeMap[prefs.portraitSize] || "36px");
       }
-
       if (elements.button) {
         elements.button.setAttribute("aria-expanded", elements.panel && !elements.panel.hidden ? "true" : "false");
       }
-
-      if (elements.mode) {
-        elements.mode.value = prefs.mode;
-      }
-
-      if (elements.opacity) {
-        elements.opacity.value = String(prefs.opacity);
-      }
-
-      if (elements.opacityValue) {
-        elements.opacityValue.textContent = `${prefs.opacity}%`;
-      }
-
-      if (elements.portraitSize) {
-        elements.portraitSize.value = prefs.portraitSize || "medium";
-      }
+      if (elements.mode) elements.mode.value = prefs.mode;
+      if (elements.opacity) elements.opacity.value = String(prefs.opacity);
+      if (elements.opacityValue) elements.opacityValue.textContent = `${prefs.opacity}%`;
+      if (elements.portraitSize) elements.portraitSize.value = prefs.portraitSize || "medium";
     }
 
     function updateHeaderPresentation() {
@@ -1428,26 +1379,16 @@
         headerPinButton.setAttribute("aria-pressed", prefs.pinned ? "true" : "false");
         headerPinButton.title = prefs.pinned ? "Unpin header" : "Pin header open";
       }
-
-      if (headerOpacity) {
-        headerOpacity.value = String(prefs.opacity);
-      }
-
-      if (headerOpacityValue) {
-        headerOpacityValue.textContent = `${prefs.opacity}%`;
-      }
+      if (headerOpacity) headerOpacity.value = String(prefs.opacity);
+      if (headerOpacityValue) headerOpacityValue.textContent = `${prefs.opacity}%`;
     }
 
     function updateChatPresentation() {
       if (!chatPanel) return;
       const prefs = uiPreferences?.chat || shellDefaults.chat;
       chatPanel.style.setProperty("--chat-body-opacity", `${clampNumber(prefs.opacity, 0, 100, 96) / 100}`);
-      if (chatOpacity) {
-        chatOpacity.value = String(prefs.opacity);
-      }
-      if (chatOpacityValue) {
-        chatOpacityValue.textContent = `${prefs.opacity}%`;
-      }
+      if (chatOpacity) chatOpacity.value = String(prefs.opacity);
+      if (chatOpacityValue) chatOpacityValue.textContent = `${prefs.opacity}%`;
     }
 
     function syncDrawerWidths() {
@@ -1472,7 +1413,6 @@
       } else if (field === "portraitSize" && side === "left") {
         uiPreferences[side].portraitSize = normalizePortraitSize(value);
       }
-
       saveUiPreferences();
       applyDrawerState(side);
     }
@@ -1505,8 +1445,7 @@
     }
 
     function renderPresencePreview(users) {
-      if (!presencePreview || !presenceState) return;
-      if (!VenueShell.renderPresencePreview) return;
+      if (!presencePreview || !presenceState || !VenueShell.renderPresencePreview) return;
       const avatarSize = uiPreferences?.left?.portraitSize === "large"
         ? "44px"
         : uiPreferences?.left?.portraitSize === "small"
@@ -1523,7 +1462,7 @@
         const presence = Array.isArray(payload?.data?.presence) ? payload.data.presence : [];
         renderPresencePreview(presence);
       } catch (error) {
-        console.warn("failed to refresh middle school stage presence", error);
+        console.warn("failed to refresh stage template presence", error);
       }
     }
 
@@ -1567,77 +1506,6 @@
       stageContextMenu.hidden = false;
       stageContextMenu.style.left = `${Math.max(18, x - rect.left)}px`;
       stageContextMenu.style.top = `${Math.max(18, y - rect.top)}px`;
-    }
-
-    async function bootstrapMiddleSchoolStage() {
-      try {
-        const pingStartedAt = performance.now();
-        const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
-        const pingMs = Math.max(0, Math.round(performance.now() - pingStartedAt));
-        const sessionPayload = await sessionResponse.json().catch(() => null);
-        if (!sessionPayload?.signed_in) {
-          showForbiddenScreen();
-          return;
-        }
-
-        const data = sessionPayload.data || {};
-        const role = String(data.role || "audience").toLowerCase();
-        const isOperator = Boolean(data.is_operator);
-        if (role !== "producer" && !isOperator) {
-          showForbiddenScreen();
-          return;
-        }
-
-        uiPreferenceKey = String(data.user_id || data.handle || data.display_name || "unknown-user");
-        uiPreferences = loadUiPreferences(uiPreferenceKey);
-        uiPreferences.header = {
-          ...shellDefaults.header,
-          ...(uiPreferences.header || {}),
-        };
-        uiPreferences.chat = {
-          ...shellDefaults.chat,
-          ...(uiPreferences.chat || {}),
-        };
-
-        const visibilityResponse = await fetch("/api/map/visibility", { credentials: "include" });
-        const visibilityPayload = await visibilityResponse.json().catch(() => null);
-        const visible = Array.isArray(visibilityPayload?.data)
-          ? visibilityPayload.data.some((venue) => venue?.slug === "middle-school-stage")
-          : false;
-
-        if (!visible) {
-          showForbiddenScreen();
-          return;
-        }
-
-        if (identityValue) identityValue.textContent = data.display_name || data.handle || "Producer";
-        if (roleValue) roleValue.textContent = isOperator ? "Operator" : "Producer";
-        if (accountLabel) accountLabel.textContent = data.display_name || data.handle || "Account";
-        if (characterValue) characterValue.textContent = "No Character";
-        if (rightCharacterValue) rightCharacterValue.textContent = "No Character";
-        if (viewValue) viewValue.textContent = "Self";
-        if (targetValue) targetValue.textContent = "No Target";
-        if (targetClassValue) targetClassValue.textContent = "Unknown Class";
-        if (pingValue) pingValue.textContent = Number.isFinite(pingMs) ? `${pingMs}ms` : "—";
-        if (networkState) networkState.textContent = "Visible, but intentionally quiet until a later kernel adds live transport.";
-        if (presenceState) presenceState.textContent = "Edge drawer reserved for presence and network tools.";
-
-        if (stageShell) stageShell.hidden = false;
-        if (forbiddenScreen) forbiddenScreen.hidden = true;
-        updateHeaderPresentation();
-        applyDrawerState("left");
-        applyDrawerState("right");
-        updateChatPresentation();
-        renderPresencePreview([]);
-        await refreshPresencePreview();
-        if (presenceRefreshTimer) {
-          window.clearInterval(presenceRefreshTimer);
-        }
-        presenceRefreshTimer = window.setInterval(refreshPresencePreview, 15000);
-      } catch (error) {
-        console.error("middle school stage bootstrap failed", error);
-        showForbiddenScreen();
-      }
     }
 
     function closeAccountMenu() {
@@ -1711,6 +1579,64 @@
       updateChatPresentation();
     });
 
+    async function bootstrapStageTemplate() {
+      try {
+        const pingStartedAt = performance.now();
+        const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
+        const pingMs = Math.max(0, Math.round(performance.now() - pingStartedAt));
+        const sessionPayload = await sessionResponse.json().catch(() => null);
+        if (!sessionPayload?.signed_in) {
+          forbiddenScreen.hidden = false;
+          return;
+        }
+
+        const data = sessionPayload.data || {};
+        const role = String(data.role || "audience").toLowerCase();
+        const isOperator = Boolean(data.is_operator);
+        if (role !== "producer" && !isOperator) {
+          forbiddenScreen.hidden = false;
+          return;
+        }
+
+        uiPreferenceKey = String(data.user_id || data.handle || data.display_name || "unknown-user");
+        uiPreferences = loadUiPreferences(uiPreferenceKey);
+        uiPreferences.header = {
+          ...shellDefaults.header,
+          ...(uiPreferences.header || {}),
+        };
+        uiPreferences.chat = {
+          ...shellDefaults.chat,
+          ...(uiPreferences.chat || {}),
+        };
+
+        if (identityValue) identityValue.textContent = data.display_name || data.handle || "Producer";
+        if (roleValue) roleValue.textContent = isOperator ? "Operator" : "Producer";
+        if (accountLabel) accountLabel.textContent = data.display_name || data.handle || "Account";
+        if (characterValue) characterValue.textContent = "No Character";
+        if (rightCharacterValue) rightCharacterValue.textContent = "No Character";
+        if (viewValue) viewValue.textContent = "Self";
+        if (targetValue) targetValue.textContent = "No Target";
+        if (targetClassValue) targetClassValue.textContent = "Unknown Class";
+        if (pingValue) pingValue.textContent = Number.isFinite(pingMs) ? `${pingMs}ms` : "—";
+        if (networkState) networkState.textContent = "Visible, but intentionally quiet until a later kernel adds live transport.";
+        if (presenceState) presenceState.textContent = "Edge drawer reserved for presence and network tools.";
+
+        stageShell.hidden = false;
+        forbiddenScreen.hidden = true;
+        updateHeaderPresentation();
+        applyDrawerState("left");
+        applyDrawerState("right");
+        updateChatPresentation();
+        renderPresencePreview([]);
+        await refreshPresencePreview();
+        if (presenceRefreshTimer) window.clearInterval(presenceRefreshTimer);
+        presenceRefreshTimer = window.setInterval(refreshPresencePreview, 15000);
+      } catch (error) {
+        console.error("stage template bootstrap failed", error);
+        forbiddenScreen.hidden = false;
+      }
+    }
+
     leftDrawer?.addEventListener("pointerenter", () => setDrawerHoverState("left", "hover", true));
     leftDrawer?.addEventListener("pointerleave", () => setDrawerHoverState("left", "hover", false));
     leftDrawer?.addEventListener("focusin", () => setDrawerHoverState("left", "focus", true));
@@ -1733,7 +1659,6 @@
       event.stopPropagation();
       toggleDrawerSettings("left");
     });
-
     rightSettingsButton?.addEventListener("click", (event) => {
       event.stopPropagation();
       toggleDrawerSettings("right");
@@ -1803,24 +1728,7 @@
       }
     });
 
-    stageContextMenu?.addEventListener("click", (event) => {
-      const button = event.target.closest("button[data-context-action]");
-      if (!button) return;
-      const action = button.getAttribute("data-context-action") || "";
-      const messageMap = {
-        inspect: "Inspect selected.",
-        reveal: "Reveal previewed.",
-        hide: "Hide previewed.",
-        move: "Move focus previewed.",
-        remove: "Remove previewed.",
-        lock: "Lock previewed.",
-        unlock: "Unlock previewed.",
-        "hide-nameplate": "Hide nameplate previewed.",
-        "show-nameplate": "Show nameplate previewed.",
-        "show-overlay": "Show overlay previewed.",
-        "hide-overlay": "Hide overlay previewed.",
-        handout: "Handout routing reserved for later.",
-      };
+    stageContextMenu?.addEventListener("click", () => {
       if (chatBadge) chatBadge.hidden = true;
       hideContextMenu();
     });
@@ -1854,16 +1762,14 @@
     });
 
     window.addEventListener("beforeunload", () => {
-      if (presenceRefreshTimer) {
-        window.clearInterval(presenceRefreshTimer);
-      }
+      if (presenceRefreshTimer) window.clearInterval(presenceRefreshTimer);
     });
 
     syncDrawerWidths();
     updateHeaderPresentation();
     updateChatPresentation();
     setChatOpen(false);
-    bootstrapMiddleSchoolStage();
+    bootstrapStageTemplate();
   </script>
 </body>
 </html>

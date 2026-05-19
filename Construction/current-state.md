@@ -1,14 +1,14 @@
 # Victory Current State
 
 ## Purpose
-This document is the current-state canon for Victory as of Kernel 31.
+This document is the current-state canon for Victory as of Kernel 32.
 
 Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful as history, but this file is the current source of truth when they disagree.
 
 ## Kernel State
-- Current kernel label: **Kernel 31**
-- Current kernel purpose: **Middle School Stage + Edge Drawer Layout v1**
-- Product state: **kernel active; Kernel 31 is in progress**
+- Current kernel label: **Kernel 32**
+- Current kernel purpose: **Template Venue Extraction v1**
+- Product state: **kernel active; Kernel 32 is in progress**
 - Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
 
 ## Current Stack
@@ -38,6 +38,7 @@ Live venue rows currently present:
 - `the-cave` - presentation venue
 - `greenroom` - profile/character venue
 - `trailers` - profile drafting venue
+- `stage-template` - hidden internal shell scaffold, not map-visible
 - `workshop` - workshop venue
 - `info-booth` - public info venue
 - `producers-office` - office venue
@@ -200,15 +201,18 @@ Current Pixi proving-ground behavior:
 - PixiJS is experimental unless proven otherwise; it is renderer-only, not app authority
 - live Cave snapshot and session actions can be used to judge renderer coexistence
 - DOM overlays remain separate from the Pixi canvas so controls stay outside the stage layer
+- the portable overlay panel is now mounted from the shared venue shell helper so First Theater can compare Pixi and overlay together
+- the overlay proof marker is smoke-only; it is hidden in normal First Theater mode and only appears when explicitly running smoke tests
 - Kernel 29 is complete as a proving-ground spike
 - Kernel 30 organized the proving-ground UI and cleaned up the remaining affordances
 
 Strategy:
 - tools may be built visibly in The Cave first
 - once stable, they should be hidden into overlays, drawers, context menus, or cleaner surfaces
-- a clean template venue will later be extracted from The Cave
+- a clean template venue was extracted from the organized stage shell as `stage-template`
 - future venues should descend from that cleaned template rather than re-inventing runtime behavior separately
-- Middle School Stage is the first clean copyable stage shell and should prove the edge-drawer grammar without dragging The Cave clutter along
+- Middle School Stage remains the source shell and proves the edge-drawer grammar without dragging The Cave clutter along
+- First Theater now shows the portable overlay over Pixi so renderer and overlay can be compared side by side
 
 ## Current Greenroom / Trailers Split
 - Greenroom:

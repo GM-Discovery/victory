@@ -52,6 +52,7 @@ Current confirmed capabilities:
 - Character card sheet links are metadata on `character_cards`; they are not playable sheets, macros, dice, stats, or rules execution yet
 - The Cave is now explicitly the full-feature proving-ground venue. Tools may appear there first, then later move into overlays, drawers, and context menus before template extraction.
 - Middle School Stage is the first clean stage-shell experiment. It should stay producer-only, drawer-first, and center-stage-primary.
+- Kernel 32 now extracts a hidden Stage Template venue from that shell and reuses the portable overlay over First Theater's Pixi stage.
 - Pixi remains outside The Cave and is not automatically part of the stage shell.
 - Showing Review means review of actions/chat/reactions/logs. Video recording is future-only and not a near-term priority.
 

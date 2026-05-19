@@ -1,7 +1,7 @@
 # Victory Roadmap
 
 ## Purpose
-This roadmap reflects current priorities after Kernel 31.
+This roadmap reflects current priorities after Kernel 32.
 
 Kernel numbers are labels, but from here they should remain stable once assigned so planning, reportbacks, and future agents all refer to the same landmarks.
 
@@ -18,23 +18,25 @@ Kernel numbers are labels, but from here they should remain stable once assigned
   - build the first clean copyable stage shell without turning The Cave into the template
 - `32 — Template Venue Extraction v1`
   - extract a cleaner reusable venue shell after the stage-shell pass
-- `33 — Stage Navigation / View Resolver v1`
+- `33 — Discord OAuth Primary Login v1`
+  - add Discord OAuth as the primary login path while preserving Victory identity and operator fallback
+- `34 — Stage Navigation / View Resolver v1`
   - better view/surface routing inside venue runtime
-- `34 — Map/Object Movement v1`
+- `35 — Map/Object Movement v1`
   - more formal object movement and navigation behavior
-- `35 — Venue Policy Console v1`
+- `36 — Venue Policy Console v1`
   - clearer venue-level policy toggles and controls
-- `36 — Asset Browser / Library v1`
+- `37 — Asset Browser / Library v1`
   - browse and select reusable assets/library elements
-- `37 — Warehouse / Asset Storage Surface v1`
+- `38 — Warehouse / Asset Storage Surface v1`
   - durable storage and browsing surface for reusable assets
-- `38 — Library / Script Surface v1`
+- `39 — Library / Script Surface v1`
   - browse scripts and reusable reference material by ruleset or sheet type
-- `39 — Catharsis Prep Kernel`
+- `40 — Catharsis Prep Kernel`
   - prep surfaces for the catharsis flow without building the full experience yet
-- `40 — Socio/Catharsis v1`
+- `41 — Socio/Catharsis v1`
   - first public-facing catharsis experience surface
-- `41 — Documentation + Hardening Pass`
+- `42 — Documentation + Hardening Pass`
   - reconcile docs, tighten errors, and stabilize the kernel trail
 
 Ordering note:
@@ -43,8 +45,9 @@ Ordering note:
 - Cave polish and organization belongs around Kernel 30
 - Middle School Stage follows the organization pass and proves the first clean shell
 - template extraction follows that stage-shell pass, not before it
+- Discord OAuth sits after the shell extraction so identity work stays separate from layout work
 
-## Medium Roadmap: Kernels 37–61
+## Medium Roadmap: Kernels 38–62
 - strengthen showing/review surfaces and auditability
 - richer director controls and venue policy tools
 - asset pipeline improvements beyond first browser/library pass

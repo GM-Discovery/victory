@@ -8,17 +8,18 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg: #0f0d0b;
-      --panel: rgba(22, 18, 14, 0.94);
-      --panel-soft: rgba(17, 14, 11, 0.82);
-      --line: rgba(255, 235, 209, 0.1);
-      --line-strong: rgba(255, 235, 209, 0.16);
+      --bg: #090807;
+      --panel: rgba(11, 14, 19, 0.82);
+      --panel-soft: rgba(11, 14, 19, 0.68);
+      --line: rgba(240, 208, 155, 0.12);
+      --line-strong: rgba(240, 208, 155, 0.2);
       --text: #f5ead7;
-      --muted: #d2c0aa;
-      --accent: #dfc08a;
-      --accent-strong: #f0d49b;
-      --stage-top: #1a1713;
-      --stage-bottom: #0b0907;
+      --muted: #cbbba5;
+      --accent: #e1c38c;
+      --accent-strong: #f3d79f;
+      --utility: #8fb7da;
+      --stage-top: #531017;
+      --stage-bottom: #050403;
     }
 
     body {
@@ -26,9 +27,10 @@
       min-height: 100vh;
       font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
       background:
-        radial-gradient(circle at 14% 8%, rgba(143, 94, 54, 0.12), transparent 28%),
-        radial-gradient(circle at 82% 0%, rgba(112, 84, 44, 0.08), transparent 24%),
-        linear-gradient(180deg, #15110f 0%, #0a0806 100%);
+        radial-gradient(circle at 50% 0%, rgba(228, 185, 108, 0.08), transparent 26%),
+        radial-gradient(circle at 50% 14%, rgba(168, 62, 78, 0.2), transparent 32%),
+        radial-gradient(circle at 15% 12%, rgba(95, 140, 186, 0.08), transparent 24%),
+        linear-gradient(180deg, #201014 0%, #11090a 32%, #070606 100%);
       color: var(--text);
     }
 
@@ -89,12 +91,13 @@
 
     .corner-controls {
       position: fixed;
-      top: 16px;
-      right: 16px;
+      top: auto;
+      bottom: 16px;
+      left: 16px;
       z-index: 40;
       display: flex;
       gap: 8px;
-      opacity: 0.18;
+      opacity: 0.55;
       transition: opacity 0.18s ease, transform 0.18s ease;
     }
 
@@ -139,9 +142,25 @@
       border-radius: 0;
       border: 0;
       background:
-        radial-gradient(circle at center, rgba(73, 46, 24, 0.2), transparent 44%),
-        linear-gradient(180deg, var(--stage-top) 0%, var(--stage-bottom) 100%);
+        radial-gradient(circle at 50% 36%, rgba(255, 236, 196, 0.12), transparent 20%),
+        linear-gradient(180deg, #6a1520 0%, #3d0d14 18%, #140708 42%, #090606 100%);
       box-shadow: none;
+      isolation: isolate;
+    }
+
+    .shell-chrome {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      pointer-events: none;
+      --left-drawer-width: 42px;
+      --right-drawer-width: 42px;
+      --chat-rail-height: 44px;
+    }
+
+    .stage-summary,
+    .overlay-panel {
+      display: none !important;
     }
 
     .stage-status {
@@ -149,14 +168,73 @@
       left: 16px;
       top: 16px;
       z-index: 8;
-      padding: 12px 14px;
-      max-width: min(380px, calc(100vw - 64px));
-      border-radius: 14px;
-      background: rgba(18, 14, 11, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 10px 12px;
+      max-width: min(360px, calc(100vw - 64px));
+      border-radius: 999px;
+      background: rgba(12, 14, 19, 0.72);
+      border: 1px solid rgba(240, 208, 155, 0.14);
       color: #f8eedf;
       line-height: 1.45;
-      backdrop-filter: blur(6px);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.22);
+      font-size: 0.92rem;
+    }
+
+    .stage-empty-state {
+      position: absolute;
+      left: 50%;
+      top: 52%;
+      transform: translate(-50%, -50%);
+      z-index: 7;
+      display: grid;
+      gap: 8px;
+      justify-items: center;
+      pointer-events: none;
+      text-align: center;
+      width: min(340px, calc(100vw - 48px));
+      padding: 8px 10px;
+    }
+
+    .stage-empty-state[hidden] {
+      display: none;
+    }
+
+    .stage-empty-card {
+      display: grid;
+      gap: 6px;
+      width: min(100%, 320px);
+      padding: 12px 14px 11px;
+      border-radius: 999px;
+      background: rgba(12, 14, 19, 0.7);
+      border: 1px solid rgba(240, 208, 155, 0.16);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.24);
+      backdrop-filter: blur(8px);
+    }
+
+    .stage-empty-card strong {
+      font-size: 0.94rem;
+      color: var(--accent-strong);
+      letter-spacing: 0.03em;
+    }
+
+    .stage-empty-card span {
+      color: #d2c3ae;
+      line-height: 1.45;
+      font-size: 0.86rem;
+    }
+
+    .stage-empty-card em {
+      display: inline-block;
+      font-style: normal;
+      color: #f1e0bf;
+      background: rgba(240, 208, 155, 0.08);
+      border: 1px solid rgba(240, 208, 155, 0.12);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      justify-self: center;
     }
 
     .stage-summary {
@@ -165,7 +243,7 @@
       top: 16px;
       z-index: 8;
       width: min(360px, calc(100vw - 64px));
-      display: grid;
+      display: none !important;
       gap: 8px;
       pointer-events: none;
     }
@@ -228,6 +306,7 @@
       position: absolute;
       inset: 0;
       touch-action: none;
+      z-index: 1;
     }
 
     .pixi-stage-host canvas {
@@ -237,10 +316,37 @@
     }
 
     .stage-dom-overlay {
-      position: absolute;
+      position: fixed;
       inset: 0;
       pointer-events: none;
-      z-index: 10;
+      z-index: 9999;
+    }
+
+    .overlay-anchor {
+      position: fixed;
+      left: 16px;
+      top: 16px;
+      z-index: 10000;
+      pointer-events: none;
+      display: grid;
+      gap: 8px;
+      justify-items: start;
+    }
+
+    .overlay-anchor[hidden] {
+      display: none;
+    }
+
+    .overlay-anchor__badge {
+      pointer-events: auto;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: linear-gradient(180deg, rgba(240, 201, 107, 0.98), rgba(140, 199, 255, 0.96));
+      color: #122033;
+      font-weight: 800;
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      font-size: 0.86rem;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
     }
 
     .overlay-panel {
@@ -255,6 +361,7 @@
       box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
       pointer-events: auto;
       backdrop-filter: blur(6px);
+      display: none !important;
     }
 
     .overlay-row {
@@ -299,6 +406,773 @@
       color: #c7bba5;
       font-size: 0.88rem;
       line-height: 1.45;
+    }
+
+    .top-bar,
+    .drawer,
+    .chat-panel {
+      border: 1px solid rgba(240, 208, 155, 0.12);
+      background: linear-gradient(180deg, rgba(15, 18, 25, 0.86), rgba(8, 10, 15, 0.82));
+      border-radius: 18px;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(12px);
+      pointer-events: auto;
+    }
+
+    .top-bar {
+      position: fixed;
+      top: 0;
+      left: 14px;
+      right: 14px;
+      z-index: 88;
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(220px, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 8px 14px;
+      min-height: 54px;
+      overflow: visible;
+      transition: padding 180ms ease, transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+      --header-surface-opacity: 0.95;
+      background: linear-gradient(180deg, rgba(15, 18, 25, var(--header-surface-opacity)), rgba(8, 10, 15, calc(var(--header-surface-opacity) - 0.06)));
+    }
+
+    .top-bar[data-open="false"] {
+      min-height: 12px;
+      padding: 0 14px;
+      border-radius: 0 0 18px 18px;
+      background: linear-gradient(180deg, rgba(15, 18, 25, 0.06), rgba(8, 10, 15, 0.03));
+      border-color: transparent;
+      box-shadow: none;
+      backdrop-filter: blur(2px);
+      overflow: hidden;
+    }
+
+    .top-bar[data-open="true"] {
+      padding: 10px 14px;
+      min-height: 58px;
+      transform: translateY(0);
+    }
+
+    .top-bar[data-open="false"] .header-left,
+    .top-bar[data-open="false"] .header-center,
+    .top-bar[data-open="false"] .header-right,
+    .top-bar[data-open="false"] .header-settings-panel {
+      opacity: 0;
+      transform: translateY(-8px);
+      pointer-events: none;
+      visibility: hidden;
+    }
+
+    .brand {
+      display: grid;
+      gap: 4px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.12rem;
+      letter-spacing: 0.03em;
+    }
+
+    .brand p,
+    .status-strip,
+    .header-center {
+      transition: opacity 160ms ease, transform 160ms ease;
+    }
+
+    .brand p {
+      margin: 0;
+      color: #b5c5de;
+      font-size: 0.84rem;
+    }
+
+    .status-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .header-center {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .top-bar .brand p {
+      opacity: 0;
+      transform: translateY(-4px);
+      pointer-events: none;
+      display: none;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.03);
+      color: #eef4ff;
+      font-size: 0.84rem;
+    }
+
+    .chip strong {
+      color: #f0c96b;
+      font-weight: 700;
+    }
+
+    .chip-action {
+      border: 0;
+      background: transparent;
+      color: #8cc7ff;
+      cursor: help;
+      padding: 0;
+      line-height: 1;
+      font-size: 1rem;
+    }
+
+    .chip--target {
+      min-width: min(100%, 300px);
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .chip-stack {
+      display: grid;
+      gap: 2px;
+    }
+
+    .chip-stack span {
+      display: block;
+      line-height: 1.15;
+    }
+
+    .header-right {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      position: relative;
+    }
+
+    .header-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+
+    .header-pill {
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: #f0c96b;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      text-decoration: none;
+      line-height: 1;
+    }
+
+    .header-pill:hover {
+      background: rgba(240, 201, 107, 0.14);
+    }
+
+    .header-pill.is-active {
+      background: rgba(140, 199, 255, 0.16);
+      border-color: rgba(140, 199, 255, 0.36);
+      color: #8cc7ff;
+    }
+
+    .header-pill--back {
+      font-size: 0.95rem;
+    }
+
+    .account-menu-wrap {
+      position: relative;
+    }
+
+    .account-chip {
+      min-width: 52px;
+      padding-inline: 8px;
+      justify-content: space-between;
+    }
+
+    .account-chip #account-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .account-avatar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, rgba(240, 201, 107, 0.22), rgba(140, 199, 255, 0.16));
+      color: #f0c96b;
+      font-weight: 700;
+      font-size: 0.82rem;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .account-menu {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 10px);
+      min-width: 180px;
+      border: 1px solid rgba(186, 208, 239, 0.14);
+      border-radius: 16px;
+      background: rgba(11, 18, 29, 0.98);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+      padding: 8px;
+      display: grid;
+      gap: 6px;
+      z-index: 9;
+    }
+
+    .account-menu[hidden] {
+      display: none;
+    }
+
+    .account-menu a,
+    .account-menu button,
+    .drawer-settings-button,
+    .overlay-actions button,
+    .chat-row button,
+    .context-menu button {
+      font: inherit;
+    }
+
+    .account-menu a,
+    .account-menu button {
+      border: 0;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      color: #eef4ff;
+      text-decoration: none;
+      text-align: left;
+      padding: 10px 12px;
+      cursor: pointer;
+    }
+
+    .account-menu a:hover,
+    .account-menu button:hover {
+      background: rgba(240, 201, 107, 0.14);
+    }
+
+    .drawer {
+      min-height: 0;
+      position: fixed;
+      top: 66px;
+      bottom: 60px;
+      width: var(--left-drawer-width, 20px);
+      overflow: visible;
+      transition: width 180ms ease, transform 180ms ease, background 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+      --drawer-surface-opacity: 0.9;
+      background: linear-gradient(180deg, rgba(15, 18, 25, var(--drawer-surface-opacity)), rgba(8, 10, 15, calc(var(--drawer-surface-opacity) - 0.06)));
+    }
+
+    .drawer-inner {
+      min-height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      width: 100%;
+    }
+
+    .drawer-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      user-select: none;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .drawer-head__copy {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+      transition: opacity 140ms ease, transform 180ms ease;
+    }
+
+    .drawer-head strong {
+      font-size: 0.95rem;
+      letter-spacing: 0.02em;
+      color: #f0c96b;
+    }
+
+    .drawer-head span {
+      color: #b5c5de;
+      font-size: 0.82rem;
+    }
+
+    .drawer-head__actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .drawer-settings-button {
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: #f0c96b;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .drawer-settings-button:hover {
+      background: rgba(240, 201, 107, 0.14);
+    }
+
+    .drawer[data-open="false"] .drawer-head__copy {
+      opacity: 0;
+      transform: translateX(-4px);
+      pointer-events: none;
+      width: 0;
+      overflow: hidden;
+    }
+
+    .drawer[data-open="false"] .drawer-head__actions {
+      opacity: 0;
+      transform: translateX(4px);
+      pointer-events: none;
+      width: 0;
+      overflow: hidden;
+    }
+
+    .drawer[data-open="false"]::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) rotate(180deg);
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      color: #f6e6c7;
+      letter-spacing: 0.08em;
+      font-size: 0.66rem;
+      text-transform: uppercase;
+      opacity: 0.08;
+      pointer-events: none;
+    }
+
+    .drawer[data-open="false"] .drawer-body {
+      display: none;
+    }
+
+    .drawer[data-open="true"] .drawer-item,
+    .drawer[data-open="true"] .drawer-body {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .drawer-item {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .drawer[data-open="false"] {
+      border-color: transparent;
+      box-shadow: none;
+      background: linear-gradient(180deg, rgba(15, 18, 25, 0.06), rgba(8, 10, 15, 0.03));
+      backdrop-filter: blur(2px);
+      overflow: hidden;
+      opacity: 0.34;
+    }
+
+    .drawer[data-open="false"] .drawer-head {
+      padding: 0;
+      justify-content: center;
+      min-height: 100%;
+      border-bottom: 0;
+    }
+
+    .drawer-settings-panel {
+      position: absolute;
+      top: 56px;
+      z-index: 6;
+      border-radius: 14px;
+      border: 1px solid rgba(186, 208, 239, 0.14);
+      background: rgba(11, 18, 29, 0.98);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+      padding: 12px;
+      display: grid;
+      gap: 12px;
+    }
+
+    #left-drawer .drawer-settings-panel {
+      left: calc(100% + 10px);
+      right: auto;
+      width: min(340px, calc(100vw - 32px));
+    }
+
+    #right-drawer .drawer-settings-panel {
+      right: calc(100% + 10px);
+      left: auto;
+      width: min(340px, calc(100vw - 32px));
+    }
+
+    .drawer-settings-panel[hidden] {
+      display: none;
+    }
+
+    .drawer-settings-panel h3,
+    .header-settings-panel h3 {
+      margin: 0;
+      font-size: 0.92rem;
+      letter-spacing: 0.02em;
+      color: #eef4ff;
+    }
+
+    .drawer-settings-group,
+    .header-settings-group {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .drawer-settings-group label,
+    .header-settings-group label {
+      display: grid;
+      gap: 4px;
+      font-size: 0.82rem;
+      color: #b5c5de;
+    }
+
+    .drawer-settings-group select,
+    .drawer-settings-group input[type="range"],
+    .header-settings-group input[type="range"] {
+      width: 100%;
+    }
+
+    .drawer-settings-group select {
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(8, 13, 20, 0.86);
+      color: #eef4ff;
+      padding: 9px 10px;
+    }
+
+    .drawer-settings-helper,
+    .header-settings-helper {
+      color: #b5c5de;
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+
+    .drawer-settings-value,
+    .header-settings-value {
+      color: #eef4ff;
+      font-size: 0.84rem;
+    }
+
+    .drawer-body {
+      padding: 14px 12px 16px;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+      opacity: 1;
+      transition: opacity 180ms ease;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .drawer--collapsed {
+      width: 12px;
+    }
+
+    .drawer--expanded {
+      width: auto;
+      min-width: 0;
+    }
+
+    #left-drawer.drawer--expanded,
+    #right-drawer.drawer--expanded {
+      width: min(24vw, 420px) !important;
+    }
+
+    #left-drawer {
+      left: 16px;
+      width: var(--left-drawer-width, 12px);
+      z-index: 86;
+    }
+
+    #right-drawer {
+      right: 16px;
+      width: var(--right-drawer-width, 12px);
+      z-index: 86;
+    }
+
+    .drawer[data-open-mode="always-open"] {
+      width: auto;
+      min-width: 0;
+    }
+
+    .drawer[data-open-mode="hover"]:not(:hover):not(:focus-within) {
+      width: 12px;
+    }
+
+    .drawer-item {
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 12px;
+      display: grid;
+      gap: 4px;
+    }
+
+    .drawer-item strong {
+      color: #f0c96b;
+      font-size: 0.92rem;
+    }
+
+    .drawer-item span {
+      margin: 0;
+      color: #b5c5de;
+      font-size: 0.86rem;
+      line-height: 1.4;
+    }
+
+    .presence-preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .presence-avatar {
+      width: var(--portrait-size, 36px);
+      height: var(--portrait-size, 36px);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: linear-gradient(180deg, rgba(240, 201, 107, 0.16), rgba(140, 199, 255, 0.1));
+      color: #eef4ff;
+      font-size: 0.78rem;
+      font-weight: 700;
+      flex: 0 0 auto;
+      overflow: hidden;
+    }
+
+    .presence-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .presence-avatar--fallback {
+      background: linear-gradient(180deg, rgba(25, 40, 62, 0.96), rgba(14, 22, 35, 0.96));
+    }
+
+    .drawer-portrait-note {
+      color: #b5c5de;
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
+
+    .chat-panel {
+      position: fixed;
+      left: 50%;
+      bottom: 14px;
+      z-index: 82;
+      overflow: hidden;
+      transition: opacity 180ms ease, transform 180ms ease, box-shadow 180ms ease, background 180ms ease, border-color 180ms ease;
+      transform: translateX(-50%) translateY(calc(100% - var(--chat-rail-height, 38px)));
+      border-radius: 18px 18px 0 0;
+      box-shadow: 0 16px 42px rgba(0, 0, 0, 0.34);
+      width: var(--chat-panel-width, min(50vw, 720px));
+      max-width: calc(100vw - 32px);
+      --chat-surface-opacity: 0.9;
+      opacity: 0.05;
+      background: linear-gradient(180deg, rgba(15, 18, 25, var(--chat-surface-opacity)), rgba(8, 10, 15, calc(var(--chat-surface-opacity) - 0.06)));
+    }
+
+    .chat-panel.is-open {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .chat-panel[data-open="false"] {
+      border-color: transparent;
+      box-shadow: none;
+      background: linear-gradient(180deg, rgba(15, 18, 25, 0.05), rgba(8, 10, 15, 0.02));
+      backdrop-filter: blur(2px);
+    }
+
+    .chat-panel[data-open="true"] {
+      --chat-panel-width: min(50vw, 720px);
+      opacity: 1;
+    }
+
+    .chat-panel:hover,
+    .chat-panel:focus-within {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .chat-head {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 38px;
+      padding: 7px 11px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+      cursor: pointer;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .chat-head__label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+      flex: 1;
+      font-weight: 700;
+      color: #f0c96b;
+      letter-spacing: 0.02em;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(140, 199, 255, 0.18);
+      color: #eef4ff;
+      font-size: 0.78rem;
+      border: 1px solid rgba(140, 199, 255, 0.24);
+    }
+
+    .chat-body {
+      padding: 10px 12px 12px;
+      display: none;
+      gap: 12px;
+      opacity: 1;
+      transition: opacity 180ms ease;
+      background: rgba(8, 10, 15, 0.96);
+      max-height: min(30vh, 280px);
+      overflow: auto;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .chat-panel[data-open="true"] .chat-body {
+      display: grid;
+    }
+
+    .chat-panel:hover .chat-body,
+    .chat-panel:focus-within .chat-body {
+      display: grid;
+    }
+
+    .chat-log {
+      min-height: 64px;
+      padding: 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: #b5c5de;
+      overflow: auto;
+    }
+
+    .chat-entry {
+      display: grid;
+      gap: 4px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: #b5c5de;
+    }
+
+    .chat-entry strong {
+      color: #f0c96b;
+      font-size: 0.85rem;
+    }
+
+    .chat-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .chat-row input {
+      width: 100%;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(9, 12, 18, 0.8);
+      color: #eef4ff;
+      padding: 10px 14px;
+    }
+
+    .chat-row button {
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: #eef4ff;
+      padding: 10px 14px;
+    }
+
+    .header-settings-panel {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 18px;
+      width: min(360px, calc(100vw - 36px));
+      z-index: 20;
+      border-radius: 16px;
+      border: 1px solid rgba(186, 208, 239, 0.14);
+      background: rgba(11, 18, 29, 0.98);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+      padding: 12px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .header-settings-panel[hidden] {
+      display: none;
+    }
+
+    .top-bar[data-open="false"] .header-settings-panel {
+      display: none !important;
     }
 
     .selected-actions {
@@ -426,7 +1300,7 @@
 
     .context-menu {
       position: fixed;
-      z-index: 24;
+      z-index: 220;
       min-width: 240px;
       border-radius: 16px;
       background: rgba(18, 14, 11, 0.98);
@@ -525,6 +1399,26 @@
         padding: 0;
       }
 
+      .top-bar {
+        left: 12px;
+        right: 12px;
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 10px 12px;
+      }
+
+      .header-right {
+        justify-content: space-between;
+      }
+
+      .header-center {
+        justify-content: flex-start;
+      }
+
+      .status-strip {
+        justify-content: flex-start;
+      }
+
       .report-card {
         padding: 14px;
       }
@@ -545,15 +1439,39 @@
         bottom: 12px;
         width: auto;
       }
+
+      .drawer {
+        top: 80px;
+        bottom: 72px;
+        width: 34px;
+      }
+
+      #left-drawer {
+        left: 10px;
+        width: 34px;
+      }
+
+      #right-drawer {
+        right: 10px;
+        width: 34px;
+      }
+
+      .chat-panel {
+        left: 50%;
+        bottom: 10px;
+        width: calc(100vw - 20px);
+      }
+
+      #left-drawer .drawer-settings-panel,
+      #right-drawer .drawer-settings-panel {
+        left: 0;
+        right: auto;
+        width: min(340px, calc(100vw - 24px));
+      }
     }
   </style>
 </head>
 <body>
-  <div class="corner-controls" aria-label="Quick navigation">
-    <a class="corner-control" href="/" aria-label="Back to map">←</a>
-    <a class="corner-control" href="/venues/trailers/" aria-label="Profile">◉</a>
-  </div>
-
   <div id="forbidden-screen" class="forbidden-screen" hidden>
     <div class="forbidden-card">
       <img src="/assets/redirect.png" alt="Security redirect" />
@@ -567,7 +1485,14 @@
     <div class="page">
       <section class="stage-section panel">
         <div class="stage-shell" id="stage-shell">
-          <div id="stage-status" class="stage-status">Waiting for session join...</div>
+          <div id="stage-status" class="stage-status" hidden>Stage ready.</div>
+          <div id="stage-empty-state" class="stage-empty-state" hidden>
+            <div class="stage-empty-card">
+              <em>First Theater</em>
+              <strong>Right-click the stage to create an index card.</strong>
+              <span>Empty stages are allowed here, but they should still feel ready.</span>
+            </div>
+          </div>
           <div class="stage-summary">
             <div class="stage-summary-card">
               <strong>Live Feed</strong>
@@ -591,13 +1516,16 @@
               <div id="movement-line" class="stage-summary-line">Idle</div>
             </div>
           </div>
-          <div id="pixi-stage-host" class="pixi-stage-host" aria-label="First Theater stage"></div>
-          <div id="renderer-fallback" class="renderer-fallback" hidden>
-            <strong>Renderer fallback</strong>
-            <p id="renderer-fallback-line">PixiJS has not loaded yet.</p>
-            <p>The stage remains usable in DOM mode while the latest snapshot and controls stay available.</p>
-          </div>
-          <div class="stage-dom-overlay">
+              <div id="pixi-stage-host" class="pixi-stage-host" aria-label="First Theater stage"></div>
+              <div id="renderer-fallback" class="renderer-fallback" hidden>
+                <strong>Renderer fallback</strong>
+                <p id="renderer-fallback-line">PixiJS has not loaded yet.</p>
+                <p>The stage remains usable in DOM mode while the latest snapshot and controls stay available.</p>
+              </div>
+          <div id="overlay-root" class="stage-dom-overlay">
+            <div id="overlay-anchor" class="overlay-anchor" aria-label="Smoke overlay proof marker" hidden>
+              <div id="overlay-badge" class="overlay-anchor__badge">Smoke overlay</div>
+            </div>
             <div class="overlay-panel">
               <div class="overlay-row">
                 <strong>Session</strong>
@@ -656,6 +1584,190 @@
               </div>
             </div>
             <div id="pixi-context-menu" class="context-menu" hidden></div>
+          <div id="shell-root" class="shell-chrome">
+              <header id="top-bar" class="top-bar" data-open="false" data-pinned="false">
+                <div class="header-left">
+                  <div class="brand">
+                    <h1>First Theater</h1>
+                  </div>
+                  <div class="status-strip">
+                    <span class="chip">Role <strong id="role-value">Audience</strong></span>
+                    <span class="chip">Connection <strong id="connection-value">Waiting</strong></span>
+                  </div>
+                </div>
+                <div class="header-center">
+                  <button id="target-info" class="chip chip--target" type="button" aria-label="Selected target information" title="No target selected">
+                    <span class="chip-stack">
+                      <span><strong id="target-value">No Target</strong></span>
+                      <span id="target-class-value">Unknown Class</span>
+                      <span id="pointer-value">Screen n/a | Stage n/a</span>
+                    </span>
+                    <span class="chip-action" aria-hidden="true">ⓘ</span>
+                  </button>
+                </div>
+                <div class="header-right">
+                  <div class="header-controls">
+                    <button id="header-pin-button" class="header-pill" type="button" aria-label="Pin header open" aria-pressed="false" title="Pin header open">📌</button>
+                    <button id="header-settings-button" class="header-pill" type="button" aria-label="Header settings" aria-expanded="false" title="Header settings">⚙</button>
+                    <a class="header-pill header-pill--back" href="/" aria-label="Back to map" title="Back to map">←</a>
+                  </div>
+                  <div class="account-menu-wrap">
+                    <button id="account-menu-toggle" class="chip account-chip" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Open account menu">
+                      <span class="account-avatar" aria-hidden="true">FT</span>
+                      <span id="account-label">Account</span>
+                    </button>
+                    <div id="account-menu" class="account-menu" hidden>
+                      <button id="account-logout-button" type="button">Log Out</button>
+                    </div>
+                  </div>
+                </div>
+                <div id="header-settings-panel" class="header-settings-panel" hidden>
+                  <h3>Shell windows</h3>
+                  <div class="header-settings-group">
+                    <label for="header-opacity">Header body opacity
+                      <input id="header-opacity" type="range" min="0" max="100" step="5" value="100" />
+                      <span id="header-opacity-value" class="header-settings-value">100%</span>
+                    </label>
+                    <label for="chat-opacity">Chat body opacity
+                      <input id="chat-opacity" type="range" min="0" max="100" step="5" value="96" />
+                      <span id="chat-opacity-value" class="header-settings-value">96%</span>
+                    </label>
+                  </div>
+                  <div class="header-settings-group">
+                    <label>Identity
+                      <span id="identity-value" class="header-settings-value">Unknown User</span>
+                    </label>
+                    <label>Character
+                      <span id="character-value" class="header-settings-value">No Character</span>
+                    </label>
+                    <label>Viewing As
+                      <span id="view-value" class="header-settings-value">Self</span>
+                    </label>
+                    <label>Ping
+                      <span id="ping-value" class="header-settings-value">—</span>
+                    </label>
+                  </div>
+                  <div class="overlay-actions">
+                    <button id="reset-shell-prefs" type="button">Reset shell prefs</button>
+                  </div>
+                  <div class="header-settings-helper">The rails stay reachable even when the body fades down. Pin the header when you want rehearsal mode to stay open.</div>
+                </div>
+              </header>
+
+              <aside id="left-drawer" class="drawer drawer--collapsed" data-open-mode="hover" data-open="false" data-rail-label="Presence / Tools">
+                <div class="drawer-inner">
+                  <div class="drawer-head">
+                    <div class="drawer-head__copy">
+                      <strong>Presence / Tools</strong>
+                    </div>
+                    <div class="drawer-head__actions">
+                      <button id="left-settings-button" class="drawer-settings-button" type="button" aria-label="Left drawer settings" aria-expanded="false">⚙</button>
+                    </div>
+                  </div>
+                  <div id="left-settings-panel" class="drawer-settings-panel" hidden>
+                    <h3>Left drawer settings</h3>
+                    <div class="drawer-settings-group">
+                      <label for="left-open-mode">Open mode
+                        <select id="left-open-mode">
+                          <option value="hover">Hover open</option>
+                          <option value="always-open">Always open</option>
+                          <option value="always-closed">Always closed</option>
+                        </select>
+                      </label>
+                      <label for="left-opacity">Window opacity
+                        <input id="left-opacity" type="range" min="0" max="100" step="5" value="96" />
+                        <span id="left-opacity-value" class="drawer-settings-value">96%</span>
+                      </label>
+                      <label for="left-portrait-size">Portrait size
+                        <select id="left-portrait-size">
+                          <option value="small">Small</option>
+                          <option value="medium">Medium</option>
+                          <option value="large">Large</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div class="drawer-settings-helper">Settings are stored locally for this user on this device.</div>
+                  </div>
+                  <div class="drawer-body">
+                    <div class="drawer-item">
+                      <strong>Network</strong>
+                      <span id="network-state">Idle</span>
+                    </div>
+                    <div class="drawer-item">
+                      <strong>Presence</strong>
+                      <div id="presence-preview" class="presence-preview" aria-label="Current room presence preview">
+                        <span class="presence-avatar presence-avatar--fallback">?</span>
+                        <span class="presence-avatar presence-avatar--fallback">?</span>
+                        <span class="presence-avatar presence-avatar--fallback">?</span>
+                      </div>
+                    </div>
+                    <div class="drawer-item">
+                      <strong>Stage Controls</strong>
+                      <div class="overlay-actions">
+                        <button id="shell-refresh-world" type="button">Reload snapshot</button>
+                        <button id="shell-clear-selection" type="button">Clear</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+
+              <aside id="right-drawer" class="drawer drawer--collapsed" data-open-mode="hover" data-open="false" data-rail-label="Character / Notes">
+                <div class="drawer-inner">
+                  <div class="drawer-head">
+                    <div class="drawer-head__copy">
+                      <strong>Character / Notes</strong>
+                    </div>
+                    <div class="drawer-head__actions">
+                      <button id="right-settings-button" class="drawer-settings-button" type="button" aria-label="Right drawer settings" aria-expanded="false">⚙</button>
+                    </div>
+                  </div>
+                  <div id="right-settings-panel" class="drawer-settings-panel" hidden>
+                    <h3>Right drawer settings</h3>
+                    <div class="drawer-settings-group">
+                      <label for="right-open-mode">Open mode
+                        <select id="right-open-mode">
+                          <option value="hover">Hover open</option>
+                          <option value="always-open">Always open</option>
+                          <option value="always-closed">Always closed</option>
+                        </select>
+                      </label>
+                      <label for="right-opacity">Window opacity
+                        <input id="right-opacity" type="range" min="0" max="100" step="5" value="96" />
+                        <span id="right-opacity-value" class="drawer-settings-value">96%</span>
+                      </label>
+                    </div>
+                    <div class="drawer-settings-helper">Right drawer settings are stored locally per user and kept intentionally small for now.</div>
+                  </div>
+                  <div class="drawer-body">
+                    <div class="drawer-item">
+                      <strong>Character</strong>
+                      <span id="right-character-value">No Character</span>
+                    </div>
+                    <div class="drawer-item">
+                      <strong>Selection</strong>
+                      <div class="overlay-actions">
+                        <button id="right-card-editor-button" type="button">Card editor</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+
+              <section id="chat-panel" class="chat-panel" data-open="false">
+                <div id="chat-head" class="chat-head" role="button" tabindex="0" aria-label="Toggle chat open">
+                  <div class="chat-head__label">Chat <span id="chat-badge" class="badge" hidden>0</span></div>
+                </div>
+                <div class="chat-body">
+                  <div class="chat-log" id="chat-log">
+                  </div>
+                  <div class="chat-row">
+                    <input id="chat-input" type="text" placeholder="Start typing here..." />
+                    <button id="chat-send" type="button">Send</button>
+                  </div>
+                </div>
+              </section>
+            </div>
           </div>
         </div>
       </section>
@@ -663,6 +1775,7 @@
   </div>
 
   <script src="/lib/forbidden.js"></script>
+  <script src="/venues/shared/venue-shell.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.3/dist/pixi.min.js"></script>
   <script>
     const stageShell = document.getElementById("stage-shell");
@@ -675,9 +1788,12 @@
     const sessionLine = document.getElementById("session-line");
     const roleLine = document.getElementById("role-line");
     const objectCountLine = document.getElementById("object-count-line");
+    const stageEmptyState = document.getElementById("stage-empty-state");
     const snapshotSummary = document.getElementById("snapshot-summary");
     const rendererFallback = document.getElementById("renderer-fallback");
     const rendererFallbackLine = document.getElementById("renderer-fallback-line");
+    const overlayAnchor = document.getElementById("overlay-anchor");
+    const overlayBadge = document.getElementById("overlay-badge");
     const refreshWorldButton = document.getElementById("refresh-world");
     const clearSelectionButton = document.getElementById("clear-selection");
     const selectedActions = document.getElementById("selected-actions");
@@ -723,6 +1839,79 @@
     let objectLayer = null;
     let uiLayer = null;
     let resizeObserver = null;
+    let currentIdentity = null;
+    let uiPreferenceKey = "";
+    let uiPreferences = null;
+    let presenceRefreshTimer = null;
+    let unreadChatCount = 0;
+    let lastPingMs = null;
+    let currentPresenceUsers = [];
+    let chatHoverOpen = false;
+    let chatPinnedOpen = false;
+    let chatDismissedUntilPointerLeavesRail = false;
+    let lastChatPointerY = Number.NaN;
+    let headerHoverOpen = false;
+    let lastHeaderPointerY = Number.NaN;
+    let drawerHoverOpen = { left: false, right: false };
+    let drawerHoverCloseTimers = { left: null, right: null };
+    const shellDefaults = {
+      header: { pinned: false, opacity: 100 },
+      chat: { opacity: 96 },
+    };
+    const drawerDefaults = {
+      left: { mode: "hover", opacity: 96, portraitSize: "medium" },
+      right: { mode: "hover", opacity: 96 },
+    };
+    const shellRoot = document.getElementById("shell-root");
+    const topBar = document.getElementById("top-bar");
+    const identityValue = document.getElementById("identity-value");
+    const roleValue = document.getElementById("role-value");
+    const characterValue = document.getElementById("character-value");
+    const viewValue = document.getElementById("view-value");
+    const pingValue = document.getElementById("ping-value");
+    const targetValue = document.getElementById("target-value");
+    const targetClassValue = document.getElementById("target-class-value");
+    const pointerValue = document.getElementById("pointer-value");
+    const targetInfoButton = document.getElementById("target-info");
+    const headerPinButton = document.getElementById("header-pin-button");
+    const headerSettingsButton = document.getElementById("header-settings-button");
+    const headerSettingsPanel = document.getElementById("header-settings-panel");
+    const headerOpacity = document.getElementById("header-opacity");
+    const headerOpacityValue = document.getElementById("header-opacity-value");
+    const connectionValue = document.getElementById("connection-value");
+    const resetShellPrefsButton = document.getElementById("reset-shell-prefs");
+    const chatOpacity = document.getElementById("chat-opacity");
+    const chatOpacityValue = document.getElementById("chat-opacity-value");
+    const leftDrawer = document.getElementById("left-drawer");
+    const rightDrawer = document.getElementById("right-drawer");
+    const leftSettingsButton = document.getElementById("left-settings-button");
+    const rightSettingsButton = document.getElementById("right-settings-button");
+    const leftSettingsPanel = document.getElementById("left-settings-panel");
+    const rightSettingsPanel = document.getElementById("right-settings-panel");
+    const leftOpenMode = document.getElementById("left-open-mode");
+    const leftOpacity = document.getElementById("left-opacity");
+    const leftOpacityValue = document.getElementById("left-opacity-value");
+    const leftPortraitSize = document.getElementById("left-portrait-size");
+    const rightOpenMode = document.getElementById("right-open-mode");
+    const rightOpacity = document.getElementById("right-opacity");
+    const rightOpacityValue = document.getElementById("right-opacity-value");
+    const networkState = document.getElementById("network-state");
+    const presencePreview = document.getElementById("presence-preview");
+    const presenceState = document.getElementById("presence-state");
+    const rightCharacterValue = document.getElementById("right-character-value");
+    const rightCardEditorButton = document.getElementById("right-card-editor-button");
+    const chatPanel = document.getElementById("chat-panel");
+    const chatHead = document.getElementById("chat-head");
+    const chatBadge = document.getElementById("chat-badge");
+    const chatLog = document.getElementById("chat-log");
+    const chatInput = document.getElementById("chat-input");
+    const chatSend = document.getElementById("chat-send");
+    const shellRefreshWorldButton = document.getElementById("shell-refresh-world");
+    const shellClearSelectionButton = document.getElementById("shell-clear-selection");
+    const accountMenu = document.getElementById("account-menu");
+    const accountMenuToggle = document.getElementById("account-menu-toggle");
+    const accountLabel = document.getElementById("account-label");
+    const accountLogoutButton = document.getElementById("account-logout-button");
 
     function escapeHtml(value) {
       return String(value)
@@ -787,6 +1976,7 @@
     function setPointerLine(text) {
       lastPointerReport = text || "Screen n/a | Stage n/a";
       if (pointerLine) pointerLine.textContent = lastPointerReport;
+      updateShellTargetPresentation();
     }
 
     function setSmokeLine(text) {
@@ -818,12 +2008,26 @@
       if (smokePanel) {
         smokePanel.hidden = !smokeMode;
       }
+      if (stageStatus) {
+        stageStatus.hidden = !smokeMode;
+      }
+      if (overlayAnchor) {
+        overlayAnchor.hidden = !smokeMode;
+      }
+      if (overlayBadge) {
+        overlayBadge.textContent = smokeMode ? "Smoke overlay" : "Smoke overlay";
+      }
       if (smokeToggleGridButton) {
         smokeToggleGridButton.textContent = smokeGridEnabled ? "Grid: On" : "Grid: Off";
       }
       if (smokeMode && smokeLine && !smokeLine.textContent) {
         setSmokeLine("Smoke mode ready. Use buttons or g/d.");
       }
+    }
+
+    function updateStageEmptyState() {
+      if (!stageEmptyState) return;
+      stageEmptyState.hidden = currentObjects.length > 0;
     }
 
     function setSelectionLine(text) {
@@ -864,7 +2068,479 @@
       setRoleLine(roleLabel(currentRole));
       setObjectCountLine(String(currentObjects.length));
       setPointerLine(lastPointerReport);
+      if (connectionValue) {
+        connectionValue.textContent = currentSessionId ? "Live" : "Waiting";
+      }
+      if (networkState) {
+        networkState.textContent = currentSessionId ? "Online" : "Idle";
+      }
       updateSmokeUI();
+      updateStageEmptyState();
+    }
+
+    function loadUiPreferencesForKey(key) {
+      return window.VictoryVenueShell?.loadPreferences?.(key, {
+        header: { ...shellDefaults.header },
+        chat: { ...shellDefaults.chat },
+        left: { ...drawerDefaults.left },
+        right: { ...drawerDefaults.right },
+      }) || {
+        header: { ...shellDefaults.header },
+        chat: { ...shellDefaults.chat },
+        left: { ...drawerDefaults.left },
+        right: { ...drawerDefaults.right },
+      };
+    }
+
+    function saveUiPreferences() {
+      if (!uiPreferenceKey) return;
+      window.VictoryVenueShell?.savePreferences?.(uiPreferenceKey, uiPreferences);
+    }
+
+    function resetShellPreferences() {
+      if (!uiPreferenceKey) return;
+      const storageKey = window.VictoryVenueShell?.resolveStorageKey?.(uiPreferenceKey) || `victory.venue.ui.v1:${uiPreferenceKey}`;
+      try {
+        localStorage.removeItem(storageKey);
+      } catch (error) {
+        console.warn("failed to clear first theater shell prefs", error);
+      }
+      initializeShellChrome(currentIdentity);
+    }
+
+    function capitalizeLabel(value) {
+      const text = String(value || "").trim();
+      if (!text) return "Unknown Class";
+      return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+    }
+
+    function updateShellMetaPresentation() {
+      const displayName = String(currentIdentity?.display_name || "").trim();
+      const handle = String(currentIdentity?.handle || "").trim();
+      const genericDisplayNames = new Set(["web user", "webuser", "browser user", "browser", "account", "user"]);
+      const identityLabel = displayName && !genericDisplayNames.has(displayName.toLowerCase())
+        ? displayName
+        : (handle || "Unknown User");
+      if (identityValue) {
+        identityValue.textContent = identityLabel;
+      }
+      if (roleValue) {
+        roleValue.textContent = roleLabel(currentRole);
+      }
+      if (characterValue) {
+        characterValue.textContent = "No Character";
+      }
+      if (viewValue) {
+        viewValue.textContent = "Self";
+      }
+      if (pingValue) {
+        pingValue.textContent = Number.isFinite(lastPingMs) ? `${lastPingMs}ms` : "—";
+      }
+      if (rightCharacterValue) {
+        rightCharacterValue.textContent = "No Character";
+      }
+      if (networkState) {
+        networkState.textContent = currentSessionId ? "Online" : "Idle";
+      }
+      if (accountLabel) {
+        accountLabel.textContent = identityLabel === "Unknown User" ? "Account" : identityLabel;
+      }
+      if (connectionValue) {
+        connectionValue.textContent = currentSessionId ? "Live" : "Waiting";
+      }
+    }
+
+    function updateShellTargetPresentation() {
+      const targetLabel = currentSelection?.label || "No Target";
+      const targetClass = currentSelection?.kind ? capitalizeLabel(currentSelection.kind) : "Unknown Class";
+      if (targetValue) targetValue.textContent = targetLabel;
+      if (targetClassValue) targetClassValue.textContent = targetClass;
+      if (pointerValue) pointerValue.textContent = lastPointerReport || "Screen n/a | Stage n/a";
+      if (targetInfoButton) {
+        targetInfoButton.title = currentSelection ? currentSelectionSummary() : "No target selected";
+      }
+    }
+
+    function isHeaderPinned() {
+      return Boolean(uiPreferences?.header?.pinned);
+    }
+
+    function isHeaderDetailsVisible() {
+      return Boolean((headerSettingsPanel && !headerSettingsPanel.hidden) || (accountMenu && !accountMenu.hidden));
+    }
+
+    function isDrawerDetailsVisible(side) {
+      return side === "left"
+        ? Boolean(leftSettingsPanel && !leftSettingsPanel.hidden)
+        : Boolean(rightSettingsPanel && !rightSettingsPanel.hidden);
+    }
+
+    function syncHeaderHoverState(clientY = Number.NaN) {
+      if (!topBar) return;
+      if (Number.isFinite(clientY)) {
+        lastHeaderPointerY = clientY;
+      }
+
+      const prefs = uiPreferences?.header || shellDefaults.header;
+      if (prefs.pinned || isHeaderDetailsVisible() || topBar.contains(document.activeElement)) {
+        if (!headerHoverOpen) {
+          headerHoverOpen = true;
+          updateHeaderPresentation();
+        }
+        return;
+      }
+
+      const pointerY = Number.isFinite(lastHeaderPointerY) ? lastHeaderPointerY : clientY;
+      if (!Number.isFinite(pointerY)) return;
+
+      const headerRect = topBar.getBoundingClientRect();
+      const triggerLine = 24;
+      const releaseLine = headerRect.bottom + 10;
+      const nextOpen = headerHoverOpen ? pointerY <= releaseLine : pointerY <= triggerLine;
+
+      if (nextOpen !== headerHoverOpen) {
+        headerHoverOpen = nextOpen;
+        updateHeaderPresentation();
+      }
+    }
+
+    function setHeaderPinned(pinned) {
+      uiPreferences.header = {
+        ...(uiPreferences.header || shellDefaults.header),
+        pinned: Boolean(pinned),
+      };
+      saveUiPreferences();
+      updateHeaderPresentation();
+    }
+
+    function closeHeaderSettings() {
+      if (!headerSettingsPanel || !headerSettingsButton) return;
+      headerSettingsPanel.hidden = true;
+      headerSettingsButton.setAttribute("aria-expanded", "false");
+    }
+
+    function toggleHeaderSettings() {
+      if (!headerSettingsPanel || !headerSettingsButton) return;
+      const open = headerSettingsPanel.hidden;
+      headerSettingsPanel.hidden = !open;
+      headerSettingsButton.setAttribute("aria-expanded", String(open));
+    }
+
+    function closeDrawerSettings() {
+      if (!leftSettingsPanel || !rightSettingsPanel || !leftSettingsButton || !rightSettingsButton) return;
+      leftSettingsPanel.hidden = true;
+      rightSettingsPanel.hidden = true;
+      leftSettingsButton.setAttribute("aria-expanded", "false");
+      rightSettingsButton.setAttribute("aria-expanded", "false");
+    }
+
+    function toggleDrawerSettings(side) {
+      const panel = side === "left" ? leftSettingsPanel : rightSettingsPanel;
+      const button = side === "left" ? leftSettingsButton : rightSettingsButton;
+      if (!panel || !button) return;
+      const open = panel.hidden;
+      panel.hidden = !open;
+      button.setAttribute("aria-expanded", String(open));
+      if (side === "left" && rightSettingsPanel) rightSettingsPanel.hidden = true;
+      if (side === "right" && leftSettingsPanel) leftSettingsPanel.hidden = true;
+    }
+
+    function setDrawerSetting(side, key, value) {
+      if (!uiPreferences) return;
+      uiPreferences[side] = {
+        ...(uiPreferences[side] || drawerDefaults[side]),
+        [key]: value,
+      };
+      saveUiPreferences();
+      applyDrawerState(side);
+    }
+
+    function setDrawerHoverState(side, open) {
+      if (!uiPreferences) return;
+      const prefs = uiPreferences?.[side] || drawerDefaults[side];
+      if (prefs.mode === "always-open") {
+        drawerHoverOpen[side] = true;
+        if (drawerHoverCloseTimers[side]) {
+          window.clearTimeout(drawerHoverCloseTimers[side]);
+          drawerHoverCloseTimers[side] = null;
+        }
+        applyDrawerState(side);
+        return;
+      }
+      if (prefs.mode === "always-closed") {
+        drawerHoverOpen[side] = false;
+        if (drawerHoverCloseTimers[side]) {
+          window.clearTimeout(drawerHoverCloseTimers[side]);
+          drawerHoverCloseTimers[side] = null;
+        }
+        applyDrawerState(side);
+        return;
+      }
+      if (drawerHoverCloseTimers[side]) {
+        window.clearTimeout(drawerHoverCloseTimers[side]);
+        drawerHoverCloseTimers[side] = null;
+      }
+      if (open) {
+        drawerHoverOpen[side] = true;
+        applyDrawerState(side, true);
+        return;
+      }
+      drawerHoverOpen[side] = false;
+      applyDrawerState(side, false);
+    }
+
+    function applyDrawerState(side, hoverOverride = null) {
+      const state = side === "left" ? leftDrawer : rightDrawer;
+      if (!state) return;
+      const prefs = uiPreferences?.[side] || drawerDefaults[side];
+      const open = prefs.mode === "always-open"
+        ? true
+        : prefs.mode === "always-closed"
+          ? false
+          : hoverOverride === null
+            ? (drawerHoverOpen[side] || state.contains(document.activeElement) || isDrawerDetailsVisible(side))
+            : Boolean(hoverOverride);
+
+      state.dataset.openMode = prefs.mode;
+      state.dataset.open = open ? "true" : "false";
+      state.classList.toggle("drawer--expanded", open);
+      state.classList.toggle("drawer--collapsed", !open);
+      state.style.setProperty("--drawer-surface-opacity", `${clampNumber(prefs.opacity, 0, 100, 96) / 100}`);
+      const width = open
+        ? (window.innerWidth <= 720
+          ? "min(320px, calc(100vw - 24px))"
+          : "min(24vw, 420px)")
+        : "20px";
+      if (side === "left") {
+        state.style.setProperty("--left-drawer-width", width);
+        if (leftOpenMode) leftOpenMode.value = prefs.mode;
+        if (leftOpacity) leftOpacity.value = String(clampNumber(prefs.opacity, 0, 100, 96));
+        if (leftOpacityValue) leftOpacityValue.textContent = `${clampNumber(prefs.opacity, 0, 100, 96)}%`;
+        if (leftPortraitSize) leftPortraitSize.value = window.VictoryVenueShell?.normalizePortraitSize?.(prefs.portraitSize) || "medium";
+        if (presencePreview) {
+          const avatarSize = prefs.portraitSize === "large" ? "44px" : prefs.portraitSize === "small" ? "30px" : "36px";
+          if (presenceState) {
+            presenceState.textContent = window.VictoryVenueShell?.renderPresencePreview?.(presencePreview, currentPresenceUsers, { avatarSize }) || presenceState.textContent;
+          }
+        }
+      } else {
+        state.style.setProperty("--right-drawer-width", width);
+        if (rightOpenMode) rightOpenMode.value = prefs.mode;
+        if (rightOpacity) rightOpacity.value = String(clampNumber(prefs.opacity, 0, 100, 96));
+        if (rightOpacityValue) rightOpacityValue.textContent = `${clampNumber(prefs.opacity, 0, 100, 96)}%`;
+      }
+    }
+
+    function updateHeaderPresentation() {
+      if (!topBar) return;
+      const prefs = uiPreferences?.header || shellDefaults.header;
+      const open = prefs.pinned
+        || headerHoverOpen
+        || topBar.matches(":hover")
+        || topBar.contains(document.activeElement)
+        || isHeaderDetailsVisible();
+      topBar.dataset.open = open ? "true" : "false";
+      topBar.dataset.pinned = prefs.pinned ? "true" : "false";
+      topBar.style.setProperty("--header-surface-opacity", `${clampNumber(prefs.opacity, 0, 100, 100) / 100}`);
+      if (headerPinButton) {
+        headerPinButton.classList.toggle("is-active", Boolean(prefs.pinned));
+        headerPinButton.setAttribute("aria-pressed", prefs.pinned ? "true" : "false");
+        headerPinButton.title = prefs.pinned ? "Unpin header" : "Pin header open";
+      }
+      if (headerOpacity) headerOpacity.value = String(clampNumber(prefs.opacity, 0, 100, 100));
+      if (headerOpacityValue) headerOpacityValue.textContent = `${clampNumber(prefs.opacity, 0, 100, 100)}%`;
+      updateShellTargetPresentation();
+      if (connectionValue) {
+        connectionValue.textContent = currentSessionId ? "Live" : "Waiting";
+      }
+    }
+
+    function isChatActive() {
+      const active = document.activeElement;
+      return Boolean(chatPanel && active && chatPanel.contains(active) && active !== chatHead);
+    }
+
+    function updateChatPresentation() {
+      if (!chatPanel) return;
+      const prefs = uiPreferences?.chat || shellDefaults.chat;
+      chatPanel.style.setProperty("--chat-surface-opacity", `${clampNumber(prefs.opacity, 0, 100, 96) / 100}`);
+      if (chatOpacity) chatOpacity.value = String(clampNumber(prefs.opacity, 0, 100, 96));
+      if (chatOpacityValue) chatOpacityValue.textContent = `${clampNumber(prefs.opacity, 0, 100, 96)}%`;
+      const active = isChatActive();
+      const open = chatPinnedOpen || chatHoverOpen || active;
+      chatPanel.dataset.open = open ? "true" : "false";
+      chatPanel.classList.toggle("is-open", open);
+      chatPanel.style.setProperty("--chat-panel-width", open ? "min(50vw, 720px)" : "clamp(140px, 18vw, 220px)");
+      if (chatBadge) {
+        chatBadge.hidden = open || unreadChatCount === 0;
+        chatBadge.textContent = String(unreadChatCount);
+      }
+    }
+
+    function setChatHoverOpen(open) {
+      chatHoverOpen = Boolean(open);
+      if (!chatHoverOpen && !chatPinnedOpen && !isChatActive()) {
+        lastChatPointerY = Number.NaN;
+      }
+      updateChatPresentation();
+    }
+
+    function setChatPinnedOpen(open) {
+      chatPinnedOpen = Boolean(open);
+      if (!chatPinnedOpen && !isChatActive()) {
+        chatHoverOpen = false;
+        lastChatPointerY = Number.NaN;
+      }
+      updateChatPresentation();
+    }
+
+    function closeChatPanel() {
+      if (chatPanel?.contains(document.activeElement)) {
+        document.activeElement?.blur?.();
+      }
+      chatHead?.blur?.();
+      chatPinnedOpen = false;
+      chatHoverOpen = false;
+      chatDismissedUntilPointerLeavesRail = true;
+      lastChatPointerY = Number.NaN;
+      updateChatPresentation();
+    }
+
+    function appendChatEntry(author, text) {
+      if (!chatLog) return;
+      const entry = document.createElement("div");
+      entry.className = "chat-entry";
+      const title = document.createElement("strong");
+      title.textContent = author;
+      const body = document.createElement("span");
+      body.textContent = text;
+      entry.append(title, body);
+      chatLog.appendChild(entry);
+      chatLog.scrollTop = chatLog.scrollHeight;
+      unreadChatCount += 1;
+      updateChatPresentation();
+    }
+
+    function sendChatDraft() {
+      if (!chatInput) return;
+      const text = chatInput.value.trim();
+      if (!text) return;
+      appendChatEntry("You", text);
+      chatInput.value = "";
+      unreadChatCount = 0;
+      updateChatPresentation();
+    }
+
+    function syncChatOpenState() {
+      updateChatPresentation();
+    }
+
+    function syncChatHoverState(clientX = Number.NaN, clientY = Number.NaN) {
+      if (!chatPanel) return;
+      if (Number.isFinite(clientY)) {
+        lastChatPointerY = clientY;
+      }
+
+      if (chatPinnedOpen || isChatActive()) {
+        chatDismissedUntilPointerLeavesRail = false;
+        if (!chatHoverOpen) {
+          chatHoverOpen = true;
+          updateChatPresentation();
+        }
+        return;
+      }
+
+      const chatRect = chatPanel.getBoundingClientRect();
+      const pointerY = Number.isFinite(lastChatPointerY) ? lastChatPointerY : clientY;
+      const pointerX = Number.isFinite(clientX) ? clientX : Number.NaN;
+      if (!Number.isFinite(pointerX) || !Number.isFinite(pointerY)) return;
+      const insideRail = pointerX >= chatRect.left - 16 && pointerX <= chatRect.right + 16 && pointerY >= chatRect.top - 10 && pointerY <= chatRect.bottom + 10;
+      const nearRail = pointerY >= window.innerHeight - 92;
+
+      const nextOpen = insideRail || nearRail;
+
+      if (chatDismissedUntilPointerLeavesRail) {
+        if (nextOpen) {
+          if (chatHoverOpen) {
+            chatHoverOpen = false;
+            updateChatPresentation();
+          }
+          return;
+        }
+        chatDismissedUntilPointerLeavesRail = false;
+      }
+
+      if (nextOpen !== chatHoverOpen) {
+        chatHoverOpen = nextOpen;
+        updateChatPresentation();
+      }
+    }
+
+    async function refreshPresencePreview() {
+      try {
+        const response = await fetch("/api/director-console/current", { credentials: "include" });
+        if (!response.ok) return;
+        const payload = await response.json().catch(() => null);
+        const presence = Array.isArray(payload?.data?.presence) ? payload.data.presence : [];
+        const avatarSize = uiPreferences?.left?.portraitSize === "large"
+          ? "44px"
+          : uiPreferences?.left?.portraitSize === "small"
+            ? "30px"
+            : "36px";
+        const stateText = window.VictoryVenueShell?.renderPresencePreview?.(presencePreview, presence, { avatarSize });
+        if (presenceState) {
+          presenceState.textContent = stateText || "Roster";
+        }
+        currentPresenceUsers = presence;
+      } catch (error) {
+        console.warn("failed to refresh first theater presence", error);
+      }
+    }
+
+    function initializeShellChrome(identity) {
+      currentIdentity = identity || null;
+      uiPreferenceKey = String(identity?.user_id || identity?.handle || identity?.display_name || "unknown-user");
+      uiPreferences = loadUiPreferencesForKey(uiPreferenceKey);
+      uiPreferences.header = {
+        ...shellDefaults.header,
+        ...(uiPreferences.header || {}),
+      };
+      uiPreferences.chat = {
+        ...shellDefaults.chat,
+        ...(uiPreferences.chat || {}),
+      };
+      uiPreferences.left = {
+        ...drawerDefaults.left,
+        ...(uiPreferences.left || {}),
+      };
+      uiPreferences.right = {
+        ...drawerDefaults.right,
+        ...(uiPreferences.right || {}),
+      };
+      chatHoverOpen = false;
+      chatPinnedOpen = false;
+      chatDismissedUntilPointerLeavesRail = false;
+      lastChatPointerY = Number.NaN;
+      drawerHoverOpen = { left: false, right: false };
+      if (drawerHoverCloseTimers.left) {
+        window.clearTimeout(drawerHoverCloseTimers.left);
+      }
+      if (drawerHoverCloseTimers.right) {
+        window.clearTimeout(drawerHoverCloseTimers.right);
+      }
+      drawerHoverCloseTimers = { left: null, right: null };
+      updateShellMetaPresentation();
+      updateShellTargetPresentation();
+      updateHeaderPresentation();
+      updateStatusSummary();
+      applyDrawerState("left");
+      applyDrawerState("right");
+      updateChatPresentation();
+      if (presenceRefreshTimer) {
+        window.clearInterval(presenceRefreshTimer);
+      }
+      presenceRefreshTimer = window.setInterval(refreshPresencePreview, 15000);
+      refreshPresencePreview();
     }
 
     function closeContextMenu() {
@@ -1359,6 +3035,12 @@
         return { clientX: 0, clientY: 0 };
       }
 
+      const originalClientX = Number(event.data?.originalEvent?.clientX ?? event.originalEvent?.clientX ?? Number.NaN);
+      const originalClientY = Number(event.data?.originalEvent?.clientY ?? event.originalEvent?.clientY ?? Number.NaN);
+      if (Number.isFinite(originalClientX) && Number.isFinite(originalClientY)) {
+        return { clientX: originalClientX, clientY: originalClientY };
+      }
+
       const clientX = Number(event.clientX ?? event.x ?? 0);
       const clientY = Number(event.clientY ?? event.y ?? 0);
       if (Number.isFinite(clientX) && Number.isFinite(clientY) && (clientX !== 0 || clientY !== 0)) {
@@ -1708,6 +3390,7 @@
         setStageStatus(reason || "Selection cleared.");
       }
 
+      updateShellTargetPresentation();
       syncSelectedActions();
       syncCardEditorWithSelection();
 
@@ -1897,6 +3580,9 @@
       };
 
       container.on("pointerdown", (event) => {
+        if (isSecondaryPointerEvent(event)) {
+          return;
+        }
         event.stopPropagation();
         selectObject(model, `${model.label} selected.`);
 
@@ -1992,6 +3678,9 @@
       };
 
       container.on("pointerdown", (event) => {
+        if (isSecondaryPointerEvent(event)) {
+          return;
+        }
         event.stopPropagation();
         selectObject(model, "Fire selected.");
       });
@@ -2122,19 +3811,96 @@
       const size = getStageSize();
       const width = Math.max(320, size.width);
       const height = Math.max(320, size.height);
+      const prosceniumInset = Math.max(18, Math.round(width * 0.04));
+      const upperDrapeHeight = Math.max(80, Math.round(height * 0.16));
+      const floorBandTop = Math.max(Math.round(height * 0.72), height - 200);
+      const footlightY = Math.max(floorBandTop + 10, height - 38);
 
       backgroundLayer.removeChildren();
       const backdrop = new PIXI.Graphics();
-      backdrop.beginFill(0x1b1712, 1);
+      backdrop.beginFill(0x050405, 1);
       backdrop.drawRect(0, 0, width, height);
       backdrop.endFill();
       backgroundLayer.addChild(backdrop);
 
-      const glow = new PIXI.Graphics();
-      glow.beginFill(0x8a5d2f, 0.12);
-      glow.drawCircle(width * 0.52, height * 0.48, Math.min(width, height) * 0.24);
-      glow.endFill();
-      backgroundLayer.addChild(glow);
+      const ambientGlow = new PIXI.Graphics();
+      ambientGlow.beginFill(0xf0d49b, 0.08);
+      ambientGlow.drawEllipse(width * 0.5, height * 0.48, width * 0.26, height * 0.16);
+      ambientGlow.endFill();
+      backgroundLayer.addChild(ambientGlow);
+
+      const stageOpening = new PIXI.Graphics();
+      stageOpening.beginFill(0x090709, 1);
+      stageOpening.drawRect(prosceniumInset, upperDrapeHeight, width - (prosceniumInset * 2), height - upperDrapeHeight);
+      stageOpening.endFill();
+      backgroundLayer.addChild(stageOpening);
+
+      const topValance = new PIXI.Graphics();
+      topValance.beginFill(0x5a1119, 1);
+      topValance.drawRect(0, 0, width, upperDrapeHeight);
+      topValance.endFill();
+      backgroundLayer.addChild(topValance);
+
+      const topValanceSheen = new PIXI.Graphics();
+      topValanceSheen.beginFill(0xf0d49b, 0.08);
+      topValanceSheen.drawRect(0, 0, width, Math.max(24, Math.round(upperDrapeHeight * 0.42)));
+      topValanceSheen.endFill();
+      backgroundLayer.addChild(topValanceSheen);
+
+      const sideCurtains = new PIXI.Graphics();
+      sideCurtains.beginFill(0x2b090d, 0.92);
+      sideCurtains.drawRect(0, upperDrapeHeight, prosceniumInset, height - upperDrapeHeight);
+      sideCurtains.drawRect(width - prosceniumInset, upperDrapeHeight, prosceniumInset, height - upperDrapeHeight);
+      sideCurtains.endFill();
+      backgroundLayer.addChild(sideCurtains);
+
+      const curtainFoldStyle = new PIXI.Graphics();
+      const foldWidth = Math.max(64, Math.round(width / 12));
+      for (let x = 0; x < width; x += foldWidth) {
+        const foldAlpha = (Math.floor(x / foldWidth) % 2 === 0) ? 0.08 : 0.14;
+        curtainFoldStyle.beginFill(0x22070a, foldAlpha);
+        curtainFoldStyle.drawRect(x, 0, Math.max(16, Math.round(foldWidth * 0.42)), upperDrapeHeight);
+        curtainFoldStyle.endFill();
+      }
+      backgroundLayer.addChild(curtainFoldStyle);
+
+      const prosceniumFrame = new PIXI.Graphics();
+      prosceniumFrame.lineStyle(3, 0xf0d49b, 0.16);
+      prosceniumFrame.drawRoundedRect(prosceniumInset, upperDrapeHeight, width - (prosceniumInset * 2), height - upperDrapeHeight - 2, 18);
+      prosceniumFrame.lineStyle(1, 0xffffff, 0.06);
+      prosceniumFrame.drawRoundedRect(prosceniumInset + 8, upperDrapeHeight + 8, width - ((prosceniumInset + 8) * 2), height - upperDrapeHeight - 18, 14);
+      backgroundLayer.addChild(prosceniumFrame);
+
+      const stageFloor = new PIXI.Graphics();
+      stageFloor.beginFill(0x0d0a0b, 1);
+      stageFloor.drawRect(0, floorBandTop, width, height - floorBandTop);
+      stageFloor.endFill();
+      backgroundLayer.addChild(stageFloor);
+
+      const floorGlow = new PIXI.Graphics();
+      floorGlow.beginFill(0x8fb7da, 0.06);
+      floorGlow.drawEllipse(width * 0.5, floorBandTop + ((height - floorBandTop) * 0.12), width * 0.3, Math.max(24, (height - floorBandTop) * 0.2));
+      floorGlow.endFill();
+      backgroundLayer.addChild(floorGlow);
+
+      const footlights = new PIXI.Graphics();
+      const footlightCount = Math.max(5, Math.min(14, Math.floor(width / 120)));
+      for (let index = 0; index < footlightCount; index += 1) {
+        const x = (width / (footlightCount + 1)) * (index + 1);
+        footlights.beginFill(0xf3d79f, 0.75);
+        footlights.drawCircle(x, footlightY, 2.4);
+        footlights.endFill();
+        footlights.beginFill(0xf3d79f, 0.11);
+        footlights.drawCircle(x, footlightY, 9);
+        footlights.endFill();
+      }
+      backgroundLayer.addChild(footlights);
+
+      const stageLip = new PIXI.Graphics();
+      stageLip.beginFill(0x120b0b, 0.9);
+      stageLip.drawRect(0, floorBandTop, width, height - floorBandTop);
+      stageLip.endFill();
+      backgroundLayer.addChild(stageLip);
 
       if (smokeGridEnabled) {
         const grid = new PIXI.Graphics();
@@ -2167,12 +3933,6 @@
         originLabel.position.set(8, 6);
         backgroundLayer.addChild(grid, origin, originLabel);
       }
-
-      const footlight = new PIXI.Graphics();
-      footlight.beginFill(0x000000, 0.18);
-      footlight.drawRect(0, height * 0.68, width, height * 0.32);
-      footlight.endFill();
-      backgroundLayer.addChild(footlight);
 
       if (recentPlacementMarker && Date.now() - recentPlacementMarker.at < 15000) {
         const marker = new PIXI.Graphics();
@@ -2230,6 +3990,7 @@
       setSnapshotSummary(`${renderedFire ? "Fire" : "No fire"} and ${renderedCards} card object${renderedCards === 1 ? "" : "s"} are rendered from the live Cave snapshot.`);
       updateStatusSummary();
       refreshNodeSelection();
+      updateStageEmptyState();
     }
 
     function layoutPixiScene() {
@@ -2484,16 +4245,19 @@
     async function joinCave() {
       setStageStatus("Joining the live Cave session...");
 
-      let sessionHandle = "web";
-      let sessionDisplayName = "Friend";
-      try {
-        const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
-        const sessionPayload = await sessionResponse.json().catch(() => null);
-        const session = sessionPayload?.data || {};
-        sessionHandle = String(session.handle || sessionHandle).trim() || sessionHandle;
-        sessionDisplayName = String(session.display_name || sessionDisplayName).trim() || sessionDisplayName;
-      } catch (err) {
-        console.warn("session identity lookup failed", err);
+      let sessionHandle = String(currentIdentity?.handle || "web").trim() || "web";
+      let sessionDisplayName = String(currentIdentity?.display_name || "Friend").trim() || "Friend";
+      if (!currentIdentity) {
+        try {
+          const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
+          const sessionPayload = await sessionResponse.json().catch(() => null);
+          const session = sessionPayload?.data || {};
+          currentIdentity = session;
+          sessionHandle = String(session.handle || sessionHandle).trim() || sessionHandle;
+          sessionDisplayName = String(session.display_name || sessionDisplayName).trim() || sessionDisplayName;
+        } catch (err) {
+          console.warn("session identity lookup failed", err);
+        }
       }
 
       const response = await fetch("/api/session/the-cave/join", {
@@ -2523,6 +4287,7 @@
       }
 
       updateStatusSummary();
+      updateShellMetaPresentation();
       setStageStatus(`Joined as ${roleLabel(currentRole)}.`);
     }
 
@@ -2598,8 +4363,11 @@
 
     async function bootstrapFirstTheater() {
       try {
+        const pingStartedAt = performance.now();
         const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
         const sessionPayload = await sessionResponse.json().catch(() => null);
+        lastPingMs = Math.max(0, Math.round(performance.now() - pingStartedAt));
+        currentIdentity = sessionPayload?.data || null;
 
         if (!sessionPayload?.signed_in) {
           showForbiddenScreen();
@@ -2621,21 +4389,198 @@
         }
 
         await initializePixi();
+        initializeShellChrome(currentIdentity);
+
         await joinCave();
         connectSocket();
         await refreshWorld();
       } catch (error) {
         console.error("first theater bootstrap failed", error);
         setStageStatus(error.message || String(error));
-        showForbiddenScreen();
+        if (forbiddenScreen) {
+          forbiddenScreen.hidden = true;
+        }
+        initializeShellChrome(currentIdentity);
       }
     }
+
+    topBar?.addEventListener("pointerenter", (event) => syncHeaderHoverState(event.clientY));
+    topBar?.addEventListener("pointerleave", (event) => syncHeaderHoverState(event.clientY));
+    topBar?.addEventListener("focusin", updateHeaderPresentation);
+    topBar?.addEventListener("focusout", (event) => {
+      if (!topBar?.contains(event.relatedTarget)) {
+        updateHeaderPresentation();
+      }
+    });
+    topBar?.addEventListener("pointerdown", (event) => {
+      syncHeaderHoverState(event.clientY);
+    });
+    document.addEventListener("pointermove", (event) => {
+      syncHeaderHoverState(event.clientY);
+    }, { passive: true });
+    document.addEventListener("pointerdown", (event) => {
+      syncHeaderHoverState(event.clientY);
+    }, { passive: true });
+
+    headerPinButton?.addEventListener("click", () => {
+      setHeaderPinned(!isHeaderPinned());
+    });
+
+    headerSettingsButton?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleHeaderSettings();
+    });
+
+    resetShellPrefsButton?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      resetShellPreferences();
+    });
+
+    headerOpacity?.addEventListener("input", () => {
+      uiPreferences.header = {
+        ...(uiPreferences.header || shellDefaults.header),
+        opacity: clampNumber(headerOpacity.value, 0, 100, 100),
+      };
+      saveUiPreferences();
+      updateHeaderPresentation();
+    });
+
+    chatOpacity?.addEventListener("input", () => {
+      uiPreferences.chat = {
+        ...(uiPreferences.chat || shellDefaults.chat),
+        opacity: clampNumber(chatOpacity.value, 0, 100, 96),
+      };
+      saveUiPreferences();
+      updateChatPresentation();
+    });
+
+    leftDrawer?.addEventListener("pointerenter", () => setDrawerHoverState("left", true));
+    leftDrawer?.addEventListener("pointerleave", () => setDrawerHoverState("left", false));
+    leftDrawer?.addEventListener("focusin", () => setDrawerHoverState("left", true));
+    leftDrawer?.addEventListener("focusout", (event) => {
+      if (!leftDrawer?.contains(event.relatedTarget)) {
+        setDrawerHoverState("left", false);
+      }
+    });
+
+    rightDrawer?.addEventListener("pointerenter", () => setDrawerHoverState("right", true));
+    rightDrawer?.addEventListener("pointerleave", () => setDrawerHoverState("right", false));
+    rightDrawer?.addEventListener("focusin", () => setDrawerHoverState("right", true));
+    rightDrawer?.addEventListener("focusout", (event) => {
+      if (!rightDrawer?.contains(event.relatedTarget)) {
+        setDrawerHoverState("right", false);
+      }
+    });
+
+    leftSettingsButton?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleDrawerSettings("left");
+      setDrawerHoverState("left", true);
+    });
+    rightSettingsButton?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleDrawerSettings("right");
+      setDrawerHoverState("right", true);
+    });
+
+    leftOpenMode?.addEventListener("change", () => setDrawerSetting("left", "mode", leftOpenMode.value));
+    leftOpacity?.addEventListener("input", () => setDrawerSetting("left", "opacity", leftOpacity.value));
+    leftPortraitSize?.addEventListener("change", () => setDrawerSetting("left", "portraitSize", leftPortraitSize.value));
+    rightOpenMode?.addEventListener("change", () => setDrawerSetting("right", "mode", rightOpenMode.value));
+    rightOpacity?.addEventListener("input", () => setDrawerSetting("right", "opacity", rightOpacity.value));
+
+    chatHead?.addEventListener("pointerenter", (event) => syncChatHoverState(event.clientX, event.clientY));
+    chatHead?.addEventListener("pointerleave", (event) => syncChatHoverState(event.clientX, event.clientY));
+    chatPanel?.addEventListener("pointerenter", (event) => syncChatHoverState(event.clientX, event.clientY));
+    chatPanel?.addEventListener("pointerleave", (event) => syncChatHoverState(event.clientX, event.clientY));
+    chatPanel?.addEventListener("focusin", syncChatOpenState);
+    chatPanel?.addEventListener("focusout", (event) => {
+      if (!chatPanel?.contains(event.relatedTarget)) {
+        chatHoverOpen = false;
+        updateChatPresentation();
+      }
+    });
+    chatPanel?.addEventListener("pointerdown", (event) => {
+      syncChatHoverState(event.clientX, event.clientY);
+    });
+    chatHead?.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (chatPinnedOpen) {
+        closeChatPanel();
+        return;
+      }
+      setChatPinnedOpen(true);
+      chatHoverOpen = true;
+      chatInput?.focus({ preventScroll: true });
+    });
+    chatHead?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        if (chatPinnedOpen) {
+          closeChatPanel();
+          return;
+        }
+        setChatPinnedOpen(true);
+        chatHoverOpen = true;
+        chatInput?.focus({ preventScroll: true });
+      }
+    });
+    chatInput?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        sendChatDraft();
+      }
+    });
+    chatSend?.addEventListener("click", sendChatDraft);
+    window.addEventListener("pointermove", (event) => {
+      syncChatHoverState(event.clientX, event.clientY);
+    }, { passive: true, capture: true });
+    window.addEventListener("pointerdown", (event) => {
+      syncChatHoverState(event.clientX, event.clientY);
+    }, { passive: true, capture: true });
+    rightCardEditorButton?.addEventListener("click", () => {
+      toggleCardEditorFromSelection();
+    });
+
+    accountMenuToggle?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (accountMenu) {
+        accountMenu.hidden = !accountMenu.hidden;
+        accountMenuToggle.setAttribute("aria-expanded", String(!accountMenu.hidden));
+        syncHeaderHoverState();
+        updateHeaderPresentation();
+      }
+    });
+
+    accountLogoutButton?.addEventListener("click", async () => {
+      if (accountMenu) accountMenu.hidden = true;
+      if (accountMenuToggle) accountMenuToggle.setAttribute("aria-expanded", "false");
+      try {
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          credentials: "include",
+        });
+      } catch (error) {
+        console.warn("logout request failed", error);
+      } finally {
+        window.location.href = "/";
+      }
+    });
 
     refreshWorldButton?.addEventListener("click", () => {
       refreshWorld();
     });
 
+    shellRefreshWorldButton?.addEventListener("click", () => {
+      refreshWorld();
+    });
+
     clearSelectionButton?.addEventListener("click", () => {
+      selectObject(null, "Selection cleared.");
+      closeContextMenu();
+    });
+
+    shellClearSelectionButton?.addEventListener("click", () => {
       selectObject(null, "Selection cleared.");
       closeContextMenu();
     });
@@ -2676,6 +4621,25 @@
       if (contextMenu && !contextMenu.hidden && !contextMenu.contains(event.target)) {
         closeContextMenu();
       }
+      const clickTarget = event.target instanceof Element ? event.target : null;
+      if (chatPanel && clickTarget && !clickTarget.closest("#chat-panel") && (chatPinnedOpen || isChatActive() || chatHoverOpen)) {
+        closeChatPanel();
+      }
+      if (accountMenu && !accountMenu.hidden && !event.target.closest("#account-menu") && !event.target.closest("#account-menu-toggle")) {
+        accountMenu.hidden = true;
+        accountMenuToggle?.setAttribute("aria-expanded", "false");
+      }
+      if (headerSettingsPanel && !headerSettingsPanel.hidden && !event.target.closest("#header-settings-panel") && !event.target.closest("#header-settings-button")) {
+        closeHeaderSettings();
+      }
+      if (leftSettingsPanel && !leftSettingsPanel.hidden && !event.target.closest("#left-settings-panel") && !event.target.closest("#left-settings-button")) {
+        leftSettingsPanel.hidden = true;
+        leftSettingsButton?.setAttribute("aria-expanded", "false");
+      }
+      if (rightSettingsPanel && !rightSettingsPanel.hidden && !event.target.closest("#right-settings-panel") && !event.target.closest("#right-settings-button")) {
+        rightSettingsPanel.hidden = true;
+        rightSettingsButton?.setAttribute("aria-expanded", "false");
+      }
     });
 
     document.addEventListener("keydown", (event) => {
@@ -2696,6 +4660,14 @@
       }
       if (event.key === "Escape") {
         closeContextMenu();
+        if (accountMenu) accountMenu.hidden = true;
+        if (headerSettingsPanel) headerSettingsPanel.hidden = true;
+        if (leftSettingsPanel) leftSettingsPanel.hidden = true;
+        if (rightSettingsPanel) rightSettingsPanel.hidden = true;
+        accountMenuToggle?.setAttribute("aria-expanded", "false");
+        headerSettingsButton?.setAttribute("aria-expanded", "false");
+        leftSettingsButton?.setAttribute("aria-expanded", "false");
+        rightSettingsButton?.setAttribute("aria-expanded", "false");
         if (currentSelection) {
           selectObject(null, "Selection cleared.");
         }

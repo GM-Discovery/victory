@@ -206,10 +206,13 @@ Do not:
 - The Cave is the live table and the full-feature proving-ground venue.
 - It is acceptable to build runtime tools visibly in The Cave first.
 - Once stable, move them into cleaner overlays, drawers, context menus, or secondary surfaces.
-- A clean template venue should later be extracted from the organized Cave surface.
+- A clean template venue should later be extracted from the organized stage-shell surface.
 - Future venues should descend from that cleaned template.
 - PixiJS, when present, is a client-side renderer only. Do not let Pixi state become app truth.
 - Middle School Stage is the first clean stage-shell venue. Keep it simple, producer-only, and drawer-first.
+- The hidden Stage Template venue is the reusable shell descendant and the canonical extraction target.
+- First Theater should use the portable overlay above Pixi so renderer and overlay can be compared side by side.
+- The First Theater overlay proof marker is smoke-only. Treat it as a test affordance for verifying DOM chrome over Pixi, not as normal venue UI.
 - The Greenroom is public profile display plus character dressing room.
 - Trailers owns performer profile drafting and publishing.
 - Avoid putting full editors into The Cave unless the kernel explicitly says the live table owns that workflow.

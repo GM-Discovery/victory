@@ -292,3 +292,19 @@ Implement `perform/speak` using the same action pipeline:
 - The Cave remains untouched and continues to serve as the proving ground
 - Pixi remains outside The Cave
 - Full live control parity is still Cave-specific; Middle School Stage is currently a shell-first proof
+
+## 2026-05-17 — Kernel 32 template extraction
+
+### Frontend
+- Added a hidden `stage-template` venue scaffold as the reusable shell descendant
+- Mounted the portable overlay from `frontend/venues/shared/venue-shell.js` in First Theater so Pixi and overlay can be compared together
+- Refactored Middle School Stage to use the shared venue shell helper for preferences and presence preview behavior
+
+### Documentation
+- Updated the current-state canon and roadmap to treat Kernel 32 as the template extraction pass
+- Renumbered the downstream roadmap so Discord OAuth becomes the next identity kernel
+
+### Operational Notes
+- The Cave was left untouched
+- The hidden template scaffold is not map-visible
+- First Theater now shows the portable overlay above Pixi as the comparison surface
