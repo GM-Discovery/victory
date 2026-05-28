@@ -37,6 +37,12 @@ DISCORD_REDIRECT_URL='http://127.0.0.1:8081/auth/discord/callback'
 DISCORD_OAUTH_SCOPES='identify email'
 ```
 
+Operator bootstrap command for Kernel 33:
+```bash
+cd /opt/victory/backend
+DATABASE_URL='postgres://victory:REDACTED@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory-bootstrap producer --discord-user-id <discord_user_id>
+```
+
 If `8081` is occupied:
 ```bash
 PORT=18081 DATABASE_URL='postgres://victory:REDACTED@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory
@@ -62,6 +68,7 @@ git diff --check
 - Discord OAuth start: `/auth/discord/start`
 - Discord OAuth callback: `/auth/discord/callback`
 - Auth providers: `/api/auth/providers`
+- Operator producer bootstrap: `go run ./cmd/victory-bootstrap producer --discord-user-id <discord_user_id>`
 - Cave snapshot: `/api/world/the-cave`
 - Cave WebSocket: `/ws/the-cave`
 - First Theater Pixi spike: `/venues/first-theater/`

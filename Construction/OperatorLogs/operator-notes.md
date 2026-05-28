@@ -42,6 +42,8 @@ Current confirmed capabilities:
 - Discord OAuth is now wired as the primary login path alongside local handle/password login
 - The Victory session cookie model remains authoritative after Discord login
 - Discord login does not grant producer/director authority by itself
+- Kernel 33 adds a separate operator bootstrap CLI for granting producer authority after identity already exists
+- Kernel 33 captures Kernel 32 plus the live-site follow-on work into the canon docs
 - Kernel 7 evidence is covered by `go test ./internal/network -run TestKernel7PresenceAndAttributionEvidence -v`
 - Kernel 8 adds a shared identity surface and `persona: null` in action/presence payloads
 - The Cave does not allow anonymous presence

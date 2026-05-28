@@ -74,7 +74,7 @@ async function loadVenues() {
       const fallbackPositions = {
         library: { x: 67, y: 87 },
         "first-theater": { x: 73, y: 66 },
-        "middle-school-stage": { x: 58, y: 61 },
+        "middle-school-stage": { x: 87, y: 38 },
         "the-cave": { x: 22, y: 23 },
         "grants-cabin": { x: 28, y: 21 },
       "audition-hall": { x: 24, y: 37 },
@@ -121,7 +121,7 @@ async function loadVenues() {
         "audition-hall": "/assets/audition-hall.png",
         "the-cave": "/assets/cave.png",
         "workshop": "/assets/workshop.png",
-        "victory-theater": "/assets/favicon.png",
+        "victory-theater": "/assets/victorytheater.png",
         "construction": "/assets/construction.png",
         "greenroom": "/assets/Greenroom.png",
         "trailers": "/assets/trailers.png",

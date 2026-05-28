@@ -1,7 +1,7 @@
 # Victory Roadmap
 
 ## Purpose
-This roadmap reflects current priorities after Kernel 32.
+This roadmap reflects current priorities after Kernel 33.
 
 Kernel numbers are labels, but from here they should remain stable once assigned so planning, reportbacks, and future agents all refer to the same landmarks.
 
@@ -18,7 +18,9 @@ Kernel numbers are labels, but from here they should remain stable once assigned
   - build the first clean copyable stage shell without turning The Cave into the template
 - `32 — Discord OAuth Primary Login v1`
   - add Discord OAuth as the primary login path while preserving Victory identity and operator fallback
-- `33 — Stage Navigation / View Resolver v1`
+- `33 — Operator Bootstrap + Canon Capture v1`
+  - add a safe operator bootstrap path for producer authority and capture Kernel 32 plus follow-on live-site work into canon
+- `34 — Stage Navigation / View Resolver v1`
   - better view/surface routing inside venue runtime
 - `34 — Map/Object Movement v1`
   - more formal object movement and navigation behavior
@@ -43,6 +45,7 @@ Ordering note:
 - Cave polish and organization belongs around Kernel 30
 - Middle School Stage follows the organization pass and proves the first clean shell
 - Discord OAuth now lands immediately after the shell work so identity work can become the primary login path without replacing Victory authorization
+- Operator bootstrap lands immediately after Discord OAuth so producers still come from Victory authority, not the Discord login itself
 
 ## Medium Roadmap: Kernels 38–62
 - strengthen showing/review surfaces and auditability

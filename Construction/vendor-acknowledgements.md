@@ -41,6 +41,7 @@ Indirect dependencies currently present in `go.mod`:
 - PostgreSQL `pgcrypto` remains relevant for `gen_random_uuid()`
 - Discord OAuth is an external platform/API integration, not a bundled runtime dependency
 - Kernel 32 uses the Go standard library for OAuth requests, so no new Go OAuth package was added
+- Kernel 33 also adds no new external dependency; the operator bootstrap CLI reuses the existing Go and pgx stack
 
 ## Dependency Philosophy
 - keep external dependencies small and intentional

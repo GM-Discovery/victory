@@ -11,6 +11,34 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-05-20 — Kernel 33 Operator Bootstrap + Canon Capture
+
+### Backend
+- Added an operator bootstrap CLI:
+  - `go run ./cmd/victory-bootstrap producer --discord-user-id <discord_user_id>`
+  - `go run ./cmd/victory-bootstrap producer --user-id <victory_user_id>`
+  - `go run ./cmd/victory-bootstrap producer --handle <victory_handle>`
+- The bootstrap path grants only `producer` at the location scope already used by Victory access checks
+- The command is idempotent and reports whether the producer grant already existed
+- Unknown Discord user IDs fail clearly instead of creating a new grant
+
+### Canon / Documentation
+- Captured Kernel 32 as complete in the current canon
+- Captured the live-site follow-on work:
+  - Terms page
+  - Privacy page
+  - favicon asset
+  - favicon wiring
+  - `/auth/*` proxy routing
+  - Discord env wiring
+  - local `.env` guidance
+- Updated roadmap/current-state/operator notes to reflect Kernel 33
+
+### Notes
+- Discord login remains identity only
+- Victory still authorizes producer authority
+- Operator/bootstrap authority stays separate from normal app authority
+
 ## 2026-05-19 — Kernel 32 Discord OAuth Primary Login
 
 ### Backend

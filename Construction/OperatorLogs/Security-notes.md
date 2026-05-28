@@ -247,6 +247,13 @@ Historical note:
 - Discord identity is only an authentication proof; Victory still authorizes roles, memberships, and venue access
 - email is optional and must not be used as an automatic account-merge key
 
+### Operator Bootstrap Security Notes
+- Kernel 33 adds a separate operator bootstrap CLI rather than a public HTTP grant endpoint
+- The bootstrap path grants only `producer`
+- The bootstrap path is idempotent and reports whether the grant already existed
+- The bootstrap path resolves Victory identity first; Discord login alone still does not grant producer
+- The operator/bootstrap path is infrastructure recovery authority, not ordinary in-app authority
+
 ---
 
 ## 9. Presence + Attribution (Kernel 7)

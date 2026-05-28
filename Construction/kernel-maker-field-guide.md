@@ -13,6 +13,7 @@ Current canon references:
 ## Repo Map
 - `/opt/victory/backend/` - Go service, HTTP APIs, WebSocket handlers, domain packages.
 - `/opt/victory/backend/cmd/victory/main.go` - process entry point, bootstraps kernel surfaces, registers routes.
+- `/opt/victory/backend/cmd/victory-bootstrap/main.go` - operator bootstrap CLI for safe authority grants.
 - `/opt/victory/backend/internal/actions/` - append-only action types, validation, authority rules.
 - `/opt/victory/backend/internal/network/` - Cave WebSocket hub, presence, snapshots, live broadcasts.
 - `/opt/victory/backend/internal/world/` - world and venue snapshot projection.
@@ -46,6 +47,7 @@ Current canon references:
 ## Current Character Kernel Baseline
 Kernel 23 added character cards and Cave persona actions. Kernel 24 moved character editing into Greenroom. Kernel 27 added the closed-showing review surface in the Director's Chair. Kernel 28 added the live Director Console for current-showing control.
 Kernel 32 adds Discord OAuth as the primary login path while keeping Victory sessions, users, and role authority authoritative.
+Kernel 33 adds the operator bootstrap command and canon capture so producer authority still comes from Victory, not from Discord login.
 
 Current product behavior:
 - HTTP:

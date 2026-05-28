@@ -1,14 +1,14 @@
 # Victory Current State
 
 ## Purpose
-This document is the current-state canon for Victory as of Kernel 32.
+This document is the current-state canon for Victory as of Kernel 33.
 
 Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful as history, but this file is the current source of truth when they disagree.
 
 ## Kernel State
-- Current kernel label: **Kernel 32**
-- Current kernel purpose: **Discord OAuth Primary Login v1**
-- Product state: **kernel active; Kernel 32 is complete**
+- Current kernel label: **Kernel 33**
+- Current kernel purpose: **Operator Bootstrap + Canon Capture v1**
+- Product state: **kernel active; Kernel 32 is complete and Kernel 33 is in progress**
 - Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
 
 ## Current Stack
@@ -65,6 +65,11 @@ Auth and identity:
 - `POST /api/auth/password-reset/request`
 - `POST /api/auth/password-reset/confirm`
 - `GET /api/session/me`
+
+Operator bootstrap:
+- `go run ./cmd/victory-bootstrap producer --discord-user-id <discord_user_id>`
+- `go run ./cmd/victory-bootstrap producer --user-id <victory_user_id>`
+- `go run ./cmd/victory-bootstrap producer --handle <victory_handle>`
 
 Invites, requests, and production access:
 - `POST /api/invites`
@@ -158,6 +163,16 @@ Identity and access:
 - `memberships`
 - `location_memberships`
 
+Current live-site support:
+- Terms of Service page exists at `/legal/terms/`
+- Privacy Policy page exists at `/legal/privacy/`
+- Favicon asset exists at `frontend/assets/favicon.png`
+- Favicon is wired into the main site, login/account/mailbox, legal pages, and venue shells
+- Victory Theater map icon uses the same favicon asset
+- `/auth/*` live proxy routing is fixed so Discord OAuth reaches Victory
+- Discord environment wiring is present in Docker Compose and `.env`
+- `.env` stays local and is ignored by git
+
 World model:
 - `locations`
 - `lots`
@@ -186,6 +201,12 @@ Important language:
 - **production run** is not the same thing as video capture
 - **production** means production-scoped world/authority context
 - **venue** means a surfaced experience and rules context
+
+Operator rule:
+- Discord OAuth authenticates a person
+- Victory authorizes the person
+- operator/bootstrap authority can grant producer authority after identity exists
+- producer remains the highest normal in-app authority
 
 ## Current Live-Table Behavior
 The Cave is the full-feature proving-ground venue.
