@@ -298,6 +298,14 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 
 	filtered := make([]PlacedElement, 0, len(snap.Elements))
 	for _, el := range snap.Elements {
+		audienceVisible := effectiveAudienceVisible(layerVisibility, el)
+		if strings.TrimSpace(strings.ToLower(el.Surface)) == "stage" {
+			el.Visibility = cloneMap(el.Visibility)
+			el.Visibility["visible"] = audienceVisible
+			el.State = cloneMap(el.State)
+			el.State["visible"] = audienceVisible
+		}
+
 		switch normalizeRole(viewerRole) {
 		case "producer", "director":
 			filtered = append(filtered, el)
@@ -312,18 +320,32 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 			}
 
 		case "audience":
-			if elementVisibilityForLayer(layerVisibility, el, "audience", false) {
+			if audienceVisible {
 				filtered = append(filtered, el)
 			}
 
 		default:
-			if elementVisibilityForLayer(layerVisibility, el, "audience", false) {
+			if audienceVisible {
 				filtered = append(filtered, el)
 			}
 		}
 	}
 	snap.Elements = filtered
 	return &snap, nil
+}
+
+func effectiveAudienceVisible(layerVisibility map[string]bool, el PlacedElement) bool {
+	defaultVisible := strings.TrimSpace(strings.ToLower(el.Surface)) == "stage" &&
+		visibilityBool(el.Visibility, "visible", false)
+	return elementVisibilityForLayer(layerVisibility, el, "audience", defaultVisible)
+}
+
+func cloneMap(in map[string]any) map[string]any {
+	out := map[string]any{}
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }
 
 func decodeJSONMap(raw []byte) map[string]any {

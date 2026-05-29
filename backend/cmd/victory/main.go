@@ -41,7 +41,7 @@ import (
 func main() {
 	port := getenv("PORT", "8081")
 	databaseURL := getenv("DATABASE_URL", "postgres://victory:REDACTED@victory-postgres:5432/victory?sslmode=disable")
-	secureCookie := getenv("COOKIE_SECURE", "false") == "true"
+	secureCookie := getenv("COOKIE_SECURE", "true") == "true"
 	storageRoot := getenv("STORAGE_ROOT", "/opt/victory/storage")
 	discordOAuthConfig := discordOAuthConfigFromEnv()
 
@@ -232,6 +232,10 @@ func main() {
 			})
 			return
 		}
+
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, private")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
 
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()

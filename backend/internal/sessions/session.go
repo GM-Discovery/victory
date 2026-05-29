@@ -110,25 +110,35 @@ func RevokeAllUserSessions(ctx context.Context, pool *pgxpool.Pool, userID strin
 }
 
 func SetSessionCookie(w http.ResponseWriter, raw string, expiresAt time.Time, secure bool) {
+	sameSite := http.SameSiteLaxMode
+	if secure {
+		sameSite = http.SameSiteNoneMode
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
 		Value:    raw,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSite,
 		Expires:  expiresAt,
 	})
 }
 
 func ClearSessionCookie(w http.ResponseWriter, secure bool) {
+	sameSite := http.SameSiteLaxMode
+	if secure {
+		sameSite = http.SameSiteNoneMode
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSite,
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
 	})
@@ -158,4 +168,3 @@ func clientIP(r *http.Request) string {
 
 	return strings.TrimSpace(r.RemoteAddr)
 }
-

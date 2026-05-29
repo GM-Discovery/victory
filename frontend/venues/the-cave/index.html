@@ -703,6 +703,15 @@
       background: rgba(255, 255, 255, 0.08);
     }
 
+    .element-context-menu button:disabled {
+      color: rgba(245, 239, 228, 0.42);
+      cursor: not-allowed;
+    }
+
+    .element-context-menu button:disabled:hover {
+      background: transparent;
+    }
+
     .element-context-menu button.is-destructive {
       color: #f0b0a8;
     }
@@ -2389,6 +2398,23 @@
     elementInfoPopup.hidden = false;
   }
 
+  function openStageInfo() {
+    if (!elementInfoPopup || !elementInfoTitle || !elementInfoContent) return;
+    const point = stagePlacementPoint();
+    const staged = latestSnapshotElements.filter((element) => indexCardSurface(element) === "stage");
+    const cards = staged.filter(isIndexCardElement);
+    elementInfoTitle.textContent = "Stage";
+    elementInfoContent.textContent = [
+      "Type: stage",
+      "Venue: the-cave",
+      `Pointer: x: ${Number(point.x || 0)}, y: ${Number(point.y || 0)}`,
+      `Stage objects: ${staged.length}`,
+      `Index cards: ${cards.length}`,
+      `Current role: ${currentRole || "unknown"}`,
+    ].join("\n");
+    elementInfoPopup.hidden = false;
+  }
+
   function clearMoveMode() {
     activeMoveElement = null;
     if (stageMovePreview) {
@@ -2667,6 +2693,19 @@
     indexCardFront?.focus();
     setPendingStagePlacement(stagePlacementPoint(), "create");
     setIndexCardStatus("Create a card, then save it to place it where you clicked.");
+    closeStageContextMenu();
+  }
+
+  function createCardInTrayFromMenu() {
+    if (!canManageIndexCards(currentRole)) {
+      setIndexCardStatus("Only producers and directors can create cards.");
+      return;
+    }
+    clearPendingStagePlacement();
+    clearIndexCardEditor();
+    scrollToIndexCardPanel();
+    indexCardFront?.focus();
+    setIndexCardStatus("Create a card, then save it to keep it in the venue tray.");
     closeStageContextMenu();
   }
 
@@ -2976,6 +3015,11 @@
           return "";
       }
     }).filter(Boolean);
+    menuItems.push(
+      `<div class="menu-separator"></div>`,
+      `<button type="button" data-menu-action="copy" disabled>Copy</button>`,
+      `<button type="button" data-menu-action="paste" disabled>Paste</button>`
+    );
 
     if (!menuItems.length) {
       closeElementContextMenu();
@@ -3015,6 +3059,47 @@
     stageContextMenu.innerHTML = `
       <button type="button" data-stage-menu-action="add-workshop">Add from Workshop</button>
       <button type="button" data-stage-menu-action="create-card">Create / Place Index Card</button>
+      <div class="menu-separator"></div>
+      <button type="button" data-stage-menu-action="inspect-stage">Inspect Stage</button>
+      <button type="button" data-stage-menu-action="copy" disabled>Copy</button>
+      <button type="button" data-stage-menu-action="paste" disabled>Paste</button>
+    `;
+    stageContextMenu.hidden = false;
+    stageContextMenu.style.left = "0px";
+    stageContextMenu.style.top = "0px";
+    const rect = stageContextMenu.getBoundingClientRect();
+    const maxX = Math.max(8, window.innerWidth - rect.width - 8);
+    const maxY = Math.max(8, window.innerHeight - rect.height - 8);
+    const left = Math.max(8, Math.min(event.clientX, maxX));
+    const top = Math.max(8, Math.min(event.clientY, maxY));
+    stageContextMenu.style.left = `${left}px`;
+    stageContextMenu.style.top = `${top}px`;
+  }
+
+  function openIndexCardTrayContextMenu(event) {
+    if (!canUseStageContextMenu(currentRole)) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    contextMenuMode = "tray";
+    contextMenuTarget = null;
+    updatePointerState(event, "index-card-tray");
+    stageContextPoint = {
+      screenX: Number(event.clientX || 0),
+      screenY: Number(event.clientY || 0),
+      stageX: pointerState.stageX,
+      stageY: pointerState.stageY,
+    };
+
+    if (!stageContextMenu) return;
+
+    const createDisabled = canManageIndexCards(currentRole) ? "" : " disabled";
+    stageContextMenu.innerHTML = `
+      <button type="button" data-stage-menu-action="create-card-tray"${createDisabled}>Create Index Card</button>
+      <div class="menu-separator"></div>
+      <button type="button" data-stage-menu-action="inspect-tray">Info</button>
+      <button type="button" data-stage-menu-action="copy" disabled>Copy</button>
+      <button type="button" data-stage-menu-action="paste" disabled>Paste</button>
     `;
     stageContextMenu.hidden = false;
     stageContextMenu.style.left = "0px";
@@ -4122,6 +4207,7 @@
       const response = await fetch("/api/world/the-cave", {
         method: "GET",
         credentials: "include",
+        cache: "no-store",
       });
 
       const payload = await response.json().catch(() => null);
@@ -4769,7 +4855,18 @@
   stageContextMenu?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-stage-menu-action]");
     if (!button) return;
+    if (button.disabled) return;
     const action = button.getAttribute("data-stage-menu-action");
+    if (action === "inspect-stage") {
+      openStageInfo();
+      closeStageContextMenu();
+      return;
+    }
+    if (action === "inspect-tray") {
+      openStageInfo();
+      closeStageContextMenu();
+      return;
+    }
     if (action === "add-workshop") {
       openWorkshopFromStageMenu();
       return;
@@ -4778,6 +4875,17 @@
       createCardAtStagePoint();
       return;
     }
+    if (action === "create-card-tray") {
+      createCardInTrayFromMenu();
+      return;
+    }
+  });
+
+  indexCardPanel?.addEventListener("contextmenu", (event) => {
+    if (event.defaultPrevented) return;
+    if (event.target.closest(".index-card-item")) return;
+    if (event.target.closest("textarea, input, select, a, #element-context-menu, #stage-context-menu")) return;
+    openIndexCardTrayContextMenu(event);
   });
 
   elementInfoClose?.addEventListener("click", closeElementInfoPopup);

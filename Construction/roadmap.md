@@ -22,21 +22,21 @@ Kernel numbers are labels, but from here they should remain stable once assigned
   - add a safe operator bootstrap path for producer authority and capture Kernel 32 plus follow-on live-site work into canon
 - `34 — Stage Navigation / View Resolver v1`
   - better view/surface routing inside venue runtime
-- `34 — Map/Object Movement v1`
+- `35 — Map/Object Movement v1`
   - more formal object movement and navigation behavior
-- `35 — Venue Policy Console v1`
+- `36 — Venue Policy Console v1`
   - clearer venue-level policy toggles and controls
-- `36 — Asset Browser / Library v1`
+- `37 — Asset Browser / Library v1`
   - browse and select reusable assets/library elements
-- `37 — Warehouse / Asset Storage Surface v1`
+- `38 — Warehouse / Asset Storage Surface v1`
   - durable storage and browsing surface for reusable assets
-- `38 — Library / Script Surface v1`
+- `39 — Library / Script Surface v1`
   - browse scripts and reusable reference material by ruleset or sheet type
-- `39 — Catharsis Prep Kernel`
+- `40 — Catharsis Prep Kernel`
   - prep surfaces for the catharsis flow without building the full experience yet
-- `40 — Socio/Catharsis v1`
+- `41 — Socio/Catharsis v1`
   - first public-facing catharsis experience surface
-- `41 — Documentation + Hardening Pass`
+- `42 — Documentation + Hardening Pass`
   - reconcile docs, tighten errors, and stabilize the kernel trail
 
 Ordering note:

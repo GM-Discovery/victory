@@ -5,10 +5,10 @@ import (
 	"errors"
 	"strings"
 
+	"victory/backend/internal/access"
 	"victory/backend/internal/sessions"
 	"victory/backend/internal/showings"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -147,39 +147,7 @@ func resolveJoiningUser(ctx context.Context, pool *pgxpool.Pool, req JoinRequest
 }
 
 func resolveRoleForUser(ctx context.Context, pool *pgxpool.Pool, userID string) (string, error) {
-	var role string
-
-	err := pool.QueryRow(ctx, `
-		SELECT m.role::text
-		FROM memberships m
-		WHERE m.user_id = $1
-		  AND m.active = TRUE
-		ORDER BY
-		  CASE m.role
-		    WHEN 'producer' THEN 1
-		    WHEN 'director' THEN 2
-		    WHEN 'cast' THEN 3
-		    WHEN 'crew' THEN 4
-		    WHEN 'audience' THEN 5
-		    ELSE 99
-		  END,
-		  m.created_at ASC
-		LIMIT 1
-	`, userID).Scan(&role)
-
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "audience", nil
-		}
-		return "", err
-	}
-
-	switch role {
-	case "producer", "director", "cast", "crew", "audience":
-		return role, nil
-	default:
-		return "audience", nil
-	}
+	return access.CurrentLocationRole(ctx, pool, userID)
 }
 
 func normalizeHandle(in string) string {

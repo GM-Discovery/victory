@@ -8,13 +8,13 @@ Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful 
 ## Kernel State
 - Current kernel label: **Kernel 33**
 - Current kernel purpose: **Operator Bootstrap + Canon Capture v1**
-- Product state: **kernel active; Kernel 32 is complete and Kernel 33 is in progress**
+- Product state: **Kernel 33 is complete; next kernel selection is pending**
 - Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
 
 ## Current Stack
 - Frontend: static HTML, CSS, and inline JavaScript under `/opt/victory/frontend`
 - Backend: Go `1.25` in `/opt/victory/backend`
-- Reverse proxy/static serving: Caddy via `/opt/victory/Caddyfile`
+- Reverse proxy/static serving: Caddy. Repo config lives at `/opt/victory/Caddyfile`; the current live shared Caddy container mounts `/opt/bread-exchange/Caddyfile` and serves Victory from `/opt/victory/frontend`.
 - Database: PostgreSQL `16-alpine`
 - Container orchestration: Docker Compose
 - Key Go dependencies:
