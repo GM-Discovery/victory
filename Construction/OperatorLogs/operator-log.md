@@ -11,6 +11,14 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-05-29 — Kernel 34 Account Authority Surface
+
+- Added a current-account summary endpoint at `GET /api/account/me`
+- Account UI now shows Victory identity, Discord link status, location memberships, and producer authority
+- Discord login remains authentication only; Victory membership remains the source of producer authority
+
+---
+
 ## 2026-05-20 — Kernel 33 Operator Bootstrap + Canon Capture
 
 ### Backend

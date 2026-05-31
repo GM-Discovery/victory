@@ -99,6 +99,7 @@ func main() {
 	mux.HandleFunc("/api/requests/incoming", identity.HandleListIncomingPermissionRequests(pool))
 	mux.HandleFunc("/api/requests/respond", identity.HandleRespondPermissionRequest(pool))
 	mux.HandleFunc("/api/productions", identity.HandleListProductions(pool))
+	mux.HandleFunc("/api/account/me", identity.HandleAccountMe(pool))
 	mux.HandleFunc("/api/session/me", identity.HandleMe(pool))
 	mux.HandleFunc("/api/profiles/me", profiles.HandleGetMyProfile(pool))
 	mux.HandleFunc("/api/profiles/public", profiles.HandleGetPublicProfile(pool))

@@ -347,7 +347,7 @@ async function loadAccountLink() {
   });
 
   try {
-    const response = await fetch("/api/session/me", {
+    const response = await fetch("/api/account/me", {
       credentials: "include",
     });
 
@@ -360,11 +360,14 @@ async function loadAccountLink() {
     }
 
     const payload = await response.json();
-    const session = payload?.data || {};
+    const account = payload?.data || {};
 
-    if (payload && payload.signed_in) {
-      const displayName = session.display_name || "Friend";
-      accountLink.textContent = `Hello ${displayName}`;
+    if (payload && payload.ok) {
+      const user = account.user || {};
+      const authority = account.authority || {};
+      const displayName = identityDisplayName(user);
+      const role = authority.is_producer ? "Producer" : roleLabel(authority.current_role);
+      accountLink.textContent = `${displayName} · ${role}`;
       accountLink.href = "/account/";
       accountLink.title = "View your account";
       setMapSignedInState(true);

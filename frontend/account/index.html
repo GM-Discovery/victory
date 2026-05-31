@@ -244,21 +244,36 @@
       </div>
 
       <section class="provider">
-        <h2>Discord</h2>
-        <p class="note">Use Discord as your Victory sign-in path. Victory still owns your sessions and permissions.</p>
-        <div class="toolbar" style="margin-top:0;">
-          <a class="button" href="/auth/discord/start">Log in with Discord</a>
-          <a class="chip" href="/login/">Back to login</a>
-        </div>
+        <h2>Operator Bootstrap Note</h2>
+        <p class="note">Producer authority is granted inside Victory. Discord login alone does not grant producer access. If this account should be a producer, the server operator must run the bootstrap command. There is no public producer grant button on this page.</p>
       </section>
 
       <div class="grid">
         <section class="panel">
-          <p class="label">Session</p>
+          <p class="label">Victory Account</p>
           <h2 class="profile-name" id="display-name">Checking access...</h2>
           <p class="profile-role" id="role-name">Loading...</p>
-          <div id="session-state" class="session-state" data-state="loading">Checking session...</div>
-          <p class="note" id="session-note">We are checking your session now.</p>
+          <div id="session-state" class="session-state" data-state="loading">Checking account...</div>
+          <p class="note" id="session-note">We are checking your account now.</p>
+          <div class="meta" id="account-meta"></div>
+        </section>
+
+        <section class="panel">
+          <p class="label">Login / Linked Accounts</p>
+          <h2 class="profile-name" id="discord-heading">Discord</h2>
+          <p class="note" id="discord-note">Checking Discord link status...</p>
+          <div class="meta" id="discord-meta"></div>
+          <div class="toolbar" style="margin-top: 12px;">
+            <a class="button" id="discord-link-button" href="/auth/discord/start">Link Discord</a>
+            <a class="chip" href="/login/">Back to login</a>
+          </div>
+        </section>
+
+        <section class="panel">
+          <p class="label">Victory Authority</p>
+          <h2 class="profile-name" id="authority-heading">Authority</h2>
+          <p class="note" id="authority-note">Checking memberships...</p>
+          <div class="meta" id="authority-meta"></div>
         </section>
 
         <section class="panel">
@@ -286,6 +301,19 @@
     function profileValue(value) {
       const text = String(value || "").trim();
       return text || "Not set";
+    }
+
+    function shortId(value) {
+      const text = String(value || "").trim();
+      if (!text) return "Not set";
+      return text.length > 10 ? `${text.slice(0, 10)}…` : text;
+    }
+
+    function joinList(items) {
+      return items
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+        .join("\n") || "Not set";
     }
 
     function renderMeta(el, items) {
@@ -329,70 +357,170 @@
       const profileHeading = document.getElementById("profile-heading");
       const sessionState = document.getElementById("session-state");
       const recovery = document.getElementById("recovery");
-
-      const sessionResponse = await fetch("/api/session/me", {
-        credentials: "include",
-      });
-      const sessionPayload = await sessionResponse.json().catch(() => null);
-
-      if (!sessionResponse.ok || !sessionPayload?.ok || !sessionPayload.signed_in) {
-        if (sessionState) {
-          sessionState.textContent = "Signed out";
-          sessionState.dataset.state = "signed-out";
-        }
-        if (displayNameEl) displayNameEl.textContent = "Not signed in";
-        if (roleEl) roleEl.textContent = "No account session";
-        if (sessionNote) sessionNote.textContent = "Clear cookies or log in again to reach your account and profile pages.";
-        if (recovery) recovery.classList.add("visible");
-        showForbiddenScreen();
-        return;
-      }
-
-      const session = sessionPayload.data || {};
-      const displayName = identityDisplayName(session);
-      displayNameEl.textContent = displayName;
-      roleEl.textContent = `${roleLabel(session.role)} account`;
-      if (sessionState) {
-        sessionState.textContent = "Signed in";
-        sessionState.dataset.state = "signed-in";
-      }
-      if (recovery) recovery.classList.remove("visible");
-      sessionNote.textContent = "Signed in and ready.";
+      const accountMeta = document.getElementById("account-meta");
+      const discordHeading = document.getElementById("discord-heading");
+      const discordNote = document.getElementById("discord-note");
+      const discordMeta = document.getElementById("discord-meta");
+      const discordLinkButton = document.getElementById("discord-link-button");
+      const authorityHeading = document.getElementById("authority-heading");
+      const authorityNote = document.getElementById("authority-note");
+      const authorityMeta = document.getElementById("authority-meta");
 
       try {
-        const response = await fetch("/api/profiles/me", {
+        const response = await fetch("/api/account/me", {
           credentials: "include",
         });
         const payload = await response.json().catch(() => null);
 
         if (!response.ok || !payload?.ok) {
-        profileNote.textContent = "Profile data is not available right now, but your account session is active.";
-        profileHeading.textContent = "Profile unavailable";
-          renderMeta(document.getElementById("profile-meta"), [
-            { label: "Trailers", value: "Open Trailers to edit" },
-            { label: "Greenroom", value: "Open Greenroom to view" },
-            { label: "Persona", value: "Still null" },
-          ]);
+          if (sessionState) {
+            sessionState.textContent = "Signed out";
+            sessionState.dataset.state = "signed-out";
+          }
+          if (displayNameEl) displayNameEl.textContent = "Not signed in";
+          if (roleEl) roleEl.textContent = "Login required";
+          if (sessionNote) sessionNote.textContent = "Log in again to reach your account, linked accounts, authority, and profile pages.";
+          if (accountMeta) {
+            renderMeta(accountMeta, [
+              { label: "Account", value: "Signed out" },
+              { label: "Victory user ID", value: "Not available" },
+              { label: "Handle", value: "Not available" },
+            ]);
+          }
+          if (discordHeading) discordHeading.textContent = "Discord unavailable";
+          if (discordNote) discordNote.textContent = "Log in to see whether Discord is linked to this Victory account.";
+          if (discordMeta) {
+            renderMeta(discordMeta, [
+              { label: "Discord linked", value: "No" },
+              { label: "Discord user", value: "Not available" },
+              { label: "Global name", value: "Not available" },
+            ]);
+          }
+          if (discordLinkButton) {
+            discordLinkButton.hidden = false;
+            discordLinkButton.textContent = "Link Discord";
+            discordLinkButton.href = "/login/";
+          }
+          if (authorityHeading) authorityHeading.textContent = "Authority unavailable";
+          if (authorityNote) authorityNote.textContent = "Log in to see Victory memberships and producer status.";
+          if (authorityMeta) {
+            renderMeta(authorityMeta, [
+              { label: "Producer access", value: "Not granted" },
+              { label: "Current role", value: "Not available" },
+              { label: "Producer locations", value: "Not available" },
+            ]);
+          }
+          if (profileHeading) profileHeading.textContent = "Profile locked";
+          if (profileNote) profileNote.textContent = "Sign in to view your profile summary.";
+          if (recovery) recovery.classList.add("visible");
           return;
         }
 
-        const profile = payload.data?.profile || {};
-        const publicProfile = profile.public || {};
-        profileHeading.textContent = profileValue(publicProfile.stage_name) !== "Not set" ? profileValue(publicProfile.stage_name) : "Profile ready";
-        profileNote.textContent = profile.is_published ? "Published profile is live in the Greenroom." : "Draft profile exists. Publish it from Trailers when ready.";
+        const account = payload.data || {};
+        const user = account.user || {};
+        const auth = account.auth || {};
+        const authority = account.authority || {};
+        const memberships = Array.isArray(account.memberships) ? account.memberships : [];
+        const displayName = identityDisplayName(user);
 
-        renderMeta(document.getElementById("profile-meta"), [
-          { label: "Stage Name", value: profileValue(publicProfile.stage_name) },
-          { label: "Pronouns", value: profileValue(publicProfile.pronouns) },
-          { label: "Age Range", value: profileValue(publicProfile.performance_age_range) },
-          { label: "Favorite Color", value: profileValue(publicProfile.favorite_color) },
-          { label: "Favorite Artist", value: profileValue(publicProfile.favorite_artist) },
-          { label: "Favorite Food", value: profileValue(publicProfile.favorite_food) },
-          { label: "Ideal Day", value: profileValue(publicProfile.ideal_day) },
+        displayNameEl.textContent = displayName;
+        roleEl.textContent = `${roleLabel(authority.current_role)} access`;
+        if (sessionState) {
+          sessionState.textContent = authority.is_producer ? "Signed in as producer" : "Signed in";
+          sessionState.dataset.state = "signed-in";
+        }
+        if (recovery) recovery.classList.remove("visible");
+        sessionNote.textContent = "Signed in and ready.";
+        renderMeta(accountMeta, [
+          { label: "Handle", value: profileValue(user.handle) },
+          { label: "Display Name", value: profileValue(user.display_name) },
+          { label: "Victory user ID", value: shortId(user.id) },
         ]);
+
+        if (discordHeading) {
+          discordHeading.textContent = auth.discord_linked ? "Discord linked" : "Discord not linked";
+        }
+        if (discordNote) {
+          discordNote.textContent = auth.discord_linked
+            ? "Discord is linked to this Victory account. Victory still owns the session and permissions."
+            : "Discord is not linked yet. You can link it from here without changing Victory authority.";
+        }
+        renderMeta(discordMeta, [
+          { label: "Discord linked", value: auth.discord_linked ? "Yes" : "No" },
+          { label: "Discord user", value: profileValue(auth.discord?.username) },
+          { label: "Global name", value: profileValue(auth.discord?.global_name) },
+          { label: "Discord user ID", value: shortId(auth.discord?.discord_user_id) },
+        ]);
+        if (discordLinkButton) {
+          if (auth.discord_linked) {
+            discordLinkButton.hidden = true;
+          } else {
+            discordLinkButton.hidden = false;
+            discordLinkButton.textContent = "Link Discord";
+            discordLinkButton.href = "/auth/discord/start";
+          }
+        }
+
+        if (authorityHeading) {
+          authorityHeading.textContent = authority.is_producer ? "Producer access active" : "Producer access not granted";
+        }
+        if (authorityNote) {
+          authorityNote.textContent = authority.is_producer
+            ? "This account can act as a producer in Victory."
+            : "This account is signed in, but producer authority has not been granted.";
+        }
+        renderMeta(authorityMeta, [
+          { label: "Producer access", value: authority.is_producer ? "Active" : "Not granted" },
+          { label: "Current role", value: roleLabel(authority.current_role) },
+          { label: "Producer locations", value: joinList(authority.producer_locations || []) },
+          { label: "Location memberships", value: joinList(memberships.map((membership) => `${membership.location_slug || membership.location_name || "Unknown"} · ${roleLabel(membership.role)}`)) },
+        ]);
+
+        try {
+          const profileResponse = await fetch("/api/profiles/me", {
+            credentials: "include",
+          });
+          const profilePayload = await profileResponse.json().catch(() => null);
+
+          if (!profileResponse.ok || !profilePayload?.ok) {
+            profileNote.textContent = "Profile data is not available right now, but your account session is active.";
+            profileHeading.textContent = "Profile unavailable";
+            renderMeta(document.getElementById("profile-meta"), [
+              { label: "Trailers", value: "Open Trailers to edit" },
+              { label: "Greenroom", value: "Open Greenroom to view" },
+              { label: "Persona", value: "Still null" },
+            ]);
+            return;
+          }
+
+          const profile = profilePayload.data?.profile || {};
+          const publicProfile = profile.public || {};
+          profileHeading.textContent = profileValue(publicProfile.stage_name) !== "Not set" ? profileValue(publicProfile.stage_name) : "Profile ready";
+          profileNote.textContent = profile.is_published ? "Published profile is live in the Greenroom." : "Draft profile exists. Publish it from Trailers when ready.";
+
+          renderMeta(document.getElementById("profile-meta"), [
+            { label: "Stage Name", value: profileValue(publicProfile.stage_name) },
+            { label: "Pronouns", value: profileValue(publicProfile.pronouns) },
+            { label: "Age Range", value: profileValue(publicProfile.performance_age_range) },
+            { label: "Favorite Color", value: profileValue(publicProfile.favorite_color) },
+            { label: "Favorite Artist", value: profileValue(publicProfile.favorite_artist) },
+            { label: "Favorite Food", value: profileValue(publicProfile.favorite_food) },
+            { label: "Ideal Day", value: profileValue(publicProfile.ideal_day) },
+          ]);
+        } catch (profileError) {
+          console.error("profile load failed", profileError);
+          profileNote.textContent = "We could not load your profile, but the account session is active.";
+        }
       } catch (error) {
         console.error("account bootstrap failed", error);
-        profileNote.textContent = "We could not load your profile, but the account session is active.";
+        if (sessionState) {
+          sessionState.textContent = "Signed out";
+          sessionState.dataset.state = "signed-out";
+        }
+        if (displayNameEl) displayNameEl.textContent = "Not signed in";
+        if (roleEl) roleEl.textContent = "Login required";
+        if (sessionNote) sessionNote.textContent = "We could not reach the account service. Try logging in again.";
+        if (recovery) recovery.classList.add("visible");
       }
     }
 
