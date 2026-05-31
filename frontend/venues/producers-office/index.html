@@ -332,6 +332,92 @@
       </section>
 
       <section class="card">
+        <h2>Discord Server</h2>
+        <p class="muted small">This links Victory to one Discord Server for this location. Discord is the social rail; Victory still owns the authority.</p>
+        <div id="discord-server-status" class="status">Checking Discord Server link...</div>
+        <div class="request-grid" style="margin-top: 12px;">
+          <div>
+            <div class="muted small"><strong>Server</strong></div>
+            <div id="discord-server-name">Not linked</div>
+          </div>
+          <div>
+            <div class="muted small"><strong>System channel</strong></div>
+            <div id="discord-server-channel">Not linked</div>
+          </div>
+          <div>
+            <div class="muted small"><strong>Bot</strong></div>
+            <div id="discord-server-bot">Unavailable</div>
+          </div>
+        </div>
+        <div class="chip-list" style="margin-top: 14px;">
+          <a id="discord-server-install" class="button" href="/auth/discord/server/install?return_to=/venues/producers-office/">Install / Replace Bot</a>
+          <button id="discord-server-unlink" class="chip" type="button">Unlink Server</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Discord Channel Mapping</h2>
+        <p class="muted small">Create or repair the Victory Theater category, core admin channels, and venue categories inside the linked Discord Server.</p>
+        <div id="discord-mapping-status" class="status">Checking channel mapping...</div>
+        <div class="request-grid" style="margin-top: 12px;">
+          <div>
+            <div class="muted small"><strong>Core category</strong></div>
+            <div id="discord-mapping-core-category">Unavailable</div>
+          </div>
+          <div>
+            <div class="muted small"><strong>Repair</strong></div>
+            <div id="discord-mapping-repair-state">Waiting</div>
+          </div>
+        </div>
+        <div class="request-grid" style="margin-top: 12px;">
+          <div>
+            <div class="muted small"><strong>Core Channels</strong></div>
+            <div id="discord-mapping-core-channels"></div>
+          </div>
+          <div>
+            <div class="muted small"><strong>Venue Categories</strong></div>
+            <div id="discord-mapping-venues"></div>
+          </div>
+        </div>
+        <div class="chip-list" style="margin-top: 14px;">
+          <button id="discord-mapping-repair" class="button" type="button">Create / Repair Discord Channels</button>
+        </div>
+      </section>
+
+      <section id="discord-bootstrap-card" class="card" hidden>
+        <h2>Operator Bootstrap</h2>
+        <p class="muted small">Operator-only Discord bot settings. These values bootstrap the install flow and are stored on the server, not in the browser.</p>
+        <div id="discord-bootstrap-status" class="status">Loading operator bootstrap...</div>
+        <form id="discord-bootstrap-form">
+          <label for="discord-bootstrap-application-id">Application ID</label>
+          <input id="discord-bootstrap-application-id" type="text" placeholder="Discord application ID" />
+
+          <label for="discord-bootstrap-bot-token">Bot Token</label>
+          <input id="discord-bootstrap-bot-token" type="password" placeholder="Bot token" />
+
+          <label for="discord-bootstrap-redirect-url">Bot Redirect URL</label>
+          <input id="discord-bootstrap-redirect-url" type="url" placeholder="https://victory.example/auth/discord/server/callback" />
+          <div class="muted small" id="discord-bootstrap-redirect-hint" style="margin-top: 6px;"></div>
+          <div class="chip-list" style="margin-top: 8px;">
+            <button id="discord-bootstrap-use-callback" class="chip" type="button">Use Current Callback</button>
+          </div>
+
+          <label for="discord-bootstrap-permissions">Bot Permissions</label>
+          <input id="discord-bootstrap-permissions" type="text" placeholder="16" />
+
+          <label style="display:flex;align-items:center;gap:10px;margin:10px 0 0;">
+            <input id="discord-bootstrap-enabled" type="checkbox" />
+            <span>Enable Discord Server linking</span>
+          </label>
+
+          <div class="chip-list" style="margin-top: 14px;">
+            <button id="discord-bootstrap-save" class="button" type="submit">Save Bootstrap</button>
+          </div>
+        </form>
+        <div class="muted small" id="discord-bootstrap-source" style="margin-top: 10px;"></div>
+      </section>
+
+      <section class="card">
         <h2>Grant Access / Invite</h2>
         <p class="muted small">
           Use an audience invite for venue access, or a production invite for cast, crew, and director permissions. People will see the public display name, not the private login handle.
@@ -396,8 +482,32 @@
     const targetRole = document.getElementById("target-role");
     const productionID = document.getElementById("production-id");
     const venueSlug = document.getElementById("venue-slug");
+    const discordServerStatus = document.getElementById("discord-server-status");
+    const discordServerName = document.getElementById("discord-server-name");
+    const discordServerChannel = document.getElementById("discord-server-channel");
+    const discordServerBot = document.getElementById("discord-server-bot");
+    const discordServerInstall = document.getElementById("discord-server-install");
+    const discordServerUnlink = document.getElementById("discord-server-unlink");
+    const discordMappingStatus = document.getElementById("discord-mapping-status");
+    const discordMappingCoreCategory = document.getElementById("discord-mapping-core-category");
+    const discordMappingCoreChannels = document.getElementById("discord-mapping-core-channels");
+    const discordMappingVenues = document.getElementById("discord-mapping-venues");
+    const discordMappingRepair = document.getElementById("discord-mapping-repair");
+    const discordMappingRepairState = document.getElementById("discord-mapping-repair-state");
+    const discordBootstrapCard = document.getElementById("discord-bootstrap-card");
+    const discordBootstrapForm = document.getElementById("discord-bootstrap-form");
+    const discordBootstrapStatus = document.getElementById("discord-bootstrap-status");
+    const discordBootstrapApplicationID = document.getElementById("discord-bootstrap-application-id");
+    const discordBootstrapBotToken = document.getElementById("discord-bootstrap-bot-token");
+    const discordBootstrapRedirectURL = document.getElementById("discord-bootstrap-redirect-url");
+    const discordBootstrapRedirectHint = document.getElementById("discord-bootstrap-redirect-hint");
+    const discordBootstrapUseCallback = document.getElementById("discord-bootstrap-use-callback");
+    const discordBootstrapPermissions = document.getElementById("discord-bootstrap-permissions");
+    const discordBootstrapEnabled = document.getElementById("discord-bootstrap-enabled");
+    const discordBootstrapSource = document.getElementById("discord-bootstrap-source");
 
     const officeAccess = new Set(["producer"]);
+    const discordBootstrapCallbackURL = `${window.location.origin}/auth/discord/server/callback`;
 
     const venueOptions = [
       "the-cave",
@@ -425,6 +535,111 @@
 
     function setStatus(el, text) {
       if (el) el.textContent = text;
+    }
+
+    function setDiscordServerState(status) {
+      const linked = Boolean(status?.linked);
+      const setupAvailable = Boolean(status?.setup_available);
+      const canManage = Boolean(status?.can_manage);
+      const bot = status?.bot || {};
+      const server = status?.discord_server || null;
+      const channel = status?.system_channel || null;
+
+      setStatus(
+        discordServerStatus,
+        linked
+          ? `Linked to ${server?.name || server?.id || "a Discord Server"}.`
+          : setupAvailable
+            ? "No Discord Server linked yet."
+            : "Discord Server linking is unavailable right now."
+      );
+
+      if (discordServerName) {
+        discordServerName.textContent = linked ? `${server?.name || server?.id || "Linked"}` : "Not linked";
+      }
+      if (discordServerChannel) {
+        discordServerChannel.textContent = linked ? `${channel?.name || channel?.id || "victory-system"}` : "Not linked";
+      }
+      if (discordServerBot) {
+        discordServerBot.textContent = bot.verified
+          ? "Installed and verified"
+          : bot.installed
+            ? "Installed, not verified"
+            : setupAvailable
+              ? "Ready to install"
+              : "Unavailable";
+      }
+      if (discordServerInstall) {
+        discordServerInstall.hidden = !(setupAvailable && canManage);
+        if (setupAvailable && canManage && status?.install_url) {
+          discordServerInstall.href = status.install_url;
+        }
+        discordServerInstall.setAttribute("aria-disabled", setupAvailable && canManage ? "false" : "true");
+      }
+      if (discordServerUnlink) {
+        discordServerUnlink.hidden = !(linked && canManage);
+        discordServerUnlink.disabled = !(linked && canManage);
+      }
+    }
+
+    function renderMappingItem(item) {
+      const status = item?.status || "missing";
+      const actual = item?.actual_name || item?.expected_name || "(missing)";
+      const channelId = item?.discord_channel_id ? ` · ${item.discord_channel_id}` : "";
+      return `<div class="request" style="margin-top:10px;">
+        <div class="request-head">
+          <strong>${escapeHtml(item?.expected_name || "(missing)")}</strong>
+          <span class="badge">${escapeHtml(status)}</span>
+        </div>
+        <div class="muted small">${escapeHtml(actual)}${escapeHtml(channelId)}</div>
+      </div>`;
+    }
+
+    function setDiscordMappingState(status) {
+      const linked = Boolean(status?.linked);
+      const canManage = Boolean(status?.can_manage);
+      const setupAvailable = Boolean(status?.setup_available);
+      const server = status?.discord_server || null;
+      const core = status?.core || {};
+      const venues = Array.isArray(status?.venues) ? status.venues : [];
+
+      if (discordMappingStatus) {
+        setStatus(
+          discordMappingStatus,
+          linked
+            ? setupAvailable
+              ? `Mapping ready for ${server?.name || server?.id || "the Discord Server"}.`
+              : "Discord Server is linked, but bot config is unavailable."
+            : "Discord Server is not linked yet."
+        );
+      }
+
+      if (discordMappingCoreCategory) {
+        discordMappingCoreCategory.innerHTML = renderMappingItem(core.category || {});
+      }
+      if (discordMappingCoreChannels) {
+        discordMappingCoreChannels.innerHTML = Array.isArray(core.channels) && core.channels.length
+          ? core.channels.map((item) => renderMappingItem(item)).join("")
+          : `<div class="muted small">No core channels yet.</div>`;
+      }
+      if (discordMappingVenues) {
+        discordMappingVenues.innerHTML = venues.length
+          ? venues.map((item) => renderMappingItem(item)).join("")
+          : `<div class="muted small">No venue categories yet.</div>`;
+      }
+      if (discordMappingRepair) {
+        discordMappingRepair.hidden = !(linked && setupAvailable && canManage);
+        discordMappingRepair.disabled = !(linked && setupAvailable && canManage);
+      }
+      if (discordMappingRepairState) {
+        discordMappingRepairState.textContent = linked && setupAvailable ? (canManage ? "Ready" : "Read only") : "Unavailable";
+      }
+    }
+
+    function refreshDiscordBootstrapHint() {
+      if (discordBootstrapRedirectHint) {
+        discordBootstrapRedirectHint.textContent = `Victory expects this exact callback URL: ${discordBootstrapCallbackURL}`;
+      }
     }
 
     function renderRequests(rows) {
@@ -522,6 +737,165 @@
       }
     }
 
+    async function loadDiscordServerStatus() {
+      setStatus(discordServerStatus, "Checking Discord Server link...");
+      try {
+        const res = await fetch("/api/discord/server-link/status", { credentials: "include" });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Failed to load Discord Server status (HTTP ${res.status})`);
+        }
+        setDiscordServerState(payload.data || {});
+      } catch (error) {
+        setStatus(discordServerStatus, error.message || String(error));
+        setDiscordServerState({
+          linked: false,
+          setup_available: false,
+          can_manage: false,
+          bot: { installed: false, verified: false },
+        });
+      }
+    }
+
+    async function loadDiscordChannelMappingStatus() {
+      try {
+        const res = await fetch("/api/discord/channel-mapping/status", { credentials: "include" });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Failed to load channel mapping status (HTTP ${res.status})`);
+        }
+        setDiscordMappingState(payload.data || {});
+      } catch (error) {
+        if (discordMappingStatus) {
+          setStatus(discordMappingStatus, error.message || String(error));
+        }
+        setDiscordMappingState({
+          linked: false,
+          setup_available: false,
+          can_manage: false,
+          core: { category: {}, channels: [] },
+          venues: [],
+        });
+      }
+    }
+
+    async function repairDiscordChannelMapping() {
+      if (discordMappingRepairState) setStatus(discordMappingRepairState, "Repairing Discord channels...");
+      try {
+        const res = await fetch("/api/discord/channel-mapping/repair", {
+          method: "POST",
+          credentials: "include",
+        });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Failed to repair Discord channels (HTTP ${res.status})`);
+        }
+        const data = payload.data || {};
+        if (discordMappingRepairState) {
+          const created = Array.isArray(data.created) ? data.created.length : 0;
+          const found = Array.isArray(data.found) ? data.found.length : 0;
+          const updated = Array.isArray(data.updated) ? data.updated.length : 0;
+          const failed = Array.isArray(data.failed) ? data.failed.length : 0;
+          setStatus(discordMappingRepairState, `Created ${created}, found ${found}, updated ${updated}, failed ${failed}.`);
+        }
+        await loadDiscordChannelMappingStatus();
+        await loadDiscordServerStatus();
+      } catch (error) {
+        if (discordMappingRepairState) setStatus(discordMappingRepairState, error.message || String(error));
+      }
+    }
+
+    async function loadDiscordBootstrapStatus() {
+      if (discordBootstrapCard) {
+        discordBootstrapCard.hidden = false;
+      }
+      if (discordBootstrapStatus) {
+        setStatus(discordBootstrapStatus, "Loading operator bootstrap...");
+      }
+      try {
+        const res = await fetch("/api/discord/server/bootstrap", { credentials: "include" });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Failed to load bootstrap settings (HTTP ${res.status})`);
+        }
+        const data = payload.data || {};
+        if (discordBootstrapApplicationID) discordBootstrapApplicationID.value = data.application_id || "";
+        if (discordBootstrapBotToken) discordBootstrapBotToken.value = "";
+        if (discordBootstrapRedirectURL) {
+          discordBootstrapRedirectURL.value = data.redirect_url || discordBootstrapCallbackURL;
+        }
+        if (discordBootstrapPermissions) discordBootstrapPermissions.value = data.permissions || "16";
+        if (discordBootstrapEnabled) discordBootstrapEnabled.checked = Boolean(data.enabled);
+        if (discordBootstrapStatus) {
+          setStatus(discordBootstrapStatus, data.application_id ? "Bootstrap settings loaded." : "Bootstrap settings not configured yet.");
+        }
+        if (discordBootstrapSource) {
+          const redirectState = data.redirect_url && data.redirect_url !== discordBootstrapCallbackURL
+            ? ` · Redirect mismatch`
+            : "";
+          discordBootstrapSource.textContent = `Source: ${data.source || "env"} · Bot token set: ${data.bot_token_set ? "Yes" : "No"}${redirectState}`;
+        }
+      } catch (error) {
+        if (discordBootstrapStatus) {
+          setStatus(discordBootstrapStatus, error.message || String(error));
+        }
+      }
+    }
+
+    async function saveDiscordBootstrap(event) {
+      event.preventDefault();
+      if (discordBootstrapStatus) setStatus(discordBootstrapStatus, "Saving bootstrap settings...");
+      try {
+        const response = await fetch("/api/discord/server/bootstrap", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            application_id: discordBootstrapApplicationID?.value.trim() || "",
+            bot_token: discordBootstrapBotToken?.value.trim() || "",
+            redirect_url: discordBootstrapRedirectURL?.value.trim() || discordBootstrapCallbackURL,
+            permissions: discordBootstrapPermissions?.value.trim() || "16",
+            enabled: Boolean(discordBootstrapEnabled?.checked),
+          }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Failed to save bootstrap settings (HTTP ${response.status})`);
+        }
+        const data = payload.data || {};
+        if (discordBootstrapBotToken) discordBootstrapBotToken.value = "";
+        if (discordBootstrapSource) {
+          const redirectState = data.redirect_url && data.redirect_url !== discordBootstrapCallbackURL
+            ? ` · Redirect mismatch`
+            : "";
+          discordBootstrapSource.textContent = `Source: ${data.source || "database"} · Bot token set: ${data.bot_token_set ? "Yes" : "No"}${redirectState}`;
+        }
+        if (discordBootstrapStatus) setStatus(discordBootstrapStatus, "Bootstrap settings saved.");
+        await loadDiscordServerStatus();
+      } catch (error) {
+        if (discordBootstrapStatus) setStatus(discordBootstrapStatus, error.message || String(error));
+      }
+    }
+
+    async function unlinkDiscordServer() {
+      setStatus(discordServerStatus, "Unlinking Discord Server...");
+      try {
+        const res = await fetch("/api/discord/server/unlink", {
+          method: "POST",
+          credentials: "include",
+        });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Failed to unlink Discord Server (HTTP ${res.status})`);
+        }
+        await loadDiscordServerStatus();
+      } catch (error) {
+        setStatus(discordServerStatus, error.message || String(error));
+      }
+    }
+
     inviteForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       setStatus(inviteStatus, "Creating invite...");
@@ -572,6 +946,26 @@
       }
     });
 
+    discordServerUnlink?.addEventListener("click", async () => {
+      await unlinkDiscordServer();
+    });
+
+    discordMappingRepair?.addEventListener("click", async () => {
+      await repairDiscordChannelMapping();
+    });
+
+    discordBootstrapUseCallback?.addEventListener("click", () => {
+      if (discordBootstrapRedirectURL) {
+        discordBootstrapRedirectURL.value = discordBootstrapCallbackURL;
+      }
+      refreshDiscordBootstrapHint();
+      if (discordBootstrapStatus) {
+        setStatus(discordBootstrapStatus, "Callback URL copied into the bootstrap form.");
+      }
+    });
+
+    discordBootstrapForm?.addEventListener("submit", saveDiscordBootstrap);
+
     (async () => {
       try {
         const response = await fetch("/api/session/me", { credentials: "include" });
@@ -583,7 +977,8 @@
 
         document.querySelector(".shell")?.classList.add("venue-shell--signed-in");
         const role = String(payload?.data?.role || "").toLowerCase();
-        if (!officeAccess.has(role) && !payload?.data?.is_operator) {
+        const isOperator = Boolean(payload?.data?.is_operator);
+        if (!officeAccess.has(role) && !isOperator) {
           showForbidden();
           return;
         }
@@ -596,7 +991,13 @@
           }
         }
 
-        await Promise.all([loadProductions(), loadIncomingRequests()]);
+        await Promise.all([loadProductions(), loadIncomingRequests(), loadDiscordServerStatus(), loadDiscordChannelMappingStatus()]);
+        if (isOperator) {
+          refreshDiscordBootstrapHint();
+          await loadDiscordBootstrapStatus();
+        } else if (discordBootstrapCard) {
+          discordBootstrapCard.hidden = true;
+        }
       } catch (error) {
         console.error("producer office bootstrap failed", error);
         showForbidden();

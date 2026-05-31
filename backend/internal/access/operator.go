@@ -10,14 +10,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var operatorUserIDEnv = strings.TrimSpace(os.Getenv("OPERATOR_USER_ID"))
-var operatorHandleEnv = strings.ToLower(strings.TrimSpace(os.Getenv("OPERATOR_HANDLE")))
-
 func IsOperatorUser(ctx context.Context, pool *pgxpool.Pool, userID string) (bool, error) {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
 		return false, nil
 	}
+
+	operatorUserIDEnv := strings.TrimSpace(os.Getenv("OPERATOR_USER_ID"))
+	operatorHandleEnv := strings.ToLower(strings.TrimSpace(os.Getenv("OPERATOR_HANDLE")))
 
 	if operatorUserIDEnv != "" && userID == operatorUserIDEnv {
 		return true, nil

@@ -44,6 +44,7 @@ func main() {
 	secureCookie := getenv("COOKIE_SECURE", "true") == "true"
 	storageRoot := getenv("STORAGE_ROOT", "/opt/victory/storage")
 	discordOAuthConfig := discordOAuthConfigFromEnv()
+	discordServerLinkConfig := discordServerLinkConfigFromEnv()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -94,6 +95,13 @@ func main() {
 	mux.HandleFunc("/api/auth/password-reset/confirm", identity.HandleResetPassword(pool, secureCookie))
 	mux.HandleFunc("/api/invites", identity.HandleCreateInvite(pool))
 	mux.HandleFunc("/api/invites/accept", identity.HandleAcceptInvite(pool, secureCookie))
+	mux.HandleFunc("GET /api/discord/server-link/status", identity.HandleDiscordServerLinkStatus(pool, discordServerLinkConfig))
+	mux.HandleFunc("/api/discord/server/bootstrap", identity.HandleDiscordServerBootstrap(pool, discordServerLinkConfig))
+	mux.HandleFunc("GET /auth/discord/server/install", identity.HandleDiscordServerInstall(pool, discordServerLinkConfig))
+	mux.HandleFunc("GET /auth/discord/server/callback", identity.HandleDiscordServerCallback(pool, discordServerLinkConfig))
+	mux.HandleFunc("POST /api/discord/server/unlink", identity.HandleDiscordServerUnlink(pool, discordServerLinkConfig))
+	mux.HandleFunc("GET /api/discord/channel-mapping/status", identity.HandleDiscordChannelMappingStatus(pool, discordServerLinkConfig))
+	mux.HandleFunc("POST /api/discord/channel-mapping/repair", identity.HandleDiscordChannelMappingRepair(pool, discordServerLinkConfig))
 	mux.HandleFunc("/api/requests/create", identity.HandleCreatePermissionRequest(pool))
 	mux.HandleFunc("/api/requests/mine", identity.HandleListMyPermissionRequests(pool))
 	mux.HandleFunc("/api/requests/incoming", identity.HandleListIncomingPermissionRequests(pool))
@@ -445,6 +453,37 @@ func discordOAuthConfigFromEnv() identity.DiscordOAuthConfig {
 		RedirectURL:  strings.TrimSpace(os.Getenv("DISCORD_REDIRECT_URL")),
 		Scopes:       scopes,
 		Enabled:      enabled,
+	}
+}
+
+func discordServerLinkConfigFromEnv() identity.DiscordServerLinkConfig {
+	applicationID := strings.TrimSpace(getenv("DISCORD_APPLICATION_ID", ""))
+	if applicationID == "" {
+		applicationID = strings.TrimSpace(getenv("DISCORD_CLIENT_ID", ""))
+	}
+
+	redirectURL := strings.TrimSpace(getenv("DISCORD_BOT_REDIRECT_URL", ""))
+	enabledValue, enabledSet := os.LookupEnv("DISCORD_SERVER_LINK_ENABLED")
+	enabled := false
+	if strings.TrimSpace(enabledValue) == "" {
+		enabled = applicationID != "" &&
+			strings.TrimSpace(os.Getenv("DISCORD_BOT_TOKEN")) != "" &&
+			redirectURL != ""
+	} else if enabledSet {
+		enabled = parseBoolish(enabledValue)
+	}
+
+	permissions := strings.TrimSpace(getenv("DISCORD_BOT_PERMISSIONS", "16"))
+	if permissions == "" {
+		permissions = "16"
+	}
+
+	return identity.DiscordServerLinkConfig{
+		ApplicationID: applicationID,
+		BotToken:      strings.TrimSpace(os.Getenv("DISCORD_BOT_TOKEN")),
+		RedirectURL:   redirectURL,
+		Permissions:   permissions,
+		Enabled:       enabled,
 	}
 }
 
