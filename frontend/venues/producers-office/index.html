@@ -359,14 +359,11 @@
         <h2>Discord Channel Mapping</h2>
         <p class="muted small">Create or repair the Victory Theater category, core admin channels, and venue categories inside the linked Discord Server.</p>
         <div id="discord-mapping-status" class="status">Checking channel mapping...</div>
+        <div id="discord-mapping-repair-state" class="status">Waiting</div>
         <div class="request-grid" style="margin-top: 12px;">
           <div>
             <div class="muted small"><strong>Core category</strong></div>
             <div id="discord-mapping-core-category">Unavailable</div>
-          </div>
-          <div>
-            <div class="muted small"><strong>Repair</strong></div>
-            <div id="discord-mapping-repair-state">Waiting</div>
           </div>
         </div>
         <div class="request-grid" style="margin-top: 12px;">
@@ -796,7 +793,10 @@
           const found = Array.isArray(data.found) ? data.found.length : 0;
           const updated = Array.isArray(data.updated) ? data.updated.length : 0;
           const failed = Array.isArray(data.failed) ? data.failed.length : 0;
-          setStatus(discordMappingRepairState, `Created ${created}, found ${found}, updated ${updated}, failed ${failed}.`);
+          const details = Array.isArray(data.failed_details) && data.failed_details.length
+            ? ` ${data.failed_details.slice(0, 3).map((item) => `• ${item}`).join(" ")}`
+            : "";
+          setStatus(discordMappingRepairState, `Created ${created}, found ${found}, updated ${updated}, failed ${failed}.${details}`);
         }
         await loadDiscordChannelMappingStatus();
         await loadDiscordServerStatus();

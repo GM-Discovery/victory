@@ -562,6 +562,17 @@ func discordServerLinkRequest(ctx context.Context, cfg DiscordServerLinkConfig, 
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var errBody map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&errBody)
+		if resp.StatusCode == http.StatusUnauthorized {
+			if message, ok := errBody["message"].(string); ok && strings.TrimSpace(message) != "" {
+				return fmt.Errorf("discord api unauthorized: %s", message)
+			}
+			return fmt.Errorf("discord api unauthorized: check bot token")
+		}
+		if message, ok := errBody["message"].(string); ok && strings.TrimSpace(message) != "" {
+			return fmt.Errorf("discord api http %d: %s", resp.StatusCode, message)
+		}
 		return fmt.Errorf("discord api http %d", resp.StatusCode)
 	}
 

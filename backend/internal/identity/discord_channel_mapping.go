@@ -53,10 +53,11 @@ type DiscordChannelMappingStatus struct {
 }
 
 type DiscordChannelMappingRepairSummary struct {
-	Created []string `json:"created"`
-	Found   []string `json:"found"`
-	Updated []string `json:"updated"`
-	Failed  []string `json:"failed"`
+	Created       []string `json:"created"`
+	Found         []string `json:"found"`
+	Updated       []string `json:"updated"`
+	Failed        []string `json:"failed"`
+	FailedDetails []string `json:"failed_details,omitempty"`
 }
 
 type discordChannelMappingRow struct {
@@ -242,7 +243,7 @@ func HandleDiscordChannelMappingRepair(pool *pgxpool.Pool, cfg DiscordServerLink
 		summary := &DiscordChannelMappingRepairSummary{}
 		createdBy := userID
 
-		coreCategory, action, err := ensureDiscordChannelMapping(ctx, pool, cfg, location.ID, linkRecord.DiscordGuildID, createdBy, channels, rows, discordChannelMappingSpec{
+		coreCategory, action, err := ensureDiscordChannelMapping(ctx, pool, runtimeCfg, location.ID, linkRecord.DiscordGuildID, createdBy, channels, rows, discordChannelMappingSpec{
 			MappingKind:      discordChannelMappingKindCoreCategory,
 			VictoryScopeKind: discordChannelScopeKindLocation,
 			VictoryScopeSlug: location.Slug,
@@ -251,6 +252,7 @@ func HandleDiscordChannelMappingRepair(pool *pgxpool.Pool, cfg DiscordServerLink
 		}, "")
 		if err != nil {
 			summary.Failed = append(summary.Failed, "Victory Theater")
+			summary.FailedDetails = append(summary.FailedDetails, err.Error())
 		} else {
 			summary.add(action, coreCategory.ExpectedName)
 			rows = upsertRowCache(rows, coreCategory)
@@ -263,9 +265,10 @@ func HandleDiscordChannelMappingRepair(pool *pgxpool.Pool, cfg DiscordServerLink
 			}
 		} else {
 			for _, spec := range coreChannelSpecs() {
-				item, action, err := ensureDiscordChannelMapping(ctx, pool, cfg, location.ID, linkRecord.DiscordGuildID, createdBy, channels, rows, spec, coreCategoryID)
+				item, action, err := ensureDiscordChannelMapping(ctx, pool, runtimeCfg, location.ID, linkRecord.DiscordGuildID, createdBy, channels, rows, spec, coreCategoryID)
 				if err != nil {
 					summary.Failed = append(summary.Failed, spec.ExpectedName)
+					summary.FailedDetails = append(summary.FailedDetails, spec.ExpectedName+": "+err.Error())
 					continue
 				}
 				summary.add(action, item.ExpectedName)
@@ -274,9 +277,10 @@ func HandleDiscordChannelMappingRepair(pool *pgxpool.Pool, cfg DiscordServerLink
 		}
 
 		for _, spec := range venueCategorySpecs() {
-			item, action, err := ensureDiscordChannelMapping(ctx, pool, cfg, location.ID, linkRecord.DiscordGuildID, createdBy, channels, rows, spec, "")
+			item, action, err := ensureDiscordChannelMapping(ctx, pool, runtimeCfg, location.ID, linkRecord.DiscordGuildID, createdBy, channels, rows, spec, "")
 			if err != nil {
 				summary.Failed = append(summary.Failed, spec.ExpectedName)
+				summary.FailedDetails = append(summary.FailedDetails, spec.ExpectedName+": "+err.Error())
 				continue
 			}
 			summary.add(action, item.ExpectedName)
