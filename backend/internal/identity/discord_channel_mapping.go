@@ -17,9 +17,11 @@ const (
 	discordChannelMappingKindCoreCategory  = "core_category"
 	discordChannelMappingKindCoreChannel   = "core_channel"
 	discordChannelMappingKindVenueCategory = "venue_category"
+	discordChannelMappingKindVenueChat     = "venue_chat_channel"
 	discordChannelScopeKindLocation        = "location"
 	discordChannelScopeKindCoreChannel     = "core_channel"
 	discordChannelScopeKindVenue           = "venue"
+	discordChannelScopeKindVenueChat       = "venue_chat_channel"
 	discordChannelTypeCategory             = "category"
 	discordChannelTypeText                 = "text"
 )
@@ -49,6 +51,7 @@ type DiscordChannelMappingStatus struct {
 	SetupAvailable bool                                `json:"setup_available"`
 	Core           DiscordChannelMappingGroup          `json:"core"`
 	Venues         []DiscordChannelMappingItem         `json:"venues"`
+	ChatParents    []DiscordChannelMappingItem         `json:"chat_parents"`
 	RepairSummary  *DiscordChannelMappingRepairSummary `json:"repair_summary,omitempty"`
 }
 
@@ -142,6 +145,7 @@ func HandleDiscordChannelMappingStatus(pool *pgxpool.Pool, cfg DiscordServerLink
 			status.Core.Category = missingMappingItem(discordChannelMappingKindCoreCategory, discordChannelScopeKindLocation, location.Slug, "Victory Theater")
 			status.Core.Channels = defaultCoreChannelMissingItems()
 			status.Venues = defaultVenueMissingItems()
+			status.ChatParents = defaultVenueChatMissingItems()
 			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": status})
 			return
 		}
@@ -170,6 +174,9 @@ func HandleDiscordChannelMappingStatus(pool *pgxpool.Pool, cfg DiscordServerLink
 		}
 		for _, spec := range venueCategorySpecs() {
 			status.Venues = append(status.Venues, mappingStatusForSpec(rows, channels, spec))
+		}
+		for _, spec := range venueChatChannelSpecs() {
+			status.ChatParents = append(status.ChatParents, mappingStatusForSpec(rows, channels, spec))
 		}
 
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": status})
@@ -278,6 +285,24 @@ func HandleDiscordChannelMappingRepair(pool *pgxpool.Pool, cfg DiscordServerLink
 
 		for _, spec := range venueCategorySpecs() {
 			item, action, err := ensureDiscordChannelMapping(ctx, pool, runtimeCfg, location.ID, linkRecord.DiscordGuildID, createdBy, channels, rows, spec, "")
+			if err != nil {
+				summary.Failed = append(summary.Failed, spec.ExpectedName)
+				summary.FailedDetails = append(summary.FailedDetails, spec.ExpectedName+": "+err.Error())
+				continue
+			}
+			summary.add(action, item.ExpectedName)
+			rows = upsertRowCache(rows, item)
+		}
+
+		for _, spec := range venueChatChannelSpecs() {
+			parentSpec := venueCategorySpecForSlug(spec.VictoryScopeSlug)
+			parentRow, ok := rows[mappingKey(parentSpec.MappingKind, parentSpec.VictoryScopeKind, parentSpec.VictoryScopeSlug)]
+			if !ok || strings.TrimSpace(parentRow.DiscordChannelID) == "" {
+				summary.Failed = append(summary.Failed, spec.ExpectedName)
+				summary.FailedDetails = append(summary.FailedDetails, spec.ExpectedName+": parent category missing")
+				continue
+			}
+			item, action, err := ensureDiscordChannelMapping(ctx, pool, runtimeCfg, location.ID, linkRecord.DiscordGuildID, createdBy, channels, rows, spec, parentRow.DiscordChannelID)
 			if err != nil {
 				summary.Failed = append(summary.Failed, spec.ExpectedName)
 				summary.FailedDetails = append(summary.FailedDetails, spec.ExpectedName+": "+err.Error())
@@ -659,6 +684,31 @@ func venueCategorySpecs() []discordChannelMappingSpec {
 		{MappingKind: discordChannelMappingKindVenueCategory, VictoryScopeKind: discordChannelScopeKindVenue, VictoryScopeSlug: "trailers", ExpectedName: "Trailers", ChannelType: discordChannelTypeCategory},
 		{MappingKind: discordChannelMappingKindVenueCategory, VictoryScopeKind: discordChannelScopeKindVenue, VictoryScopeSlug: "workshop", ExpectedName: "Workshop", ChannelType: discordChannelTypeCategory},
 	}
+}
+
+func venueChatChannelSpecs() []discordChannelMappingSpec {
+	return []discordChannelMappingSpec{
+		{MappingKind: discordChannelMappingKindVenueChat, VictoryScopeKind: discordChannelScopeKindVenueChat, VictoryScopeSlug: "the-cave", ExpectedName: "the-cave-chat", ChannelType: discordChannelTypeText},
+		{MappingKind: discordChannelMappingKindVenueChat, VictoryScopeKind: discordChannelScopeKindVenueChat, VictoryScopeSlug: "first-theater", ExpectedName: "first-theater-chat", ChannelType: discordChannelTypeText},
+		{MappingKind: discordChannelMappingKindVenueChat, VictoryScopeKind: discordChannelScopeKindVenueChat, VictoryScopeSlug: "middle-school-stage", ExpectedName: "middle-school-stage-chat", ChannelType: discordChannelTypeText},
+	}
+}
+
+func defaultVenueChatMissingItems() []DiscordChannelMappingItem {
+	items := make([]DiscordChannelMappingItem, 0, len(venueChatChannelSpecs()))
+	for _, spec := range venueChatChannelSpecs() {
+		items = append(items, missingMappingItem(spec.MappingKind, spec.VictoryScopeKind, spec.VictoryScopeSlug, spec.ExpectedName))
+	}
+	return items
+}
+
+func venueCategorySpecForSlug(slug string) discordChannelMappingSpec {
+	for _, spec := range venueCategorySpecs() {
+		if strings.EqualFold(strings.TrimSpace(spec.VictoryScopeSlug), strings.TrimSpace(slug)) {
+			return spec
+		}
+	}
+	return discordChannelMappingSpec{VictoryScopeSlug: slug}
 }
 
 func (s *DiscordChannelMappingRepairSummary) add(action, name string) {

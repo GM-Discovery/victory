@@ -376,7 +376,29 @@
             <div id="discord-mapping-venues"></div>
           </div>
         </div>
+        <div class="request-grid" style="margin-top: 12px;">
+          <div>
+            <div class="muted small"><strong>Venue Chat Parents</strong></div>
+            <div id="discord-mapping-chat-parents"></div>
+          </div>
+          <div>
+            <div class="muted small"><strong>Mic Command</strong></div>
+            <div id="discord-mic-command-state">Unknown</div>
+            <div class="muted small" id="discord-mic-command-hint" style="margin-top: 6px;"></div>
+          </div>
+        </div>
+        <div class="request-grid" style="margin-top: 12px;">
+          <div>
+            <div class="muted small"><strong>Public Key</strong></div>
+            <div id="discord-mic-public-key-state">Unknown</div>
+          </div>
+          <div>
+            <div class="muted small"><strong>Interactions Endpoint</strong></div>
+            <div id="discord-mic-interactions-state">Unknown</div>
+          </div>
+        </div>
         <div class="chip-list" style="margin-top: 14px;">
+          <button id="discord-mic-register" class="chip" type="button">Register /mic Command</button>
           <button id="discord-mapping-repair" class="button" type="button">Create / Repair Discord Channels</button>
         </div>
       </section>
@@ -401,6 +423,9 @@
 
           <label for="discord-bootstrap-permissions">Bot Permissions</label>
           <input id="discord-bootstrap-permissions" type="text" placeholder="16" />
+
+          <label for="discord-bootstrap-public-key">Discord Public Key</label>
+          <input id="discord-bootstrap-public-key" type="text" placeholder="Discord application public key" />
 
           <label style="display:flex;align-items:center;gap:10px;margin:10px 0 0;">
             <input id="discord-bootstrap-enabled" type="checkbox" />
@@ -489,8 +514,14 @@
     const discordMappingCoreCategory = document.getElementById("discord-mapping-core-category");
     const discordMappingCoreChannels = document.getElementById("discord-mapping-core-channels");
     const discordMappingVenues = document.getElementById("discord-mapping-venues");
+    const discordMappingChatParents = document.getElementById("discord-mapping-chat-parents");
     const discordMappingRepair = document.getElementById("discord-mapping-repair");
     const discordMappingRepairState = document.getElementById("discord-mapping-repair-state");
+    const discordMicRegister = document.getElementById("discord-mic-register");
+    const discordMicCommandState = document.getElementById("discord-mic-command-state");
+    const discordMicCommandHint = document.getElementById("discord-mic-command-hint");
+    const discordMicPublicKeyState = document.getElementById("discord-mic-public-key-state");
+    const discordMicInteractionsState = document.getElementById("discord-mic-interactions-state");
     const discordBootstrapCard = document.getElementById("discord-bootstrap-card");
     const discordBootstrapForm = document.getElementById("discord-bootstrap-form");
     const discordBootstrapStatus = document.getElementById("discord-bootstrap-status");
@@ -500,6 +531,7 @@
     const discordBootstrapRedirectHint = document.getElementById("discord-bootstrap-redirect-hint");
     const discordBootstrapUseCallback = document.getElementById("discord-bootstrap-use-callback");
     const discordBootstrapPermissions = document.getElementById("discord-bootstrap-permissions");
+    const discordBootstrapPublicKey = document.getElementById("discord-bootstrap-public-key");
     const discordBootstrapEnabled = document.getElementById("discord-bootstrap-enabled");
     const discordBootstrapSource = document.getElementById("discord-bootstrap-source");
 
@@ -599,6 +631,7 @@
       const server = status?.discord_server || null;
       const core = status?.core || {};
       const venues = Array.isArray(status?.venues) ? status.venues : [];
+      const chatParents = Array.isArray(status?.chat_parents) ? status.chat_parents : [];
 
       if (discordMappingStatus) {
         setStatus(
@@ -624,6 +657,11 @@
           ? venues.map((item) => renderMappingItem(item)).join("")
           : `<div class="muted small">No venue categories yet.</div>`;
       }
+      if (discordMappingChatParents) {
+        discordMappingChatParents.innerHTML = chatParents.length
+          ? chatParents.map((item) => renderMappingItem(item)).join("")
+          : `<div class="muted small">No venue chat parents yet.</div>`;
+      }
       if (discordMappingRepair) {
         discordMappingRepair.hidden = !(linked && setupAvailable && canManage);
         discordMappingRepair.disabled = !(linked && setupAvailable && canManage);
@@ -636,6 +674,79 @@
     function refreshDiscordBootstrapHint() {
       if (discordBootstrapRedirectHint) {
         discordBootstrapRedirectHint.textContent = `Victory expects this exact callback URL: ${discordBootstrapCallbackURL}`;
+      }
+    }
+
+    function setDiscordMicState(status) {
+      const publicKeyConfigured = Boolean(status?.public_key_configured);
+      const interactionsConfigured = Boolean(status?.interactions_endpoint_configured);
+      const commandRegistered = Boolean(status?.command_registered);
+      const commandStatus = String(status?.command_status || (commandRegistered ? "registered" : "missing"));
+      const commandError = String(status?.command_error || "").trim();
+
+      if (discordMicPublicKeyState) {
+        discordMicPublicKeyState.textContent = publicKeyConfigured ? "Configured" : "Missing";
+      }
+      if (discordMicInteractionsState) {
+        discordMicInteractionsState.textContent = interactionsConfigured ? "Configured" : "Missing";
+      }
+      if (discordMicCommandState) {
+        discordMicCommandState.textContent = commandRegistered ? "Registered" : commandStatus;
+      }
+      if (discordMicCommandHint) {
+        discordMicCommandHint.textContent = commandError
+          ? `Last error: ${commandError}`
+          : `Route: /api/discord/interactions`;
+      }
+      if (discordMicRegister) {
+        const canManage = Boolean(status?.can_manage);
+        discordMicRegister.hidden = !(canManage && publicKeyConfigured);
+        discordMicRegister.disabled = !(canManage && publicKeyConfigured);
+      }
+    }
+
+    async function loadDiscordMicStatus() {
+      try {
+        const res = await fetch("/api/discord/mic/status?venue_slug=the-cave", { credentials: "include" });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Failed to load mic status (HTTP ${res.status})`);
+        }
+        setDiscordMicState(payload.data || {});
+      } catch (error) {
+        setDiscordMicState({
+          public_key_configured: false,
+          interactions_endpoint_configured: false,
+          command_registered: false,
+          command_status: "unknown",
+          command_error: error.message || String(error),
+          can_control: false,
+          can_manage: false,
+        });
+      }
+    }
+
+    async function registerDiscordMicCommand() {
+      if (discordMicCommandState) {
+        setStatus(discordMicCommandState, "Registering /mic command...");
+      }
+      try {
+        const res = await fetch("/api/discord/mic/register", {
+          method: "POST",
+          credentials: "include",
+        });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Failed to register /mic command (HTTP ${res.status})`);
+        }
+        if (discordMicCommandHint) {
+          discordMicCommandHint.textContent = `Registered at ${payload.data?.registered_at || "now"}`;
+        }
+        await loadDiscordMicStatus();
+      } catch (error) {
+        if (discordMicCommandHint) {
+          discordMicCommandHint.textContent = error.message || String(error);
+        }
       }
     }
 
@@ -772,6 +883,7 @@
           can_manage: false,
           core: { category: {}, channels: [] },
           venues: [],
+          chat_parents: [],
         });
       }
     }
@@ -825,6 +937,7 @@
           discordBootstrapRedirectURL.value = data.redirect_url || discordBootstrapCallbackURL;
         }
         if (discordBootstrapPermissions) discordBootstrapPermissions.value = data.permissions || "16";
+        if (discordBootstrapPublicKey) discordBootstrapPublicKey.value = data.public_key || "";
         if (discordBootstrapEnabled) discordBootstrapEnabled.checked = Boolean(data.enabled);
         if (discordBootstrapStatus) {
           setStatus(discordBootstrapStatus, data.application_id ? "Bootstrap settings loaded." : "Bootstrap settings not configured yet.");
@@ -833,7 +946,7 @@
           const redirectState = data.redirect_url && data.redirect_url !== discordBootstrapCallbackURL
             ? ` · Redirect mismatch`
             : "";
-          discordBootstrapSource.textContent = `Source: ${data.source || "env"} · Bot token set: ${data.bot_token_set ? "Yes" : "No"}${redirectState}`;
+          discordBootstrapSource.textContent = `Source: ${data.source || "env"} · Bot token set: ${data.bot_token_set ? "Yes" : "No"} · Public key set: ${data.public_key_set ? "Yes" : "No"}${redirectState}`;
         }
       } catch (error) {
         if (discordBootstrapStatus) {
@@ -857,6 +970,7 @@
             bot_token: discordBootstrapBotToken?.value.trim() || "",
             redirect_url: discordBootstrapRedirectURL?.value.trim() || discordBootstrapCallbackURL,
             permissions: discordBootstrapPermissions?.value.trim() || "16",
+            public_key: discordBootstrapPublicKey?.value.trim() || "",
             enabled: Boolean(discordBootstrapEnabled?.checked),
           }),
         });
@@ -870,7 +984,7 @@
           const redirectState = data.redirect_url && data.redirect_url !== discordBootstrapCallbackURL
             ? ` · Redirect mismatch`
             : "";
-          discordBootstrapSource.textContent = `Source: ${data.source || "database"} · Bot token set: ${data.bot_token_set ? "Yes" : "No"}${redirectState}`;
+          discordBootstrapSource.textContent = `Source: ${data.source || "database"} · Bot token set: ${data.bot_token_set ? "Yes" : "No"} · Public key set: ${data.public_key_set ? "Yes" : "No"}${redirectState}`;
         }
         if (discordBootstrapStatus) setStatus(discordBootstrapStatus, "Bootstrap settings saved.");
         await loadDiscordServerStatus();
@@ -954,6 +1068,10 @@
       await repairDiscordChannelMapping();
     });
 
+    discordMicRegister?.addEventListener("click", async () => {
+      await registerDiscordMicCommand();
+    });
+
     discordBootstrapUseCallback?.addEventListener("click", () => {
       if (discordBootstrapRedirectURL) {
         discordBootstrapRedirectURL.value = discordBootstrapCallbackURL;
@@ -991,7 +1109,7 @@
           }
         }
 
-        await Promise.all([loadProductions(), loadIncomingRequests(), loadDiscordServerStatus(), loadDiscordChannelMappingStatus()]);
+        await Promise.all([loadProductions(), loadIncomingRequests(), loadDiscordServerStatus(), loadDiscordChannelMappingStatus(), loadDiscordMicStatus()]);
         if (isOperator) {
           refreshDiscordBootstrapHint();
           await loadDiscordBootstrapStatus();

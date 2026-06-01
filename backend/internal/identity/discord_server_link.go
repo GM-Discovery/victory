@@ -29,6 +29,7 @@ type DiscordServerLinkConfig struct {
 	BotToken      string
 	RedirectURL   string
 	Permissions   string
+	PublicKey     string
 	Enabled       bool
 	AuthorizeURL  string
 	APIBaseURL    string
@@ -100,6 +101,14 @@ func DiscordServerLinkConfigured(cfg DiscordServerLinkConfig) bool {
 		strings.TrimSpace(cfg.RedirectURL) != ""
 }
 
+func DiscordInteractionsConfigured(cfg DiscordServerLinkConfig) bool {
+	return cfg.Enabled && strings.TrimSpace(cfg.PublicKey) != ""
+}
+
+func DiscordMicCommandConfigured(cfg DiscordServerLinkConfig) bool {
+	return DiscordServerLinkConfigured(cfg) && DiscordInteractionsConfigured(cfg)
+}
+
 func discordServerLinkHTTPClient(cfg DiscordServerLinkConfig) *http.Client {
 	if cfg.HTTPClient != nil {
 		return cfg.HTTPClient
@@ -125,13 +134,13 @@ func HandleDiscordServerLinkStatus(pool *pgxpool.Pool, cfg DiscordServerLinkConf
 
 		location, err := resolveProducerOfficeLocation(ctx, pool)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "location_lookup_failed"})
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "location_lookup_failed", "detail": err.Error()})
 			return
 		}
 
 		runtimeCfg, err := resolveDiscordServerLinkRuntimeConfig(ctx, pool, cfg)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "config_lookup_failed"})
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "config_lookup_failed", "detail": err.Error()})
 			return
 		}
 
@@ -308,7 +317,7 @@ func HandleDiscordServerCallback(pool *pgxpool.Pool, cfg DiscordServerLinkConfig
 
 		location, err := resolveProducerOfficeLocation(ctx, pool)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "location_lookup_failed"})
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "location_lookup_failed", "detail": err.Error()})
 			return
 		}
 
@@ -320,7 +329,7 @@ func HandleDiscordServerCallback(pool *pgxpool.Pool, cfg DiscordServerLinkConfig
 
 		channel, err := ensureDiscordSystemChannel(ctx, runtimeCfg, guildID)
 		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "discord_system_channel_failed"})
+			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "discord_system_channel_failed", "detail": err.Error()})
 			return
 		}
 
@@ -333,7 +342,7 @@ func HandleDiscordServerCallback(pool *pgxpool.Pool, cfg DiscordServerLinkConfig
 			BotVerified:       true,
 			LinkedByUserID:    userID,
 		}); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "link_store_failed"})
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "link_store_failed", "detail": err.Error()})
 			return
 		}
 
@@ -369,12 +378,12 @@ func HandleDiscordServerUnlink(pool *pgxpool.Pool, cfg DiscordServerLinkConfig) 
 
 		location, err := resolveProducerOfficeLocation(ctx, pool)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "location_lookup_failed"})
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "location_lookup_failed", "detail": err.Error()})
 			return
 		}
 
 		if err := unlinkDiscordServer(ctx, pool, location.ID); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "unlink_failed"})
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "unlink_failed", "detail": err.Error()})
 			return
 		}
 
@@ -402,6 +411,15 @@ func resolveProducerOfficeLocation(ctx context.Context, pool *pgxpool.Pool) (str
 		JOIN lots lo ON lo.id = v.lot_id
 		JOIN locations l ON l.id = lo.location_id
 		WHERE v.slug = 'producers-office'
+		LIMIT 1
+	`).Scan(&location.ID, &location.Slug, &location.Name)
+	if err == nil {
+		return location, nil
+	}
+	err = pool.QueryRow(ctx, `
+		SELECT id::text, slug, name
+		FROM locations
+		WHERE slug = 'amurray-family'
 		LIMIT 1
 	`).Scan(&location.ID, &location.Slug, &location.Name)
 	return location, err

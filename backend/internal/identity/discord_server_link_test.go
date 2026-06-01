@@ -38,8 +38,10 @@ func TestDiscordServerInstallAndCallbackPersistLink(t *testing.T) {
 
 	userID := insertDiscordServerTestUser(t, pool, operatorHandle, "Server Link Operator")
 	locationID := resolveDiscordServerTestLocationID(t, pool, "amurray-family")
+	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)
 	t.Cleanup(func() {
 		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.sessions WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)
 		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_links WHERE location_id = $1`, locationID)
 		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.oauth_states WHERE provider = $1`, discordServerLinkProvider)
 		_, _ = pool.Exec(context.Background(), `DELETE FROM location_memberships WHERE user_id = $1`, userID)
@@ -84,7 +86,7 @@ func TestDiscordServerInstallAndCallbackPersistLink(t *testing.T) {
 	installRec := httptest.NewRecorder()
 	HandleDiscordServerInstall(pool, cfg).ServeHTTP(installRec, installReq)
 	if installRec.Code != http.StatusFound {
-		t.Fatalf("unexpected install status %d", installRec.Code)
+		t.Fatalf("unexpected install status %d body=%s", installRec.Code, installRec.Body.String())
 	}
 
 	redirectURL, err := url.Parse(installRec.Header().Get("Location"))
@@ -182,6 +184,7 @@ func TestDiscordServerBootstrapPersistsSettingsAndUnblocksInstall(t *testing.T) 
 
 	userID := insertDiscordServerTestUser(t, pool, operatorHandle, "Server Link Operator")
 	locationID := resolveDiscordServerTestLocationID(t, pool, "amurray-family")
+	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)
 	t.Cleanup(func() {
 		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.sessions WHERE user_id = $1`, userID)
 		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)
@@ -194,13 +197,13 @@ func TestDiscordServerBootstrapPersistsSettingsAndUnblocksInstall(t *testing.T) 
 		t.Fatalf("create session: %v", err)
 	}
 
-	bootstrapReq := httptest.NewRequest(http.MethodPost, "/api/discord/server/bootstrap", strings.NewReader(`{"application_id":"app-456","bot_token":"bot-456","redirect_url":"https://victory.example/auth/discord/server/callback","permissions":"16","enabled":true}`))
+	bootstrapReq := httptest.NewRequest(http.MethodPost, "/api/discord/server/bootstrap", strings.NewReader(`{"application_id":"app-456","bot_token":"bot-456","redirect_url":"https://victory.example/auth/discord/server/callback","permissions":"16","public_key":"public-key-456","enabled":true}`))
 	bootstrapReq.AddCookie(&http.Cookie{Name: sessions.CookieName, Value: rawSession})
 	bootstrapReq.Header.Set("Content-Type", "application/json")
 	bootstrapRec := httptest.NewRecorder()
 	HandleDiscordServerBootstrap(pool, DiscordServerLinkConfig{}).ServeHTTP(bootstrapRec, bootstrapReq)
 	if bootstrapRec.Code != http.StatusOK {
-		t.Fatalf("unexpected bootstrap status %d", bootstrapRec.Code)
+		t.Fatalf("unexpected bootstrap status %d body=%s", bootstrapRec.Code, bootstrapRec.Body.String())
 	}
 
 	statusReq := httptest.NewRequest(http.MethodGet, "/api/discord/server/bootstrap", nil)
@@ -251,7 +254,7 @@ func TestDiscordServerBootstrapPersistsSettingsAndUnblocksInstall(t *testing.T) 
 	installRec := httptest.NewRecorder()
 	HandleDiscordServerInstall(pool, cfg).ServeHTTP(installRec, installReq)
 	if installRec.Code != http.StatusFound {
-		t.Fatalf("unexpected install status %d", installRec.Code)
+		t.Fatalf("unexpected install status %d body=%s", installRec.Code, installRec.Body.String())
 	}
 }
 
@@ -282,6 +285,7 @@ func ensureDiscordServerTestSchema(t *testing.T, pool *pgxpool.Pool) {
 			bot_token text,
 			redirect_url text,
 			permissions text,
+			public_key text NOT NULL DEFAULT '',
 			enabled boolean NOT NULL DEFAULT FALSE,
 			updated_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
 			updated_at timestamptz NOT NULL DEFAULT now()
@@ -319,6 +323,104 @@ func ensureDiscordServerTestSchema(t *testing.T, pool *pgxpool.Pool) {
 			created_at timestamptz NOT NULL DEFAULT now()
 		)
 	`)
+	_, _ = pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS auth.discord_session_threads (
+			id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+			location_id uuid NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+			venue_id uuid,
+			venue_slug text NOT NULL,
+			session_id uuid,
+			showing_id uuid,
+			discord_server_id text NOT NULL,
+			parent_channel_id text NOT NULL,
+			thread_id text NOT NULL,
+			thread_name text NOT NULL,
+			started_by_user_id uuid,
+			started_by_discord_user_id text,
+			started_at timestamptz NOT NULL DEFAULT now(),
+			showtime_at timestamptz NOT NULL,
+			ended_at timestamptz,
+			status text NOT NULL DEFAULT 'active',
+			created_at timestamptz NOT NULL DEFAULT now(),
+			updated_at timestamptz NOT NULL DEFAULT now(),
+			UNIQUE (location_id, venue_slug)
+		)
+	`)
+	_, _ = pool.Exec(ctx, `
+		WITH location_row AS (
+			INSERT INTO locations (name, slug)
+			VALUES ('amurray.family', 'amurray-family')
+			ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+			RETURNING id
+		),
+		location_pick AS (
+			SELECT id FROM location_row
+			UNION
+			SELECT id FROM locations WHERE slug = 'amurray-family'
+			LIMIT 1
+		),
+		lot_row AS (
+			INSERT INTO lots (location_id, name, slug)
+			SELECT id, 'main-lot', 'main-lot'
+			FROM location_pick
+			ON CONFLICT (location_id, slug) DO UPDATE SET name = EXCLUDED.name
+			RETURNING id, location_id
+		),
+		lot_pick AS (
+			SELECT id, location_id FROM lot_row
+			UNION
+			SELECT id, location_id FROM lots
+			WHERE slug = 'main-lot'
+			  AND location_id = (SELECT id FROM location_pick)
+			LIMIT 1
+		)
+		INSERT INTO venues (lot_id, name, slug, kind, config, is_public, is_workshop)
+		SELECT
+			(SELECT id FROM lot_pick),
+			'Producer''s Office',
+			'producers-office',
+			'office',
+			'{ "surface": "permissions", "office": "producer", "requests": true, "permissions": true }'::jsonb,
+			FALSE,
+			FALSE
+		ON CONFLICT (lot_id, slug) DO UPDATE
+			SET name = EXCLUDED.name,
+				kind = EXCLUDED.kind,
+				config = EXCLUDED.config,
+				is_public = EXCLUDED.is_public,
+				is_workshop = EXCLUDED.is_workshop
+	`)
+	_, _ = pool.Exec(ctx, `
+		WITH location_row AS (
+			SELECT id
+			FROM locations
+			WHERE slug = 'amurray-family'
+			LIMIT 1
+		),
+		lot_row AS (
+			SELECT id
+			FROM lots
+			WHERE location_id = (SELECT id FROM location_row)
+			  AND slug = 'main-lot'
+			LIMIT 1
+		)
+		INSERT INTO venues (lot_id, name, slug, kind, config, is_public, is_workshop)
+		SELECT
+			(SELECT id FROM lot_row),
+			'The Director''s Chair',
+			'directors-chair',
+			'plaza',
+			'{ "surface": "permissions", "office": "director", "requests": true, "permissions": true }'::jsonb,
+			FALSE,
+			FALSE
+		WHERE EXISTS (SELECT 1 FROM lot_row)
+		ON CONFLICT (lot_id, slug) DO UPDATE
+			SET name = EXCLUDED.name,
+				kind = EXCLUDED.kind,
+				config = EXCLUDED.config,
+				is_public = EXCLUDED.is_public,
+				is_workshop = EXCLUDED.is_workshop
+	`)
 }
 
 func insertDiscordServerTestUser(t *testing.T, pool *pgxpool.Pool, handle, displayName string) string {
@@ -328,6 +430,8 @@ func insertDiscordServerTestUser(t *testing.T, pool *pgxpool.Pool, handle, displ
 	if err := pool.QueryRow(context.Background(), `
 		INSERT INTO users (handle, display_name)
 		VALUES ($1, $2)
+		ON CONFLICT (handle) DO UPDATE
+		SET display_name = EXCLUDED.display_name
 		RETURNING id::text
 	`, handle, displayName).Scan(&userID); err != nil {
 		t.Fatalf("insert discord server test user: %v", err)
@@ -339,12 +443,23 @@ func resolveDiscordServerTestLocationID(t *testing.T, pool *pgxpool.Pool, slug s
 	t.Helper()
 
 	var locationID string
-	if err := pool.QueryRow(context.Background(), `
+	err := pool.QueryRow(context.Background(), `
 		SELECT id::text
 		FROM locations
 		WHERE slug = $1
 		LIMIT 1
-	`, slug).Scan(&locationID); err != nil {
+	`, slug).Scan(&locationID)
+	if err != nil {
+		err = pool.QueryRow(context.Background(), `
+			SELECT l.id::text
+			FROM venues v
+			JOIN lots lo ON lo.id = v.lot_id
+			JOIN locations l ON l.id = lo.location_id
+			WHERE v.slug = $1
+			LIMIT 1
+		`, slug).Scan(&locationID)
+	}
+	if err != nil {
 		t.Fatalf("resolve location %q: %v", slug, err)
 	}
 	return locationID

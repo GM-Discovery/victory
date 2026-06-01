@@ -102,6 +102,9 @@ func main() {
 	mux.HandleFunc("POST /api/discord/server/unlink", identity.HandleDiscordServerUnlink(pool, discordServerLinkConfig))
 	mux.HandleFunc("GET /api/discord/channel-mapping/status", identity.HandleDiscordChannelMappingStatus(pool, discordServerLinkConfig))
 	mux.HandleFunc("POST /api/discord/channel-mapping/repair", identity.HandleDiscordChannelMappingRepair(pool, discordServerLinkConfig))
+	mux.HandleFunc("POST /api/discord/interactions", identity.HandleDiscordInteractions(pool, discordServerLinkConfig))
+	mux.HandleFunc("GET /api/discord/mic/status", identity.HandleDiscordMicStatus(pool, discordServerLinkConfig))
+	mux.HandleFunc("POST /api/discord/mic/register", identity.HandleDiscordMicRegister(pool, discordServerLinkConfig))
 	mux.HandleFunc("/api/requests/create", identity.HandleCreatePermissionRequest(pool))
 	mux.HandleFunc("/api/requests/mine", identity.HandleListMyPermissionRequests(pool))
 	mux.HandleFunc("/api/requests/incoming", identity.HandleListIncomingPermissionRequests(pool))
@@ -483,6 +486,7 @@ func discordServerLinkConfigFromEnv() identity.DiscordServerLinkConfig {
 		BotToken:      strings.TrimSpace(os.Getenv("DISCORD_BOT_TOKEN")),
 		RedirectURL:   redirectURL,
 		Permissions:   permissions,
+		PublicKey:     strings.TrimSpace(getenv("DISCORD_PUBLIC_KEY", "")),
 		Enabled:       enabled,
 	}
 }
