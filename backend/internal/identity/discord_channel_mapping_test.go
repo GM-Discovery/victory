@@ -24,6 +24,7 @@ func TestDiscordChannelMappingRepairCreatesAndReusesSkeleton(t *testing.T) {
 	userID := insertDiscordServerTestUser(t, pool, "mapping_operator", "Mapping Operator")
 	locationID := resolveDiscordServerTestLocationID(t, pool, "producers-office")
 	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)
+	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_links WHERE location_id = $1`, locationID)
 	t.Cleanup(func() {
 		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.sessions WHERE user_id = $1`, userID)
 		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)

@@ -21,17 +21,33 @@ func TestDiscordMicInteractionsVerifyPingAndRejectBadSignature(t *testing.T) {
 		t.Fatalf("generate key: %v", err)
 	}
 
+	pool := openDiscordTestPool(t)
+	locationID := resolveDiscordServerTestLocationID(t, pool, "producers-office")
+	ensureDiscordServerTestSchema(t, pool)
+	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)
+	_, _ = pool.Exec(context.Background(), `
+		INSERT INTO auth.discord_server_link_settings (
+			location_id,
+			public_key,
+			enabled,
+			updated_at
+		)
+		VALUES ($1, $2, TRUE, NOW())
+	`, locationID, hex.EncodeToString(pub))
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)
+	})
+
 	body := []byte(`{"type":1}`)
 	timestamp := "1710000000"
 	signature := ed25519.Sign(priv, append([]byte(timestamp), body...))
 
-	pool := openDiscordTestPool(t)
 	req := httptest.NewRequest(http.MethodPost, "/api/discord/interactions", strings.NewReader(string(body)))
 	req.Header.Set("X-Signature-Timestamp", timestamp)
 	req.Header.Set("X-Signature-Ed25519", hex.EncodeToString(signature))
 	rec := httptest.NewRecorder()
 
-	HandleDiscordInteractions(pool, DiscordServerLinkConfig{PublicKey: hex.EncodeToString(pub)}).ServeHTTP(rec, req)
+	HandleDiscordInteractions(pool, DiscordServerLinkConfig{}).ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("unexpected ping status %d", rec.Code)
 	}
@@ -66,6 +82,7 @@ func TestDiscordMicRegisterAndStatusDispatch(t *testing.T) {
 	userID := insertDiscordServerTestUser(t, pool, "mic_operator", "Mic Operator")
 	locationID := resolveDiscordServerTestLocationID(t, pool, "producers-office")
 	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)
+	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_links WHERE location_id = $1`, locationID)
 	t.Cleanup(func() {
 		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.sessions WHERE user_id = $1`, userID)
 		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)
@@ -110,6 +127,22 @@ func TestDiscordMicRegisterAndStatusDispatch(t *testing.T) {
 		VALUES ($1, 'guild-1', 'Example Server', 'sys-1', 'victory-system', TRUE, TRUE, $2, NOW(), NOW())
 	`, locationID, userID); err != nil {
 		t.Fatalf("insert linked server: %v", err)
+	}
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO auth.discord_server_link_settings (
+			location_id,
+			application_id,
+			bot_token,
+			redirect_url,
+			permissions,
+			public_key,
+			enabled,
+			updated_at
+		)
+		VALUES ($1, 'app-1', 'bot-1', 'https://victory.example/auth/discord/server/callback', '16', $2, TRUE, NOW())
+	`, locationID, hex.EncodeToString(mustDiscordMicPublicKey(t))); err != nil {
+		t.Fatalf("insert link settings: %v", err)
 	}
 
 	if _, err := pool.Exec(ctx, `
@@ -171,11 +204,6 @@ func TestDiscordMicRegisterAndStatusDispatch(t *testing.T) {
 	interactionReq.Header.Set("X-Signature-Ed25519", hex.EncodeToString(signature))
 	interactionRec := httptest.NewRecorder()
 	HandleDiscordInteractions(pool, DiscordServerLinkConfig{
-		ApplicationID: "app-1",
-		BotToken:      "bot-1",
-		RedirectURL:   "https://victory.example/auth/discord/server/callback",
-		PublicKey:     hex.EncodeToString(mustDiscordMicPublicKey(t)),
-		Enabled:       true,
 		HTTPClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 			switch {
 			case req.Method == http.MethodGet && strings.Contains(req.URL.Path, "/applications/app-1/guilds/guild-1/commands"):
@@ -200,11 +228,11 @@ func TestDiscordMicRegisterAndStatusDispatch(t *testing.T) {
 	if err := json.Unmarshal(interactionRec.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode interaction response: %v", err)
 	}
-	if response.Type != discordInteractionResponseTypeChannelReply {
+	if response.Type != discordInteractionResponseTypeDeferredChannelMessageWithSource {
 		t.Fatalf("unexpected interaction response type %d", response.Type)
 	}
-	if !strings.Contains(response.Data.Content, "Mic: Off") {
-		t.Fatalf("unexpected interaction content %q", response.Data.Content)
+	if response.Data.Flags != 1<<6 {
+		t.Fatalf("unexpected interaction flags %d", response.Data.Flags)
 	}
 }
 

@@ -382,7 +382,7 @@ func main() {
 		})
 	})
 
-	mux.HandleFunc("/ws/the-cave", network.ServeCaveWS(hub, pool))
+	mux.HandleFunc("/ws/the-cave", network.ServeCaveWS(hub, pool, discordServerLinkConfig))
 
 	server := &http.Server{
 		Addr:              ":" + port,

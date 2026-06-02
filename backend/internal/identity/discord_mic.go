@@ -1,6 +1,7 @@
 package identity
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"database/sql"
@@ -25,6 +26,7 @@ const (
 	discordInteractionTypeApplicationCommand   = 2
 	discordInteractionResponseTypePong         = 1
 	discordInteractionResponseTypeChannelReply = 4
+	discordInteractionResponseTypeDeferredChannelMessageWithSource = 5
 	discordChannelTypePrivateThread            = 12
 
 	discordMicCommandName = "mic"
@@ -335,12 +337,18 @@ func HandleDiscordInteractions(pool *pgxpool.Pool, cfg DiscordServerLinkConfig) 
 			return
 		}
 
-		if strings.TrimSpace(cfg.PublicKey) == "" {
+		runtimeCfg, err := resolveDiscordServerLinkRuntimeConfig(ctx, pool, cfg)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "config_lookup_failed"})
+			return
+		}
+
+		if strings.TrimSpace(runtimeCfg.PublicKey) == "" {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "discord_interactions_unavailable"})
 			return
 		}
 
-		if !verifyDiscordInteractionSignature(cfg.PublicKey, r.Header.Get("X-Signature-Timestamp"), body, r.Header.Get("X-Signature-Ed25519")) {
+		if !verifyDiscordInteractionSignature(runtimeCfg.PublicKey, r.Header.Get("X-Signature-Timestamp"), body, r.Header.Get("X-Signature-Ed25519")) {
 			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "invalid_signature"})
 			return
 		}
@@ -356,7 +364,7 @@ func HandleDiscordInteractions(pool *pgxpool.Pool, cfg DiscordServerLinkConfig) 
 			writeJSON(w, http.StatusOK, discordInteractionResponse{Type: discordInteractionResponseTypePong})
 			return
 		case discordInteractionTypeApplicationCommand:
-			resp := handleDiscordMicCommand(ctx, pool, cfg, interaction)
+			resp := handleDiscordMicCommandDeferred(pool, cfg, interaction)
 			writeJSON(w, http.StatusOK, resp)
 			return
 		default:
@@ -366,66 +374,86 @@ func HandleDiscordInteractions(pool *pgxpool.Pool, cfg DiscordServerLinkConfig) 
 	}
 }
 
-func handleDiscordMicCommand(ctx context.Context, pool *pgxpool.Pool, cfg DiscordServerLinkConfig, interaction discordInteractionEnvelope) discordInteractionResponse {
+func handleDiscordMicCommandDeferred(pool *pgxpool.Pool, cfg DiscordServerLinkConfig, interaction discordInteractionEnvelope) discordInteractionResponse {
+	interactionCopy := interaction
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+
+		content := handleDiscordMicCommand(ctx, pool, cfg, interactionCopy)
+		if err := editDiscordInteractionOriginalResponse(ctx, cfg, interactionCopy, content); err != nil {
+			_ = editDiscordInteractionOriginalResponse(context.Background(), cfg, interactionCopy, "Victory could not finish the mic request.")
+		}
+	}()
+
+	return discordInteractionResponse{
+		Type: discordInteractionResponseTypeDeferredChannelMessageWithSource,
+		Data: &discordInteractionResponseData{
+			Flags: 1 << 6,
+		},
+	}
+}
+
+func handleDiscordMicCommand(ctx context.Context, pool *pgxpool.Pool, cfg DiscordServerLinkConfig, interaction discordInteractionEnvelope) string {
 	subcommand := discordMicSubcommand(interaction.Data)
 	if subcommand == "" {
-		return discordMicChannelReply("Use /mic on, /mic off, or /mic status.", true)
+		return "Use /mic on, /mic off, or /mic status."
 	}
 
 	discordUserID := discordMicInteractionUserID(interaction)
 	if strings.TrimSpace(discordUserID) == "" {
-		return discordMicChannelReply("Please log into Victory with Discord first. https://victory.amurray.family/auth/discord/start", true)
+		return "Please log into Victory with Discord first. https://victory.amurray.family/auth/discord/start"
 	}
 
 	userID, err := resolveVictoryUserForDiscordUser(ctx, pool, discordUserID)
 	if err != nil {
-		return discordMicChannelReply("Please log into Victory with Discord first. https://victory.amurray.family/auth/discord/start", true)
+		return "Please log into Victory with Discord first. https://victory.amurray.family/auth/discord/start"
 	}
 
 	canControl, err := discordMicCanControl(ctx, pool, userID)
 	if err != nil {
-		return discordMicChannelReply("Victory could not verify your mic authority right now.", true)
+		return "Victory could not verify your mic authority right now."
 	}
 	if !canControl {
-		return discordMicChannelReply("Producer or director access is required for /mic.", true)
+		return "Producer or director access is required for /mic."
 	}
 
 	venueSlug, venueName, parentRow, err := resolveDiscordMicVenueFromChannel(ctx, pool, interaction.ChannelID)
 	if err != nil {
-		return discordMicChannelReply("Use /mic in a Victory venue chat channel.", true)
+		return "Use /mic in a Victory venue chat channel."
 	}
 
 	location, err := resolveProducerOfficeLocation(ctx, pool)
 	if err != nil {
-		return discordMicChannelReply("Victory could not resolve the venue location.", true)
+		return "Victory could not resolve the venue location."
 	}
 
 	runtimeCfg, err := resolveDiscordServerLinkRuntimeConfig(ctx, pool, cfg)
 	if err != nil || !DiscordMicCommandConfigured(runtimeCfg) {
-		return discordMicChannelReply("Discord mic control is not configured yet.", true)
+		return "Discord mic control is not configured yet."
 	}
 
 	switch subcommand {
 	case "on", "hot", "start":
 		text, err := discordMicTurnOn(ctx, pool, runtimeCfg, location.ID, interaction.GuildID, venueSlug, venueName, parentRow, userID, discordUserID)
 		if err != nil {
-			return discordMicChannelReply("Victory could not start the mic thread.", true)
+			return "Victory could not start the mic thread."
 		}
-		return discordMicChannelReply(text, true)
+		return text
 	case "off":
 		text, err := discordMicTurnOff(ctx, pool, venueSlug, location.ID, interaction.GuildID, userID)
 		if err != nil {
-			return discordMicChannelReply("Victory could not end the mic thread.", true)
+			return "Victory could not end the mic thread."
 		}
-		return discordMicChannelReply(text, true)
+		return text
 	case "status":
 		text, err := discordMicStatusText(ctx, pool, location.ID, interaction.GuildID, venueSlug, venueName)
 		if err != nil {
-			return discordMicChannelReply("Victory could not load the mic status.", true)
+			return "Victory could not load the mic status."
 		}
-		return discordMicChannelReply(text, true)
+		return text
 	default:
-		return discordMicChannelReply("Use /mic on, /mic off, or /mic status.", true)
+		return "Use /mic on, /mic off, or /mic status."
 	}
 }
 
@@ -435,6 +463,59 @@ func discordMicChannelReply(content string, ephemeral bool) discordInteractionRe
 		data.Flags = 1 << 6
 	}
 	return discordInteractionResponse{Type: discordInteractionResponseTypeChannelReply, Data: data}
+}
+
+func discordInteractionWebhookBaseURL(cfg DiscordServerLinkConfig, interaction discordInteractionEnvelope) string {
+	baseURL := strings.TrimSpace(cfg.APIBaseURL)
+	if baseURL == "" {
+		baseURL = discordServerLinkAPIBaseURL
+	}
+	applicationID := strings.TrimSpace(cfg.ApplicationID)
+	if applicationID == "" {
+		applicationID = strings.TrimSpace(interaction.Application)
+	}
+	if applicationID == "" || strings.TrimSpace(interaction.Token) == "" {
+		return ""
+	}
+	return strings.TrimRight(baseURL, "/") + "/webhooks/" + url.PathEscape(applicationID) + "/" + url.PathEscape(strings.TrimSpace(interaction.Token))
+}
+
+func editDiscordInteractionOriginalResponse(ctx context.Context, cfg DiscordServerLinkConfig, interaction discordInteractionEnvelope, content string) error {
+	baseURL := discordInteractionWebhookBaseURL(cfg, interaction)
+	if baseURL == "" {
+		return errors.New("discord_interaction_webhook_unavailable")
+	}
+
+	payload := map[string]any{
+		"content": content,
+	}
+
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, baseURL+"/messages/@original", bytes.NewReader(raw))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := discordServerLinkHTTPClient(cfg).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var errBody map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&errBody)
+		if message, ok := errBody["message"].(string); ok && strings.TrimSpace(message) != "" {
+			return fmt.Errorf("discord interaction followup http %d: %s", resp.StatusCode, message)
+		}
+		return fmt.Errorf("discord interaction followup http %d", resp.StatusCode)
+	}
+	return nil
 }
 
 func discordMicSubcommand(data *discordInteractionData) string {

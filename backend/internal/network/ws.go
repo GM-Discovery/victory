@@ -49,8 +49,10 @@ var storeSetElementLockFunc = actions.StoreSetElementLock
 var storeSetNameplateVisibilityFunc = actions.StoreSetNameplateVisibility
 var storePersonaEquipFunc = actions.StorePersonaEquip
 var storePersonaUnequipFunc = actions.StorePersonaUnequip
+var discordBridgeConfig identity.DiscordServerLinkConfig
 
-func ServeCaveWS(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
+func ServeCaveWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordServerLinkConfig) http.HandlerFunc {
+	discordBridgeConfig = discordLinkCfg
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -316,6 +318,7 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 				"data": storedAction,
 			})
 			hub.Broadcast(msgOut)
+			go mirrorVictoryChatToDiscord(context.Background(), pool, discordBridgeConfig, storedAction)
 		}
 
 	case "perform/speak":

@@ -177,6 +177,10 @@ func resolveDiscordServerLinkRuntimeConfig(ctx context.Context, pool *pgxpool.Po
 	return cfg, nil
 }
 
+func ResolveDiscordServerLinkRuntimeConfig(ctx context.Context, pool *pgxpool.Pool, fallback DiscordServerLinkConfig) (DiscordServerLinkConfig, error) {
+	return resolveDiscordServerLinkRuntimeConfig(ctx, pool, fallback)
+}
+
 func loadDiscordServerLinkSettings(ctx context.Context, pool *pgxpool.Pool) (*discordServerLinkSettingsRow, error) {
 	location, err := resolveProducerOfficeLocation(ctx, pool)
 	if err != nil {

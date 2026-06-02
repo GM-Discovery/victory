@@ -601,6 +601,10 @@ func discordServerLinkRequest(ctx context.Context, cfg DiscordServerLinkConfig, 
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
+func DiscordServerLinkRequest(ctx context.Context, cfg DiscordServerLinkConfig, method, path string, payload any, out any) error {
+	return discordServerLinkRequest(ctx, cfg, method, path, payload, out)
+}
+
 func fallbackString(values ...string) string {
 	for _, value := range values {
 		if trimmed := strings.TrimSpace(value); trimmed != "" {

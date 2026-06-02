@@ -771,8 +771,10 @@
     }
 
     .chat-entry {
-      display: grid;
-      gap: 4px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0 6px;
       padding: 8px 10px;
       border-radius: 12px;
       background: rgba(255, 255, 255, 0.04);
@@ -797,12 +799,14 @@
 
     .chat-row {
       display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 12px;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
       align-items: center;
     }
 
     .chat-row input {
+      min-width: 0;
+      box-sizing: border-box;
       width: 100%;
       border-radius: 999px;
       border: 1px solid rgba(255, 255, 255, 0.12);
@@ -812,6 +816,7 @@
     }
 
     .chat-row button {
+      white-space: nowrap;
       border-radius: 999px;
       border: 1px solid rgba(255, 255, 255, 0.12);
       background: rgba(255, 255, 255, 0.04);
