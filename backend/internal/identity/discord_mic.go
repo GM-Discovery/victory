@@ -22,12 +22,12 @@ import (
 )
 
 const (
-	discordInteractionTypePing                 = 1
-	discordInteractionTypeApplicationCommand   = 2
-	discordInteractionResponseTypePong         = 1
-	discordInteractionResponseTypeChannelReply = 4
+	discordInteractionTypePing                                     = 1
+	discordInteractionTypeApplicationCommand                       = 2
+	discordInteractionResponseTypePong                             = 1
+	discordInteractionResponseTypeChannelReply                     = 4
 	discordInteractionResponseTypeDeferredChannelMessageWithSource = 5
-	discordChannelTypePrivateThread            = 12
+	discordChannelTypePrivateThread                                = 12
 
 	discordMicCommandName = "mic"
 	discordMicCommandDesc = "Control the Victory mic thread for this venue."
@@ -133,6 +133,17 @@ type discordMicStatusResponse struct {
 	Mic                            *discordMicThreadStateResponse `json:"mic,omitempty"`
 	CommandStatus                  string                         `json:"command_status,omitempty"`
 	CommandError                   string                         `json:"command_error,omitempty"`
+}
+
+type discordMicControlRequest struct {
+	VenueSlug string `json:"venue_slug"`
+	Command   string `json:"command"`
+}
+
+type discordMicControlResponse struct {
+	VenueSlug string `json:"venue_slug"`
+	Command   string `json:"command"`
+	Message   string `json:"message"`
 }
 
 type discordMicThreadStateResponse struct {
@@ -316,6 +327,150 @@ func HandleDiscordMicRegister(pool *pgxpool.Pool, cfg DiscordServerLinkConfig) h
 				"registered_at":    time.Now().UTC().Format(time.RFC3339),
 				"guild_id":         linkRecord.DiscordGuildID,
 				"interactions_url": "/api/discord/interactions",
+			},
+		})
+	}
+}
+
+func HandleDiscordMicControl(pool *pgxpool.Pool, cfg DiscordServerLinkConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method_not_allowed"})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+		defer cancel()
+
+		userID, err := currentUserID(ctx, pool, r)
+		if err != nil || strings.TrimSpace(userID) == "" {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "not_authenticated"})
+			return
+		}
+
+		var req discordMicControlRequest
+		if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid_json"})
+			return
+		}
+
+		venueSlug := normalizeMicVenueSlug(req.VenueSlug)
+		if venueSlug == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "venue_not_mic_enabled"})
+			return
+		}
+		venueName, ok := discordMicVenues[venueSlug]
+		if !ok {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "venue_not_mic_enabled"})
+			return
+		}
+
+		canControl, err := discordMicCanControl(ctx, pool, userID)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "access_check_failed"})
+			return
+		}
+		if !canControl {
+			writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "forbidden"})
+			return
+		}
+
+		location, err := resolveProducerOfficeLocation(ctx, pool)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "location_lookup_failed"})
+			return
+		}
+
+		command := normalizeMicCommand(req.Command)
+		if command == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "mic_command_required"})
+			return
+		}
+
+		row, err := loadDiscordMicThread(ctx, pool, location.ID, venueSlug)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "thread_lookup_failed"})
+			return
+		}
+
+		runtimeCfg, runtimeErr := resolveDiscordServerLinkRuntimeConfig(ctx, pool, cfg)
+		linkRecord, linkErr := loadDiscordServerLinkRecord(ctx, pool, location.ID)
+		hasDiscordConfig := runtimeErr == nil && DiscordMicCommandConfigured(runtimeCfg) && linkErr == nil && linkRecord.Active && strings.TrimSpace(linkRecord.DiscordGuildID) != ""
+
+		var message string
+		switch command {
+		case "hot", "on", "start":
+			if !hasDiscordConfig {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "discord_mic_unavailable"})
+				return
+			}
+			parentRow, err := discordMicParentChannelItem(ctx, pool, location.ID, venueSlug)
+			if err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "parent_channel_missing"})
+				return
+			}
+			message, err = discordMicTurnOn(ctx, pool, runtimeCfg, location.ID, linkRecord.DiscordGuildID, venueSlug, venueName, parentRow, userID, "")
+		case "off":
+			if hasDiscordConfig {
+				message, err = discordMicTurnOff(ctx, pool, venueSlug, location.ID, linkRecord.DiscordGuildID, userID)
+				break
+			}
+			if row == nil || strings.TrimSpace(row.ThreadID) == "" || !strings.EqualFold(strings.TrimSpace(row.Status), "active") {
+				message = "Mic: Off"
+				break
+			}
+			now := time.Now().UTC()
+			if err := saveDiscordMicThread(ctx, pool, discordMicThreadRow{
+				ID:                     row.ID,
+				LocationID:             location.ID,
+				VenueSlug:              venueSlug,
+				VenueName:              venueName,
+				SessionID:              row.SessionID,
+				ShowingID:              row.ShowingID,
+				DiscordServerID:        row.DiscordServerID,
+				ParentChannelID:        row.ParentChannelID,
+				ThreadID:               row.ThreadID,
+				ThreadName:             row.ThreadName,
+				StartedByUserID:        row.StartedByUserID,
+				StartedByDiscordUserID: row.StartedByDiscordUserID,
+				StartedAt:              row.StartedAt,
+				ShowtimeAt:             row.ShowtimeAt,
+				EndedAt:                &now,
+				Status:                 "inactive",
+			}); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "mic_update_failed"})
+				return
+			}
+			message = "Mic: Off"
+		case "status":
+			if hasDiscordConfig {
+				message, err = discordMicStatusText(ctx, pool, location.ID, linkRecord.DiscordGuildID, venueSlug, venueName)
+				break
+			}
+			if row == nil || strings.TrimSpace(row.ThreadID) == "" || !strings.EqualFold(strings.TrimSpace(row.Status), "active") {
+				message = "Mic: Off"
+				break
+			}
+			threadName := row.ThreadName
+			if threadName == "" {
+				threadName = discordMicThreadName(venueName, row.ShowtimeAt)
+			}
+			message = fmt.Sprintf("Mic: On\nThread: %s", threadName)
+		default:
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "unsupported_mic_command"})
+			return
+		}
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "mic_command_failed", "detail": err.Error()})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok": true,
+			"data": discordMicControlResponse{
+				VenueSlug: venueSlug,
+				Command:   command,
+				Message:   message,
 			},
 		})
 	}
@@ -1020,6 +1175,21 @@ func discordMicThreadURL(guildID, threadID string) string {
 
 func normalizeMicVenueSlug(raw string) string {
 	return strings.ToLower(strings.TrimSpace(raw))
+}
+
+func normalizeMicCommand(raw string) string {
+	raw = strings.ToLower(strings.TrimSpace(raw))
+	raw = strings.TrimPrefix(raw, "/")
+	raw = strings.TrimSpace(raw)
+	if strings.HasPrefix(raw, "mic ") {
+		raw = strings.TrimSpace(strings.TrimPrefix(raw, "mic "))
+	}
+	switch raw {
+	case "hot", "on", "start", "off", "status":
+		return raw
+	default:
+		return ""
+	}
 }
 
 func verifyDiscordInteractionSignature(publicKeyHex, timestamp string, body []byte, signatureHex string) bool {

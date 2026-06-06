@@ -73,6 +73,9 @@ func mirrorVictoryChatToDiscord(ctx context.Context, pool *pgxpool.Pool, cfg ide
 	}
 
 	threadRow, err := loadActiveDiscordSessionThread(ctx, pool, locationID, sessionVenue)
+	if (err != nil || threadRow == nil || strings.TrimSpace(threadRow.ThreadID) == "") && sessionVenue != "" {
+		threadRow, err = loadAnyActiveDiscordSessionThread(ctx, pool, locationID)
+	}
 	if err != nil || threadRow == nil || strings.TrimSpace(threadRow.ThreadID) == "" || !strings.EqualFold(strings.TrimSpace(threadRow.Status), "active") {
 		return
 	}
@@ -165,6 +168,25 @@ func loadActiveDiscordSessionThread(ctx context.Context, pool *pgxpool.Pool, loc
 		  AND status = 'active'
 		LIMIT 1
 	`, strings.TrimSpace(locationID), strings.TrimSpace(venueSlug)).Scan(&row.DiscordServerID, &row.ThreadID, &row.Status)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &row, nil
+}
+
+func loadAnyActiveDiscordSessionThread(ctx context.Context, pool *pgxpool.Pool, locationID string) (*discordSessionThreadMirrorRow, error) {
+	var row discordSessionThreadMirrorRow
+	err := pool.QueryRow(ctx, `
+		SELECT discord_server_id, thread_id, status
+		FROM auth.discord_session_threads
+		WHERE location_id = $1::uuid
+		  AND status = 'active'
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`, strings.TrimSpace(locationID)).Scan(&row.DiscordServerID, &row.ThreadID, &row.Status)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil

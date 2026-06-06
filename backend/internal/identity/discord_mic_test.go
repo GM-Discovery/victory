@@ -236,6 +236,89 @@ func TestDiscordMicRegisterAndStatusDispatch(t *testing.T) {
 	}
 }
 
+func TestDiscordMicControlFallsBackWithoutDiscordBootstrap(t *testing.T) {
+	pool := openDiscordTestPool(t)
+	ctx := context.Background()
+	t.Setenv("OPERATOR_HANDLE", "mic_operator_local")
+
+	ensureDiscordServerTestSchema(t, pool)
+
+	userID := insertDiscordServerTestUser(t, pool, "mic_operator_local", "Mic Operator Local")
+	locationID := resolveDiscordServerTestLocationID(t, pool, "producers-office")
+	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)
+	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_links WHERE location_id = $1`, locationID)
+	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_session_threads WHERE location_id = $1 AND venue_slug = $2`, locationID, "first-theater")
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.sessions WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_session_threads WHERE location_id = $1 AND venue_slug = $2`, locationID, "first-theater")
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_identities WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM location_memberships WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
+	})
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO location_memberships (location_id, user_id, role, active)
+		VALUES ($1, $2, 'producer', TRUE)
+	`, locationID, userID); err != nil {
+		t.Fatalf("insert membership: %v", err)
+	}
+
+	rawSession, _, err := sessions.CreateSession(ctx, pool, userID, 24*time.Hour, httptest.NewRequest(http.MethodGet, "/", nil))
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	if err := saveDiscordMicThread(ctx, pool, discordMicThreadRow{
+		LocationID:      locationID,
+		VenueSlug:       "first-theater",
+		VenueName:       "First Theater",
+		DiscordServerID: "guild-1",
+		ParentChannelID: "chat-1",
+		ThreadID:        "thread-1",
+		ThreadName:      "First Theater — Showtime — June 6, 2026 12:00 PM",
+		StartedByUserID: userID,
+		StartedAt:       time.Now().UTC(),
+		ShowtimeAt:      time.Now().UTC(),
+		Status:          "active",
+	}); err != nil {
+		t.Fatalf("seed mic thread: %v", err)
+	}
+
+	statusReq := httptest.NewRequest(http.MethodPost, "/api/discord/mic/control", strings.NewReader(`{"venue_slug":"first-theater","command":"status"}`))
+	statusReq.AddCookie(&http.Cookie{Name: sessions.CookieName, Value: rawSession})
+	statusReq.Header.Set("Content-Type", "application/json")
+	statusRec := httptest.NewRecorder()
+	HandleDiscordMicControl(pool, DiscordServerLinkConfig{}).ServeHTTP(statusRec, statusReq)
+	if statusRec.Code != http.StatusOK {
+		t.Fatalf("unexpected status control code %d body=%s", statusRec.Code, statusRec.Body.String())
+	}
+	if !strings.Contains(statusRec.Body.String(), "Mic: On") {
+		t.Fatalf("expected local mic status, got %s", statusRec.Body.String())
+	}
+
+	offReq := httptest.NewRequest(http.MethodPost, "/api/discord/mic/control", strings.NewReader(`{"venue_slug":"first-theater","command":"off"}`))
+	offReq.AddCookie(&http.Cookie{Name: sessions.CookieName, Value: rawSession})
+	offReq.Header.Set("Content-Type", "application/json")
+	offRec := httptest.NewRecorder()
+	HandleDiscordMicControl(pool, DiscordServerLinkConfig{}).ServeHTTP(offRec, offReq)
+	if offRec.Code != http.StatusOK {
+		t.Fatalf("unexpected off control code %d body=%s", offRec.Code, offRec.Body.String())
+	}
+
+	var rowStatus string
+	if err := pool.QueryRow(ctx, `
+		SELECT status
+		FROM auth.discord_session_threads
+		WHERE location_id = $1 AND venue_slug = $2
+		LIMIT 1
+	`, locationID, "first-theater").Scan(&rowStatus); err != nil {
+		t.Fatalf("load mic thread status: %v", err)
+	}
+	if rowStatus != "inactive" {
+		t.Fatalf("expected inactive status, got %s", rowStatus)
+	}
+}
+
 var discordMicTestPubKey, discordMicTestPrivKey = func() (ed25519.PublicKey, ed25519.PrivateKey) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {

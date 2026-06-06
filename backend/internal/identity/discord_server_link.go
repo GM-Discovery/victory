@@ -346,6 +346,8 @@ func HandleDiscordServerCallback(pool *pgxpool.Pool, cfg DiscordServerLinkConfig
 			return
 		}
 
+		scheduleDiscordBootstrapReconcile(pool, cfg)
+
 		http.Redirect(w, r, safeReturnTo(returnTo), http.StatusFound)
 	}
 }

@@ -1592,7 +1592,8 @@
     </div>
   </div>
 
-<script src="/lib/discord-mic.js?v=kernel37-1"></script>
+<script src="/lib/discord-mic.js?v=kernel39-2"></script>
+<script src="/lib/victory-mic-chat.js?v=kernel39-2"></script>
 <script>
   const chatLog = document.getElementById("chat-log");
   const chatInput = document.getElementById("chat-input");
@@ -4487,9 +4488,37 @@
     });
   }
 
-  function sendChat() {
+  async function sendChat() {
     const text = chatInput.value.trim();
     if (!text) return;
+
+    try {
+      const sessionResult = await window.VictoryMicChat?.sendSessionCommand?.("the-cave", text);
+      if (sessionResult?.handled) {
+        const message = String(sessionResult.message || "").replace(/\n+/g, " · ").trim();
+        if (message) {
+          addChatMessage(message, formatTime(), "system");
+        }
+        chatInput.value = "";
+        chatInput.focus();
+        return;
+      }
+
+      const micResult = await window.VictoryMicChat?.sendMicCommand?.("the-cave", text);
+      if (micResult?.handled) {
+        const message = String(micResult.message || "").replace(/\n+/g, " · ").trim();
+        if (message) {
+          addChatMessage(message, formatTime(), "system");
+        }
+        chatInput.value = "";
+        chatInput.focus();
+        return;
+      }
+    } catch (error) {
+      addChatMessage(String(error?.message || error || "Mic command failed"), formatTime(), "system");
+      chatInput.focus();
+      return;
+    }
 
     if (text.length > 250) {
       addChatMessage("(chat too long: max 250 characters)", formatTime(), "system");

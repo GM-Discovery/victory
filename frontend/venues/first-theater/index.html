@@ -245,7 +245,7 @@
       top: 16px;
       z-index: 8;
       width: min(360px, calc(100vw - 64px));
-      display: none !important;
+      display: grid;
       gap: 8px;
       pointer-events: none;
     }
@@ -363,7 +363,8 @@
       box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
       pointer-events: auto;
       backdrop-filter: blur(6px);
-      display: none !important;
+      display: grid;
+      gap: 12px;
     }
 
     .overlay-row {
@@ -1087,13 +1088,44 @@
       padding: 10px 12px 12px;
       display: none;
       gap: 12px;
+      grid-template-rows: auto minmax(0, 1fr) auto;
       opacity: 1;
       transition: opacity 180ms ease;
       background: rgba(8, 10, 15, 0.96);
-      max-height: min(15vh, 140px);
-      overflow: auto;
+      height: min(15vh, 140px);
+      min-height: 0;
+      overflow: hidden;
       width: 100%;
       box-sizing: border-box;
+    }
+
+    .chat-state-note {
+      padding: 8px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(240, 201, 107, 0.22);
+      background: rgba(240, 201, 107, 0.08);
+      color: #f0c96b;
+      font-size: 0.84rem;
+      line-height: 1.35;
+    }
+
+    .chat-state-note[hidden] {
+      display: none;
+    }
+
+    .chat-panel.is-chat-open .chat-state-note {
+      border-color: rgba(133, 201, 121, 0.24);
+      background: rgba(133, 201, 121, 0.08);
+      color: #c9f2c1;
+    }
+
+    .chat-panel.is-closed .chat-log {
+      opacity: 0.78;
+    }
+
+    .chat-panel.is-closed .chat-row input,
+    .chat-panel.is-closed .chat-row button {
+      opacity: 0.74;
     }
 
     .chat-panel[data-open="true"] .chat-body {
@@ -1106,7 +1138,8 @@
     }
 
     .chat-log {
-      min-height: 64px;
+      min-height: 0;
+      height: 100%;
       padding: 10px;
       border-radius: 14px;
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1609,6 +1642,7 @@
                   <div class="status-strip">
                     <span class="chip">Role <strong id="role-value">Audience</strong></span>
                     <span class="chip">Connection <strong id="connection-value">Waiting</strong></span>
+                    <span class="chip">Session <strong id="session-status">Idle</strong></span>
                     <div id="discord-mic-status" class="chip" data-venue-slug="first-theater">Mic: Loading</div>
                   </div>
                 </div>
@@ -1793,7 +1827,8 @@
 
   <script src="/lib/forbidden.js"></script>
   <script src="/venues/shared/venue-shell.js"></script>
-  <script src="/lib/discord-mic.js?v=kernel37-1"></script>
+  <script src="/lib/discord-mic.js?v=kernel39-2"></script>
+  <script src="/lib/victory-mic-chat.js?v=kernel39-2"></script>
   <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.3/dist/pixi.min.js"></script>
   <script>
     const stageShell = document.getElementById("stage-shell");
@@ -1928,12 +1963,18 @@
     const chatLog = document.getElementById("chat-log");
     const chatInput = document.getElementById("chat-input");
     const chatSend = document.getElementById("chat-send");
+    const sessionStatus = document.getElementById("session-status");
     const shellRefreshWorldButton = document.getElementById("shell-refresh-world");
     const shellClearSelectionButton = document.getElementById("shell-clear-selection");
     const accountMenu = document.getElementById("account-menu");
     const accountMenuToggle = document.getElementById("account-menu-toggle");
     const accountLabel = document.getElementById("account-label");
     const accountLogoutButton = document.getElementById("account-logout-button");
+    const clampNumber = window.VictoryVenueShell?.clampNumber || ((value, min, max, fallback) => {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return fallback;
+      return Math.min(max, Math.max(min, num));
+    });
 
     function escapeHtml(value) {
       return String(value)
@@ -2383,6 +2424,44 @@
       return Boolean(chatPanel && active && chatPanel.contains(active) && active !== chatHead);
     }
 
+    function currentShowingIsOpen() {
+      const showing = currentSnapshot?.showing || null;
+      if (!showing) return false;
+      return String(showing.status || "").trim().toLowerCase() !== "closed";
+    }
+
+    function currentSessionStatusLabel() {
+      const showing = currentSnapshot?.showing || null;
+      if (!showing || !currentSessionId) {
+        return "Idle";
+      }
+
+      switch (String(showing.status || "").trim().toLowerCase()) {
+        case "live":
+          return "Active";
+        case "rehearsal":
+          return "Ready";
+        case "closed":
+          return "Closed";
+        default:
+          return "Idle";
+      }
+    }
+
+    function chatClosedMessage() {
+      return "Chat is closed until the showing opens.";
+    }
+
+    function chatOpenMessage() {
+      return "Showing open. Chat is live.";
+    }
+
+    function appendSystemChatNotice(text) {
+      appendChatEntry("System", text);
+      unreadChatCount = 0;
+      updateChatPresentation();
+    }
+
     function updateChatPresentation() {
       if (!chatPanel) return;
       const prefs = uiPreferences?.chat || shellDefaults.chat;
@@ -2391,12 +2470,24 @@
       if (chatOpacityValue) chatOpacityValue.textContent = `${clampNumber(prefs.opacity, 0, 100, 96)}%`;
       const active = isChatActive();
       const open = chatPinnedOpen || chatHoverOpen || active;
+      const chatOpen = currentShowingIsOpen();
       chatPanel.dataset.open = open ? "true" : "false";
       chatPanel.classList.toggle("is-open", open);
+      chatPanel.classList.toggle("is-chat-open", chatOpen);
+      chatPanel.classList.toggle("is-closed", !chatOpen);
       chatPanel.style.setProperty("--chat-panel-width", open ? "min(50vw, 720px)" : "clamp(140px, 18vw, 220px)");
+      if (chatInput) {
+        chatInput.placeholder = chatOpen ? "Start typing here..." : chatClosedMessage();
+      }
+      if (chatSend) {
+        chatSend.disabled = false;
+      }
       if (chatBadge) {
         chatBadge.hidden = open || unreadChatCount === 0;
         chatBadge.textContent = String(unreadChatCount);
+      }
+      if (sessionStatus) {
+        sessionStatus.textContent = currentSessionStatusLabel();
       }
     }
 
@@ -2444,14 +2535,63 @@
       updateChatPresentation();
     }
 
-    function sendChatDraft() {
+    function appendChatActionLine(action) {
+      const text = String(action?.payload?.text || action?.text || "").trim();
+      if (!text) return;
+      const author = String(action?.actor_display_name || action?.actor?.display_name || action?.actor_handle || "Unknown").trim() || "Unknown";
+      appendChatEntry(author, text);
+    }
+
+    async function sendChatDraft() {
       if (!chatInput) return;
       const text = chatInput.value.trim();
       if (!text) return;
-      appendChatEntry("You", text);
+
+      try {
+        const sessionResult = await window.VictoryMicChat?.sendSessionCommand?.("first-theater", text);
+        if (sessionResult?.handled) {
+          const message = String(sessionResult.message || "").replace(/\n+/g, " · ").trim();
+          if (message) {
+            appendSystemChatNotice(message);
+          }
+          chatInput.value = "";
+          return;
+        }
+      } catch (error) {
+        appendSystemChatNotice(String(error?.message || error || "Session command failed"));
+        chatInput.value = "";
+        return;
+      }
+
+      if (!currentShowingIsOpen()) {
+        chatInput.value = "";
+        appendSystemChatNotice(chatClosedMessage());
+        return;
+      }
+
+      try {
+        const micResult = await window.VictoryMicChat?.sendMicCommand?.("first-theater", text);
+        if (micResult?.handled) {
+          const message = String(micResult.message || "").replace(/\n+/g, " · ").trim();
+          if (message) {
+            appendSystemChatNotice(message);
+          }
+          chatInput.value = "";
+          return;
+        }
+      } catch (error) {
+        appendSystemChatNotice(String(error?.message || error || "Mic command failed"));
+        chatInput.value = "";
+        return;
+      }
+
+      const sent = sendAction("chat/message", { text });
+      if (!sent) {
+        appendSystemChatNotice("Chat could not be sent right now.");
+        chatInput.value = "";
+        return;
+      }
       chatInput.value = "";
-      unreadChatCount = 0;
-      updateChatPresentation();
     }
 
     function syncChatOpenState() {
@@ -4588,6 +4728,10 @@
 
         if (msg.type === "action" && msg.data) {
           const actionType = msg.data.type || "";
+          if (actionType === "chat/message") {
+            appendChatActionLine(msg.data);
+            return;
+          }
           if (
             actionType === "act/place_element" ||
             actionType === "act/remove_element" ||
@@ -4625,9 +4769,24 @@
           }
         }
 
+        if (msg.type === "showing/update") {
+          await refreshWorld();
+          updateChatPresentation();
+          return;
+        }
+
         if (msg.type === "error") {
-          setStageStatus(`Action denied: ${msg.error || "action_denied"}`);
-          setMovementLine(`Denied: ${msg.error || "action_denied"}`);
+          const errorText = String(msg.error || "action_denied");
+          setStageStatus(`Action denied: ${errorText}`);
+          setMovementLine(`Denied: ${errorText}`);
+          if (errorText === "showing_closed") {
+            appendSystemChatNotice(chatClosedMessage());
+            if (chatInput) {
+              chatInput.value = "";
+            }
+          } else if (errorText && errorText !== "chat/message") {
+            appendSystemChatNotice(`Action denied: ${errorText}`);
+          }
           pendingStageCardPlacement = null;
           stagePlacementCandidate = null;
         }

@@ -235,81 +235,10 @@ func HandleDiscordChannelMappingRepair(pool *pgxpool.Pool, cfg DiscordServerLink
 			return
 		}
 
-		channels, err := fetchDiscordServerChannels(ctx, runtimeCfg, linkRecord.DiscordGuildID)
+		summary, err := reconcileDiscordChannelMappings(ctx, pool, runtimeCfg, location.ID, linkRecord.DiscordGuildID, userID)
 		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "discord_channel_list_failed"})
+			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "discord_channel_repair_failed", "detail": err.Error()})
 			return
-		}
-
-		rows, err := loadDiscordChannelMappings(ctx, pool, location.ID)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "mapping_lookup_failed"})
-			return
-		}
-
-		summary := &DiscordChannelMappingRepairSummary{}
-		createdBy := userID
-
-		coreCategory, action, err := ensureDiscordChannelMapping(ctx, pool, runtimeCfg, location.ID, linkRecord.DiscordGuildID, createdBy, channels, rows, discordChannelMappingSpec{
-			MappingKind:      discordChannelMappingKindCoreCategory,
-			VictoryScopeKind: discordChannelScopeKindLocation,
-			VictoryScopeSlug: location.Slug,
-			ExpectedName:     "Victory Theater",
-			ChannelType:      discordChannelTypeCategory,
-		}, "")
-		if err != nil {
-			summary.Failed = append(summary.Failed, "Victory Theater")
-			summary.FailedDetails = append(summary.FailedDetails, err.Error())
-		} else {
-			summary.add(action, coreCategory.ExpectedName)
-			rows = upsertRowCache(rows, coreCategory)
-		}
-
-		coreCategoryID := coreCategory.DiscordChannelID
-		if strings.TrimSpace(coreCategoryID) == "" {
-			for _, spec := range coreChannelSpecs() {
-				summary.Failed = append(summary.Failed, spec.ExpectedName)
-			}
-		} else {
-			for _, spec := range coreChannelSpecs() {
-				item, action, err := ensureDiscordChannelMapping(ctx, pool, runtimeCfg, location.ID, linkRecord.DiscordGuildID, createdBy, channels, rows, spec, coreCategoryID)
-				if err != nil {
-					summary.Failed = append(summary.Failed, spec.ExpectedName)
-					summary.FailedDetails = append(summary.FailedDetails, spec.ExpectedName+": "+err.Error())
-					continue
-				}
-				summary.add(action, item.ExpectedName)
-				rows = upsertRowCache(rows, item)
-			}
-		}
-
-		for _, spec := range venueCategorySpecs() {
-			item, action, err := ensureDiscordChannelMapping(ctx, pool, runtimeCfg, location.ID, linkRecord.DiscordGuildID, createdBy, channels, rows, spec, "")
-			if err != nil {
-				summary.Failed = append(summary.Failed, spec.ExpectedName)
-				summary.FailedDetails = append(summary.FailedDetails, spec.ExpectedName+": "+err.Error())
-				continue
-			}
-			summary.add(action, item.ExpectedName)
-			rows = upsertRowCache(rows, item)
-		}
-
-		for _, spec := range venueChatChannelSpecs() {
-			parentSpec := venueCategorySpecForSlug(spec.VictoryScopeSlug)
-			parentRow, ok := rows[mappingKey(parentSpec.MappingKind, parentSpec.VictoryScopeKind, parentSpec.VictoryScopeSlug)]
-			if !ok || strings.TrimSpace(parentRow.DiscordChannelID) == "" {
-				summary.Failed = append(summary.Failed, spec.ExpectedName)
-				summary.FailedDetails = append(summary.FailedDetails, spec.ExpectedName+": parent category missing")
-				continue
-			}
-			item, action, err := ensureDiscordChannelMapping(ctx, pool, runtimeCfg, location.ID, linkRecord.DiscordGuildID, createdBy, channels, rows, spec, parentRow.DiscordChannelID)
-			if err != nil {
-				summary.Failed = append(summary.Failed, spec.ExpectedName)
-				summary.FailedDetails = append(summary.FailedDetails, spec.ExpectedName+": "+err.Error())
-				continue
-			}
-			summary.add(action, item.ExpectedName)
-			rows = upsertRowCache(rows, item)
 		}
 
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -317,6 +246,89 @@ func HandleDiscordChannelMappingRepair(pool *pgxpool.Pool, cfg DiscordServerLink
 			"data": summary,
 		})
 	}
+}
+
+func reconcileDiscordChannelMappings(ctx context.Context, pool *pgxpool.Pool, runtimeCfg DiscordServerLinkConfig, locationID, guildID, createdBy string) (*DiscordChannelMappingRepairSummary, error) {
+	channels, err := fetchDiscordServerChannels(ctx, runtimeCfg, guildID)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := loadDiscordChannelMappings(ctx, pool, locationID)
+	if err != nil {
+		return nil, err
+	}
+
+	location, err := resolveProducerOfficeLocation(ctx, pool)
+	if err != nil {
+		return nil, err
+	}
+
+	summary := &DiscordChannelMappingRepairSummary{}
+
+	coreCategory, action, err := ensureDiscordChannelMapping(ctx, pool, runtimeCfg, locationID, guildID, createdBy, channels, rows, discordChannelMappingSpec{
+		MappingKind:      discordChannelMappingKindCoreCategory,
+		VictoryScopeKind: discordChannelScopeKindLocation,
+		VictoryScopeSlug: location.Slug,
+		ExpectedName:     "Victory Theater",
+		ChannelType:      discordChannelTypeCategory,
+	}, "")
+	if err != nil {
+		summary.Failed = append(summary.Failed, "Victory Theater")
+		summary.FailedDetails = append(summary.FailedDetails, err.Error())
+	} else {
+		summary.add(action, coreCategory.ExpectedName)
+		rows = upsertRowCache(rows, coreCategory)
+	}
+
+	coreCategoryID := coreCategory.DiscordChannelID
+	if strings.TrimSpace(coreCategoryID) == "" {
+		for _, spec := range coreChannelSpecs() {
+			summary.Failed = append(summary.Failed, spec.ExpectedName)
+		}
+	} else {
+		for _, spec := range coreChannelSpecs() {
+			item, action, err := ensureDiscordChannelMapping(ctx, pool, runtimeCfg, locationID, guildID, createdBy, channels, rows, spec, coreCategoryID)
+			if err != nil {
+				summary.Failed = append(summary.Failed, spec.ExpectedName)
+				summary.FailedDetails = append(summary.FailedDetails, spec.ExpectedName+": "+err.Error())
+				continue
+			}
+			summary.add(action, item.ExpectedName)
+			rows = upsertRowCache(rows, item)
+		}
+	}
+
+	for _, spec := range venueCategorySpecs() {
+		item, action, err := ensureDiscordChannelMapping(ctx, pool, runtimeCfg, locationID, guildID, createdBy, channels, rows, spec, "")
+		if err != nil {
+			summary.Failed = append(summary.Failed, spec.ExpectedName)
+			summary.FailedDetails = append(summary.FailedDetails, spec.ExpectedName+": "+err.Error())
+			continue
+		}
+		summary.add(action, item.ExpectedName)
+		rows = upsertRowCache(rows, item)
+	}
+
+	for _, spec := range venueChatChannelSpecs() {
+		parentSpec := venueCategorySpecForSlug(spec.VictoryScopeSlug)
+		parentRow, ok := rows[mappingKey(parentSpec.MappingKind, parentSpec.VictoryScopeKind, parentSpec.VictoryScopeSlug)]
+		if !ok || strings.TrimSpace(parentRow.DiscordChannelID) == "" {
+			summary.Failed = append(summary.Failed, spec.ExpectedName)
+			summary.FailedDetails = append(summary.FailedDetails, spec.ExpectedName+": parent category missing")
+			continue
+		}
+		item, action, err := ensureDiscordChannelMapping(ctx, pool, runtimeCfg, locationID, guildID, createdBy, channels, rows, spec, parentRow.DiscordChannelID)
+		if err != nil {
+			summary.Failed = append(summary.Failed, spec.ExpectedName)
+			summary.FailedDetails = append(summary.FailedDetails, spec.ExpectedName+": "+err.Error())
+			continue
+		}
+		summary.add(action, item.ExpectedName)
+		rows = upsertRowCache(rows, item)
+	}
+
+	return summary, nil
 }
 
 func fetchDiscordServerChannels(ctx context.Context, cfg DiscordServerLinkConfig, guildID string) ([]discordChannel, error) {

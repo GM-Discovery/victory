@@ -258,6 +258,107 @@ func TestDiscordServerBootstrapPersistsSettingsAndUnblocksInstall(t *testing.T) 
 	}
 }
 
+func TestDiscordBootstrapReconcileRestoresMappingsAndMicCommand(t *testing.T) {
+	pool := openDiscordTestPool(t)
+	ensureDiscordServerTestSchema(t, pool)
+
+	locationID := resolveDiscordServerTestLocationID(t, pool, "amurray-family")
+	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)
+	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_links WHERE location_id = $1`, locationID)
+	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_channel_mappings WHERE location_id = $1`, locationID)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_links WHERE location_id = $1`, locationID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_channel_mappings WHERE location_id = $1`, locationID)
+	})
+
+	_, _ = pool.Exec(context.Background(), `
+		INSERT INTO auth.discord_server_link_settings (
+			location_id,
+			application_id,
+			bot_token,
+			redirect_url,
+			permissions,
+			public_key,
+			enabled,
+			updated_at
+		)
+		VALUES ($1, 'app-1', 'bot-1', 'https://victory.example/auth/discord/server/callback', '16', 'public-key-1', TRUE, NOW())
+	`, locationID)
+
+	_, _ = pool.Exec(context.Background(), `
+		INSERT INTO auth.discord_server_links (
+			location_id,
+			discord_guild_id,
+			discord_guild_name,
+			system_channel_id,
+			system_channel_name,
+			bot_verified,
+			active,
+			linked_at,
+			updated_at
+		)
+		VALUES ($1, 'guild-1', 'Example Server', 'sys-1', 'victory-system', TRUE, TRUE, NOW(), NOW())
+	`, locationID)
+
+	channelsJSON := `[
+		{"id":"cat-core","name":"Victory Theater","type":4},
+		{"id":"sys-1","name":"victory-system","type":0},
+		{"id":"ann-1","name":"victory-announcements","type":0},
+		{"id":"lobby-1","name":"victory-lobby","type":0},
+		{"id":"support-1","name":"victory-support","type":0},
+		{"id":"the-cave-cat","name":"The Cave","type":4},
+		{"id":"first-theater-cat","name":"First Theater","type":4},
+		{"id":"middle-school-stage-cat","name":"Middle School Stage","type":4},
+		{"id":"producers-office-cat","name":"Producer's Office","type":4},
+		{"id":"directors-chair-cat","name":"The Director's Chair","type":4},
+		{"id":"audition-hall-cat","name":"Audition Hall","type":4},
+		{"id":"greenroom-cat","name":"The Greenroom","type":4},
+		{"id":"trailers-cat","name":"Trailers","type":4},
+		{"id":"workshop-cat","name":"Workshop","type":4},
+		{"id":"the-cave-chat","name":"the-cave-chat","type":0,"parent_id":"the-cave-cat"},
+		{"id":"first-theater-chat","name":"first-theater-chat","type":0,"parent_id":"first-theater-cat"},
+		{"id":"middle-school-stage-chat","name":"middle-school-stage-chat","type":0,"parent_id":"middle-school-stage-cat"}
+	]`
+
+	cfg := DiscordServerLinkConfig{
+		ApplicationID: "app-1",
+		BotToken:      "bot-1",
+		RedirectURL:   "https://victory.example/auth/discord/server/callback",
+		PublicKey:     "public-key-1",
+		Enabled:       true,
+		HTTPClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			switch {
+			case req.Method == http.MethodGet && strings.HasSuffix(req.URL.Path, "/guilds/guild-1/channels"):
+				return jsonResponse(channelsJSON), nil
+			case req.Method == http.MethodGet && strings.HasSuffix(req.URL.Path, "/applications/app-1/guilds/guild-1/commands"):
+				return jsonResponse(`[]`), nil
+			case req.Method == http.MethodPost && strings.HasSuffix(req.URL.Path, "/applications/app-1/guilds/guild-1/commands"):
+				return jsonResponse(`{"id":"mic-1","name":"mic"}`), nil
+			default:
+				t.Fatalf("unexpected discord request %s %s", req.Method, req.URL.Path)
+				return nil, nil
+			}
+		})},
+	}
+
+	if err := ReconcileDiscordBootstrap(context.Background(), pool, cfg); err != nil {
+		t.Fatalf("reconcile bootstrap: %v", err)
+	}
+
+	var mappingCount int
+	if err := pool.QueryRow(context.Background(), `
+		SELECT COUNT(*)
+		FROM auth.discord_channel_mappings
+		WHERE location_id = $1
+	`, locationID).Scan(&mappingCount); err != nil {
+		t.Fatalf("count mappings: %v", err)
+	}
+	if mappingCount < 16 {
+		t.Fatalf("expected reconciled mappings, got %d", mappingCount)
+	}
+}
+
 func ensureDiscordServerTestSchema(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 

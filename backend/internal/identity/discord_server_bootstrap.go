@@ -106,6 +106,9 @@ func HandleDiscordServerBootstrap(pool *pgxpool.Pool, cfg DiscordServerLinkConfi
 				writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "bootstrap_lookup_failed", "detail": err.Error()})
 				return
 			}
+			if linkRecord, err := loadDiscordServerLinkRecord(ctx, pool, location.ID); err == nil && linkRecord.Active && strings.TrimSpace(linkRecord.DiscordGuildID) != "" {
+				scheduleDiscordBootstrapReconcile(pool, cfg)
+			}
 			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": summary})
 		default:
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method_not_allowed"})

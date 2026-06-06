@@ -73,6 +73,14 @@ func main() {
 
 	hub := network.NewHub()
 
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+		defer cancel()
+		if err := identity.ReconcileDiscordBootstrap(ctx, pool, discordServerLinkConfig); err != nil {
+			log.Printf("discord bootstrap reconcile failed: %v", err)
+		}
+	}()
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -105,6 +113,8 @@ func main() {
 	mux.HandleFunc("POST /api/discord/interactions", identity.HandleDiscordInteractions(pool, discordServerLinkConfig))
 	mux.HandleFunc("GET /api/discord/mic/status", identity.HandleDiscordMicStatus(pool, discordServerLinkConfig))
 	mux.HandleFunc("POST /api/discord/mic/register", identity.HandleDiscordMicRegister(pool, discordServerLinkConfig))
+	mux.HandleFunc("POST /api/discord/mic/control", identity.HandleDiscordMicControl(pool, discordServerLinkConfig))
+	mux.HandleFunc("POST /api/session/control", network.HandleSessionControl(hub, pool))
 	mux.HandleFunc("/api/requests/create", identity.HandleCreatePermissionRequest(pool))
 	mux.HandleFunc("/api/requests/mine", identity.HandleListMyPermissionRequests(pool))
 	mux.HandleFunc("/api/requests/incoming", identity.HandleListIncomingPermissionRequests(pool))

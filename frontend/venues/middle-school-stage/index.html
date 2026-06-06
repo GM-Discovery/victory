@@ -761,6 +761,9 @@
       padding: 14px 16px 16px;
       display: none;
       gap: 12px;
+      grid-template-rows: minmax(0, 1fr) auto;
+      max-height: min(18vh, 180px);
+      overflow: hidden;
       opacity: var(--chat-body-opacity, 1);
       transition: opacity 180ms ease;
     }
@@ -788,7 +791,8 @@
     }
 
     .chat-log {
-      min-height: 86px;
+      min-height: 0;
+      height: 100%;
       padding: 12px;
       border-radius: 14px;
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1229,7 +1233,8 @@
 
   <script src="/lib/forbidden.js"></script>
   <script src="/venues/shared/venue-shell.js"></script>
-  <script src="/lib/discord-mic.js?v=kernel37-1"></script>
+  <script src="/lib/discord-mic.js?v=kernel39-2"></script>
+  <script src="/lib/victory-mic-chat.js?v=kernel39-2"></script>
   <script>
     const stageShell = document.getElementById("stage-shell");
     const topBar = document.getElementById("top-bar");
@@ -1555,10 +1560,40 @@
       chatLog.scrollTop = chatLog.scrollHeight;
     }
 
-    function sendChatDraft() {
+    async function sendChatDraft() {
       if (!chatInput) return;
       const text = chatInput.value.trim();
       if (!text) return;
+
+      try {
+        const sessionResult = await window.VictoryMicChat?.sendSessionCommand?.("middle-school-stage", text);
+        if (sessionResult?.handled) {
+          const message = String(sessionResult.message || "").replace(/\n+/g, " · ").trim();
+          if (message) {
+            appendChatEntry("System", message);
+          }
+          chatInput.value = "";
+          setChatOpen(true);
+          return;
+        }
+
+        const micResult = await window.VictoryMicChat?.sendMicCommand?.("middle-school-stage", text);
+        if (micResult?.handled) {
+          const message = String(micResult.message || "").replace(/\n+/g, " · ").trim();
+          if (message) {
+            appendChatEntry("System", message);
+          }
+          chatInput.value = "";
+          setChatOpen(true);
+          return;
+        }
+      } catch (error) {
+        appendChatEntry("System", String(error?.message || error || "Mic command failed"));
+        chatInput.value = "";
+        setChatOpen(true);
+        return;
+      }
+
       appendChatEntry("You", text);
       chatInput.value = "";
       setChatOpen(true);

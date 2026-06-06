@@ -62,12 +62,33 @@
     }
   }
 
+  async function refreshStatus(venueSlug) {
+    const slug = String(venueSlug || "").trim();
+    if (!slug) return;
+    const el = Array.from(document.querySelectorAll(selector)).find((node) => {
+      return String(node.dataset?.venueSlug || "").trim() === slug;
+    });
+    if (!el) return;
+    await loadStatus(el);
+  }
+
   function bootstrap() {
     const el = document.querySelector(selector);
     if (!el) return;
     loadStatus(el);
     window.setInterval(() => loadStatus(el), 30000);
   }
+
+  window.addEventListener("victory:discord-mic-refresh", (event) => {
+    const venueSlug = event?.detail?.venueSlug;
+    if (venueSlug) {
+      refreshStatus(venueSlug);
+    }
+  });
+
+  window.VictoryDiscordMic = {
+    refreshStatus,
+  };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bootstrap, { once: true });
