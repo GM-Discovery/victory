@@ -1643,7 +1643,7 @@
                     <span class="chip">Role <strong id="role-value">Audience</strong></span>
                     <span class="chip">Connection <strong id="connection-value">Waiting</strong></span>
                     <span class="chip">Session <strong id="session-status">Idle</strong></span>
-                    <div id="discord-mic-status" class="chip" data-venue-slug="first-theater">Mic: Loading</div>
+                    <div id="discord-mic-status" class="chip" data-venue-slug="first-theater">House Mic: Loading</div>
                   </div>
                 </div>
                 <div class="header-center">
@@ -1742,7 +1742,7 @@
                   <div class="drawer-body">
                     <div class="drawer-item">
                       <strong>Network</strong>
-                      <span id="network-state">Idle</span>
+                      <span id="network-state">Idle. Audio hooks reserved.</span>
                     </div>
                     <div class="drawer-item">
                       <strong>Presence</strong>
@@ -1827,8 +1827,8 @@
 
   <script src="/lib/forbidden.js"></script>
   <script src="/venues/shared/venue-shell.js"></script>
-  <script src="/lib/discord-mic.js?v=kernel39-2"></script>
-  <script src="/lib/victory-mic-chat.js?v=kernel39-2"></script>
+  <script src="/lib/discord-mic.js?v=kernel40-1"></script>
+  <script src="/lib/victory-mic-chat.js?v=kernel40-1"></script>
   <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.3/dist/pixi.min.js"></script>
   <script>
     const stageShell = document.getElementById("stage-shell");
@@ -2543,7 +2543,7 @@
       const author = String(action?.actor_display_name || action?.actor?.display_name || action?.actor_handle || "Unknown").trim() || "Unknown";
       const source = String(action?.payload?.source || action?.source || "").trim().toLowerCase();
       const edited = Boolean(action?.payload?.edited || action?.edited);
-      const label = source === "discord" ? `${author} via Discord${edited ? " (edited)" : ""}` : author;
+      const label = source === "discord" ? `${author} via Discord Bridge${edited ? " (edited)" : ""}` : author;
       appendChatEntry(label, text);
     }
 

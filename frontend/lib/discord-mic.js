@@ -22,9 +22,14 @@
     }
 
     el.hidden = false;
-    const label = active ? "Mic: On" : "Mic: Off";
+    const parts = [
+      active ? "House Mic: Hot" : "House Mic: Off",
+      status?.linked ? "Discord Bridge: On" : "Discord Bridge: Off",
+      status?.command_registered ? "Discord Intake: Ready" : "Discord Intake: Check",
+    ];
     const threadName = String(mic?.thread_name || "").trim();
     const threadURL = String(mic?.thread_url || "").trim();
+    const label = parts.join(" · ");
 
     if (active && threadName && threadURL) {
       el.innerHTML = `${escapeText(label)} <a href="${escapeText(threadURL)}" target="_blank" rel="noreferrer">${escapeText(threadName)}</a>`;
@@ -56,7 +61,7 @@
     } catch (error) {
       if (el.dataset.venueSlug) {
         el.hidden = false;
-        el.textContent = "Mic unavailable";
+        el.textContent = "House Mic unavailable";
       }
       console.warn("discord mic status failed", error);
     }

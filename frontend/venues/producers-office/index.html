@@ -566,7 +566,7 @@
         </div>
         <div class="muted small" id="discord-gateway-debug-state" style="margin-top: 8px;"></div>
         <div class="muted small" style="margin-top: 8px; line-height: 1.45;">
-          Debug tracing is for the live Discord gateway import path only. Turn it on when you want detailed backend logs for a pong test, then turn it back off when you're done. You will not see extra messages in the venue from this toggle; watch the backend logs and gateway status instead.
+          Debug tracing is for the live Discord gateway import path only. Turn it on when you want detailed backend logs for a pong test, then turn it back off when you're done. You will not see extra messages in the venue from this toggle; watch the backend logs and gateway status instead. When it is ON, the backend logs may be noisy.
         </div>
       </section>
 
@@ -785,7 +785,7 @@
       }
       if (discordGatewayDebugState) {
         discordGatewayDebugState.textContent = debugEnabled
-          ? "Verbose gateway/import tracing is on for the primary Discord intake path."
+          ? "Debug tracing is ON. Backend logs may be noisy."
           : "Verbose gateway/import tracing is off.";
       }
     }

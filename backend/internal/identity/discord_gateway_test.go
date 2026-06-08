@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
+
+	"victory/backend/internal/sessions"
 )
 
 func TestDiscordGatewayStatusReportsRuntimeState(t *testing.T) {
@@ -182,6 +185,79 @@ func TestDiscordGatewayDebugEnabledPersistsInStatus(t *testing.T) {
 	}
 	if !response.Ok || !response.Data.DebugEnabled {
 		t.Fatalf("expected debug enabled in status, got %+v", response.Data)
+	}
+}
+
+func TestDiscordGatewayDebugToggleEndpoint(t *testing.T) {
+	pool := openDiscordTestPool(t)
+	ensureDiscordServerTestSchema(t, pool)
+	if err := EnsureKernel39DiscordGatewaySurface(context.Background(), pool); err != nil {
+		t.Fatalf("ensure gateway surface: %v", err)
+	}
+
+	t.Setenv("OPERATOR_HANDLE", "gateway_debug_operator")
+	locationID := resolveDiscordServerTestLocationID(t, pool, "amurray-family")
+	userID := insertDiscordServerTestUser(t, pool, "gateway_debug_operator", "Gateway Debug Operator")
+	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_gateway_settings WHERE location_id = $1`, locationID)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.sessions WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_gateway_settings WHERE location_id = $1`, locationID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM location_memberships WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
+	})
+
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO location_memberships (location_id, user_id, role, active)
+		VALUES ($1, $2, 'producer', TRUE)
+	`, locationID, userID); err != nil {
+		t.Fatalf("insert membership: %v", err)
+	}
+
+	rawSession, _, err := sessions.CreateSession(context.Background(), pool, userID, 24*time.Hour, httptest.NewRequest(http.MethodGet, "/", nil))
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	toggleReq := httptest.NewRequest(http.MethodPost, "/api/discord/gateway/debug", nil)
+	toggleReq.AddCookie(&http.Cookie{Name: sessions.CookieName, Value: rawSession})
+	toggleRec := httptest.NewRecorder()
+	HandleDiscordGatewayDebug(pool).ServeHTTP(toggleRec, toggleReq)
+	if toggleRec.Code != http.StatusOK {
+		t.Fatalf("unexpected toggle status %d body=%s", toggleRec.Code, toggleRec.Body.String())
+	}
+
+	var first struct {
+		Ok   bool `json:"ok"`
+		Data struct {
+			DebugEnabled bool `json:"debug_enabled"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(toggleRec.Body.Bytes(), &first); err != nil {
+		t.Fatalf("decode toggle response: %v", err)
+	}
+	if !first.Ok || !first.Data.DebugEnabled {
+		t.Fatalf("expected toggle on, got %+v", first.Data)
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/api/discord/gateway/debug", nil)
+	secondReq.AddCookie(&http.Cookie{Name: sessions.CookieName, Value: rawSession})
+	secondRec := httptest.NewRecorder()
+	HandleDiscordGatewayDebug(pool).ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusOK {
+		t.Fatalf("unexpected second toggle status %d body=%s", secondRec.Code, secondRec.Body.String())
+	}
+
+	var second struct {
+		Ok   bool `json:"ok"`
+		Data struct {
+			DebugEnabled bool `json:"debug_enabled"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(secondRec.Body.Bytes(), &second); err != nil {
+		t.Fatalf("decode second toggle response: %v", err)
+	}
+	if !second.Ok || second.Data.DebugEnabled {
+		t.Fatalf("expected toggle off, got %+v", second.Data)
 	}
 }
 

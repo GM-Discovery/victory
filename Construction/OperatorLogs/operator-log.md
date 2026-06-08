@@ -11,6 +11,22 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-06-08 — Kernel 40 Runtime Hardening + House Mic Regression Harness v1
+
+### Backend
+- Added regression coverage for the Discord Gateway main path: Victory-to-Discord mirror posting, Discord-to-Victory intake, duplicate suppression, bot/self echo suppression, wrong-location thread filtering, debug-toggle neutrality, and minimal delete handling via import-status updates.
+- Hardened the Discord gateway thread lookup so imports only resolve threads for the current location.
+- Kept the debug trace toggle on the primary gateway path as an operator-controlled visibility switch.
+
+### Frontend
+- Standardized the house mic label in the venue mic chips and source labels to `House Mic` / `Discord Bridge`.
+- Added explicit debug-on warning text in Producer's Office.
+- Reserved the left-side network/tray areas for future audio hooks without building Discord voice/audio transport.
+
+### Notes
+- No Discord audio/voice/speaking metadata was added.
+- Message delete handling is intentionally minimal for now: delete events mark imports deleted, but no visible venue tombstone stream was built.
+
 ## 2026-05-29 — Kernel 34 Account Authority Surface
 
 - Added a current-account summary endpoint at `GET /api/account/me`

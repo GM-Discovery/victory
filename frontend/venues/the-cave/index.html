@@ -1357,7 +1357,7 @@
     <div class="header">
       <h1>The Cave</h1>
       <div id="connection-status" class="status-line">Starting...</div>
-      <div id="discord-mic-status" class="status-line" data-venue-slug="the-cave">Mic: Loading</div>
+      <div id="discord-mic-status" class="status-line" data-venue-slug="the-cave">House Mic: Loading</div>
     </div>
 
     <div class="stage">
@@ -1598,8 +1598,8 @@
     </div>
   </div>
 
-<script src="/lib/discord-mic.js?v=kernel39-2"></script>
-<script src="/lib/victory-mic-chat.js?v=kernel39-2"></script>
+<script src="/lib/discord-mic.js?v=kernel40-1"></script>
+<script src="/lib/victory-mic-chat.js?v=kernel40-1"></script>
 <script>
   const chatLog = document.getElementById("chat-log");
   const chatInput = document.getElementById("chat-input");
@@ -3851,7 +3851,7 @@
     const source = String(action?.payload?.source || action?.source || "").trim().toLowerCase();
     const edited = Boolean(action?.payload?.edited || action?.edited);
     const sourceBadge = source === "discord"
-      ? `<span class="chat-source"> via Discord${edited ? " (edited)" : ""}</span>`
+      ? `<span class="chat-source"> via Discord Bridge${edited ? " (edited)" : ""}</span>`
       : "";
     const time = escapeHtml(formatActionTime(action));
     const identity = action?.actor || action || {};

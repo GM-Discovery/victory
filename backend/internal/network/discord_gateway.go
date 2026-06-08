@@ -418,6 +418,27 @@ func runDiscordGatewayConnection(ctx context.Context, pool *pgxpool.Pool, hub *H
 					}
 				}
 				setState(true, true, "")
+
+			case "MESSAGE_DELETE":
+				var msg struct {
+					ID        string `json:"id"`
+					ChannelID string `json:"channel_id"`
+					GuildID   string `json:"guild_id,omitempty"`
+				}
+				if err := json.Unmarshal(envelope.D, &msg); err != nil {
+					log.Printf("discord gateway delete decode failed: %v", err)
+					continue
+				}
+				debugEnabled, _ := identity.LoadDiscordGatewayDebugEnabled(ctx, pool, locationID)
+				if debugEnabled {
+					log.Printf("discord gateway message delete id=%s channel=%s guild=%s", strings.TrimSpace(msg.ID), strings.TrimSpace(msg.ChannelID), strings.TrimSpace(msg.GuildID))
+				}
+				if strings.TrimSpace(msg.ID) != "" {
+					if err := handleDiscordGatewayMessageDelete(ctx, pool, locationID, msg.ID, msg.ChannelID, msg.GuildID); err != nil {
+						log.Printf("discord gateway delete handling failed: %v", err)
+					}
+				}
+				setState(true, true, "")
 			}
 		}
 
@@ -693,6 +714,32 @@ func handleDiscordGatewayMessageUpdate(ctx context.Context, pool *pgxpool.Pool, 
 	return nil
 }
 
+func handleDiscordGatewayMessageDelete(ctx context.Context, pool *pgxpool.Pool, locationID, messageID, channelID, guildID string) error {
+	threadRow, err := loadActiveDiscordThreadByID(ctx, pool, locationID, channelID)
+	if err != nil {
+		return err
+	}
+	if threadRow == nil {
+		return nil
+	}
+	if !strings.EqualFold(strings.TrimSpace(threadRow.DiscordServerID), strings.TrimSpace(guildID)) && strings.TrimSpace(guildID) != "" {
+		return nil
+	}
+
+	importRow, err := loadDiscordGatewayImportByMessageID(ctx, pool, messageID)
+	if err != nil {
+		return err
+	}
+	if importRow == nil {
+		return nil
+	}
+	if !strings.EqualFold(strings.TrimSpace(importRow.LocationID), strings.TrimSpace(locationID)) {
+		return nil
+	}
+
+	return updateDiscordGatewayImportStatus(ctx, pool, messageID, "deleted", importRow.ActionID, importRow.LinkedUserID)
+}
+
 func resolveDiscordGatewayActor(ctx context.Context, pool *pgxpool.Pool, sessionID, discordAuthorID, authorUsername, authorGlobalName string, debugEnabled bool) (actorID, actorDisplayName, actorHandle, actorRole string, actorPersona any, linkedUserID string, linkedUserSessionMissing bool, err error) {
 	linkedUser, err := identity.ResolveBootstrapUserByDiscordID(ctx, pool, discordAuthorID)
 	if err == nil {
@@ -781,6 +828,7 @@ type discordGatewayImportRow struct {
 
 type discordGatewayImportRecord struct {
 	ID                      string
+	LocationID              string
 	ActionID                string
 	EditActionID            string
 	SessionID               string
@@ -855,6 +903,7 @@ func loadDiscordGatewayImportByMessageID(ctx context.Context, pool *pgxpool.Pool
 	err := pool.QueryRow(ctx, `
 		SELECT
 			id::text,
+			location_id::text,
 			COALESCE(action_id::text, ''),
 			COALESCE(edit_action_id::text, ''),
 			COALESCE(session_id::text, ''),
@@ -876,6 +925,7 @@ func loadDiscordGatewayImportByMessageID(ctx context.Context, pool *pgxpool.Pool
 		LIMIT 1
 	`, messageID).Scan(
 		&row.ID,
+		&row.LocationID,
 		&row.ActionID,
 		&row.EditActionID,
 		&row.SessionID,
@@ -978,10 +1028,11 @@ func loadActiveDiscordThreadByID(ctx context.Context, pool *pgxpool.Pool, locati
 			thread_id,
 			status
 		FROM auth.discord_session_threads
-		WHERE thread_id = $1::text
+		WHERE location_id = $1::uuid
+		  AND thread_id = $2::text
 		  AND status = 'active'
 		LIMIT 1
-	`, threadID).Scan(&row.LocationID, &row.VenueSlug, &row.SessionID, &row.ShowingID, &row.DiscordServerID, &row.ThreadID, &row.Status)
+	`, locationID, threadID).Scan(&row.LocationID, &row.VenueSlug, &row.SessionID, &row.ShowingID, &row.DiscordServerID, &row.ThreadID, &row.Status)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil

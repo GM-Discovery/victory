@@ -292,7 +292,7 @@ func TestDiscordMicControlFallsBackWithoutDiscordBootstrap(t *testing.T) {
 	if statusRec.Code != http.StatusOK {
 		t.Fatalf("unexpected status control code %d body=%s", statusRec.Code, statusRec.Body.String())
 	}
-	if !strings.Contains(statusRec.Body.String(), "Mic: On") {
+	if !strings.Contains(statusRec.Body.String(), "House Mic: On") {
 		t.Fatalf("expected local mic status, got %s", statusRec.Body.String())
 	}
 
@@ -335,4 +335,19 @@ func mustDiscordMicPublicKey(t *testing.T) ed25519.PublicKey {
 func mustDiscordMicPrivateKey(t *testing.T) ed25519.PrivateKey {
 	t.Helper()
 	return discordMicTestPrivKey
+}
+
+func TestNormalizeMicVenueSlug(t *testing.T) {
+	cases := map[string]string{
+		"first-theater":       "first-theater",
+		" First-Theater ":     "first-theater",
+		"MIDDLE-SCHOOL-STAGE": "middle-school-stage",
+		"the-cave":            "the-cave",
+	}
+
+	for input, want := range cases {
+		if got := normalizeMicVenueSlug(input); got != want {
+			t.Fatalf("normalizeMicVenueSlug(%q) = %q, want %q", input, got, want)
+		}
+	}
 }

@@ -262,6 +262,305 @@ func TestDiscordGatewayMessageCreateFallsBackWhenLinkedUserNotInSession(t *testi
 	}
 }
 
+func TestDiscordGatewayMessageCreateSkipsWrongLocationThread(t *testing.T) {
+	pool := openDiscordGatewayTestPool(t)
+	ctx := context.Background()
+
+	if err := identity.EnsureKernel39DiscordGatewaySurface(ctx, pool); err != nil {
+		t.Fatalf("ensure gateway surface: %v", err)
+	}
+
+	locationA, venueA, lotA, productionA, userA, sessionA, showingA := setupDiscordGatewayEditFixture(t, pool)
+	locationB, venueB, lotB, productionB, userB, sessionB, showingB := setupDiscordGatewayEditFixture(t, pool)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_chat_imports WHERE location_id IN ($1, $2)`, locationA, locationB)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_session_threads WHERE location_id IN ($1, $2)`, locationA, locationB)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM session_participants WHERE session_id IN ($1, $2)`, sessionA, sessionB)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM actions WHERE session_id IN ($1, $2)`, sessionA, sessionB)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM showings WHERE id IN ($1, $2)`, showingA, showingB)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM sessions WHERE id IN ($1, $2)`, sessionA, sessionB)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM productions WHERE id IN ($1, $2)`, productionA, productionB)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM venues WHERE id IN ($1, $2)`, venueA, venueB)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM lots WHERE id IN ($1, $2)`, lotA, lotB)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id IN ($1, $2)`, userA, userB)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM locations WHERE id IN ($1, $2)`, locationA, locationB)
+	})
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO auth.discord_session_threads (
+			location_id,
+			venue_id,
+			venue_slug,
+			session_id,
+			showing_id,
+			discord_server_id,
+			parent_channel_id,
+			thread_id,
+			thread_name,
+			started_by_user_id,
+			started_by_discord_user_id,
+			started_at,
+			showtime_at,
+			status
+		)
+		VALUES (
+			$1::uuid,
+			$2::uuid,
+			'gateway-edit-fixture',
+			$3::uuid,
+			$4::uuid,
+			'guild-1',
+			'parent-2',
+			'thread-2',
+			'Wrong Location Thread',
+			$5::uuid,
+			'discord-user-2',
+			NOW(),
+			NOW(),
+			'active'
+		)
+	`, locationB, venueB, sessionB, showingB, userB); err != nil {
+		t.Fatalf("insert secondary thread: %v", err)
+	}
+
+	hub := NewHub()
+	linkRecord := discordGatewayLinkRecord{LocationID: locationA, DiscordGuildID: "guild-1", Active: true}
+	msg := discordGatewayMessage{
+		ID:        "msg-wrong-location",
+		ChannelID: "thread-2",
+		GuildID:   "guild-1",
+		Content:   "pong",
+		Type:      0,
+		Author: &discordGatewayUser{
+			ID:       "discord-user-2",
+			Username: "wrong_location",
+		},
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+	}
+	if err := handleDiscordGatewayMessageCreate(ctx, pool, hub, identity.DiscordServerLinkConfig{}, locationA, linkRecord, identity.DiscordGatewayConfig{}, "", msg); err != nil {
+		t.Fatalf("create import for wrong location: %v", err)
+	}
+
+	var importCount int
+	if err := pool.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM auth.discord_chat_imports
+		WHERE discord_message_id = $1
+	`, msg.ID).Scan(&importCount); err != nil {
+		t.Fatalf("load import count: %v", err)
+	}
+	if importCount != 0 {
+		t.Fatalf("expected wrong-location message to be skipped, got %d imports", importCount)
+	}
+}
+
+func TestDiscordGatewayMessageCreateSkipsDuplicateAndBotEcho(t *testing.T) {
+	pool := openDiscordGatewayTestPool(t)
+	ctx := context.Background()
+
+	if err := identity.EnsureKernel39DiscordGatewaySurface(ctx, pool); err != nil {
+		t.Fatalf("ensure gateway surface: %v", err)
+	}
+
+	locationID, venueID, lotID, productionID, userID, sessionID, showingID := setupDiscordGatewayEditFixture(t, pool)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_chat_imports WHERE location_id = $1`, locationID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_session_threads WHERE location_id = $1`, locationID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM session_participants WHERE session_id = $1`, sessionID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM actions WHERE session_id = $1`, sessionID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM showings WHERE id = $1`, showingID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM sessions WHERE id = $1`, sessionID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM productions WHERE id = $1`, productionID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM venues WHERE id = $1`, venueID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM lots WHERE id = $1`, lotID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM locations WHERE id = $1`, locationID)
+	})
+
+	hub := NewHub()
+	linkRecord := discordGatewayLinkRecord{LocationID: locationID, DiscordGuildID: "guild-1", Active: true}
+	msg := discordGatewayMessage{
+		ID:        "msg-duplicate",
+		ChannelID: "thread-1",
+		GuildID:   "guild-1",
+		Content:   "pong",
+		Type:      0,
+		Author: &discordGatewayUser{
+			ID:       "discord-user-1",
+			Username: "grant",
+		},
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+	}
+	if err := handleDiscordGatewayMessageCreate(ctx, pool, hub, identity.DiscordServerLinkConfig{}, locationID, linkRecord, identity.DiscordGatewayConfig{}, "", msg); err != nil {
+		t.Fatalf("first import: %v", err)
+	}
+	if err := handleDiscordGatewayMessageCreate(ctx, pool, hub, identity.DiscordServerLinkConfig{}, locationID, linkRecord, identity.DiscordGatewayConfig{}, "", msg); err != nil {
+		t.Fatalf("duplicate import: %v", err)
+	}
+
+	var actionCount int
+	if err := pool.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM actions
+		WHERE session_id = $1::uuid
+	`, sessionID).Scan(&actionCount); err != nil {
+		t.Fatalf("load action count: %v", err)
+	}
+	if actionCount != 1 {
+		t.Fatalf("expected duplicate import to stay at 1 action, got %d", actionCount)
+	}
+
+	var botMsgCount int
+	botMsg := msg
+	botMsg.ID = "msg-bot-echo"
+	botMsg.Author = &discordGatewayUser{
+		ID:       "discord-bot-1",
+		Username: "victory-bot",
+		Bot:      true,
+	}
+	if err := handleDiscordGatewayMessageCreate(ctx, pool, hub, identity.DiscordServerLinkConfig{}, locationID, linkRecord, identity.DiscordGatewayConfig{}, "discord-bot-1", botMsg); err != nil {
+		t.Fatalf("bot echo import: %v", err)
+	}
+	if err := pool.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM auth.discord_chat_imports
+		WHERE discord_message_id = $1
+	`, botMsg.ID).Scan(&botMsgCount); err != nil {
+		t.Fatalf("load bot import count: %v", err)
+	}
+	if botMsgCount != 0 {
+		t.Fatalf("expected bot echo to be dropped, got %d imports", botMsgCount)
+	}
+}
+
+func TestDiscordGatewayMessageCreateHonorsDebugToggle(t *testing.T) {
+	pool := openDiscordGatewayTestPool(t)
+	ctx := context.Background()
+
+	if err := identity.EnsureKernel39DiscordGatewaySurface(ctx, pool); err != nil {
+		t.Fatalf("ensure gateway surface: %v", err)
+	}
+
+	locationID, venueID, lotID, productionID, userID, sessionID, showingID := setupDiscordGatewayEditFixture(t, pool)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_chat_imports WHERE location_id = $1`, locationID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_gateway_settings WHERE location_id = $1`, locationID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_session_threads WHERE location_id = $1`, locationID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM session_participants WHERE session_id = $1`, sessionID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM actions WHERE session_id = $1`, sessionID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM showings WHERE id = $1`, showingID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM sessions WHERE id = $1`, sessionID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM productions WHERE id = $1`, productionID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM venues WHERE id = $1`, venueID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM lots WHERE id = $1`, lotID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM locations WHERE id = $1`, locationID)
+	})
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO auth.discord_gateway_settings (
+			location_id,
+			debug_enabled,
+			updated_by_user_id,
+			updated_at
+		)
+		VALUES ($1::uuid, TRUE, $2::uuid, NOW())
+		ON CONFLICT (location_id) DO UPDATE
+		SET debug_enabled = EXCLUDED.debug_enabled,
+			updated_by_user_id = EXCLUDED.updated_by_user_id,
+			updated_at = NOW()
+	`, locationID, userID); err != nil {
+		t.Fatalf("enable debug tracing: %v", err)
+	}
+
+	hub := NewHub()
+	linkRecord := discordGatewayLinkRecord{LocationID: locationID, DiscordGuildID: "guild-1", Active: true}
+	msg := discordGatewayMessage{
+		ID:        "msg-debug-enabled",
+		ChannelID: "thread-1",
+		GuildID:   "guild-1",
+		Content:   "pong with debug",
+		Type:      0,
+		Author: &discordGatewayUser{
+			ID:       "discord-user-1",
+			Username: "grant",
+		},
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+	}
+	if err := handleDiscordGatewayMessageCreate(ctx, pool, hub, identity.DiscordServerLinkConfig{}, locationID, linkRecord, identity.DiscordGatewayConfig{}, "", msg); err != nil {
+		t.Fatalf("debug-enabled import: %v", err)
+	}
+
+	var importStatus string
+	if err := pool.QueryRow(ctx, `
+		SELECT import_status
+		FROM auth.discord_chat_imports
+		WHERE discord_message_id = $1
+	`, msg.ID).Scan(&importStatus); err != nil {
+		t.Fatalf("load debug import status: %v", err)
+	}
+	if importStatus != "imported" {
+		t.Fatalf("expected debug-enabled import to succeed, got %s", importStatus)
+	}
+}
+
+func TestDiscordGatewayMessageDeleteMarksImportDeleted(t *testing.T) {
+	pool := openDiscordGatewayTestPool(t)
+	ctx := context.Background()
+
+	if err := identity.EnsureKernel39DiscordGatewaySurface(ctx, pool); err != nil {
+		t.Fatalf("ensure gateway surface: %v", err)
+	}
+
+	locationID, venueID, lotID, productionID, userID, sessionID, showingID := setupDiscordGatewayEditFixture(t, pool)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_chat_imports WHERE location_id = $1`, locationID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_session_threads WHERE location_id = $1`, locationID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM session_participants WHERE session_id = $1`, sessionID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM actions WHERE session_id = $1`, sessionID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM showings WHERE id = $1`, showingID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM sessions WHERE id = $1`, sessionID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM productions WHERE id = $1`, productionID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM venues WHERE id = $1`, venueID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM lots WHERE id = $1`, lotID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM locations WHERE id = $1`, locationID)
+	})
+
+	hub := NewHub()
+	linkRecord := discordGatewayLinkRecord{LocationID: locationID, DiscordGuildID: "guild-1", Active: true}
+	msg := discordGatewayMessage{
+		ID:        "msg-delete-me",
+		ChannelID: "thread-1",
+		GuildID:   "guild-1",
+		Content:   "delete me",
+		Type:      0,
+		Author: &discordGatewayUser{
+			ID:       "discord-user-1",
+			Username: "grant",
+		},
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+	}
+	if err := handleDiscordGatewayMessageCreate(ctx, pool, hub, identity.DiscordServerLinkConfig{}, locationID, linkRecord, identity.DiscordGatewayConfig{}, "", msg); err != nil {
+		t.Fatalf("seed import before delete: %v", err)
+	}
+	if err := handleDiscordGatewayMessageDelete(ctx, pool, locationID, msg.ID, msg.ChannelID, msg.GuildID); err != nil {
+		t.Fatalf("delete handling: %v", err)
+	}
+
+	var importStatus string
+	if err := pool.QueryRow(ctx, `
+		SELECT import_status
+		FROM auth.discord_chat_imports
+		WHERE discord_message_id = $1
+	`, msg.ID).Scan(&importStatus); err != nil {
+		t.Fatalf("load deleted import status: %v", err)
+	}
+	if importStatus != "deleted" {
+		t.Fatalf("expected deleted import status, got %s", importStatus)
+	}
+}
+
 func openDiscordGatewayTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
