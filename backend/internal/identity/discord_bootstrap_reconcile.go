@@ -43,6 +43,17 @@ func ReconcileDiscordBootstrap(ctx context.Context, pool *pgxpool.Pool, cfg Disc
 		}
 	}
 
+	activeThreads, err := listActiveDiscordMicThreads(ctx, pool, location.ID)
+	if err != nil {
+		log.Printf("discord mic thread load failed: %v", err)
+	} else {
+		for _, thread := range activeThreads {
+			if err := joinDiscordMicThread(ctx, runtimeCfg, thread.ThreadID); err != nil {
+				log.Printf("discord mic thread join failed thread=%s: %v", strings.TrimSpace(thread.ThreadID), err)
+			}
+		}
+	}
+
 	return nil
 }
 

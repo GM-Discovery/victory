@@ -81,7 +81,7 @@ func ResolveBootstrapUserByDiscordID(ctx context.Context, pool *pgxpool.Pool, di
 		  COALESCE(NULLIF(u.email, ''), '')
 		FROM auth.discord_identities d
 		JOIN users u ON u.id = d.user_id
-		WHERE d.discord_user_id = $1
+		WHERE d.discord_user_id = $1::text
 		LIMIT 1
 	`, discordUserID).Scan(&user.ID, &user.Handle, &user.DisplayName, &user.DiscordID, &user.Email)
 	if err != nil {
@@ -108,7 +108,7 @@ func ResolveBootstrapUserByID(ctx context.Context, pool *pgxpool.Pool, userID st
 		  COALESCE(NULLIF(display_name, ''), ''),
 		  COALESCE(NULLIF(email, ''), '')
 		FROM users
-		WHERE id = $1
+		WHERE id = $1::uuid
 		LIMIT 1
 	`, userID).Scan(&user.ID, &user.Handle, &user.DisplayName, &user.Email)
 	if err != nil {
@@ -135,7 +135,7 @@ func ResolveBootstrapUserByHandle(ctx context.Context, pool *pgxpool.Pool, handl
 		  COALESCE(NULLIF(display_name, ''), ''),
 		  COALESCE(NULLIF(email, ''), '')
 		FROM users
-		WHERE lower(handle) = $1
+		WHERE lower(handle) = $1::text
 		LIMIT 1
 	`, handle).Scan(&user.ID, &user.Handle, &user.DisplayName, &user.Email)
 	if err != nil {

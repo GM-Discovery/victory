@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -275,6 +276,21 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 		a.Persona = a.Payload["actor_persona"]
 		if a.Persona == nil && a.Type == "persona/equip" {
 			a.Persona = a.Payload["persona"]
+		}
+		if source, _ := a.Payload["source"].(string); strings.EqualFold(strings.TrimSpace(source), "discord") {
+			if discordMeta, ok := a.Payload["discord"].(map[string]any); ok {
+				if linkedUserID := strings.TrimSpace(stringValueMap(discordMeta, "linked_user_id")); linkedUserID == "" {
+					if value := strings.TrimSpace(stringValueMap(discordMeta, "author_global_name")); value != "" {
+						a.ActorDisplayName = value
+					} else if value := strings.TrimSpace(stringValueMap(discordMeta, "author_username")); value != "" {
+						a.ActorDisplayName = value
+					}
+					if value := strings.TrimSpace(stringValueMap(discordMeta, "author_username")); value != "" {
+						a.ActorHandle = value
+					}
+					a.ActorRole = "audience"
+				}
+			}
 		}
 		a.Actor = map[string]any{
 			"user_id":      a.ActorID,
@@ -632,4 +648,15 @@ func visibilityBool(visibility map[string]any, key string, fallback bool) bool {
 		}
 	}
 	return fallback
+}
+
+func stringValueMap(m map[string]any, key string) string {
+	if m == nil {
+		return ""
+	}
+	value, ok := m[key]
+	if !ok || value == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
 }

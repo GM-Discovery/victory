@@ -77,7 +77,7 @@ func ResolveSessionIdentity(ctx context.Context, q identityQuerier, sessionID, u
 		LEFT JOIN current_session_personas csp ON csp.session_id = s.id AND csp.user_id = sp.user_id
 		LEFT JOIN character_cards cc ON cc.id = csp.character_card_id AND cc.is_deleted = FALSE
 		WHERE v.slug = 'the-cave'
-		  AND s.id = $1
+		  AND s.id = $1::uuid
 		  AND sp.user_id = $2
 		  AND s.status IN ('rehearsal', 'live')
 		LIMIT 1

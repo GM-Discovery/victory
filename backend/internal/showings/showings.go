@@ -147,7 +147,7 @@ func EnsureForSession(ctx context.Context, q showingQuerier, sessionID, createdB
 		err := q.QueryRow(ctx, `
 			SELECT sp.user_id::text
 			FROM session_participants sp
-			WHERE sp.session_id = $1
+			WHERE sp.session_id = $1::uuid
 			ORDER BY sp.joined_at ASC
 			LIMIT 1
 		`, sessionID).Scan(&createdBy)
@@ -181,7 +181,7 @@ func EnsureForSession(ctx context.Context, q showingQuerier, sessionID, createdB
 		JOIN venues v ON v.id = s.venue_id
 		JOIN lots lo ON lo.id = v.lot_id
 		JOIN locations l ON l.id = lo.location_id
-		WHERE s.id = $1
+		WHERE s.id = $1::uuid
 		LIMIT 1
 	`, sessionID).Scan(&status, &venueID, &productionID, &startedAt); err != nil {
 		return Showing{}, err
@@ -210,7 +210,7 @@ func EnsureForSession(ctx context.Context, q showingQuerier, sessionID, createdB
 			created_by
 		)
 		VALUES (
-			$1,
+			$1::uuid,
 			$2::uuid,
 			$3::uuid,
 			NULL,
@@ -263,7 +263,7 @@ func LoadBySession(ctx context.Context, q showingQuerier, sessionID string) (Sho
 			created_by::text,
 			session_id::text
 		FROM showings
-		WHERE session_id = $1
+		WHERE session_id = $1::uuid
 		LIMIT 1
 	`, sessionID).Scan(&showing.ID, &showing.ProductionID, &showing.VenueID, &showing.RunID, &showing.Status, &showing.AudienceViewEnabled, &showing.StartedAt, &showing.EndedAt, &showing.CreatedBy, &showing.SessionID); err != nil {
 		return Showing{}, err

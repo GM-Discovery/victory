@@ -130,7 +130,7 @@ func canActPersona(ctx context.Context, q actionQuerier, userID, sessionID strin
 	err := q.QueryRow(ctx, `
 		SELECT sp.user_id::text
 		FROM session_participants sp
-		WHERE sp.session_id = $1
+		WHERE sp.session_id = $1::uuid
 		  AND sp.user_id = $2
 		LIMIT 1
 	`, sessionID, userID).Scan(&participantUserID)
@@ -189,7 +189,7 @@ func canActRevealInCave(ctx context.Context, q actionQuerier, userID, sessionID 
 		FROM sessions s
 		JOIN venues v ON v.id = s.venue_id
 		JOIN session_participants sp ON sp.session_id = s.id
-		WHERE s.id = $1
+		WHERE s.id = $1::uuid
 		  AND sp.user_id = $2
 		LIMIT 1
 	`, sessionID, userID).Scan(&venueSlug, &participantRole, &actorsCanReveal, &sessionVenueID, &sessionFoundUser)
@@ -210,7 +210,7 @@ func canActRevealInCave(ctx context.Context, q actionQuerier, userID, sessionID 
 			SELECT 1
 			FROM sessions s
 			JOIN venues v ON v.id = s.venue_id
-			WHERE s.id = $1
+			WHERE s.id = $1::uuid
 			  AND v.slug = 'the-cave'
 		)
 	`, sessionID).Scan(&venueAccess)

@@ -458,6 +458,21 @@ func loadReviewEvents(ctx context.Context, pool *pgxpool.Pool, showingID string)
 		}
 		payload := decodeJSONMap(row.PayloadRaw)
 		target := decodeJSONMap(row.TargetRaw)
+		if source, _ := payload["source"].(string); strings.EqualFold(strings.TrimSpace(source), "discord") {
+			if discordMeta, ok := payload["discord"].(map[string]any); ok {
+				if linkedUserID := strings.TrimSpace(stringValueMap(discordMeta, "linked_user_id")); linkedUserID == "" {
+					if value := strings.TrimSpace(stringValueMap(discordMeta, "author_global_name")); value != "" {
+						row.ActorDisplay = value
+					} else if value := strings.TrimSpace(stringValueMap(discordMeta, "author_username")); value != "" {
+						row.ActorDisplay = value
+					}
+					if value := strings.TrimSpace(stringValueMap(discordMeta, "author_username")); value != "" {
+						row.ActorHandle = value
+					}
+					row.ActorRole = "audience"
+				}
+			}
+		}
 		event := normalizeReviewEvent(row, target, payload, elementCache, cardCache)
 		out = append(out, event)
 	}
@@ -522,6 +537,17 @@ func normalizeReviewEvent(row reviewActionRow, target, payload map[string]any, e
 		event.CardColor = strings.TrimSpace(color)
 	}
 	return event
+}
+
+func stringValueMap(m map[string]any, key string) string {
+	if m == nil {
+		return ""
+	}
+	value, ok := m[key]
+	if !ok || value == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
 }
 
 func reviewCategoryForAction(actionType string) string {

@@ -1887,6 +1887,8 @@
     let cardEditorDragState = null;
     let cardFaceState = new Map();
     let pendingSocketActions = [];
+    let socketReconnectTimer = null;
+    let socketReconnectDelay = 1000;
     let worldRefreshSerial = 0;
     const smokeMode = new URLSearchParams(location.search).has("smoke");
     let smokeGridEnabled = smokeMode;
@@ -2539,7 +2541,10 @@
       const text = String(action?.payload?.text || action?.text || "").trim();
       if (!text) return;
       const author = String(action?.actor_display_name || action?.actor?.display_name || action?.actor_handle || "Unknown").trim() || "Unknown";
-      appendChatEntry(author, text);
+      const source = String(action?.payload?.source || action?.source || "").trim().toLowerCase();
+      const edited = Boolean(action?.payload?.edited || action?.edited);
+      const label = source === "discord" ? `${author} via Discord${edited ? " (edited)" : ""}` : author;
+      appendChatEntry(label, text);
     }
 
     async function sendChatDraft() {
@@ -4509,6 +4514,15 @@
       return !!ws && ws.readyState === WebSocket.OPEN;
     }
 
+    function scheduleSocketReconnect() {
+      if (socketReconnectTimer) return;
+      socketReconnectTimer = window.setTimeout(() => {
+        socketReconnectTimer = null;
+        socketReconnectDelay = Math.min(socketReconnectDelay * 2, 10000);
+        connectSocket();
+      }, socketReconnectDelay);
+    }
+
     function queuePendingSocketAction(type, extra = {}) {
       pendingSocketActions.push({
         type,
@@ -4692,10 +4706,15 @@
     }
 
     function connectSocket() {
+      if (socketReconnectTimer) {
+        window.clearTimeout(socketReconnectTimer);
+        socketReconnectTimer = null;
+      }
       const protocol = location.protocol === "https:" ? "wss:" : "ws:";
       ws = new WebSocket(`${protocol}//${location.host}/ws/the-cave`);
 
       ws.addEventListener("open", () => {
+        socketReconnectDelay = 1000;
         setStageStatus("Connected to the Cave WebSocket.");
         updateShellMetaPresentation();
         flushPendingSocketActions();
@@ -4706,11 +4725,13 @@
         setMovementLine("Socket closed");
         updateShellMetaPresentation();
         pendingSocketActions = [];
+        scheduleSocketReconnect();
       });
 
       ws.addEventListener("error", () => {
         setStageStatus("WebSocket error.");
         updateShellMetaPresentation();
+        scheduleSocketReconnect();
       });
 
       ws.addEventListener("message", async (event) => {

@@ -527,6 +527,50 @@
       </section>
 
       <section class="card">
+        <h2>Discord Gateway Intake</h2>
+        <p class="muted small">Gateway intake mirrors active `/mic` thread messages from Discord into Victory. Message Content Intent must be enabled in the Discord Developer Portal.</p>
+        <div id="discord-gateway-status" class="status">Checking Discord Gateway intake...</div>
+        <div class="request-grid" style="margin-top: 12px;">
+          <div>
+            <div class="muted small"><strong>Configured</strong></div>
+            <div id="discord-gateway-configured">Unknown</div>
+          </div>
+          <div>
+            <div class="muted small"><strong>Running</strong></div>
+            <div id="discord-gateway-running">Unknown</div>
+          </div>
+        </div>
+        <div class="request-grid" style="margin-top: 12px;">
+          <div>
+            <div class="muted small"><strong>Connected</strong></div>
+            <div id="discord-gateway-connected">Unknown</div>
+          </div>
+          <div>
+            <div class="muted small"><strong>Active threads</strong></div>
+            <div id="discord-gateway-threads">0</div>
+          </div>
+        </div>
+        <div class="request-grid" style="margin-top: 12px;">
+          <div>
+            <div class="muted small"><strong>Last event</strong></div>
+            <div id="discord-gateway-last-event">Never</div>
+          </div>
+          <div>
+            <div class="muted small"><strong>Last error</strong></div>
+            <div id="discord-gateway-last-error">None</div>
+          </div>
+        </div>
+        <div class="muted small" id="discord-gateway-note" style="margin-top: 10px;"></div>
+        <div class="chip-list" style="margin-top: 14px;">
+          <button id="discord-gateway-debug-toggle" class="chip" type="button">Enable debug tracing</button>
+        </div>
+        <div class="muted small" id="discord-gateway-debug-state" style="margin-top: 8px;"></div>
+        <div class="muted small" style="margin-top: 8px; line-height: 1.45;">
+          Debug tracing is for the live Discord gateway import path only. Turn it on when you want detailed backend logs for a pong test, then turn it back off when you're done. You will not see extra messages in the venue from this toggle; watch the backend logs and gateway status instead.
+        </div>
+      </section>
+
+      <section class="card">
         <h2>Grant Access / Invite</h2>
         <p class="muted small">
           Use an audience invite for venue access, or a production invite for cast, crew, and director permissions. People will see the public display name, not the private login handle. First Theater can be granted directly from here too.
@@ -622,6 +666,16 @@
     const discordBootstrapPublicKey = document.getElementById("discord-bootstrap-public-key");
     const discordBootstrapEnabled = document.getElementById("discord-bootstrap-enabled");
     const discordBootstrapSource = document.getElementById("discord-bootstrap-source");
+    const discordGatewayStatus = document.getElementById("discord-gateway-status");
+    const discordGatewayConfigured = document.getElementById("discord-gateway-configured");
+    const discordGatewayRunning = document.getElementById("discord-gateway-running");
+    const discordGatewayConnected = document.getElementById("discord-gateway-connected");
+    const discordGatewayThreads = document.getElementById("discord-gateway-threads");
+    const discordGatewayLastEvent = document.getElementById("discord-gateway-last-event");
+    const discordGatewayLastError = document.getElementById("discord-gateway-last-error");
+    const discordGatewayNote = document.getElementById("discord-gateway-note");
+    const discordGatewayDebugToggle = document.getElementById("discord-gateway-debug-toggle");
+    const discordGatewayDebugState = document.getElementById("discord-gateway-debug-state");
 
     const officeAccess = new Set(["producer"]);
     const discordBootstrapCallbackURL = `${window.location.origin}/auth/discord/server/callback`;
@@ -696,6 +750,43 @@
       if (discordServerUnlink) {
         discordServerUnlink.hidden = !(linked && canManage);
         discordServerUnlink.disabled = !(linked && canManage);
+      }
+    }
+
+    function setDiscordGatewayState(status) {
+      const configured = Boolean(status?.configured);
+      const enabled = Boolean(status?.enabled);
+      const running = Boolean(status?.running);
+      const connected = Boolean(status?.connected);
+      const debugEnabled = Boolean(status?.debug_enabled);
+      const threads = Number(status?.active_thread_count || 0);
+      const lastEvent = String(status?.last_event_at || "").trim();
+      const lastError = String(status?.last_error || "").trim();
+
+      setStatus(
+        discordGatewayStatus,
+        configured
+          ? (running ? (connected ? "Gateway is connected." : "Gateway is running but disconnected.") : "Gateway is configured.")
+          : "Gateway is not configured."
+      );
+      if (discordGatewayConfigured) discordGatewayConfigured.textContent = configured ? "Yes" : "No";
+      if (discordGatewayRunning) discordGatewayRunning.textContent = running ? "Yes" : "No";
+      if (discordGatewayConnected) discordGatewayConnected.textContent = connected ? "Yes" : "No";
+      if (discordGatewayThreads) discordGatewayThreads.textContent = String(threads);
+      if (discordGatewayLastEvent) discordGatewayLastEvent.textContent = lastEvent || "Never";
+      if (discordGatewayLastError) discordGatewayLastError.textContent = lastError || "None";
+      if (discordGatewayNote) {
+        discordGatewayNote.textContent = status?.message_content_intent_note || "Discord Message Content Intent must be enabled in the Discord Developer Portal for Gateway chat intake.";
+      }
+      if (discordGatewayDebugToggle) {
+        discordGatewayDebugToggle.textContent = debugEnabled ? "Disable debug tracing" : "Enable debug tracing";
+        discordGatewayDebugToggle.disabled = !configured;
+        discordGatewayDebugToggle.setAttribute("aria-pressed", debugEnabled ? "true" : "false");
+      }
+      if (discordGatewayDebugState) {
+        discordGatewayDebugState.textContent = debugEnabled
+          ? "Verbose gateway/import tracing is on for the primary Discord intake path."
+          : "Verbose gateway/import tracing is off.";
       }
     }
 
@@ -953,6 +1044,31 @@
       }
     }
 
+    async function loadDiscordGatewayStatus() {
+      setStatus(discordGatewayStatus, "Checking Discord Gateway intake...");
+      try {
+        const res = await fetch("/api/discord/gateway/status", { credentials: "include" });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Failed to load Discord Gateway status (HTTP ${res.status})`);
+        }
+        setDiscordGatewayState(payload.data || {});
+      } catch (error) {
+        setStatus(discordGatewayStatus, error.message || String(error));
+        setDiscordGatewayState({
+          configured: false,
+          enabled: false,
+          running: false,
+          connected: false,
+          debug_enabled: false,
+          active_thread_count: 0,
+          last_event_at: "",
+          last_error: error.message || String(error),
+          message_content_intent_note: "Discord Message Content Intent must be enabled in the Discord Developer Portal for Gateway chat intake.",
+        });
+      }
+    }
+
     async function loadDiscordChannelMappingStatus() {
       try {
         const res = await fetch("/api/discord/channel-mapping/status", { credentials: "include" });
@@ -973,6 +1089,27 @@
           venues: [],
           chat_parents: [],
         });
+      }
+    }
+
+    async function toggleDiscordGatewayDebug() {
+      if (discordGatewayDebugState) {
+        setStatus(discordGatewayDebugState, "Toggling debug tracing...");
+      }
+      try {
+        const res = await fetch("/api/discord/gateway/debug", {
+          method: "POST",
+          credentials: "include",
+        });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Failed to toggle gateway tracing (HTTP ${res.status})`);
+        }
+        await loadDiscordGatewayStatus();
+      } catch (error) {
+        if (discordGatewayDebugState) {
+          setStatus(discordGatewayDebugState, error.message || String(error));
+        }
       }
     }
 
@@ -1156,6 +1293,10 @@
       await repairDiscordChannelMapping();
     });
 
+    discordGatewayDebugToggle?.addEventListener("click", async () => {
+      await toggleDiscordGatewayDebug();
+    });
+
     discordMicRegister?.addEventListener("click", async () => {
       await registerDiscordMicCommand();
     });
@@ -1197,7 +1338,7 @@
           }
         }
 
-        await Promise.all([loadProductions(), loadIncomingRequests(), loadDiscordServerStatus(), loadDiscordChannelMappingStatus(), loadDiscordMicStatus()]);
+        await Promise.all([loadProductions(), loadIncomingRequests(), loadDiscordServerStatus(), loadDiscordGatewayStatus(), loadDiscordChannelMappingStatus(), loadDiscordMicStatus()]);
         if (isOperator) {
           refreshDiscordBootstrapHint();
           await loadDiscordBootstrapStatus();

@@ -20,6 +20,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,6 +46,7 @@ func main() {
 	storageRoot := getenv("STORAGE_ROOT", "/opt/victory/storage")
 	discordOAuthConfig := discordOAuthConfigFromEnv()
 	discordServerLinkConfig := discordServerLinkConfigFromEnv()
+	discordGatewayConfig := discordGatewayConfigFromEnv()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -70,6 +72,9 @@ func main() {
 	if err := characters.EnsureKernel23CharacterSurface(ctx, pool); err != nil {
 		log.Fatalf("kernel 23 character bootstrap failed: %v", err)
 	}
+	if err := identity.EnsureKernel39DiscordGatewaySurface(ctx, pool); err != nil {
+		log.Fatalf("kernel 39 discord gateway bootstrap failed: %v", err)
+	}
 
 	hub := network.NewHub()
 
@@ -80,6 +85,8 @@ func main() {
 			log.Printf("discord bootstrap reconcile failed: %v", err)
 		}
 	}()
+
+	go network.RunDiscordGatewayWorker(context.Background(), pool, hub, discordServerLinkConfig, discordGatewayConfig)
 
 	mux := http.NewServeMux()
 
@@ -105,6 +112,8 @@ func main() {
 	mux.HandleFunc("/api/invites/accept", identity.HandleAcceptInvite(pool, secureCookie))
 	mux.HandleFunc("GET /api/discord/server-link/status", identity.HandleDiscordServerLinkStatus(pool, discordServerLinkConfig))
 	mux.HandleFunc("/api/discord/server/bootstrap", identity.HandleDiscordServerBootstrap(pool, discordServerLinkConfig))
+	mux.HandleFunc("GET /api/discord/gateway/status", identity.HandleDiscordGatewayStatus(pool, discordGatewayConfig))
+	mux.HandleFunc("/api/discord/gateway/debug", identity.HandleDiscordGatewayDebug(pool))
 	mux.HandleFunc("GET /auth/discord/server/install", identity.HandleDiscordServerInstall(pool, discordServerLinkConfig))
 	mux.HandleFunc("GET /auth/discord/server/callback", identity.HandleDiscordServerCallback(pool, discordServerLinkConfig))
 	mux.HandleFunc("POST /api/discord/server/unlink", identity.HandleDiscordServerUnlink(pool, discordServerLinkConfig))
@@ -499,6 +508,40 @@ func discordServerLinkConfigFromEnv() identity.DiscordServerLinkConfig {
 		PublicKey:     strings.TrimSpace(getenv("DISCORD_PUBLIC_KEY", "")),
 		Enabled:       enabled,
 	}
+}
+
+func discordGatewayConfigFromEnv() identity.DiscordGatewayConfig {
+	enabledValue, enabledSet := os.LookupEnv("DISCORD_GATEWAY_ENABLED")
+	enabled := false
+	if strings.TrimSpace(enabledValue) == "" {
+		enabled = strings.TrimSpace(os.Getenv("DISCORD_BOT_TOKEN")) != ""
+	} else if enabledSet {
+		enabled = parseBoolish(enabledValue)
+	}
+
+	intents := parseDiscordGatewayIntents(getenv("DISCORD_GATEWAY_INTENTS", ""))
+	if intents == 0 {
+		intents = (1 << 0) | (1 << 9)
+	}
+
+	return identity.DiscordGatewayConfig{
+		Enabled:    enabled,
+		BotToken:   strings.TrimSpace(os.Getenv("DISCORD_BOT_TOKEN")),
+		Intents:    intents,
+		GatewayURL: strings.TrimSpace(getenv("DISCORD_GATEWAY_URL", "")),
+	}
+}
+
+func parseDiscordGatewayIntents(raw string) int64 {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0
+	}
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return value
 }
 
 func parseDiscordOAuthScopes(raw string) []string {

@@ -300,6 +300,21 @@ func TestDiscordBootstrapReconcileRestoresMappingsAndMicCommand(t *testing.T) {
 		)
 		VALUES ($1, 'guild-1', 'Example Server', 'sys-1', 'victory-system', TRUE, TRUE, NOW(), NOW())
 	`, locationID)
+	_, _ = pool.Exec(context.Background(), `
+		INSERT INTO auth.discord_session_threads (
+			location_id,
+			venue_slug,
+			discord_server_id,
+			parent_channel_id,
+			thread_id,
+			thread_name,
+			started_at,
+			showtime_at,
+			status,
+			updated_at
+		)
+		VALUES ($1, 'first-theater', 'guild-1', 'first-theater-cat', 'first-theater-chat', 'First Theater — Showtime', NOW(), NOW(), 'active', NOW())
+	`, locationID)
 
 	channelsJSON := `[
 		{"id":"cat-core","name":"Victory Theater","type":4},
@@ -335,6 +350,8 @@ func TestDiscordBootstrapReconcileRestoresMappingsAndMicCommand(t *testing.T) {
 				return jsonResponse(`[]`), nil
 			case req.Method == http.MethodPost && strings.HasSuffix(req.URL.Path, "/applications/app-1/guilds/guild-1/commands"):
 				return jsonResponse(`{"id":"mic-1","name":"mic"}`), nil
+			case req.Method == http.MethodPut && strings.HasSuffix(req.URL.Path, "/channels/first-theater-chat/thread-members/@me"):
+				return jsonResponse(`{}`), nil
 			default:
 				t.Fatalf("unexpected discord request %s %s", req.Method, req.URL.Path)
 				return nil, nil
@@ -388,6 +405,14 @@ func ensureDiscordServerTestSchema(t *testing.T, pool *pgxpool.Pool) {
 			permissions text,
 			public_key text NOT NULL DEFAULT '',
 			enabled boolean NOT NULL DEFAULT FALSE,
+			updated_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+			updated_at timestamptz NOT NULL DEFAULT now()
+		)
+	`)
+	_, _ = pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS auth.discord_gateway_settings (
+			location_id uuid PRIMARY KEY REFERENCES locations(id) ON DELETE CASCADE,
+			debug_enabled boolean NOT NULL DEFAULT FALSE,
 			updated_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
 			updated_at timestamptz NOT NULL DEFAULT now()
 		)

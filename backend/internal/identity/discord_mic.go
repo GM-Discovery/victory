@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -117,6 +118,55 @@ type discordMicThreadRow struct {
 	ShowtimeAt             time.Time
 	EndedAt                *time.Time
 	Status                 string
+}
+
+func listActiveDiscordMicThreads(ctx context.Context, pool *pgxpool.Pool, locationID string) ([]discordMicThreadRow, error) {
+	rows, err := pool.Query(ctx, `
+		SELECT
+			id::text,
+			location_id::text,
+			COALESCE(venue_id::text, ''),
+			venue_slug,
+			COALESCE(session_id::text, ''),
+			COALESCE(showing_id::text, ''),
+			discord_server_id,
+			parent_channel_id,
+			thread_id,
+			thread_name,
+			COALESCE(started_by_user_id::text, ''),
+			COALESCE(started_by_discord_user_id, ''),
+			started_at,
+			showtime_at,
+			ended_at,
+			status
+		FROM auth.discord_session_threads
+		WHERE location_id = $1::uuid
+		  AND status = 'active'
+		  AND COALESCE(NULLIF(thread_id, ''), '') <> ''
+		ORDER BY started_at DESC
+	`, locationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []discordMicThreadRow
+	for rows.Next() {
+		var row discordMicThreadRow
+		var endedAt sql.NullTime
+		if err := rows.Scan(&row.ID, &row.LocationID, &row.VenueID, &row.VenueSlug, &row.SessionID, &row.ShowingID, &row.DiscordServerID, &row.ParentChannelID, &row.ThreadID, &row.ThreadName, &row.StartedByUserID, &row.StartedByDiscordUserID, &row.StartedAt, &row.ShowtimeAt, &endedAt, &row.Status); err != nil {
+			return nil, err
+		}
+		if endedAt.Valid {
+			ts := endedAt.Time
+			row.EndedAt = &ts
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 type discordMicStatusResponse struct {
@@ -850,6 +900,9 @@ func discordMicTurnOn(ctx context.Context, pool *pgxpool.Pool, cfg DiscordServer
 		}); err != nil {
 			return "", err
 		}
+		if err := joinDiscordMicThread(ctx, cfg, row.ThreadID); err != nil {
+			return "", err
+		}
 		if !strings.EqualFold(strings.TrimSpace(row.Status), "active") {
 			_ = sendDiscordMicThreadStarter(ctx, cfg, row.ThreadID, discordMicStartMessage(venueName, showtimeAt))
 		}
@@ -876,6 +929,9 @@ func discordMicTurnOn(ctx context.Context, pool *pgxpool.Pool, cfg DiscordServer
 		ShowtimeAt:             showtimeAt,
 		Status:                 "active",
 	}); err != nil {
+		return "", err
+	}
+	if err := joinDiscordMicThread(ctx, cfg, created.ID); err != nil {
 		return "", err
 	}
 	_ = sendDiscordMicThreadStarter(ctx, cfg, created.ID, discordMicStartMessage(venueName, showtimeAt))
@@ -1145,6 +1201,14 @@ func createDiscordMicThread(ctx context.Context, cfg DiscordServerLinkConfig, pa
 		return discordChannel{}, err
 	}
 	return created, nil
+}
+
+func joinDiscordMicThread(ctx context.Context, cfg DiscordServerLinkConfig, threadID string) error {
+	if err := discordServerLinkRequest(ctx, cfg, http.MethodPut, "/channels/"+url.PathEscape(strings.TrimSpace(threadID))+"/thread-members/@me", nil, nil); err != nil {
+		return err
+	}
+	log.Printf("discord mic thread joined thread=%s", strings.TrimSpace(threadID))
+	return nil
 }
 
 func sendDiscordMicThreadStarter(ctx context.Context, cfg DiscordServerLinkConfig, threadID, content string) error {
