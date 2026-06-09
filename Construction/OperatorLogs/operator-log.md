@@ -11,6 +11,29 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-06-09 — Kernel 42 Migration Baseline Cleanup + Documentation Audit v1
+
+### Backend
+- Added a real `productions` baseline migration so fresh installs can migrate from an empty database without a temporary shell table.
+- Updated bootstrap resolution so fresh installs default to `victory-theater` while keeping `amurray-family` as a compatibility fallback.
+- Kept the operator bootstrap CLI aligned with the neutral install default.
+
+### Database
+- Seeded a neutral install location and `main-lot` for `Victory Theater`.
+- Retained legacy `amurray-family` data for compatibility paths.
+
+### Smoke / Verification
+- Removed the proof-only `the-cave` temp insert from the fresh-install smoke harness.
+- Proved the full empty-DB install path end to end with signup, neutral producer bootstrap, legacy bootstrap compatibility, and account-authority verification.
+
+### Docs
+- Audited install/runtime docs so they match the actual fresh-install flow.
+- Added environment and compose defaults for the neutral install location.
+
+### Notes
+- No Discord audio/voice/speaking features were added.
+- Old migrations were edited only because Victory still has no customer installs yet; the live database was not wiped.
+
 ## 2026-06-08 — Kernel 40 Runtime Hardening + House Mic Regression Harness v1
 
 ### Backend
@@ -385,3 +408,18 @@ Implement `perform/speak` using the same action pipeline:
 - The Cave was left untouched
 - The hidden template scaffold is not map-visible
 - First Theater now shows the portable overlay above Pixi as the comparison surface
+
+## 2026-06-08 — Kernel 41 fresh install / deployment proof
+
+### Deployment Proof
+- Added `.env.example` with the current runtime and Discord operator settings
+- Kept `.env` ignored while explicitly allowing `.env.example`
+- Added a clean-install smoke harness at `scripts/smoke/fresh-install.sh`
+- Added a fresh-install operator guide at `Construction/deployment/fresh-install.md`
+- Verified the install proof against a temporary database in the local Postgres container
+
+### Runtime Notes
+- The smoke path does not touch the live database
+- Discord config is optional for backend boot and surfaces degrade safely when blank
+- No Discord voice/audio path was built for this kernel
+- The kernel 2 seed migration must follow the world seed migration in clean-install proof runs

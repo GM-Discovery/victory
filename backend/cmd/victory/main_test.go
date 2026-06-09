@@ -24,6 +24,20 @@ func TestParseBoolish(t *testing.T) {
 	}
 }
 
+func TestCookieSecureFromEnvPrefersSessionCookieSecure(t *testing.T) {
+	t.Setenv("SESSION_COOKIE_SECURE", "true")
+	t.Setenv("COOKIE_SECURE", "false")
+	if !cookieSecureFromEnv() {
+		t.Fatalf("expected SESSION_COOKIE_SECURE to win")
+	}
+
+	t.Setenv("SESSION_COOKIE_SECURE", "")
+	t.Setenv("COOKIE_SECURE", "false")
+	if cookieSecureFromEnv() {
+		t.Fatalf("expected COOKIE_SECURE fallback to be false")
+	}
+}
+
 func TestDiscordOAuthConfigFromEnvDisabledWithoutVars(t *testing.T) {
 	t.Setenv("DISCORD_OAUTH_ENABLED", "")
 	t.Setenv("DISCORD_CLIENT_ID", "")

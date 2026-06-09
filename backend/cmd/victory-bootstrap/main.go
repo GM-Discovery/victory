@@ -44,7 +44,7 @@ func runProducer(args []string) error {
 		discordUserID = fs.String("discord-user-id", "", "Discord user ID linked to the Victory user")
 		userID        = fs.String("user-id", "", "Victory user ID")
 		handle        = fs.String("handle", "", "Victory handle")
-		locationSlug  = fs.String("location", "amurray-family", "Location slug for the producer grant")
+		locationSlug  = fs.String("location", getenv("DEFAULT_LOCATION_SLUG", "victory-theater"), "Location slug for the producer grant")
 	)
 
 	if err := fs.Parse(args); err != nil {

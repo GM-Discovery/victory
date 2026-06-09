@@ -88,6 +88,7 @@ func HandleSignup(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc {
 			RETURNING id
 		`, req.Email, req.Handle, req.DisplayName).Scan(&userID)
 		if err != nil {
+			log.Printf("signup insert user failed: %v", err)
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "signup_failed"})
 			return
 		}

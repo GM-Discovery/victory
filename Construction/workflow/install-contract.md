@@ -25,6 +25,8 @@ A fresh server must be able to:
 
 No manual patching allowed.
 
+Fresh installs should boot from a neutral default location. `victory-theater` is the current clean-install default, while `amurray-family` remains a compatibility location on legacy/live data.
+
 ---
 
 ## Minimum Install Steps (target)
@@ -111,6 +113,8 @@ lot
 venue the-cave
 fire element
 session
+
+Clean install also seeds the neutral `victory-theater` location so bootstrap defaults do not point at the family server.
 Environment Configuration
 
 Must be externalized:

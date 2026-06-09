@@ -101,6 +101,33 @@ CREATE TABLE IF NOT EXISTS productions (
 CREATE INDEX IF NOT EXISTS idx_productions_location_id
   ON productions(location_id);
 
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'productions_location_id_fkey'
+  ) THEN
+    ALTER TABLE productions
+      ADD CONSTRAINT productions_location_id_fkey
+      FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE;
+  END IF;
+END
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'productions_location_slug_unique'
+  ) THEN
+    ALTER TABLE productions
+      ADD CONSTRAINT productions_location_slug_unique UNIQUE (location_id, slug);
+  END IF;
+END
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Invites: general access mechanism with scoped role assignment.
 -- token_hash stores SHA-256(raw_token).

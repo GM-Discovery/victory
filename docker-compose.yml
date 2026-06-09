@@ -20,10 +20,13 @@ services:
     container_name: victory-backend
     restart: unless-stopped
     environment:
-      PORT: 8081
+      PORT: ${PORT:-8081}
       DATABASE_URL: postgres://victory:REDACTED@victory-postgres:5432/victory?sslmode=disable
-      STORAGE_ROOT: /opt/victory/storage
-      OPERATOR_HANDLE: straturli
+      STORAGE_ROOT: ${STORAGE_ROOT:-/opt/victory/storage}
+      OPERATOR_HANDLE: ${OPERATOR_HANDLE:-straturli}
+      DEFAULT_LOCATION_SLUG: ${DEFAULT_LOCATION_SLUG:-victory-theater}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
       DISCORD_REDIRECT_URL: ${DISCORD_REDIRECT_URL:-}
@@ -34,6 +37,8 @@ services:
       DISCORD_BOT_PERMISSIONS: ${DISCORD_BOT_PERMISSIONS:-16}
       DISCORD_BOT_REDIRECT_URL: ${DISCORD_BOT_REDIRECT_URL:-}
       DISCORD_SERVER_LINK_ENABLED: ${DISCORD_SERVER_LINK_ENABLED:-}
+      DISCORD_GATEWAY_INTENTS: ${DISCORD_GATEWAY_INTENTS:-513}
+      DISCORD_GATEWAY_URL: ${DISCORD_GATEWAY_URL:-}
     depends_on:
       - postgres
     volumes:

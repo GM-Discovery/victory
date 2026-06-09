@@ -42,7 +42,7 @@ import (
 func main() {
 	port := getenv("PORT", "8081")
 	databaseURL := getenv("DATABASE_URL", "postgres://victory:REDACTED@victory-postgres:5432/victory?sslmode=disable")
-	secureCookie := getenv("COOKIE_SECURE", "true") == "true"
+	secureCookie := cookieSecureFromEnv()
 	storageRoot := getenv("STORAGE_ROOT", "/opt/victory/storage")
 	discordOAuthConfig := discordOAuthConfigFromEnv()
 	discordServerLinkConfig := discordServerLinkConfigFromEnv()
@@ -560,6 +560,13 @@ func parseBoolish(raw string) bool {
 	default:
 		return false
 	}
+}
+
+func cookieSecureFromEnv() bool {
+	if value, ok := os.LookupEnv("SESSION_COOKIE_SECURE"); ok && strings.TrimSpace(value) != "" {
+		return parseBoolish(value)
+	}
+	return parseBoolish(getenv("COOKIE_SECURE", "true"))
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

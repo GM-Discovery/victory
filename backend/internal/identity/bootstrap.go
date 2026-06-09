@@ -3,6 +3,7 @@ package identity
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -45,24 +46,30 @@ type BootstrapProducerInput struct {
 func ResolveBootstrapLocation(ctx context.Context, pool *pgxpool.Pool, slug string) (BootstrapLocation, error) {
 	slug = strings.TrimSpace(slug)
 	if slug == "" {
-		slug = "amurray-family"
+		slug = defaultBootstrapLocationSlug()
 	}
 
-	var location BootstrapLocation
-	err := pool.QueryRow(ctx, `
-		SELECT id::text, name, slug
-		FROM locations
-		WHERE slug = $1
-		LIMIT 1
-	`, slug).Scan(&location.ID, &location.Name, &location.Slug)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return BootstrapLocation{}, ErrBootstrapLocationNotFound
+	candidates := []string{slug}
+	if slug != "amurray-family" {
+		candidates = append(candidates, "amurray-family")
+	}
+	for _, candidate := range candidates {
+		var location BootstrapLocation
+		err := pool.QueryRow(ctx, `
+			SELECT id::text, name, slug
+			FROM locations
+			WHERE slug = $1
+			LIMIT 1
+		`, candidate).Scan(&location.ID, &location.Name, &location.Slug)
+		if err == nil {
+			return location, nil
 		}
-		return BootstrapLocation{}, err
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return BootstrapLocation{}, err
+		}
 	}
 
-	return location, nil
+	return BootstrapLocation{}, ErrBootstrapLocationNotFound
 }
 
 func ResolveBootstrapUserByDiscordID(ctx context.Context, pool *pgxpool.Pool, discordUserID string) (BootstrapUser, error) {
@@ -221,4 +228,12 @@ func ensureLocationProducerMembership(ctx context.Context, pool *pgxpool.Pool, l
 	}
 
 	return false, nil
+}
+
+func defaultBootstrapLocationSlug() string {
+	slug := strings.TrimSpace(os.Getenv("DEFAULT_LOCATION_SLUG"))
+	if slug == "" {
+		slug = "victory-theater"
+	}
+	return slug
 }

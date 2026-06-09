@@ -114,7 +114,7 @@ async function loadVenues() {
       const icon = document.createElement("img");
       const venueIcons = {
         library: "/assets/librarycc.png",
-        "first-theater": "/assets/default.png",
+        "first-theater": "/assets/firsttheater.png",
         "middle-school-stage": "/assets/default.png",
         "soil-experts": "/assets/mudfarm.png",
         "info-booth": "/assets/infobooth.png",
