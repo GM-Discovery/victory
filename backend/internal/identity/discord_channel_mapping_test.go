@@ -86,8 +86,8 @@ func TestDiscordChannelMappingRepairCreatesAndReusesSkeleton(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM auth.discord_channel_mappings WHERE location_id = $1`, locationID).Scan(&count); err != nil {
 		t.Fatalf("count mappings: %v", err)
 	}
-	if count != 17 {
-		t.Fatalf("expected 17 mappings, got %d", count)
+	if count != 19 {
+		t.Fatalf("expected 19 mappings, got %d", count)
 	}
 
 	repeatReq := httptest.NewRequest(http.MethodPost, "/api/discord/channel-mapping/repair", nil)
@@ -129,6 +129,7 @@ func TestDiscordChannelMappingRepairCreatesAndReusesSkeleton(t *testing.T) {
 				Channels []DiscordChannelMappingItem `json:"channels"`
 			} `json:"core"`
 			Venues      []DiscordChannelMappingItem `json:"venues"`
+			Audio       []DiscordChannelMappingItem `json:"audio"`
 			ChatParents []DiscordChannelMappingItem `json:"chat_parents"`
 		} `json:"data"`
 	}
@@ -141,8 +142,11 @@ func TestDiscordChannelMappingRepairCreatesAndReusesSkeleton(t *testing.T) {
 	if statusPayload.Data.Core.Category.Status != "found" {
 		t.Fatalf("unexpected core category status: %+v", statusPayload.Data.Core.Category)
 	}
-	if len(statusPayload.Data.Core.Channels) != 4 || len(statusPayload.Data.Venues) != 9 || len(statusPayload.Data.ChatParents) != 3 {
+	if len(statusPayload.Data.Core.Channels) != 4 || len(statusPayload.Data.Venues) != 9 || len(statusPayload.Data.Audio) != 2 || len(statusPayload.Data.ChatParents) != 3 {
 		t.Fatalf("unexpected mapping counts: %+v", statusPayload.Data)
+	}
+	if statusPayload.Data.Audio[0].ExpectedName == "" {
+		t.Fatalf("expected audio mapping details: %+v", statusPayload.Data.Audio)
 	}
 }
 

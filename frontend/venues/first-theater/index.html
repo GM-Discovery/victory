@@ -1744,6 +1744,7 @@
                       <strong>Network</strong>
                       <span id="network-state">Idle. Audio hooks reserved.</span>
                     </div>
+                    <div id="first-theater-audio-tray" class="drawer-item"></div>
                     <div class="drawer-item">
                       <strong>Presence</strong>
                       <div id="presence-preview" class="presence-preview" aria-label="Current room presence preview">
@@ -1828,8 +1829,15 @@
   <script src="/lib/forbidden.js"></script>
   <script src="/venues/shared/venue-shell.js"></script>
   <script src="/lib/discord-mic.js?v=kernel40-1"></script>
+  <script src="/lib/discord-audio.js?v=kernel43-2"></script>
   <script src="/lib/victory-mic-chat.js?v=kernel40-1"></script>
   <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.3/dist/pixi.min.js"></script>
+  <script>
+    window.VictoryDiscordAudio?.mount({
+      venueSlug: "first-theater",
+      mount: "#first-theater-audio-tray",
+    });
+  </script>
   <script>
     const stageShell = document.getElementById("stage-shell");
     const stageHost = document.getElementById("pixi-stage-host");
@@ -1864,6 +1872,18 @@
     const cardEditorColor = document.getElementById("card-editor-color");
     const cardEditorSave = document.getElementById("card-editor-save");
     const cardEditorCancel = document.getElementById("card-editor-cancel");
+    window.VictoryVenueShell?.mount?.({
+      root: stageShell,
+      venueSlug: "first-theater",
+      venueName: "First Theater",
+      slots: {
+        header: stageStatus,
+        leftTray: document.getElementById("overlay-root"),
+        rightTray: document.getElementById("snapshot-summary"),
+        chatRail: document.getElementById("renderer-fallback"),
+        audioTray: document.getElementById("first-theater-audio-tray"),
+      },
+    });
 
     let ws = null;
     let currentSessionId = "";

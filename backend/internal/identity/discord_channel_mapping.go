@@ -17,6 +17,7 @@ const (
 	discordChannelMappingKindCoreCategory  = "core_category"
 	discordChannelMappingKindCoreChannel   = "core_channel"
 	discordChannelMappingKindVenueCategory = "venue_category"
+	discordChannelMappingKindVenueAudio    = "venue_audio_channel"
 	discordChannelMappingKindVenueChat     = "venue_chat_channel"
 	discordChannelScopeKindLocation        = "location"
 	discordChannelScopeKindCoreChannel     = "core_channel"
@@ -24,6 +25,7 @@ const (
 	discordChannelScopeKindVenueChat       = "venue_chat_channel"
 	discordChannelTypeCategory             = "category"
 	discordChannelTypeText                 = "text"
+	discordChannelTypeVoice                = "voice"
 )
 
 type DiscordChannelMappingItem struct {
@@ -51,6 +53,7 @@ type DiscordChannelMappingStatus struct {
 	SetupAvailable bool                                `json:"setup_available"`
 	Core           DiscordChannelMappingGroup          `json:"core"`
 	Venues         []DiscordChannelMappingItem         `json:"venues"`
+	Audio          []DiscordChannelMappingItem         `json:"audio"`
 	ChatParents    []DiscordChannelMappingItem         `json:"chat_parents"`
 	RepairSummary  *DiscordChannelMappingRepairSummary `json:"repair_summary,omitempty"`
 }
@@ -145,6 +148,7 @@ func HandleDiscordChannelMappingStatus(pool *pgxpool.Pool, cfg DiscordServerLink
 			status.Core.Category = missingMappingItem(discordChannelMappingKindCoreCategory, discordChannelScopeKindLocation, location.Slug, "Victory Theater")
 			status.Core.Channels = defaultCoreChannelMissingItems()
 			status.Venues = defaultVenueMissingItems()
+			status.Audio = defaultVenueAudioMissingItems()
 			status.ChatParents = defaultVenueChatMissingItems()
 			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": status})
 			return
@@ -174,6 +178,9 @@ func HandleDiscordChannelMappingStatus(pool *pgxpool.Pool, cfg DiscordServerLink
 		}
 		for _, spec := range venueCategorySpecs() {
 			status.Venues = append(status.Venues, mappingStatusForSpec(rows, channels, spec))
+		}
+		for _, spec := range venueAudioChannelSpecs() {
+			status.Audio = append(status.Audio, mappingStatusForSpec(rows, channels, spec))
 		}
 		for _, spec := range venueChatChannelSpecs() {
 			status.ChatParents = append(status.ChatParents, mappingStatusForSpec(rows, channels, spec))
@@ -301,6 +308,24 @@ func reconcileDiscordChannelMappings(ctx context.Context, pool *pgxpool.Pool, ru
 
 	for _, spec := range venueCategorySpecs() {
 		item, action, err := ensureDiscordChannelMapping(ctx, pool, runtimeCfg, locationID, guildID, createdBy, channels, rows, spec, "")
+		if err != nil {
+			summary.Failed = append(summary.Failed, spec.ExpectedName)
+			summary.FailedDetails = append(summary.FailedDetails, spec.ExpectedName+": "+err.Error())
+			continue
+		}
+		summary.add(action, item.ExpectedName)
+		rows = upsertRowCache(rows, item)
+	}
+
+	for _, spec := range venueAudioChannelSpecs() {
+		parentSpec := venueCategorySpecForSlug(spec.VictoryScopeSlug)
+		parentRow, ok := rows[mappingKey(parentSpec.MappingKind, parentSpec.VictoryScopeKind, parentSpec.VictoryScopeSlug)]
+		if !ok || strings.TrimSpace(parentRow.DiscordChannelID) == "" {
+			summary.Failed = append(summary.Failed, spec.ExpectedName)
+			summary.FailedDetails = append(summary.FailedDetails, spec.ExpectedName+": parent category missing")
+			continue
+		}
+		item, action, err := ensureDiscordChannelMapping(ctx, pool, runtimeCfg, locationID, guildID, createdBy, channels, rows, spec, parentRow.DiscordChannelID)
 		if err != nil {
 			summary.Failed = append(summary.Failed, spec.ExpectedName)
 			summary.FailedDetails = append(summary.FailedDetails, spec.ExpectedName+": "+err.Error())
@@ -548,6 +573,8 @@ func channelTypeLabel(channelType int) string {
 		return discordChannelTypeCategory
 	case 0:
 		return discordChannelTypeText
+	case 2:
+		return discordChannelTypeVoice
 	default:
 		return "unknown"
 	}
@@ -559,6 +586,8 @@ func discordChannelTypeID(label string) int {
 		return 4
 	case discordChannelTypeText:
 		return 0
+	case discordChannelTypeVoice:
+		return 2
 	default:
 		return 0
 	}
@@ -698,6 +727,21 @@ func venueCategorySpecs() []discordChannelMappingSpec {
 	}
 }
 
+func venueAudioChannelSpecs() []discordChannelMappingSpec {
+	return []discordChannelMappingSpec{
+		{MappingKind: discordChannelMappingKindVenueAudio, VictoryScopeKind: discordChannelScopeKindVenue, VictoryScopeSlug: "the-cave", ExpectedName: "The Cave Audio", ChannelType: discordChannelTypeVoice},
+		{MappingKind: discordChannelMappingKindVenueAudio, VictoryScopeKind: discordChannelScopeKindVenue, VictoryScopeSlug: "first-theater", ExpectedName: "First Theater Audio", ChannelType: discordChannelTypeVoice},
+	}
+}
+
+func defaultVenueAudioMissingItems() []DiscordChannelMappingItem {
+	items := make([]DiscordChannelMappingItem, 0, len(venueAudioChannelSpecs()))
+	for _, spec := range venueAudioChannelSpecs() {
+		items = append(items, missingMappingItem(spec.MappingKind, spec.VictoryScopeKind, spec.VictoryScopeSlug, spec.ExpectedName))
+	}
+	return items
+}
+
 func venueChatChannelSpecs() []discordChannelMappingSpec {
 	return []discordChannelMappingSpec{
 		{MappingKind: discordChannelMappingKindVenueChat, VictoryScopeKind: discordChannelScopeKindVenueChat, VictoryScopeSlug: "the-cave", ExpectedName: "the-cave-chat", ChannelType: discordChannelTypeText},
@@ -716,6 +760,15 @@ func defaultVenueChatMissingItems() []DiscordChannelMappingItem {
 
 func venueCategorySpecForSlug(slug string) discordChannelMappingSpec {
 	for _, spec := range venueCategorySpecs() {
+		if strings.EqualFold(strings.TrimSpace(spec.VictoryScopeSlug), strings.TrimSpace(slug)) {
+			return spec
+		}
+	}
+	return discordChannelMappingSpec{VictoryScopeSlug: slug}
+}
+
+func venueAudioSpecForSlug(slug string) discordChannelMappingSpec {
+	for _, spec := range venueAudioChannelSpecs() {
 		if strings.EqualFold(strings.TrimSpace(spec.VictoryScopeSlug), strings.TrimSpace(slug)) {
 			return spec
 		}

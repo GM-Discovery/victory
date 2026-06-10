@@ -26,6 +26,8 @@ A fresh server must be able to:
 No manual patching allowed.
 
 Fresh installs should boot from a neutral default location. `victory-theater` is the current clean-install default, while `amurray-family` remains a compatibility location on legacy/live data.
+Discord audio stays in Discord. Victory only exposes status, participant presence, repair, and open-link control for mapped audio channels.
+Speaker indicators and per-user volume controls are only added if the API path is real and safe; the current bot/Gateway path should not fake them.
 
 ---
 
@@ -163,6 +165,7 @@ UI polish
 advanced permissions
 scaling infrastructure
 multi-venue orchestration
+speaker indicators or volume controls
 
 Install must prove:
 the system lives, not that it is complete.

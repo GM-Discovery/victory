@@ -1,11 +1,11 @@
 # Victory Roadmap
 
 ## Purpose
-This roadmap reflects current priorities after Kernel 33.
+This roadmap reflects current priorities after Kernel 44.
 
 Kernel numbers are labels, but from here they should remain stable once assigned so planning, reportbacks, and future agents all refer to the same landmarks.
 
-## Near Roadmap: Kernels 26–41
+## Near Roadmap: Kernels 26–45
 - `27 — Showing Review v1`
   - review chat, stage speech, reactions, reveal/hide, overlays, cards, and persona changes
 - `28 — Director Console v1`
@@ -38,6 +38,12 @@ Kernel numbers are labels, but from here they should remain stable once assigned
   - first public-facing catharsis experience surface
 - `42 — Documentation + Hardening Pass`
   - reconcile docs, tighten errors, and stabilize the kernel trail
+- `43 — Discord Audio Left Tray Foundation v1`
+  - add shared Discord audio status/control surface without building Victory audio transport
+- `44 — Discord Audio Presence / Speaker Feasibility v1`
+  - show live Discord voice-channel participants in the tray, prove speaker-indicator feasibility, and document why volume controls are deferred in the current architecture
+- `45 — Venue Shell Rebase + Shared Helper Extraction v1`
+  - extract reusable venue shell helpers, tighten the map shell, and make First Theater / Middle School Stage cleaner source patterns for future venues
 
 Ordering note:
 - Showing Review comes before polish-only work
@@ -46,6 +52,9 @@ Ordering note:
 - Middle School Stage follows the organization pass and proves the first clean shell
 - Discord OAuth now lands immediately after the shell work so identity work can become the primary login path without replacing Victory authorization
 - Operator bootstrap lands immediately after Discord OAuth so producers still come from Victory authority, not the Discord login itself
+- Discord audio lands as a shared surface after the hardening pass, while actual audio remains in Discord
+- Voice-state presence can follow the user/session without turning Victory into an audio router
+- Venue shell extraction follows the audio pass so the reusable shell contract can capture the live patterns already proved in First Theater, The Cave, and Middle School Stage
 
 ## Medium Roadmap: Kernels 38–62
 - strengthen showing/review surfaces and auditability

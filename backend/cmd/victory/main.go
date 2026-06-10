@@ -77,6 +77,7 @@ func main() {
 	}
 
 	hub := network.NewHub()
+	discordAudioPresenceStore := identity.NewDiscordAudioPresenceStore()
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
@@ -86,7 +87,7 @@ func main() {
 		}
 	}()
 
-	go network.RunDiscordGatewayWorker(context.Background(), pool, hub, discordServerLinkConfig, discordGatewayConfig)
+	go network.RunDiscordGatewayWorker(context.Background(), pool, hub, discordAudioPresenceStore, discordServerLinkConfig, discordGatewayConfig)
 
 	mux := http.NewServeMux()
 
@@ -113,6 +114,7 @@ func main() {
 	mux.HandleFunc("GET /api/discord/server-link/status", identity.HandleDiscordServerLinkStatus(pool, discordServerLinkConfig))
 	mux.HandleFunc("/api/discord/server/bootstrap", identity.HandleDiscordServerBootstrap(pool, discordServerLinkConfig))
 	mux.HandleFunc("GET /api/discord/gateway/status", identity.HandleDiscordGatewayStatus(pool, discordGatewayConfig))
+	mux.HandleFunc("GET /api/discord/audio/status", identity.HandleDiscordAudioStatus(pool, discordServerLinkConfig, discordAudioPresenceStore))
 	mux.HandleFunc("/api/discord/gateway/debug", identity.HandleDiscordGatewayDebug(pool))
 	mux.HandleFunc("GET /auth/discord/server/install", identity.HandleDiscordServerInstall(pool, discordServerLinkConfig))
 	mux.HandleFunc("GET /auth/discord/server/callback", identity.HandleDiscordServerCallback(pool, discordServerLinkConfig))
@@ -521,7 +523,7 @@ func discordGatewayConfigFromEnv() identity.DiscordGatewayConfig {
 
 	intents := parseDiscordGatewayIntents(getenv("DISCORD_GATEWAY_INTENTS", ""))
 	if intents == 0 {
-		intents = (1 << 0) | (1 << 9)
+		intents = (1 << 0) | (1 << 7) | (1 << 9)
 	}
 
 	return identity.DiscordGatewayConfig{

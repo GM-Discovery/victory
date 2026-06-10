@@ -11,6 +11,45 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-06-09 — Kernel 44 Discord Audio Presence / Speaker Feasibility v1
+
+### Backend
+- Added live Discord voice-state caching from the Gateway path so the audio surface can show current participants for mapped voice channels.
+- Extended the audio status endpoint to return participant rows, linked Victory identity where available, and explicit feature flags for speaker-indicator and volume-control feasibility.
+- Updated the default Discord gateway intents to include `GUILD_VOICE_STATES` so participant presence is actually observable.
+
+### Frontend
+- Extended the shared presence tray to render participant rows with Discord avatars, linked Victory display names, unlinked Discord users, and live status badges.
+- Kept speaker indicators and volume controls visibly deferred rather than faked.
+
+### Docs
+- Updated install/deployment/current-state/roadmap guidance to document the voice-state intent requirement and the current speaker/volume feasibility boundary.
+
+### Notes
+- Speaker indicators are not available from the current bot/Gateway path without a deeper voice websocket or Discord client SDK path.
+- Per-user volume controls are also deferred because the current Discord bot/Gateway path cannot control a user’s local Discord client volume.
+
+## 2026-06-09 — Kernel 43 Discord Audio Left Tray Foundation v1
+
+### Backend
+- Added Discord audio status handling at `GET /api/discord/audio/status`.
+- Extended Discord channel mapping repair/status flow to track voice-channel mappings for First Theater and The Cave with the `venue_audio_channel` mapping kind.
+- Kept the repair flow idempotent so it can find or create the mapped Discord voice channels instead of treating audio as a separate transport stack.
+
+### Frontend
+- Added a shared Discord audio tray helper at `frontend/lib/discord-audio.js`.
+- Mounted the audio status surface in First Theater and The Cave.
+- Added producer-office readiness surfaces for the audio mappings.
+
+### Docs
+- Updated the install contract, fresh-install notes, roadmap, and current-state canon to reflect the Discord audio left-tray foundation.
+- Noted the channel-management permissions needed for audio channel repair.
+
+### Notes
+- Discord still carries the actual audio.
+- No Discord SDK, voice capture, speaking indicators, or volume controls were added.
+- The new surface is intentionally status/repair/open-link only.
+
 ## 2026-06-09 — Kernel 42 Migration Baseline Cleanup + Documentation Audit v1
 
 ### Backend
@@ -423,3 +462,27 @@ Implement `perform/speak` using the same action pipeline:
 - Discord config is optional for backend boot and surfaces degrade safely when blank
 - No Discord voice/audio path was built for this kernel
 - The kernel 2 seed migration must follow the world seed migration in clean-install proof runs
+
+## 2026-06-10 — Kernel 45 venue shell rebase / shared helper extraction
+
+### Frontend
+- Collapsed the main Victory map header into a much thinner hover-open strip
+- Removed the 1280px map ceiling so the map layer can use more of the viewport
+- Added shared shell helper methods in `frontend/venues/shared/venue-shell.js` for:
+  - venue slug normalization
+  - venue name formatting
+  - shell slot resolution
+  - header chip registration
+  - safe refresh/reload hooks
+  - reusable mount metadata for headers, trays, and chat rails
+- Wired the helper into First Theater and Middle School Stage so the shared contract is now live on the main venue path
+
+### Documentation
+- Promoted Kernel 45 into the current-state canon
+- Added a Kernel 45 reportback in the official house format
+- Updated the roadmap to mark the venue shell extraction pass as the current near-term kernel
+
+### Operational Notes
+- Kernel 44 audio behavior remains untouched by this pass
+- The shared shell helper is intentionally light and does not try to replace venue-specific runtime logic
+- First Theater remains the practical source template while The Cave keeps the proving-ground role

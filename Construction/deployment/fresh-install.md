@@ -38,6 +38,8 @@
 - `DISCORD_GATEWAY_INTENTS`
 - `DISCORD_GATEWAY_URL`
 - If these are blank, the backend should still boot and the Discord surfaces should report unavailable or disabled.
+- Discord audio is still handled by Discord; Victory only creates/repairs the pass-through channel mapping and shows status.
+- Voice-state participant presence now requires `GUILD_VOICE_STATES` in the gateway intents, so the default intent string should include that bit (`641` = `GUILDS + GUILD_VOICE_STATES + GUILD_MESSAGES`).
 
 ## 7. Run Migrations / Start Stack
 - The backend boot path applies the kernel schema surfaces during startup.
@@ -71,6 +73,8 @@
 ## 12. Repair Discord Channels
 - Use the Discord channel mapping repair controls in Producer’s Office after linking the server.
 - This is safe to skip when Discord config is absent.
+- Kernel 43 extends the repair flow to create/find the initial Discord Audio channels for First Theater and The Cave.
+- Kernel 44 extends the audio tray to show live voice participants when the gateway voice-state intent is enabled. Active speaker detection and per-user volume controls remain deferred.
 
 ## 13. Test `/mic`
 - Open First Theater.
@@ -95,6 +99,7 @@
 - `GET /api/account/me` anonymous returns `401`
 - `GET /api/discord/server-link/status` anonymous returns `401`
 - `GET /api/discord/channel-mapping/status` anonymous returns `401`
+- `GET /api/discord/audio/status?venue_slug=first-theater` anonymous returns `401`
 - `GET /api/discord/gateway/status` should return safely even when Discord config is absent
 
 ## Live-Stack Safety

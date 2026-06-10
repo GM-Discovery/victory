@@ -1286,6 +1286,17 @@
     let presenceRefreshTimer = null;
     const VenueShell = window.VictoryVenueShell || {};
     const uiPreferenceStoragePrefix = "victory.middle-school-stage.ui.v1:";
+    VenueShell.mount?.({
+      root: document.querySelector(".shell"),
+      venueSlug: "middle-school-stage",
+      venueName: "Middle School Stage",
+      slots: {
+        header: topBar,
+        leftTray: leftDrawer,
+        rightTray: rightDrawer,
+        chatRail: chatPanel,
+      },
+    });
 
     const drawerState = {
       left: { hover: false, focus: false, settingsOpen: false },

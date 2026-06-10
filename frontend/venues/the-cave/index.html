@@ -1358,6 +1358,7 @@
       <h1>The Cave</h1>
       <div id="connection-status" class="status-line">Starting...</div>
       <div id="discord-mic-status" class="status-line" data-venue-slug="the-cave">House Mic: Loading</div>
+      <div id="the-cave-audio-tray"></div>
     </div>
 
     <div class="stage">
@@ -1599,7 +1600,14 @@
   </div>
 
 <script src="/lib/discord-mic.js?v=kernel40-1"></script>
+<script src="/lib/discord-audio.js?v=kernel43-2"></script>
 <script src="/lib/victory-mic-chat.js?v=kernel40-1"></script>
+<script>
+  window.VictoryDiscordAudio?.mount({
+    venueSlug: "the-cave",
+    mount: "#the-cave-audio-tray",
+  });
+</script>
 <script>
   const chatLog = document.getElementById("chat-log");
   const chatInput = document.getElementById("chat-input");

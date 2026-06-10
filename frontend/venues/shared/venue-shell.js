@@ -1,6 +1,31 @@
 (function () {
   const STORAGE_PREFIX = "victory.venue.ui.v1:";
 
+  function normalizeVenueSlug(value) {
+    const slug = String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_]+/g, "-")
+      .replace(/[^a-z0-9-]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+    return slug || "venue";
+  }
+
+  function formatVenueName(value) {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    return text
+      .split("-")
+      .map((part) => {
+        if (!part) return "";
+        return `${part[0].toUpperCase()}${part.slice(1)}`;
+      })
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
   function clampNumber(value, min, max, fallback) {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return fallback;
@@ -66,6 +91,128 @@
     } catch (error) {
       console.warn("venue shell prefs save failed", error);
     }
+  }
+
+  function resolveShellNode(target) {
+    if (!target) return null;
+    if (typeof target === "string") {
+      return document.querySelector(target);
+    }
+    if (target instanceof Element) {
+      return target;
+    }
+    return null;
+  }
+
+  function resolveShellSlots(options = {}) {
+    const slots = options.slots || options || {};
+    return {
+      header: resolveShellNode(slots.header),
+      leftTray: resolveShellNode(slots.leftTray),
+      rightTray: resolveShellNode(slots.rightTray),
+      chatRail: resolveShellNode(slots.chatRail || slots.chat),
+      audioTray: resolveShellNode(slots.audioTray || slots.audio),
+      sessionChip: resolveShellNode(slots.sessionChip),
+      houseMicChip: resolveShellNode(slots.houseMicChip),
+      bridgeChip: resolveShellNode(slots.bridgeChip),
+    };
+  }
+
+  function registerHeaderChip(target, options = {}) {
+    const chip = resolveShellNode(target);
+    if (!chip) return null;
+
+    const label = String(options.label || options.text || "").trim();
+    const sublabel = String(options.sublabel || options.detail || "").trim();
+    const title = String(options.title || "").trim();
+
+    chip.dataset.victoryShellChip = "true";
+    if (label) {
+      chip.textContent = label;
+    }
+
+    if (sublabel) {
+      chip.dataset.victoryShellChipDetail = sublabel;
+    } else {
+      delete chip.dataset.victoryShellChipDetail;
+    }
+
+    if (title) {
+      chip.title = title;
+    }
+
+    if (typeof options.onClick === "function") {
+      chip.addEventListener("click", options.onClick);
+    }
+
+    return chip;
+  }
+
+  function safeRefresh(handler, fallback = null) {
+    try {
+      if (typeof handler === "function") {
+        return Promise.resolve(handler());
+      }
+    } catch (error) {
+      console.warn("venue shell refresh handler failed", error);
+      if (typeof fallback === "function") {
+        return Promise.resolve(fallback(error));
+      }
+      return Promise.reject(error);
+    }
+
+    if (typeof fallback === "function") {
+      return Promise.resolve(fallback());
+    }
+
+    return Promise.resolve().then(() => {
+      window.location.reload();
+    });
+  }
+
+  function mount(options = {}) {
+    const root = resolveShellNode(options.root);
+    const venueSlug = normalizeVenueSlug(options.venueSlug || root?.dataset?.venueSlug);
+    const venueName = String(options.venueName || root?.dataset?.venueName || formatVenueName(venueSlug)).trim();
+    const slots = resolveShellSlots(options.slots || options);
+
+    if (root) {
+      root.dataset.victoryShell = "true";
+      root.dataset.venueSlug = venueSlug;
+      if (venueName) {
+        root.dataset.venueName = venueName;
+      }
+    }
+
+    if (slots.header) {
+      slots.header.dataset.venueSlug = venueSlug;
+      if (venueName) {
+        slots.header.dataset.venueName = venueName;
+      }
+    }
+
+    if (slots.leftTray) slots.leftTray.dataset.shellTray = "left";
+    if (slots.rightTray) slots.rightTray.dataset.shellTray = "right";
+    if (slots.chatRail) slots.chatRail.dataset.shellRail = "chat";
+    if (slots.audioTray) slots.audioTray.dataset.shellRail = "audio";
+
+    if (typeof options.onRefresh === "function") {
+      const refreshTarget = resolveShellNode(options.refreshTarget);
+      if (refreshTarget) {
+        refreshTarget.addEventListener("click", (event) => {
+          event.preventDefault();
+          safeRefresh(options.onRefresh, options.onRefreshFallback);
+        });
+      }
+    }
+
+    return {
+      root,
+      venueSlug,
+      venueName,
+      slots,
+      refresh: () => safeRefresh(options.onRefresh, options.onRefreshFallback),
+    };
   }
 
   function renderPresencePreview(root, users, options = {}) {
@@ -189,11 +336,17 @@
 
   window.VictoryVenueShell = {
     clampNumber,
+    formatVenueName,
     loadPreferences,
+    mount,
     mountOverlay,
+    normalizeVenueSlug,
     normalizeDrawerMode,
     normalizePortraitSize,
     resolveStorageKey,
+    registerHeaderChip,
+    resolveShellSlots,
+    safeRefresh,
     overlayMarkup,
     renderPresencePreview,
     savePreferences,

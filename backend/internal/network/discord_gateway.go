@@ -57,15 +57,36 @@ type discordGatewayHeartbeat struct {
 }
 
 type discordGatewayUser struct {
-	ID         string `json:"id"`
-	Username   string `json:"username,omitempty"`
-	GlobalName string `json:"global_name,omitempty"`
-	Bot        bool   `json:"bot,omitempty"`
+	ID            string `json:"id"`
+	Username      string `json:"username,omitempty"`
+	GlobalName    string `json:"global_name,omitempty"`
+	Avatar        string `json:"avatar,omitempty"`
+	Discriminator string `json:"discriminator,omitempty"`
+	Bot           bool   `json:"bot,omitempty"`
 }
 
 type discordGatewayMember struct {
 	Nick string              `json:"nick,omitempty"`
 	User *discordGatewayUser `json:"user,omitempty"`
+}
+
+type discordGatewayVoiceState struct {
+	GuildID                 string                `json:"guild_id,omitempty"`
+	ChannelID               string                `json:"channel_id,omitempty"`
+	UserID                  string                `json:"user_id,omitempty"`
+	SessionID               string                `json:"session_id,omitempty"`
+	Member                  *discordGatewayMember `json:"member,omitempty"`
+	SelfMute                bool                  `json:"self_mute,omitempty"`
+	SelfDeaf                bool                  `json:"self_deaf,omitempty"`
+	Mute                    bool                  `json:"mute,omitempty"`
+	Deaf                    bool                  `json:"deaf,omitempty"`
+	Suppress                bool                  `json:"suppress,omitempty"`
+	RequestToSpeakTimestamp string                `json:"request_to_speak_timestamp,omitempty"`
+}
+
+type discordGatewayGuildCreate struct {
+	ID          string                     `json:"id"`
+	VoiceStates []discordGatewayVoiceState `json:"voice_states,omitempty"`
 }
 
 type discordGatewayAttachment struct {
@@ -121,7 +142,7 @@ type discordGatewayConn struct {
 	writeMu sync.Mutex
 }
 
-func RunDiscordGatewayWorker(ctx context.Context, pool *pgxpool.Pool, hub *Hub, cfg identity.DiscordServerLinkConfig, gatewayCfg identity.DiscordGatewayConfig) {
+func RunDiscordGatewayWorker(ctx context.Context, pool *pgxpool.Pool, hub *Hub, presenceStore *identity.DiscordAudioPresenceStore, cfg identity.DiscordServerLinkConfig, gatewayCfg identity.DiscordGatewayConfig) {
 	location, err := loadDiscordGatewayLocation(ctx, pool)
 	if err != nil {
 		log.Printf("discord gateway location lookup failed: %v", err)
@@ -169,7 +190,7 @@ func RunDiscordGatewayWorker(ctx context.Context, pool *pgxpool.Pool, hub *Hub, 
 			continue
 		}
 
-		if err := runDiscordGatewayConnection(ctx, pool, hub, runtimeLinkCfg, effectiveGatewayCfg, location.ID, linkRecord); err != nil {
+		if err := runDiscordGatewayConnection(ctx, pool, hub, presenceStore, runtimeLinkCfg, effectiveGatewayCfg, location.ID, linkRecord); err != nil {
 			log.Printf("discord gateway connection ended: %v", err)
 			updateDiscordGatewayState(ctx, pool, location.ID, gatewayStateFromConfig(effectiveGatewayCfg, false, false, "", "", 0, err.Error(), nil, nil))
 			sleepWithContext(ctx, backoff+time.Duration(rand.Int63n(int64(backoff/2)+1)))
@@ -232,7 +253,7 @@ func loadDiscordGatewayLinkRecord(ctx context.Context, pool *pgxpool.Pool, locat
 	return row, nil
 }
 
-func runDiscordGatewayConnection(ctx context.Context, pool *pgxpool.Pool, hub *Hub, cfg identity.DiscordServerLinkConfig, gatewayCfg identity.DiscordGatewayConfig, locationID string, linkRecord discordGatewayLinkRecord) error {
+func runDiscordGatewayConnection(ctx context.Context, pool *pgxpool.Pool, hub *Hub, presenceStore *identity.DiscordAudioPresenceStore, cfg identity.DiscordServerLinkConfig, gatewayCfg identity.DiscordGatewayConfig, locationID string, linkRecord discordGatewayLinkRecord) error {
 	wsURL := strings.TrimSpace(gatewayCfg.GatewayURL)
 	if wsURL == "" {
 		wsURL = fmt.Sprintf("wss://gateway.discord.gg/?v=%d&encoding=json", discordGatewayVersion)
@@ -386,6 +407,28 @@ func runDiscordGatewayConnection(ctx context.Context, pool *pgxpool.Pool, hub *H
 				connectedAt = time.Now().UTC()
 				setState(true, true, "")
 
+			case "GUILD_CREATE":
+				var guild discordGatewayGuildCreate
+				if err := json.Unmarshal(envelope.D, &guild); err != nil {
+					log.Printf("discord gateway guild decode failed: %v", err)
+					continue
+				}
+				if presenceStore != nil {
+					presenceStore.ReplaceGuildVoiceStates(strings.TrimSpace(guild.ID), collectDiscordPresenceStates(strings.TrimSpace(guild.ID), botUserID, guild.VoiceStates))
+				}
+				setState(true, true, "")
+
+			case "VOICE_STATE_UPDATE":
+				var state discordGatewayVoiceState
+				if err := json.Unmarshal(envelope.D, &state); err != nil {
+					log.Printf("discord gateway voice state decode failed: %v", err)
+					continue
+				}
+				if presenceStore != nil {
+					applyDiscordVoiceState(presenceStore, botUserID, state)
+				}
+				setState(true, true, "")
+
 			case "MESSAGE_CREATE":
 				var msg discordGatewayMessage
 				if err := json.Unmarshal(envelope.D, &msg); err != nil {
@@ -446,6 +489,68 @@ func runDiscordGatewayConnection(ctx context.Context, pool *pgxpool.Pool, hub *H
 			return errors.New("heartbeat timeout")
 		}
 	}
+}
+
+func collectDiscordPresenceStates(guildID, botUserID string, states []discordGatewayVoiceState) []identity.DiscordAudioPresenceState {
+	items := make([]identity.DiscordAudioPresenceState, 0, len(states))
+	for _, state := range states {
+		item, ok := discordAudioPresenceStateFromGateway(guildID, botUserID, state)
+		if !ok {
+			continue
+		}
+		items = append(items, item)
+	}
+	return items
+}
+
+func applyDiscordVoiceState(store *identity.DiscordAudioPresenceStore, botUserID string, state discordGatewayVoiceState) {
+	if store == nil {
+		return
+	}
+	item, ok := discordAudioPresenceStateFromGateway(strings.TrimSpace(state.GuildID), botUserID, state)
+	if !ok {
+		store.Remove(state.GuildID, state.UserID)
+		return
+	}
+	store.Upsert(item)
+}
+
+func discordAudioPresenceStateFromGateway(guildID, botUserID string, state discordGatewayVoiceState) (identity.DiscordAudioPresenceState, bool) {
+	userID := strings.TrimSpace(state.UserID)
+	if userID == "" {
+		return identity.DiscordAudioPresenceState{}, false
+	}
+	if botUserID != "" && strings.EqualFold(userID, strings.TrimSpace(botUserID)) {
+		return identity.DiscordAudioPresenceState{}, false
+	}
+	channelID := strings.TrimSpace(state.ChannelID)
+	if channelID == "" {
+		return identity.DiscordAudioPresenceState{}, false
+	}
+
+	item := identity.DiscordAudioPresenceState{
+		GuildID:    strings.TrimSpace(guildID),
+		ChannelID:  channelID,
+		UserID:     userID,
+		SelfMute:   state.SelfMute,
+		SelfDeaf:   state.SelfDeaf,
+		Mute:       state.Mute,
+		Deaf:       state.Deaf,
+		LastSeenAt: time.Now().UTC(),
+	}
+	if state.Member != nil {
+		item.Nick = strings.TrimSpace(state.Member.Nick)
+		if state.Member.User != nil {
+			item.Username = strings.TrimSpace(state.Member.User.Username)
+			item.GlobalName = strings.TrimSpace(state.Member.User.GlobalName)
+			item.AvatarHash = strings.TrimSpace(state.Member.User.Avatar)
+			item.Discriminator = strings.TrimSpace(state.Member.User.Discriminator)
+			if state.Member.User.Bot {
+				return identity.DiscordAudioPresenceState{}, false
+			}
+		}
+	}
+	return item, true
 }
 
 func handleDiscordGatewayMessageCreate(ctx context.Context, pool *pgxpool.Pool, hub *Hub, cfg identity.DiscordServerLinkConfig, locationID string, linkRecord discordGatewayLinkRecord, gatewayCfg identity.DiscordGatewayConfig, botUserID string, msg discordGatewayMessage) error {

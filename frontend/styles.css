@@ -47,26 +47,11 @@ body {
 }
 
 .app-header {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 20;
-  padding: 1rem 1.25rem 1.25rem;
-  background: linear-gradient(
-    to bottom,
-    rgba(10, 8, 7, 0.88),
-    rgba(10, 8, 7, 0.58),
-    rgba(10, 8, 7, 0)
-  );
-  backdrop-filter: blur(14px);
-}
-
-.app-shell--signed-in .app-header {
   position: fixed;
   inset: 0 0 auto 0;
   width: 100vw;
   max-width: none;
+  z-index: 20;
   margin: 0;
   padding: 0;
   min-height: 4px;
@@ -81,11 +66,11 @@ body {
   backdrop-filter: blur(1px);
 }
 
-.app-shell--signed-in .app-header::before {
+.app-header::before {
   content: "";
   position: absolute;
   inset: 0;
-  height: 110px;
+  height: 96px;
   z-index: 0;
   opacity: 0;
   background: linear-gradient(
@@ -99,12 +84,12 @@ body {
   transition: opacity 160ms ease;
 }
 
-.app-shell--signed-in .app-header:hover::before,
-.app-shell--signed-in .app-header:focus-within::before {
+.app-header:hover::before,
+.app-header:focus-within::before {
   opacity: 1;
 }
 
-.app-shell--signed-in .brand-row {
+.brand-row {
   opacity: 0;
   position: absolute;
   inset: 0;
@@ -112,7 +97,7 @@ body {
   width: 100%;
   max-width: 1280px;
   margin: 0 auto;
-  padding: 1rem 1.25rem 1.25rem;
+  padding: 0.72rem 1rem 0.82rem;
   align-items: center;
   pointer-events: none;
   transition:
@@ -120,8 +105,8 @@ body {
     transform 180ms ease;
 }
 
-.app-shell--signed-in .app-header:hover .brand-row,
-.app-shell--signed-in .app-header:focus-within .brand-row {
+.app-header:hover .brand-row,
+.app-header:focus-within .brand-row {
   opacity: 1;
   pointer-events: auto;
 }
@@ -187,14 +172,14 @@ body {
 
 .app-header h1 {
   margin: 0;
-  font-size: 1.9rem;
+  font-size: 1.18rem;
   line-height: 1.05;
 }
 
 .app-subtitle {
   margin: 0.2rem 0 0;
   opacity: 0.92;
-  font-size: 1rem;
+  font-size: 0.74rem;
 }
 
 .login-link {
@@ -270,17 +255,21 @@ body {
   position: relative;
   flex: 1;
   min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.25rem 0 0.75rem;
 }
 
 .map-layer {
   position: relative;
-  width: 100%;
-  height: 100vh;
+  width: min(100vw, calc((100vh - 4rem) * 1.5));
+  height: min(calc(100vw / 1.5), calc(100vh - 4rem));
   background-image:
     linear-gradient(180deg, rgba(10, 8, 7, 0.08), rgba(10, 8, 7, 0.22)),
-    url("/assets/mapbackgroundbackup.png");
-  background-size: cover;
-  background-position: center;
+    url("/assets/mapbackground.png");
+  background-size: 100% 100%;
+  background-position: center top;
   background-repeat: no-repeat;
   overflow: hidden;
 }
@@ -293,7 +282,7 @@ body {
 
 .status {
   position: absolute;
-  top: 5.5rem;
+  top: 1rem;
   left: 1rem;
   z-index: 15;
   padding: 0.6rem 0.85rem;

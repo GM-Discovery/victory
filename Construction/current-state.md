@@ -1,18 +1,19 @@
 # Victory Current State
 
 ## Purpose
-This document is the current-state canon for Victory as of Kernel 33.
+This document is the current-state canon for Victory as of Kernel 45.
 
 Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful as history, but this file is the current source of truth when they disagree.
 
 ## Kernel State
-- Current kernel label: **Kernel 33**
-- Current kernel purpose: **Operator Bootstrap + Canon Capture v1**
-- Product state: **Kernel 33 is complete; next kernel selection is pending**
+- Current kernel label: **Kernel 45**
+- Current kernel purpose: **Venue Shell Rebase + Shared Helper Extraction v1**
+- Product state: **Kernel 45 is in progress**
 - Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
 
 ## Current Stack
 - Frontend: static HTML, CSS, and inline JavaScript under `/opt/victory/frontend`
+- Shared frontend shell helper: `frontend/venues/shared/venue-shell.js`
 - Backend: Go `1.25` in `/opt/victory/backend`
 - Reverse proxy/static serving: Caddy. Repo config lives at `/opt/victory/Caddyfile`; the current live shared Caddy container mounts `/opt/bread-exchange/Caddyfile` and serves Victory from `/opt/victory/frontend`.
 - Database: PostgreSQL `16-alpine`
@@ -117,7 +118,12 @@ World, session, and venue runtime:
 - `POST /api/showings/{id}/close`
 - `POST /api/showings/start`
 - `POST /api/venues/{slug}/chat-policy`
+- `GET /api/discord/audio/status`
 - `GET /health`
+
+Discord audio remains a Discord pass-through surface. Victory does not capture or stream audio.
+Voice-state participant presence is tracked from Discord Gateway events. Active speaker detection and per-user volume controls remain deferred because the current bot/Gateway path cannot truthfully provide them.
+Venue shells now share reusable helper methods for slug normalization, slot registration, presence preview rendering, and safe refresh hooks.
 
 WebSocket:
 - `GET /ws/the-cave`

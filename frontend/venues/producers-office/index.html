@@ -484,6 +484,15 @@
             <div id="discord-mic-interactions-state">Unknown</div>
           </div>
         </div>
+        <div class="request-grid" style="margin-top: 12px;">
+          <div>
+            <div class="muted small"><strong>Presence readiness</strong></div>
+            <div class="request-grid" style="margin-top: 8px;">
+              <div id="discord-audio-first-theater"></div>
+              <div id="discord-audio-the-cave"></div>
+            </div>
+          </div>
+        </div>
         <div class="chip-list" style="margin-top: 14px;">
           <button id="discord-mic-register" class="chip" type="button">Register /mic Command</button>
           <button id="discord-mapping-repair" class="button" type="button">Create / Repair Discord Channels</button>
@@ -626,6 +635,7 @@
     </main>
   </div>
 
+  <script src="/lib/discord-audio.js?v=kernel43-2"></script>
   <script>
     const forbiddenScreen = document.getElementById("forbidden-screen");
     const officeShell = document.getElementById("office-shell");
@@ -1331,6 +1341,15 @@
         }
 
         officeShell.hidden = false;
+
+      window.VictoryDiscordAudio?.mount({
+        venueSlug: "first-theater",
+        mount: "#discord-audio-first-theater",
+      });
+        window.VictoryDiscordAudio?.mount({
+          venueSlug: "the-cave",
+          mount: "#discord-audio-the-cave",
+        });
 
         for (const option of Array.from(venueSlug.options)) {
           if (option.value === "audition-hall" || venueOptions.includes(option.value)) {
