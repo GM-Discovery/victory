@@ -36,6 +36,7 @@ import (
 	"victory/backend/internal/network"
 	"victory/backend/internal/profiles"
 	"victory/backend/internal/showings"
+	"victory/backend/internal/venues"
 	"victory/backend/internal/world"
 )
 
@@ -333,6 +334,9 @@ func main() {
 
 	mux.HandleFunc("/api/workshop/assets", assets.HandleWorkshopUpload(pool, storageRoot))
 	mux.HandleFunc("/api/assets/", assets.HandleGetAssetMeta(pool))
+	mux.HandleFunc("GET /api/venues/first-theater/map", venues.HandleVenueMap(pool))
+	mux.HandleFunc("POST /api/venues/first-theater/map", venues.HandleVenueMap(pool))
+	mux.HandleFunc("/api/venues/", venues.HandleVenueMap(pool))
 
 	mux.HandleFunc("/api/session/the-cave/join", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {

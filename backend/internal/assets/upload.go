@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	MaxUploadBytes = 10 * 1024 * 1024
+	MaxUploadBytes = 25 * 1024 * 1024
 	MaxWidth       = 4096
 	MaxHeight      = 4096
 )
@@ -36,12 +36,33 @@ const (
 var DerivativeSizes = []int{512, 1024, 2048}
 
 type UploadResponse struct {
-	AssetID string `json:"asset_id"`
+	AssetID    string   `json:"asset_id"`
+	AssetType  string   `json:"asset_type,omitempty"`
+	Tags       []string `json:"tags,omitempty"`
+	ContentURL string   `json:"content_url,omitempty"`
+}
+
+type workshopAssetListItem struct {
+	AssetID          string    `json:"asset_id"`
+	OriginalFilename string    `json:"original_filename"`
+	SourceMime       string    `json:"source_mime"`
+	SniffedMime      string    `json:"sniffed_mime"`
+	Width            int       `json:"width"`
+	Height           int       `json:"height"`
+	ByteSize         int       `json:"byte_size"`
+	AssetType        string    `json:"asset_type"`
+	Tags             []string  `json:"tags"`
+	ContentURL       string    `json:"content_url"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 func HandleWorkshopUpload(pool *pgxpool.Pool, storageRoot string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
+			if strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("asset_type")), "map") {
+				handleWorkshopMapAssetList(w, r, pool)
+				return
+			}
 			handleWorkshopAssetList(w, r, pool)
 			return
 		}
@@ -99,6 +120,12 @@ func HandleWorkshopUpload(pool *pgxpool.Pool, storageRoot string) http.HandlerFu
 				"error": "invalid_or_oversize_multipart",
 			})
 			return
+		}
+
+		assetType := normalizeAssetType(r.FormValue("asset_type"))
+		tags := normalizeAssetTags(r.FormValue("tags"))
+		if assetType == "map" && !containsString(tags, "map") {
+			tags = append(tags, "map")
 		}
 
 		file, header, err := r.FormFile("file")
@@ -169,6 +196,8 @@ func HandleWorkshopUpload(pool *pgxpool.Pool, storageRoot string) http.HandlerFu
 				uploader_user_id,
 				owner_user_id,
 				owner_state,
+				asset_type,
+				tags,
 				original_filename,
 				source_ext,
 				source_mime,
@@ -182,14 +211,16 @@ func HandleWorkshopUpload(pool *pgxpool.Pool, storageRoot string) http.HandlerFu
 			)
 			VALUES (
 				$1, $2, $3, $3, 'uploader_owned',
-				$4, $5, $6, $7,
-				$8, $9, $10, $11, $12, ''
+				$4, $5, $6, $7, $8,
+				$9, $10, $11, $12, $13, $14, ''
 			)
 			RETURNING id
 		`,
 			producerUserID,
 			locationID,
 			userID,
+			assetType,
+			tags,
 			header.Filename,
 			sourceExt,
 			header.Header.Get("Content-Type"),
@@ -306,7 +337,10 @@ func HandleWorkshopUpload(pool *pgxpool.Pool, storageRoot string) http.HandlerFu
 		writeJSON(w, http.StatusOK, map[string]any{
 			"ok": true,
 			"data": UploadResponse{
-				AssetID: assetID,
+				AssetID:    assetID,
+				AssetType:  assetType,
+				Tags:       tags,
+				ContentURL: "/api/assets/" + assetID + "/content",
 			},
 		})
 	}
@@ -432,6 +466,109 @@ func handleWorkshopAssetList(w http.ResponseWriter, r *http.Request, pool *pgxpo
 	})
 }
 
+func handleWorkshopMapAssetList(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool) {
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	rawSession, err := sessions.ReadSessionCookie(r)
+	if err != nil || strings.TrimSpace(rawSession) == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{
+			"ok":    false,
+			"error": "not_authenticated",
+		})
+		return
+	}
+
+	rec, err := sessions.GetSessionByRawToken(ctx, pool, rawSession)
+	if err != nil || strings.TrimSpace(rec.UserID) == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{
+			"ok":    false,
+			"error": "not_authenticated",
+		})
+		return
+	}
+
+	ok, _, locationID, err := resolveProducerScope(ctx, pool, rec.UserID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"ok":    false,
+			"error": "producer_scope_lookup_failed",
+		})
+		return
+	}
+	if !ok {
+		writeJSON(w, http.StatusForbidden, map[string]any{
+			"ok":    false,
+			"error": "producer_membership_required",
+		})
+		return
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT
+			id::text,
+			COALESCE(NULLIF(original_filename, ''), id::text),
+			COALESCE(source_mime, ''),
+			COALESCE(sniffed_mime, ''),
+			COALESCE(width, 0),
+			COALESCE(height, 0),
+			COALESCE(byte_size, 0),
+			COALESCE(NULLIF(asset_type, ''), 'generic'),
+			COALESCE(tags, '{}'::text[]),
+			created_at
+		FROM assets
+		WHERE location_id = $1
+		  AND COALESCE(asset_type, 'generic') = 'map'
+		  AND is_deleted = FALSE
+		ORDER BY created_at DESC
+	`, locationID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"ok":    false,
+			"error": "asset_lookup_failed",
+		})
+		return
+	}
+	defer rows.Close()
+
+	items := make([]workshopAssetListItem, 0)
+	for rows.Next() {
+		var item workshopAssetListItem
+		if err := rows.Scan(
+			&item.AssetID,
+			&item.OriginalFilename,
+			&item.SourceMime,
+			&item.SniffedMime,
+			&item.Width,
+			&item.Height,
+			&item.ByteSize,
+			&item.AssetType,
+			&item.Tags,
+			&item.CreatedAt,
+		); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"ok":    false,
+				"error": "asset_scan_failed",
+			})
+			return
+		}
+		item.ContentURL = "/api/assets/" + item.AssetID + "/content"
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"ok":    false,
+			"error": "asset_lookup_failed",
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":   true,
+		"data": items,
+	})
+}
+
 func resolveProducerScope(ctx context.Context, pool *pgxpool.Pool, userID string) (bool, string, string, error) {
 	if ok, err := access.IsOperatorUser(ctx, pool, userID); err == nil && ok {
 		var locationID string
@@ -465,6 +602,51 @@ func resolveProducerScope(ctx context.Context, pool *pgxpool.Pool, userID string
 	}
 
 	return true, producerUserID, locationID, nil
+}
+
+func normalizeAssetType(value string) string {
+	assetType := strings.ToLower(strings.TrimSpace(value))
+	switch assetType {
+	case "map":
+		return "map"
+	case "generic", "":
+		return "generic"
+	default:
+		return "generic"
+	}
+}
+
+func normalizeAssetTags(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == ';' || r == '\n' || r == '\t'
+	})
+	out := make([]string, 0, len(parts))
+	seen := map[string]struct{}{}
+	for _, part := range parts {
+		tag := strings.ToLower(strings.TrimSpace(part))
+		if tag == "" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		out = append(out, tag)
+	}
+	return out
+}
+
+func containsString(values []string, want string) bool {
+	want = strings.ToLower(strings.TrimSpace(want))
+	for _, value := range values {
+		if strings.ToLower(strings.TrimSpace(value)) == want {
+			return true
+		}
+	}
+	return false
 }
 
 func readBounded(file multipart.File, maxBytes int64) ([]byte, error) {

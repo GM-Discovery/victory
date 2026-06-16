@@ -109,6 +109,7 @@ migrations=(
   "$ROOT/database/migrations/023_kernel38_discord_chat_bridges.sql"
   "$ROOT/database/migrations/024_kernel39_discord_gateway_intake.sql"
   "$ROOT/database/migrations/025_kernel42_neutral_install_location.sql"
+  "$ROOT/database/migrations/026_kernel46_first_theater_map.sql"
 )
 
 for migration in "${migrations[@]}"; do

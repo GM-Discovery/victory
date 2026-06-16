@@ -1,19 +1,20 @@
 # Victory Current State
 
 ## Purpose
-This document is the current-state canon for Victory as of Kernel 45.
+This document is the current-state canon for Victory as of Kernel 46.
 
 Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful as history, but this file is the current source of truth when they disagree.
 
 ## Kernel State
-- Current kernel label: **Kernel 45**
-- Current kernel purpose: **Venue Shell Rebase + Shared Helper Extraction v1**
-- Product state: **Kernel 45 is in progress**
+- Current kernel label: **Kernel 46**
+- Current kernel purpose: **Pixi Map Layer + Workshop Map Upload v1**
+- Product state: **Kernel 46 is complete**
 - Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
 
 ## Current Stack
 - Frontend: static HTML, CSS, and inline JavaScript under `/opt/victory/frontend`
 - Shared frontend shell helper: `frontend/venues/shared/venue-shell.js`
+- Shared Pixi helper: `frontend/lib/victory-pixi-stage.js`
 - Backend: Go `1.25` in `/opt/victory/backend`
 - Reverse proxy/static serving: Caddy. Repo config lives at `/opt/victory/Caddyfile`; the current live shared Caddy container mounts `/opt/bread-exchange/Caddyfile` and serves Victory from `/opt/victory/frontend`.
 - Database: PostgreSQL `16-alpine`
@@ -39,6 +40,7 @@ Live venue rows currently present:
 - `the-cave` - presentation venue
 - `greenroom` - profile/character venue
 - `trailers` - profile drafting venue
+- `first-theater` - stage venue with a dedicated map layer
 - `stage-template` - hidden internal shell scaffold, not map-visible
 - `workshop` - workshop venue
 - `info-booth` - public info venue
@@ -108,9 +110,11 @@ World, session, and venue runtime:
 - `GET /api/world/the-cave`
 - `POST /api/session/the-cave/join`
 - `GET /api/workshop/venues`
+- `GET /api/workshop/assets?asset_type=map`
 - `POST /api/index-cards`
 - `POST /api/workshop/assets`
 - `GET /api/assets/{id}`
+- `GET /api/assets/{id}/content`
 - `GET /api/showings`
 - `GET /api/showings/{id}/review`
 - `GET /api/director-console/current`
@@ -118,12 +122,15 @@ World, session, and venue runtime:
 - `POST /api/showings/{id}/close`
 - `POST /api/showings/start`
 - `POST /api/venues/{slug}/chat-policy`
+- `GET /api/venues/{slug}/map`
+- `POST /api/venues/{slug}/map`
 - `GET /api/discord/audio/status`
 - `GET /health`
 
 Discord audio remains a Discord pass-through surface. Victory does not capture or stream audio.
 Voice-state participant presence is tracked from Discord Gateway events. Active speaker detection and per-user volume controls remain deferred because the current bot/Gateway path cannot truthfully provide them.
 Venue shells now share reusable helper methods for slug normalization, slot registration, presence preview rendering, and safe refresh hooks.
+First Theater keeps its original stage façade; the new active map renders on a dedicated Pixi map layer and does not replace the façade or the existing DOM controls.
 
 WebSocket:
 - `GET /ws/the-cave`

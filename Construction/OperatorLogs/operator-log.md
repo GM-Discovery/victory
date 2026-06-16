@@ -11,6 +11,27 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-06-11 — Kernel 46 Pixi Map Layer + Workshop Map Upload v1
+
+### Backend
+- Added a new First Theater venue-map API at `GET /api/venues/{slug}/map` and `POST /api/venues/{slug}/map`.
+- Extended workshop uploads so `POST /api/workshop/assets` can tag uploaded assets as `map`, and `GET /api/workshop/assets?asset_type=map` lists the uploaded map assets for the venue location.
+- Added an authenticated asset content route at `GET /api/assets/{id}/content` so Pixi can load the saved map image directly from the server.
+- Added durable schema for `assets.asset_type`, `assets.tags`, and a single active venue map row per venue.
+
+### Frontend
+- Kept the old First Theater stage façade intact.
+- Added a dedicated Pixi map layer inside the First Theater stage shell.
+- Added a right-click `Add / Replace Map` stage action that opens a Workshop-style map editor panel.
+- Added upload/select controls, crop/fit/scale/safe-margin controls, and map-asset selection to the First Theater editor.
+
+### Docs
+- Updated current-state, roadmap, and the Kernel 46 reportback to reflect the real map-layer workflow instead of the backdrop experiment.
+
+### Notes
+- The active map is persisted server-side and rendered from the saved venue-map state.
+- The older First Theater presentation remains visible around the map layer and still owns the DOM controls.
+
 ## 2026-06-09 — Kernel 44 Discord Audio Presence / Speaker Feasibility v1
 
 ### Backend
@@ -486,3 +507,22 @@ Implement `perform/speak` using the same action pipeline:
 - Kernel 44 audio behavior remains untouched by this pass
 - The shared shell helper is intentionally light and does not try to replace venue-specific runtime logic
 - First Theater remains the practical source template while The Cave keeps the proving-ground role
+
+## 2026-06-10 — Kernel 46 First Theater Pixi backdrop renderer
+
+### Frontend
+- Added a shared Pixi backdrop helper at `frontend/lib/victory-pixi-stage.js`
+- Proved a shared Pixi backdrop helper path and renderer slot structure for First Theater
+- Reverted the First Theater backdrop swap after it made the stage presentation worse than the existing façade
+- Kept the existing First Theater DOM controls, chat rail, session commands, house mic status, and context menus intact
+
+### Documentation
+- Promoted Kernel 46 into the current-state canon
+- Updated the roadmap to mark the First Theater Pixi backdrop pass as the current near-term kernel
+- Added a Kernel 46 reportback in the official house format
+
+### Operational Notes
+- The Pixi helper is scoped to backdrop rendering and does not claim app truth
+- If Pixi fails to load, First Theater still falls back to its existing DOM-safe message
+- The older First Theater stage composition remains the preferred live presentation for now
+- The Cave was left untouched by this kernel
