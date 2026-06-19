@@ -39,6 +39,7 @@
     const mapEditorPreviewMode = document.getElementById("map-editor-preview-mode");
     const mapEditorPreviewFocus = document.getElementById("map-editor-preview-focus");
     const mapEditorPreviewSafe = document.getElementById("map-editor-preview-safe");
+    const mapEditorDisplayMode = document.getElementById("map-editor-display-mode");
     const mapEditorFit = document.getElementById("map-editor-fit");
     const mapEditorScale = document.getElementById("map-editor-scale");
     const mapEditorCropX = document.getElementById("map-editor-crop-x");
@@ -46,6 +47,7 @@
     const mapEditorSafeMargin = document.getElementById("map-editor-safe-margin");
     const mapEditorAssets = document.getElementById("map-editor-assets");
     const mapEditorSave = document.getElementById("map-editor-save");
+    const mapEditorRemove = document.getElementById("map-editor-remove");
     const mapEditorCancel = document.getElementById("map-editor-cancel");
     let pixiLoadPromise = null;
     let firstTheaterRuntimeStarted = false;
@@ -1354,13 +1356,16 @@
 
     function mapEditorDraftFromState() {
       const state = currentVenueMapState || {};
+      const liveDisplayMode = String(mapEditorDisplayMode?.value || "").trim();
       const liveFit = String(mapEditorFit?.value || "").trim();
       const liveScale = mapEditorScale?.value;
       const liveCropX = mapEditorCropX?.value;
       const liveCropY = mapEditorCropY?.value;
       const liveSafeMargin = mapEditorSafeMargin?.value;
+      const rawDisplayMode = liveDisplayMode || String(state.display_mode || "theater");
       return {
         assetID: String(state.asset_id || currentVenueMapAssetID || ""),
+        displayMode: rawDisplayMode === "fullscreen" ? "fullscreen" : "theater",
         fit: liveFit || String(state.fit || "cover"),
         cropX: clampNumber(liveCropX ?? state.crop_x ?? 0.5, 0, 1, 0.5),
         cropY: clampNumber(liveCropY ?? state.crop_y ?? 0.5, 0, 1, 0.5),
@@ -1476,18 +1481,23 @@
       if (!mapEditorPanel || mapEditorPanel.hidden) {
         return;
       }
-      const draft = mapEditorDraftFromState();
+      const state = currentVenueMapState || {};
       if (mapEditorFile) {
         mapEditorFile.value = "";
       }
-      if (mapEditorFit) mapEditorFit.value = draft.fit;
-      if (mapEditorScale) mapEditorScale.value = String(draft.scale);
-      if (mapEditorCropX) mapEditorCropX.value = String(draft.cropX);
-      if (mapEditorCropY) mapEditorCropY.value = String(draft.cropY);
-      if (mapEditorSafeMargin) mapEditorSafeMargin.value = String(draft.safeMargin);
-      currentVenueMapAssetID = draft.assetID;
+      // Read selects directly from state — mapEditorDraftFromState() reads the
+      // live select value first, which is always the HTML default ("theater", "cover")
+      // on a fresh page load, masking the saved state value.
+      if (mapEditorDisplayMode) mapEditorDisplayMode.value = String(state.display_mode || "theater");
+      if (mapEditorFit) mapEditorFit.value = String(state.fit || "cover");
+      if (mapEditorScale) mapEditorScale.value = String(state.scale ?? 1);
+      if (mapEditorCropX) mapEditorCropX.value = String(state.crop_x ?? 0.5);
+      if (mapEditorCropY) mapEditorCropY.value = String(state.crop_y ?? 0.5);
+      if (mapEditorSafeMargin) mapEditorSafeMargin.value = String(state.safe_margin ?? 24);
+      currentVenueMapAssetID = String(state.asset_id || "");
       syncMapAssetList();
-      syncMapEditorPreview(currentVenueMapState?.asset?.content_url || "");
+      syncMapEditorPreview(state.asset?.content_url || "");
+      if (mapEditorRemove) mapEditorRemove.disabled = !currentVenueMapAssetID;
     }
 
     function livePreviewMapOnStage() {
@@ -1495,6 +1505,7 @@
       const draft = mapEditorDraftFromState();
       currentVenueMapState = {
         ...(currentVenueMapState || {}),
+        display_mode: draft.displayMode,
         fit: draft.fit,
         scale: draft.scale,
         crop_x: draft.cropX,
@@ -1546,20 +1557,22 @@
     function cancelMapEditor() {
       if (mapEditorOriginalState) {
         currentVenueMapState = mapEditorOriginalState;
+        if (mapEditorDisplayMode) mapEditorDisplayMode.value = String(currentVenueMapState.display_mode || "theater");
         if (mapEditorFit) mapEditorFit.value = String(currentVenueMapState.fit || "cover");
         if (mapEditorScale) mapEditorScale.value = String(currentVenueMapState.scale ?? 1);
         if (mapEditorCropX) mapEditorCropX.value = String(currentVenueMapState.crop_x ?? 0.5);
         if (mapEditorCropY) mapEditorCropY.value = String(currentVenueMapState.crop_y ?? 0.5);
         if (mapEditorSafeMargin) mapEditorSafeMargin.value = String(currentVenueMapState.safe_margin ?? 24);
-        const size = getStageSize();
-        renderVenueMapLayer(Math.max(320, size.width), Math.max(320, size.height));
+        renderPixiScene();
       }
       hideMapEditor();
     }
 
     function mapEditorPayloadFromUI(assetID) {
+      const draft = mapEditorDraftFromState();
       return {
         asset_id: String(assetID || currentVenueMapAssetID || currentVenueMapState?.asset_id || "").trim(),
+        display_mode: draft.displayMode,
         fit: String(mapEditorFit?.value || currentVenueMapState?.fit || "cover"),
         crop_x: clampNumber(mapEditorCropX?.value ?? currentVenueMapState?.crop_x ?? 0.5, 0, 1, 0.5),
         crop_y: clampNumber(mapEditorCropY?.value ?? currentVenueMapState?.crop_y ?? 0.5, 0, 1, 0.5),
@@ -1673,13 +1686,36 @@
       currentVenueMapState = result.data || null;
       currentVenueMapAssetID = String(currentVenueMapState?.asset_id || assetID);
       mapEditorOriginalState = currentVenueMapState ? { ...currentVenueMapState } : null;
-      syncMapEditorWithState();
       renderPixiScene();
-      setMapEditorStatus("Map saved to the First Theater stage.");
       setStageStatus("First Theater map updated.");
+      hideMapEditor();
       void ensureVenueMapTexture().then(() => {
         renderPixiScene();
       });
+    }
+
+    async function removeVenueMap() {
+      if (!canManageIndexCards(currentRole)) {
+        setStageStatus("Only producers and directors can add or replace the First Theater map.");
+        return;
+      }
+
+      setMapEditorStatus("Removing map...");
+      const response = await fetch("/api/venues/first-theater/map", {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.error || `HTTP ${response.status}`);
+      }
+      currentVenueMapState = null;
+      currentVenueMapAssetID = "";
+      mapEditorOriginalState = null;
+      void ensureVenueMapTexture();
+      renderPixiScene();
+      setStageStatus("First Theater map removed.");
+      hideMapEditor();
     }
 
     async function ensureVenueMapTexture() {
@@ -1744,11 +1780,23 @@
         return;
       }
 
-      const safeMargin = Math.max(0, Math.min(Math.round(Number(state.safe_margin ?? 24) || 24), Math.floor(Math.min(width, height) / 2)));
-      const boundsX = safeMargin;
-      const boundsY = safeMargin;
-      const boundsWidth = Math.max(1, width - safeMargin * 2);
-      const boundsHeight = Math.max(1, height - safeMargin * 2);
+      const displayMode = String(state.display_mode || "theater").trim() === "fullscreen" ? "fullscreen" : "theater";
+
+      let boundsX, boundsY, boundsWidth, boundsHeight;
+      if (displayMode === "fullscreen") {
+        boundsX = 0;
+        boundsY = 0;
+        boundsWidth = width;
+        boundsHeight = height;
+      } else {
+        const prosceniumInset = Math.max(18, Math.round(width * 0.04));
+        const upperDrapeHeight = Math.max(80, Math.round(height * 0.16));
+        const floorBandTop = Math.max(Math.round(height * 0.72), height - 200);
+        boundsX = prosceniumInset;
+        boundsY = upperDrapeHeight;
+        boundsWidth = Math.max(1, width - prosceniumInset * 2);
+        boundsHeight = Math.max(1, floorBandTop - upperDrapeHeight);
+      }
 
       const sprite = new PIXI.Sprite(venueMapTexture);
       sprite.anchor.set(0.5);
@@ -1767,18 +1815,20 @@
         scale,
       });
 
-      const mapMask = new PIXI.Graphics();
-      mapMask.beginFill(0xffffff);
-      mapMask.drawRoundedRect(boundsX, boundsY, boundsWidth, boundsHeight, 12);
-      mapMask.endFill();
-      mapMask.renderable = false;
-      mapLayer.addChild(mapMask);
-      mapLayer.mask = mapMask;
+      if (displayMode === "theater") {
+        const mapMask = new PIXI.Graphics();
+        mapMask.beginFill(0xffffff);
+        mapMask.drawRoundedRect(boundsX, boundsY, boundsWidth, boundsHeight, 12);
+        mapMask.endFill();
+        mapMask.renderable = false;
+        mapLayer.addChild(mapMask);
+        mapLayer.mask = mapMask;
 
-      const border = new PIXI.Graphics();
-      border.lineStyle(1, 0xf0d49b, 0.18);
-      border.drawRoundedRect(boundsX, boundsY, boundsWidth, boundsHeight, 12);
-      mapLayer.addChild(border);
+        const border = new PIXI.Graphics();
+        border.lineStyle(1, 0xf0d49b, 0.18);
+        border.drawRoundedRect(boundsX, boundsY, boundsWidth, boundsHeight, 12);
+        mapLayer.addChild(border);
+      }
     }
 
     function currentLiveSelection() {
@@ -2863,72 +2913,76 @@
       stageOpening.endFill();
       backgroundLayer.addChild(stageOpening);
 
-      const topValance = new PIXI.Graphics();
-      topValance.beginFill(0x5a1119, 1);
-      topValance.drawRect(0, 0, width, upperDrapeHeight);
-      topValance.endFill();
-      facadeLayer.addChild(topValance);
+      const sceneDisplayMode = String(currentVenueMapState?.display_mode || "theater") === "fullscreen" ? "fullscreen" : "theater";
 
-      const topValanceSheen = new PIXI.Graphics();
-      topValanceSheen.beginFill(0xf0d49b, 0.08);
-      topValanceSheen.drawRect(0, 0, width, Math.max(24, Math.round(upperDrapeHeight * 0.42)));
-      topValanceSheen.endFill();
-      facadeLayer.addChild(topValanceSheen);
+      if (sceneDisplayMode !== "fullscreen") {
+        const topValance = new PIXI.Graphics();
+        topValance.beginFill(0x5a1119, 1);
+        topValance.drawRect(0, 0, width, upperDrapeHeight);
+        topValance.endFill();
+        facadeLayer.addChild(topValance);
 
-      const sideCurtains = new PIXI.Graphics();
-      sideCurtains.beginFill(0x2b090d, 0.92);
-      sideCurtains.drawRect(0, upperDrapeHeight, prosceniumInset, height - upperDrapeHeight);
-      sideCurtains.drawRect(width - prosceniumInset, upperDrapeHeight, prosceniumInset, height - upperDrapeHeight);
-      sideCurtains.endFill();
-      facadeLayer.addChild(sideCurtains);
+        const topValanceSheen = new PIXI.Graphics();
+        topValanceSheen.beginFill(0xf0d49b, 0.08);
+        topValanceSheen.drawRect(0, 0, width, Math.max(24, Math.round(upperDrapeHeight * 0.42)));
+        topValanceSheen.endFill();
+        facadeLayer.addChild(topValanceSheen);
 
-      const curtainFoldStyle = new PIXI.Graphics();
-      const foldWidth = Math.max(64, Math.round(width / 12));
-      for (let x = 0; x < width; x += foldWidth) {
-        const foldAlpha = (Math.floor(x / foldWidth) % 2 === 0) ? 0.08 : 0.14;
-        curtainFoldStyle.beginFill(0x22070a, foldAlpha);
-        curtainFoldStyle.drawRect(x, 0, Math.max(16, Math.round(foldWidth * 0.42)), upperDrapeHeight);
-        curtainFoldStyle.endFill();
+        const sideCurtains = new PIXI.Graphics();
+        sideCurtains.beginFill(0x2b090d, 0.92);
+        sideCurtains.drawRect(0, upperDrapeHeight, prosceniumInset, height - upperDrapeHeight);
+        sideCurtains.drawRect(width - prosceniumInset, upperDrapeHeight, prosceniumInset, height - upperDrapeHeight);
+        sideCurtains.endFill();
+        facadeLayer.addChild(sideCurtains);
+
+        const curtainFoldStyle = new PIXI.Graphics();
+        const foldWidth = Math.max(64, Math.round(width / 12));
+        for (let x = 0; x < width; x += foldWidth) {
+          const foldAlpha = (Math.floor(x / foldWidth) % 2 === 0) ? 0.08 : 0.14;
+          curtainFoldStyle.beginFill(0x22070a, foldAlpha);
+          curtainFoldStyle.drawRect(x, 0, Math.max(16, Math.round(foldWidth * 0.42)), upperDrapeHeight);
+          curtainFoldStyle.endFill();
+        }
+        facadeLayer.addChild(curtainFoldStyle);
+
+        const prosceniumFrame = new PIXI.Graphics();
+        prosceniumFrame.lineStyle(3, 0xf0d49b, 0.16);
+        prosceniumFrame.drawRoundedRect(prosceniumInset, upperDrapeHeight, width - (prosceniumInset * 2), height - upperDrapeHeight - 2, 18);
+        prosceniumFrame.lineStyle(1, 0xffffff, 0.06);
+        prosceniumFrame.drawRoundedRect(prosceniumInset + 8, upperDrapeHeight + 8, width - ((prosceniumInset + 8) * 2), height - upperDrapeHeight - 18, 14);
+        facadeLayer.addChild(prosceniumFrame);
+
+        const stageFloor = new PIXI.Graphics();
+        stageFloor.beginFill(0x0d0a0b, 1);
+        stageFloor.drawRect(0, floorBandTop, width, height - floorBandTop);
+        stageFloor.endFill();
+        facadeLayer.addChild(stageFloor);
+
+        const floorGlow = new PIXI.Graphics();
+        floorGlow.beginFill(0x8fb7da, 0.06);
+        floorGlow.drawEllipse(width * 0.5, floorBandTop + ((height - floorBandTop) * 0.12), width * 0.3, Math.max(24, (height - floorBandTop) * 0.2));
+        floorGlow.endFill();
+        facadeLayer.addChild(floorGlow);
+
+        const footlights = new PIXI.Graphics();
+        const footlightCount = Math.max(5, Math.min(14, Math.floor(width / 120)));
+        for (let index = 0; index < footlightCount; index += 1) {
+          const x = (width / (footlightCount + 1)) * (index + 1);
+          footlights.beginFill(0xf3d79f, 0.75);
+          footlights.drawCircle(x, footlightY, 2.4);
+          footlights.endFill();
+          footlights.beginFill(0xf3d79f, 0.11);
+          footlights.drawCircle(x, footlightY, 9);
+          footlights.endFill();
+        }
+        facadeLayer.addChild(footlights);
+
+        const stageLip = new PIXI.Graphics();
+        stageLip.beginFill(0x120b0b, 0.9);
+        stageLip.drawRect(0, floorBandTop, width, height - floorBandTop);
+        stageLip.endFill();
+        facadeLayer.addChild(stageLip);
       }
-      facadeLayer.addChild(curtainFoldStyle);
-
-      const prosceniumFrame = new PIXI.Graphics();
-      prosceniumFrame.lineStyle(3, 0xf0d49b, 0.16);
-      prosceniumFrame.drawRoundedRect(prosceniumInset, upperDrapeHeight, width - (prosceniumInset * 2), height - upperDrapeHeight - 2, 18);
-      prosceniumFrame.lineStyle(1, 0xffffff, 0.06);
-      prosceniumFrame.drawRoundedRect(prosceniumInset + 8, upperDrapeHeight + 8, width - ((prosceniumInset + 8) * 2), height - upperDrapeHeight - 18, 14);
-      facadeLayer.addChild(prosceniumFrame);
-
-      const stageFloor = new PIXI.Graphics();
-      stageFloor.beginFill(0x0d0a0b, 1);
-      stageFloor.drawRect(0, floorBandTop, width, height - floorBandTop);
-      stageFloor.endFill();
-      facadeLayer.addChild(stageFloor);
-
-      const floorGlow = new PIXI.Graphics();
-      floorGlow.beginFill(0x8fb7da, 0.06);
-      floorGlow.drawEllipse(width * 0.5, floorBandTop + ((height - floorBandTop) * 0.12), width * 0.3, Math.max(24, (height - floorBandTop) * 0.2));
-      floorGlow.endFill();
-      facadeLayer.addChild(floorGlow);
-
-      const footlights = new PIXI.Graphics();
-      const footlightCount = Math.max(5, Math.min(14, Math.floor(width / 120)));
-      for (let index = 0; index < footlightCount; index += 1) {
-        const x = (width / (footlightCount + 1)) * (index + 1);
-        footlights.beginFill(0xf3d79f, 0.75);
-        footlights.drawCircle(x, footlightY, 2.4);
-        footlights.endFill();
-        footlights.beginFill(0xf3d79f, 0.11);
-        footlights.drawCircle(x, footlightY, 9);
-        footlights.endFill();
-      }
-      facadeLayer.addChild(footlights);
-
-      const stageLip = new PIXI.Graphics();
-      stageLip.beginFill(0x120b0b, 0.9);
-      stageLip.drawRect(0, floorBandTop, width, height - floorBandTop);
-      stageLip.endFill();
-      facadeLayer.addChild(stageLip);
 
       renderVenueMapLayer(width, height);
 
@@ -3894,6 +3948,16 @@
       setMapEditorStatus(`Previewing ${selected.name}. Save to upload and replace the active map.`);
     });
 
+    mapEditorDisplayMode?.addEventListener("change", () => {
+      mapEditorDirty = true;
+      const draft = mapEditorDraftFromState();
+      currentVenueMapState = {
+        ...(currentVenueMapState || {}),
+        display_mode: draft.displayMode,
+      };
+      renderPixiScene();
+    });
+
     mapEditorFit?.addEventListener("change", () => {
       mapEditorDirty = true;
       syncMapEditorPreview(mapEditorPreviewURL || currentVenueMapState?.asset?.content_url || "");
@@ -3934,8 +3998,19 @@
       }
     });
 
+    mapEditorRemove?.addEventListener("click", async () => {
+      if (!window.confirm("Remove the active map from the First Theater stage?")) return;
+      try {
+        await removeVenueMap();
+      } catch (error) {
+        console.warn("removeVenueMap failed", error);
+        setMapEditorStatus(error.message || String(error));
+        setStageStatus(error.message || String(error));
+      }
+    });
+
     mapEditorCancel?.addEventListener("click", () => {
-      cancelMapEditor();
+      hideMapEditor();
     });
 
     document.addEventListener("click", (event) => {

@@ -24,6 +24,7 @@ type venueMapState struct {
 	CropY           float64        `json:"crop_y"`
 	Scale           float64        `json:"scale"`
 	SafeMargin      int            `json:"safe_margin"`
+	DisplayMode     string         `json:"display_mode"`
 	CreatedByUserID string         `json:"created_by_user_id,omitempty"`
 	UpdatedByUserID string         `json:"updated_by_user_id,omitempty"`
 	Asset           *venueMapAsset `json:"asset,omitempty"`
@@ -43,12 +44,13 @@ type venueMapAsset struct {
 }
 
 type venueMapRequest struct {
-	AssetID    string  `json:"asset_id"`
-	Fit        string  `json:"fit"`
-	CropX      float64 `json:"crop_x"`
-	CropY      float64 `json:"crop_y"`
-	Scale      float64 `json:"scale"`
-	SafeMargin int     `json:"safe_margin"`
+	AssetID     string  `json:"asset_id"`
+	Fit         string  `json:"fit"`
+	CropX       float64 `json:"crop_x"`
+	CropY       float64 `json:"crop_y"`
+	Scale       float64 `json:"scale"`
+	SafeMargin  int     `json:"safe_margin"`
+	DisplayMode string  `json:"display_mode"`
 }
 
 func HandleVenueMap(pool *pgxpool.Pool) http.HandlerFunc {
@@ -67,6 +69,8 @@ func HandleVenueMap(pool *pgxpool.Pool) http.HandlerFunc {
 			handleVenueMapGet(w, r, pool, venueSlug)
 		case http.MethodPost:
 			handleVenueMapSave(w, r, pool, venueSlug)
+		case http.MethodDelete:
+			handleVenueMapDelete(w, r, pool, venueSlug)
 		default:
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
 				"ok":    false,
@@ -281,6 +285,11 @@ func handleVenueMapSave(w http.ResponseWriter, r *http.Request, pool *pgxpool.Po
 		createdByUserID = userID
 	}
 
+	displayMode := strings.TrimSpace(req.DisplayMode)
+	if displayMode != "fullscreen" {
+		displayMode = "theater"
+	}
+
 	_, err = tx.Exec(ctx, `
 		INSERT INTO venue_active_maps (
 			venue_id,
@@ -290,11 +299,12 @@ func handleVenueMapSave(w http.ResponseWriter, r *http.Request, pool *pgxpool.Po
 			crop_y,
 			scale,
 			safe_margin,
+			display_mode,
 			created_by_user_id,
 			updated_by_user_id,
 			updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
 		ON CONFLICT (venue_id) DO UPDATE
 		SET asset_id = EXCLUDED.asset_id,
 		    fit = EXCLUDED.fit,
@@ -302,9 +312,10 @@ func handleVenueMapSave(w http.ResponseWriter, r *http.Request, pool *pgxpool.Po
 		    crop_y = EXCLUDED.crop_y,
 		    scale = EXCLUDED.scale,
 		    safe_margin = EXCLUDED.safe_margin,
+		    display_mode = EXCLUDED.display_mode,
 		    updated_by_user_id = EXCLUDED.updated_by_user_id,
 		    updated_at = NOW()
-	`, venueID, req.AssetID, req.Fit, req.CropX, req.CropY, req.Scale, req.SafeMargin, createdByUserID, userID)
+	`, venueID, req.AssetID, req.Fit, req.CropX, req.CropY, req.Scale, req.SafeMargin, displayMode, createdByUserID, userID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{
 			"ok":    false,
@@ -333,6 +344,49 @@ func handleVenueMapSave(w http.ResponseWriter, r *http.Request, pool *pgxpool.Po
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":   true,
 		"data": state,
+	})
+}
+
+func handleVenueMapDelete(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, venueSlug string) {
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+
+	_, allowed, err := canEditVenueMap(ctx, pool, r, venueSlug)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"ok":    false,
+			"error": "map_access_check_failed",
+		})
+		return
+	}
+	if !allowed {
+		writeJSON(w, http.StatusForbidden, map[string]any{
+			"ok":    false,
+			"error": "forbidden",
+		})
+		return
+	}
+
+	venueID, _, err := resolveVenueLocation(ctx, pool, venueSlug)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"ok":    false,
+			"error": "venue_lookup_failed",
+		})
+		return
+	}
+
+	if _, err := pool.Exec(ctx, `DELETE FROM venue_active_maps WHERE venue_id = $1`, venueID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"ok":    false,
+			"error": "venue_map_delete_failed",
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":   true,
+		"data": nil,
 	})
 }
 
@@ -407,7 +461,7 @@ func resolveVenueLocation(ctx context.Context, pool *pgxpool.Pool, venueSlug str
 func loadVenueMapState(ctx context.Context, pool *pgxpool.Pool, venueSlug string) (venueMapState, error) {
 	var state venueMapState
 	var asset venueMapAsset
-	var assetID, fit, createdByUserID, updatedByUserID string
+	var assetID, fit, displayMode, createdByUserID, updatedByUserID string
 	var cropX, cropY, scale float64
 	var safeMargin int
 	var assetOriginalFilename, assetSourceMime, assetSniffedMime, assetType string
@@ -423,6 +477,7 @@ func loadVenueMapState(ctx context.Context, pool *pgxpool.Pool, venueSlug string
 			COALESCE(vm.crop_y, 0.5),
 			COALESCE(vm.scale, 1),
 			COALESCE(vm.safe_margin, 24),
+			COALESCE(vm.display_mode, 'theater'),
 			COALESCE(vm.created_by_user_id::text, ''),
 			COALESCE(vm.updated_by_user_id::text, ''),
 			COALESCE(a.id::text, ''),
@@ -447,6 +502,7 @@ func loadVenueMapState(ctx context.Context, pool *pgxpool.Pool, venueSlug string
 		&cropY,
 		&scale,
 		&safeMargin,
+		&displayMode,
 		&createdByUserID,
 		&updatedByUserID,
 		&asset.AssetID,
@@ -471,6 +527,7 @@ func loadVenueMapState(ctx context.Context, pool *pgxpool.Pool, venueSlug string
 		CropY:           cropY,
 		Scale:           scale,
 		SafeMargin:      safeMargin,
+		DisplayMode:     displayMode,
 		CreatedByUserID: strings.TrimSpace(createdByUserID),
 		UpdatedByUserID: strings.TrimSpace(updatedByUserID),
 	}
