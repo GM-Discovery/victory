@@ -1,7 +1,7 @@
 # Victory Roadmap
 
 ## Purpose
-This roadmap reflects current priorities after Kernel 47.
+This roadmap reflects current priorities after Kernel 48.1.
 
 Kernel numbers are labels, but from here they should remain stable once assigned so planning, reportbacks, and future agents all refer to the same landmarks.
 
@@ -48,6 +48,10 @@ Kernel numbers are labels, but from here they should remain stable once assigned
   - First Theater now uploads/replaces a single active map as a Workshop asset, stores the crop/fit state server-side, and renders the map on its own Pixi layer without replacing the older stage façade
 - `47 — Pixi Grid Primitive + Map Alignment v1`
   - First Theater now supports a persistent, server-backed square or hex grid rendered above the active map and below stage elements, with a Configure Grid context-menu surface for live-preview alignment, save/cancel, hide/show, and reset; visual-only, no snapping or pan/zoom yet
+- `48 — Personal Stage Camera + Card Pinning v1`
+  - First Theater now has a browser-local personal pan/zoom camera with cursor-centered wheel zoom, middle-mouse pan, edge scrolling, bounded Fit controls, and shared index-card pin/unpin state between world-space and fixed overlay rendering
+- `48.1 — Card Attachment Repair + Director Focus Ping`
+  - First Theater now defaults new cards to screen pinning, lets cards Attach to Map or Pin to Screen without jumping, repairs floating drag behavior, and adds Director-and-above Shift+Ping focus broadcasts with a ~250ms camera transition inside the current venue
 
 Ordering note:
 - Showing Review comes before polish-only work
@@ -61,6 +65,8 @@ Ordering note:
 - Venue shell extraction follows the audio pass so the reusable shell contract can capture the live patterns already proved in First Theater, The Cave, and Middle School Stage
 - The First Theater Pixi pass now follows shell extraction as a dedicated map-layer workflow instead of a backdrop swap, and the older stage composition remains the preferred live presentation around that layer
 - The grid primitive follows the map-layer pass directly so alignment tooling has a real map to align against; stage navigation (pan/zoom) is deferred to a later kernel so the grid first ships as a fixed-viewport visual layer
+- Kernel 48 closes that stage-navigation gap for First Theater only, while keeping the camera reusable for later venues without making it global
+- Kernel 48.1 tightens the card attachment model and adds the one-time venue focus ping without turning the camera into a shared persistent state
 
 ## Medium Roadmap: Kernels 38–62
 - strengthen showing/review surfaces and auditability

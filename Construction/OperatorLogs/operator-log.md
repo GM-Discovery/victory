@@ -11,6 +11,55 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-06-21 — Kernel 48.1 Completion Reportback and Map Asset Reliability Notes
+
+### Docs
+- Added the Kernel 48.1 reportback in the house template format.
+- Updated current-state canon with the existing-map activation fix and the full-map grid coverage note.
+- Recorded the kernel extras in the reportback so the follow-on fixes stay attached to the same kernel history.
+
+### Notes
+- Existing map assets now activate directly from the list instead of leaving the editor in a blank half-selected state.
+- The reportback treats the recent header, camera, grid, and map-editor adjustments as kernel extras layered onto the core 48.1 slice.
+
+## 2026-06-21 — Kernel 48.1 Card Attachment Repair + Director Focus Ping
+
+### Frontend
+- Tightened the First Theater card movement and duplication paths so screen-pinned cards stay screen-pinned, map-attached cards stay world-attached, and unlocked cards use a transient floating drag state without snap-back.
+- Renamed card pin actions to `Attach to Map` and `Pin to Screen`.
+- Added a Ping button that sends ordinary websocket pings and Shift+Ping director focus broadcasts.
+- Added a 250ms camera transition for focus broadcasts and a temporary Director focus marker.
+
+### Backend
+- Added a venue focus ping websocket event that is authorized server-side and broadcast to the current session only.
+- Extended duplicate-card handling so duplicated cards preserve their durable pin mode and coordinates.
+
+### Docs
+- Updated current-state and roadmap canon to Kernel 48.1.
+
+### Notes
+- The camera remains personal and browser-local after focus.
+- Touch controls, snapping, and Director follow mode remain deferred.
+
+## 2026-06-21 — Kernel 48 Personal Stage Camera + Card Pinning v1
+
+### Frontend
+- Added a reusable First Theater camera helper at `frontend/lib/victory-stage-camera.js`.
+- Mounted a personal browser-local camera in First Theater with middle-mouse pan, cursor-centered wheel zoom, edge scrolling, and fixed `− / 100% / + / Fit` controls.
+- Split the First Theater Pixi scene into shared world layers and fixed overlay layers so the active map, grid, and pinned cards move together while unpinned cards remain readable above the interactive view.
+- Added card pin/unpin context-menu actions and drag behavior that store shared pin metadata on the card element itself.
+- Tightened the card context-menu move and duplicate paths so pinned cards stay in world space, overlay cards stay in screen space, and duplication preserves a single copy in the correct space.
+
+### Backend
+- Extended `update/index_card` and `act/duplicate_element` handling so card moves and card duplication can preserve and write optional `pin_mode`, `world_x`, `world_y`, `screen_x`, and `screen_y` metadata without creating a separate pin route.
+
+### Docs
+- Updated current-state and roadmap canon to Kernel 48.
+
+### Notes
+- Camera state is personal browser storage, not shared Victory truth.
+- Touch controls and Director focus/broadcast remain deferred.
+
 ## 2026-06-11 — Kernel 46 Pixi Map Layer + Workshop Map Upload v1
 
 ### Backend

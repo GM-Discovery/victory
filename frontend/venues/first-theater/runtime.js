@@ -23,6 +23,12 @@
     const smokeLine = document.getElementById("smoke-line");
     const smokeToggleGridButton = document.getElementById("smoke-toggle-grid");
     const smokeDropCardButton = document.getElementById("smoke-drop-card");
+    const cameraControls = document.getElementById("camera-controls");
+    const cameraZoomOutButton = document.getElementById("camera-zoom-out");
+    const cameraZoomValue = document.getElementById("camera-zoom-value");
+    const cameraZoomInButton = document.getElementById("camera-zoom-in");
+    const cameraFitButton = document.getElementById("camera-fit");
+    const pingButton = document.getElementById("ping-button");
     const cardEditorPanel = document.getElementById("card-editor");
     const cardEditorHeader = document.getElementById("card-editor-header");
     const cardEditorStatus = document.getElementById("card-editor-status");
@@ -101,8 +107,10 @@
     let contextMenuTarget = null;
     let suppressStageContextMenu = false;
     let stagePlacementCandidate = null;
+    let stagePlacementScreenCandidate = null;
     let pendingStageCardPlacement = null;
     let recentPlacementMarker = null;
+    let recentFocusMarker = null;
     let cardEditorTargetKey = "";
     let cardEditorDirty = false;
     let cardEditorDragState = null;
@@ -111,6 +119,7 @@
     let currentVenueMapState = null;
     let currentVenueMapAssets = [];
     let currentVenueMapAssetID = "";
+    let currentVenueMapBounds = null;
     let mapEditorDirty = false;
     let mapEditorDragState = null;
     let mapEditorPreviewURL = "";
@@ -127,11 +136,15 @@
     let pixiApp = null;
     let sceneRoot = null;
     let backgroundLayer = null;
+    let worldLayer = null;
     let mapLayer = null;
     let gridLayer = null;
     let facadeLayer = null;
-    let objectLayer = null;
+    let pinnedObjectLayer = null;
+    let overlayObjectLayer = null;
+    let floatingObjectLayer = null;
     let uiLayer = null;
+    let stageCamera = null;
     let mapEditorOriginalState = null;
     let currentVenueGridConfig = null;
     let gridEditorOriginalState = null;
@@ -144,6 +157,7 @@
     let presenceRefreshTimer = null;
     let unreadChatCount = 0;
     let lastPingMs = null;
+    let pendingPingStartedAt = null;
     let currentPresenceUsers = [];
     let chatHoverOpen = false;
     let chatPinnedOpen = false;
@@ -153,9 +167,14 @@
     let lastHeaderPointerY = Number.NaN;
     let drawerHoverOpen = { left: false, right: false };
     let drawerHoverCloseTimers = { left: null, right: null };
+    let latestFocusEventStamp = 0;
     const shellDefaults = {
       header: { pinned: false, opacity: 100 },
       chat: { opacity: 96 },
+    };
+    const cameraDefaults = {
+      minZoom: 0.7,
+      maxZoom: 4,
     };
     const drawerDefaults = {
       left: { mode: "hover", opacity: 96, portraitSize: "medium" },
@@ -183,6 +202,8 @@
     const chatOpacityValue = document.getElementById("chat-opacity-value");
     const leftDrawer = document.getElementById("left-drawer");
     const rightDrawer = document.getElementById("right-drawer");
+    const leftDrawerEdgeTrigger = document.getElementById("left-drawer-edge-trigger");
+    const rightDrawerEdgeTrigger = document.getElementById("right-drawer-edge-trigger");
     const leftSettingsButton = document.getElementById("left-settings-button");
     const rightSettingsButton = document.getElementById("right-settings-button");
     const leftSettingsPanel = document.getElementById("left-settings-panel");
@@ -290,6 +311,54 @@
       return pixiLoadPromise;
     }
 
+    function cameraViewLabel(view = null) {
+      const current = view || stageCamera?.getView?.() || { zoomRelativeToFit: 1 };
+      const zoom = clampNumber((Number(current.zoomRelativeToFit || 1) * 100), 70, 400, 100);
+      return `${Math.round(zoom)}%`;
+    }
+
+    function updateCameraControls(view = null) {
+      if (cameraZoomValue) {
+        cameraZoomValue.textContent = cameraViewLabel(view);
+      }
+      if (cameraZoomOutButton && cameraZoomInButton) {
+        const current = view || stageCamera?.getView?.() || { zoomRelativeToFit: 1 };
+        const zoom = Number(current.zoomRelativeToFit || 1);
+        cameraZoomOutButton.disabled = zoom <= 0.7001;
+        cameraZoomInButton.disabled = zoom >= 3.9999;
+      }
+    }
+
+    function getPlayableBounds() {
+      const size = getStageSize();
+      return computeStagePlayableBounds(size.width, size.height);
+    }
+
+    function currentCameraView() {
+      return stageCamera?.getView?.() || {
+        activeMapId: String(currentVenueMapState?.asset_id || currentVenueMapAssetID || ""),
+        panX: 0,
+        panY: 0,
+        zoomRelativeToFit: 1,
+      };
+    }
+
+    function resetCameraToFit(activeMapId = currentVenueMapState?.asset_id || currentVenueMapAssetID || "") {
+      stageCamera?.setActiveMapId?.(activeMapId, { reset: true });
+      stageCamera?.fit?.(activeMapId);
+      updateCameraControls();
+    }
+
+    function setCameraWorldBounds(bounds) {
+      stageCamera?.setWorldBounds?.(bounds);
+      updateCameraControls();
+    }
+
+    function setCameraPlayableBounds() {
+      stageCamera?.setPlayableBounds?.(getPlayableBounds());
+      updateCameraControls();
+    }
+
     function formatShortId(value) {
       const text = String(value || "").trim();
       if (!text) return "n/a";
@@ -343,7 +412,8 @@
       const position = currentSelection.position || {};
       const frame = String(position.frame || position.anchor_frame || position.coordinate_frame || "").trim().toLowerCase() || "legacy-centered";
       const state = objectState(currentSelection);
-      return `${currentSelection.label || "selection"} · ${currentSelection.kind || "object"} · ${frame} · ${Number(position.x ?? 0)}, ${Number(position.y ?? 0)} · locked ${state.locked ? "yes" : "no"} · nameplate ${state.nameplateVisible ? "visible" : "hidden"} · ${state.visible ? "visible" : "hidden"}`;
+      const pin = cardDisplayMode(currentSelection);
+      return `${currentSelection.label || "selection"} · ${currentSelection.kind || "object"} · ${frame} · ${Number(position.x ?? 0)}, ${Number(position.y ?? 0)} · pin ${pin} · locked ${state.locked ? "yes" : "no"} · nameplate ${state.nameplateVisible ? "visible" : "hidden"} · ${state.visible ? "visible" : "hidden"}`;
     }
 
     function updateSmokeUI() {
@@ -524,7 +594,7 @@
       }
 
       const prefs = uiPreferences?.header || shellDefaults.header;
-      if (prefs.pinned || isHeaderDetailsVisible() || topBar.contains(document.activeElement)) {
+      if (prefs.pinned || isHeaderDetailsVisible()) {
         if (!headerHoverOpen) {
           headerHoverOpen = true;
           updateHeaderPresentation();
@@ -536,8 +606,8 @@
       if (!Number.isFinite(pointerY)) return;
 
       const headerRect = topBar.getBoundingClientRect();
-      const triggerLine = 24;
-      const releaseLine = headerRect.bottom + 10;
+      const triggerLine = 20;
+      const releaseLine = headerRect.bottom + 6;
       const nextOpen = headerHoverOpen ? pointerY <= releaseLine : pointerY <= triggerLine;
 
       if (nextOpen !== headerHoverOpen) {
@@ -546,12 +616,23 @@
       }
     }
 
+    function closeHeaderHoverState() {
+      if (!headerHoverOpen) return;
+      const prefs = uiPreferences?.header || shellDefaults.header;
+      if (prefs.pinned || isHeaderDetailsVisible()) return;
+      headerHoverOpen = false;
+      updateHeaderPresentation();
+    }
+
     function setHeaderPinned(pinned) {
       uiPreferences.header = {
         ...(uiPreferences.header || shellDefaults.header),
         pinned: Boolean(pinned),
       };
       saveUiPreferences();
+      if (!pinned) {
+        closeHeaderHoverState();
+      }
       updateHeaderPresentation();
     }
 
@@ -597,6 +678,24 @@
       applyDrawerState(side);
     }
 
+    function scheduleDrawerHoverClose(side) {
+      if (drawerHoverCloseTimers[side]) {
+        window.clearTimeout(drawerHoverCloseTimers[side]);
+      }
+      drawerHoverCloseTimers[side] = window.setTimeout(() => {
+        drawerHoverCloseTimers[side] = null;
+        const state = side === "left" ? leftDrawer : rightDrawer;
+        if (!state) return;
+        const prefs = uiPreferences?.[side] || drawerDefaults[side];
+        if (prefs.mode !== "hover") return;
+        if (state.matches(":hover") || state.contains(document.activeElement) || isDrawerDetailsVisible(side)) {
+          return;
+        }
+        drawerHoverOpen[side] = false;
+        applyDrawerState(side, false);
+      }, 120);
+    }
+
     function setDrawerHoverState(side, open) {
       if (!uiPreferences) return;
       const prefs = uiPreferences?.[side] || drawerDefaults[side];
@@ -618,17 +717,16 @@
         applyDrawerState(side);
         return;
       }
-      if (drawerHoverCloseTimers[side]) {
-        window.clearTimeout(drawerHoverCloseTimers[side]);
-        drawerHoverCloseTimers[side] = null;
-      }
       if (open) {
+        if (drawerHoverCloseTimers[side]) {
+          window.clearTimeout(drawerHoverCloseTimers[side]);
+          drawerHoverCloseTimers[side] = null;
+        }
         drawerHoverOpen[side] = true;
         applyDrawerState(side, true);
         return;
       }
-      drawerHoverOpen[side] = false;
-      applyDrawerState(side, false);
+      scheduleDrawerHoverClose(side);
     }
 
     function applyDrawerState(side, hoverOverride = null) {
@@ -678,8 +776,6 @@
       const prefs = uiPreferences?.header || shellDefaults.header;
       const open = prefs.pinned
         || headerHoverOpen
-        || topBar.matches(":hover")
-        || topBar.contains(document.activeElement)
         || isHeaderDetailsVisible();
       topBar.dataset.open = open ? "true" : "false";
       topBar.dataset.pinned = prefs.pinned ? "true" : "false";
@@ -992,6 +1088,7 @@
       }
       contextMenuTarget = null;
       stagePlacementCandidate = null;
+      stagePlacementScreenCandidate = null;
     }
 
     function setRecentPlacementMarker(point, label = "") {
@@ -1000,6 +1097,19 @@
         return;
       }
       recentPlacementMarker = {
+        x: Math.round(Number(point.x || 0)),
+        y: Math.round(Number(point.y || 0)),
+        label: String(label || "").trim(),
+        at: Date.now(),
+      };
+    }
+
+    function setRecentFocusMarker(point, label = "") {
+      if (!point) {
+        recentFocusMarker = null;
+        return;
+      }
+      recentFocusMarker = {
         x: Math.round(Number(point.x || 0)),
         y: Math.round(Number(point.y || 0)),
         label: String(label || "").trim(),
@@ -1059,6 +1169,9 @@
       }
       if (state.locked) {
         return "LOCKED";
+      }
+      if (isCardObject(model)) {
+        return cardDisplayMode(model) === "world" ? "MAP" : "SCREEN";
       }
       return "";
     }
@@ -1148,6 +1261,186 @@
       return String(cardFaceState.get(cardKey) || "front").toLowerCase() === "back" ? "back" : "front";
     }
 
+    function cardPinData(model) {
+      const data = model?.source?.data || model?.data || {};
+      const position = model?.position || {};
+      const readNumber = (value) => {
+        if (value === null || value === undefined || value === "") {
+          return Number.NaN;
+        }
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : Number.NaN;
+      };
+      const pinMode = String(data.pin_mode || position.frame || "").trim().toLowerCase();
+      return {
+        mode: pinMode === "world" ? "world" : "overlay",
+        worldX: readNumber(data.world_x),
+        worldY: readNumber(data.world_y),
+        screenX: readNumber(data.screen_x),
+        screenY: readNumber(data.screen_y),
+      };
+    }
+
+    function cardDisplayMode(model) {
+      return cardPinData(model).mode;
+    }
+
+    function stagePointForWorldPoint(point) {
+      if (!point || !stageCamera) return { x: Number(point?.x || 0), y: Number(point?.y || 0) };
+      return stageCamera.worldToScreen?.(point.x, point.y) || { x: Number(point.x || 0), y: Number(point.y || 0) };
+    }
+
+    function worldPointForStagePoint(point) {
+      if (!point || !stageCamera) return { x: Number(point?.x || 0), y: Number(point?.y || 0) };
+      return stageCamera.screenToWorld?.(point.x, point.y) || { x: Number(point.x || 0), y: Number(point.y || 0) };
+    }
+
+    function currentDisplayedPointForModel(model) {
+      const pin = cardPinData(model);
+      const size = getStageSize();
+      if (pin.mode === "world") {
+        if (Number.isFinite(pin.worldX) && Number.isFinite(pin.worldY)) {
+          return stagePointForWorldPoint({ x: pin.worldX, y: pin.worldY });
+        }
+        const fallback = toStagePoint(model, size, { baseY: 0.5, orderOffset: 12 });
+        return stagePointForWorldPoint(fallback);
+      }
+
+      if (Number.isFinite(pin.screenX) && Number.isFinite(pin.screenY)) {
+        const bounds = getPlayableBounds();
+        return {
+          x: bounds.x + (bounds.width * pin.screenX),
+          y: bounds.y + (bounds.height * pin.screenY),
+        };
+      }
+
+      return toStagePoint(model, size, { baseY: model?.kind === "fire" ? 0.6 : 0.5, orderOffset: 12 });
+    }
+
+    function normalizeOverlayPoint(point) {
+      const bounds = getPlayableBounds();
+      const x = Number(point?.x || 0);
+      const y = Number(point?.y || 0);
+      return {
+        screen_x: clampNumber((x - bounds.x) / bounds.width, 0, 1, 0.5),
+        screen_y: clampNumber((y - bounds.y) / bounds.height, 0, 1, 0.5),
+      };
+    }
+
+    function clampOverlayPoint(point) {
+      const bounds = getPlayableBounds();
+      return {
+        x: Math.max(bounds.x, Math.min(bounds.x + bounds.width, Math.round(Number(point?.x || 0)))),
+        y: Math.max(bounds.y, Math.min(bounds.y + bounds.height, Math.round(Number(point?.y || 0)))),
+      };
+    }
+
+    function offsetPoint(point, dx = 24, dy = 16) {
+      return {
+        x: Math.round(Number(point?.x || 0) + Number(dx || 0)),
+        y: Math.round(Number(point?.y || 0) + Number(dy || 0)),
+      };
+    }
+
+    function cardMoveTargetForModel(model, targetPoint) {
+      const pinMode = cardDisplayMode(model);
+      const basePoint = targetPoint || stagePlacementCandidate || lastStagePoint || null;
+      if (!basePoint) {
+        return null;
+      }
+
+      if (pinMode === "world") {
+        return {
+          pinMode,
+          world_x: Math.round(Number(basePoint.x || 0)),
+          world_y: Math.round(Number(basePoint.y || 0)),
+          screen_x: null,
+          screen_y: null,
+        };
+      }
+
+      const overlayPoint = normalizeOverlayPoint(basePoint);
+      return {
+        pinMode,
+        world_x: null,
+        world_y: null,
+        screen_x: overlayPoint.screen_x,
+        screen_y: overlayPoint.screen_y,
+      };
+    }
+
+    function cardDuplicatePlacementForModel(model) {
+      const pinMode = cardDisplayMode(model);
+      const pin = cardPinData(model);
+      const offset = { x: 24, y: 16 };
+
+      if (pinMode === "world") {
+        const baseWorldPoint = Number.isFinite(pin.worldX) && Number.isFinite(pin.worldY)
+          ? { x: pin.worldX, y: pin.worldY }
+          : worldPointForStagePoint(currentDisplayedPointForModel(model));
+        const worldPoint = offsetPoint(baseWorldPoint, offset.x, offset.y);
+        return {
+          pinMode,
+          x: worldPoint.x,
+          y: worldPoint.y,
+          world_x: worldPoint.x,
+          world_y: worldPoint.y,
+          screen_x: null,
+          screen_y: null,
+        };
+      }
+
+      const baseOverlayPoint = currentDisplayedPointForModel(model);
+      const overlayStagePoint = offsetPoint(baseOverlayPoint, offset.x, offset.y);
+      const overlayPoint = normalizeOverlayPoint(overlayStagePoint);
+      return {
+        pinMode,
+        x: overlayStagePoint.x,
+        y: overlayStagePoint.y,
+        world_x: null,
+        world_y: null,
+        screen_x: overlayPoint.screen_x,
+        screen_y: overlayPoint.screen_y,
+      };
+    }
+
+    function updateLocalCardPinModel(matchModel, updater) {
+      return updateLocalObjectModel(matchModel, (model) => {
+        const data = model.source?.data || {};
+        model.source = model.source || {};
+        model.source.data = { ...data };
+        updater(model);
+      });
+    }
+
+    function setLocalPositionOverrideForModel(model, position) {
+      const key = String(model?.elementId || model?.elementSlug || model?.key || "");
+      if (!key || !position) return null;
+      const overridePos = {
+        ...(model?.position || {}),
+        x: Math.round(Number(position.x || 0)),
+        y: Math.round(Number(position.y || 0)),
+        order: Number(model?.position?.order ?? 0),
+        frame: "top-left",
+      };
+      localPositionOverrides.set(key, overridePos);
+      return overridePos;
+    }
+
+    function floatingCardStateForModel(model) {
+      if (!dragState || !model || !updateObjectMatches(dragState.model, model)) {
+        return null;
+      }
+      const point = dragState.floatingPoint || dragState.screenPoint || null;
+      if (!point) {
+        return null;
+      }
+      return {
+        x: Math.round(Number(point.x || 0)),
+        y: Math.round(Number(point.y || 0)),
+      };
+    }
+
     function truncateCardText(text, maxChars = 24) {
       const value = String(text || "").replace(/\s+/g, " ").trim();
       if (!value) return "";
@@ -1165,6 +1458,10 @@
 
     function canToggleLock(model) {
       return isLiveStageObject(model) && canManageIndexCards(currentRole);
+    }
+
+    function canTogglePinState(model) {
+      return isCardObject(model) && model?.live && !objectState(model).locked && canManageIndexCards(currentRole);
     }
 
     function cardEditorDraftFromModel(model) {
@@ -1256,6 +1553,10 @@
         push("flip", cardFaceForModel(objectModel) === "back" ? "Show Front" : "Flip", "face");
       }
 
+      if (kind === "card" && canTogglePinState(objectModel)) {
+        push(cardDisplayMode(objectModel) === "world" ? "unpin" : "pin", cardDisplayMode(objectModel) === "world" ? "Pin to Screen" : "Attach to Map", "pin");
+      }
+
       if (canMoveLiveStageObject(objectModel)) {
         push("move-here", "Move here", "move", { requiresPoint: true });
       }
@@ -1269,7 +1570,7 @@
       }
 
       if (kind === "card" && canDuplicateLiveStageObject(objectModel)) {
-        push("duplicate", "Duplicate on stage", "duplicate", { requiresPoint: true });
+        push("duplicate", "Duplicate Card", "duplicate");
       }
 
       if ((kind === "card" || kind === "prop" || kind === "fire") && canRemoveLiveStageObject(objectModel)) {
@@ -1522,8 +1823,13 @@
           syncMapEditorPreview(asset.content_url);
           syncMapAssetList();
           if (mapEditorStatus) {
-            mapEditorStatus.textContent = `Selected ${asset.original_filename || asset.asset_id}.`;
+            mapEditorStatus.textContent = `Selected ${asset.original_filename || asset.asset_id}. Saving to activate it...`;
           }
+          void saveVenueMap().catch((error) => {
+            console.warn("map asset selection save failed", error);
+            setMapEditorStatus(error.message || String(error));
+            setStageStatus(error.message || String(error));
+          });
         });
         mapEditorAssets.appendChild(button);
       });
@@ -1655,6 +1961,7 @@
 
     async function refreshVenueMapState() {
       try {
+        const previousAssetID = String(currentVenueMapState?.asset_id || currentVenueMapAssetID || "");
         const response = await fetch("/api/venues/first-theater/map", {
           credentials: "include",
           cache: "no-store",
@@ -1665,6 +1972,9 @@
         }
         currentVenueMapState = payload.data || null;
         currentVenueMapAssetID = String(currentVenueMapState?.asset_id || "");
+        if (stageCamera && previousAssetID !== currentVenueMapAssetID) {
+          resetCameraToFit(currentVenueMapAssetID);
+        }
         if (currentVenueMapState?.asset?.content_url) {
           syncMapEditorPreview(currentVenueMapState.asset.content_url);
         }
@@ -1677,6 +1987,7 @@
         console.warn("refreshVenueMapState failed", error);
         currentVenueMapState = null;
         currentVenueMapAssetID = "";
+        resetCameraToFit("");
         renderPixiScene();
       }
     }
@@ -1736,9 +2047,13 @@
       if (!response.ok || !result?.ok) {
         throw new Error(result?.error || `HTTP ${response.status}`);
       }
+      const previousAssetID = String(currentVenueMapState?.asset_id || "");
       currentVenueMapState = result.data || null;
       currentVenueMapAssetID = String(currentVenueMapState?.asset_id || assetID);
       mapEditorOriginalState = currentVenueMapState ? { ...currentVenueMapState } : null;
+      if (previousAssetID !== currentVenueMapAssetID) {
+        resetCameraToFit(currentVenueMapAssetID);
+      }
       renderPixiScene();
       setStageStatus("First Theater map updated.");
       hideMapEditor();
@@ -1765,6 +2080,7 @@
       currentVenueMapState = null;
       currentVenueMapAssetID = "";
       mapEditorOriginalState = null;
+      resetCameraToFit("");
       void ensureVenueMapTexture();
       renderPixiScene();
       setStageStatus("First Theater map removed.");
@@ -1838,8 +2154,7 @@
     function liveSyncGrid() {
       currentVenueGridConfig = gridEditorDraftFromUI();
       syncGridEditorHexFieldVisibility();
-      const size = getStageSize();
-      renderVenueGridLayer(Math.max(320, size.width), Math.max(320, size.height));
+      renderVenueGridLayer(currentVenueMapBounds || getPlayableBounds());
     }
 
     function nudgeGridNumberField(inputEl, delta, min, max) {
@@ -1881,8 +2196,7 @@
     function cancelGridEditor() {
       if (gridEditorOriginalState) {
         currentVenueGridConfig = gridEditorOriginalState;
-        const size = getStageSize();
-        renderVenueGridLayer(Math.max(320, size.width), Math.max(320, size.height));
+        renderVenueGridLayer(currentVenueMapBounds || getPlayableBounds());
       }
       hideGridEditor();
     }
@@ -1892,8 +2206,7 @@
       currentVenueGridConfig = defaultGridConfig();
       gridEditorDirty = true;
       syncGridEditorWithState();
-      const size = getStageSize();
-      renderVenueGridLayer(Math.max(320, size.width), Math.max(320, size.height));
+      renderVenueGridLayer(currentVenueMapBounds || getPlayableBounds());
       setGridEditorStatus("Grid reset to defaults. Save to persist.");
     }
 
@@ -1903,8 +2216,7 @@
       currentVenueGridConfig = draft;
       gridEditorDirty = true;
       syncGridEditorVisibilityButton();
-      const size = getStageSize();
-      renderVenueGridLayer(Math.max(320, size.width), Math.max(320, size.height));
+      renderVenueGridLayer(currentVenueMapBounds || getPlayableBounds());
       setGridEditorStatus(draft.visible ? "Grid will be shown after save." : "Grid will be hidden after save.");
     }
 
@@ -2008,10 +2320,10 @@
       };
     }
 
-    function renderVenueGridLayer(width, height) {
+    function renderVenueGridLayer(bounds) {
       if (!gridLayer || !window.PIXI) return;
-      const bounds = computeStagePlayableBounds(width, height);
-      window.VictoryPixiGrid?.render?.(gridLayer, currentVenueGridConfig, bounds);
+      const resolvedBounds = bounds || getPlayableBounds();
+      window.VictoryPixiGrid?.render?.(gridLayer, currentVenueGridConfig, resolvedBounds);
     }
 
     function renderVenueMapLayer(width, height) {
@@ -2020,12 +2332,12 @@
       mapLayer.mask = null;
       const state = currentVenueMapState;
       if (!state || !state.asset || !String(state.asset.content_url || "").trim()) {
-        return;
+        return computeStagePlayableBounds(width, height);
       }
 
       if (!venueMapTexture || venueMapTextureURL !== state.asset.content_url) {
         if (venueMapTextureFailedURL === state.asset.content_url) {
-          return;
+          return computeStagePlayableBounds(width, height);
         }
         ensureVenueMapTexture().then((texture) => {
           if (!texture) return;
@@ -2033,7 +2345,7 @@
             renderPixiScene();
           }
         });
-        return;
+        return computeStagePlayableBounds(width, height);
       }
 
       const displayMode = String(state.display_mode || "theater").trim() === "fullscreen" ? "fullscreen" : "theater";
@@ -2074,6 +2386,15 @@
         border.drawRoundedRect(boundsX, boundsY, boundsWidth, boundsHeight, 12);
         mapLayer.addChild(border);
       }
+
+      const renderedWidth = Number(sprite.width || boundsWidth);
+      const renderedHeight = Number(sprite.height || boundsHeight);
+      return {
+        x: Number(sprite.x || boundsX) - (renderedWidth / 2),
+        y: Number(sprite.y || boundsY) - (renderedHeight / 2),
+        width: renderedWidth,
+        height: renderedHeight,
+      };
     }
 
     function currentLiveSelection() {
@@ -2206,31 +2527,44 @@
       return stagePointFromClient(clientPoint.clientX, clientPoint.clientY);
     }
 
-    function stagePointFromClient(clientX, clientY) {
+    function stageScreenPointFromClient(clientX, clientY) {
       const rect = stageHost?.getBoundingClientRect();
-      const point = {
+      return {
         x: rect ? Number(clientX || 0) - rect.left : Number(clientX || 0),
         y: rect ? Number(clientY || 0) - rect.top : Number(clientY || 0),
       };
-      const size = getStageSize();
+    }
 
+    function stagePointFromClient(clientX, clientY) {
+      const point = stageScreenPointFromClient(clientX, clientY);
+      if (stageCamera) {
+        const worldPoint = stageCamera.screenToWorld?.(point.x, point.y);
+        if (worldPoint) {
+          return {
+            x: Math.round(worldPoint.x),
+            y: Math.round(worldPoint.y),
+          };
+        }
+      }
+      const size = getStageSize();
       return {
         x: Math.max(0, Math.min(Math.round(size.width), Math.round(point.x))),
         y: Math.max(0, Math.min(Math.round(size.height), Math.round(point.y))),
       };
     }
 
-    function hitTestContextMenuTarget(stagePoint) {
+    function hitTestContextMenuTarget(screenPoint, worldPoint) {
       for (let index = currentObjects.length - 1; index >= 0; index -= 1) {
         const model = currentObjects[index];
         const node = currentNodeMap.get(model.key);
         const bounds = node?.container?.getBounds?.();
-        if (bounds?.contains?.(stagePoint.x, stagePoint.y)) {
+        const point = screenPoint;
+        if (bounds?.contains?.(point.x, point.y)) {
           return model;
         }
 
         const localPoint = node?.container?.toLocal && window.PIXI
-          ? node.container.toLocal(new PIXI.Point(stagePoint.x, stagePoint.y))
+          ? node.container.toLocal(new PIXI.Point(point.x, point.y))
           : null;
         if (!localPoint) {
           continue;
@@ -2253,9 +2587,10 @@
     }
 
     function resolveContextMenuTargetFromClient(clientX, clientY) {
+      const screenPoint = stageScreenPointFromClient(clientX, clientY);
       const stagePoint = stagePointFromClient(clientX, clientY);
-      const objectModel = hitTestContextMenuTarget(stagePoint) || stageContextMenuModel();
-      return { objectModel, stagePoint };
+      const objectModel = hitTestContextMenuTarget(screenPoint, stagePoint) || stageContextMenuModel();
+      return { objectModel, stagePoint, screenPoint };
     }
 
     function eventClientPoint(event) {
@@ -2316,6 +2651,9 @@
       if (!event) return;
       const target = event.target;
       const composedPath = typeof event.composedPath === "function" ? event.composedPath() : [];
+      if (cameraControls?.contains?.(target)) {
+        return;
+      }
       const isStageEvent = target === stageHost || target === stageShell || stageShell?.contains?.(target) || stageHost?.contains?.(target) || composedPath.includes(stageHost) || composedPath.includes(stageShell) || composedPath.includes(pixiApp?.view);
       if (!isStageEvent) return;
       if (event.type !== "contextmenu" && !isSecondaryPointerEvent(event)) {
@@ -2382,6 +2720,66 @@
           renderPixiScene();
         }
         setStageStatus(`${objectModel.label} flipped to ${nextFace}.`);
+        closeContextMenu();
+        return;
+      }
+
+      if (action === "pin" || action === "unpin") {
+        if (state.locked) {
+          setStageStatus(`${objectModel.label} is locked.`);
+          closeContextMenu();
+          return;
+        }
+        const currentPoint = currentDisplayedPointForModel(objectModel);
+        const pinMode = action === "pin" ? "world" : "overlay";
+        const worldPoint = pinMode === "world"
+          ? worldPointForStagePoint(currentPoint)
+          : null;
+        const overlayPoint = pinMode === "overlay" ? normalizeOverlayPoint(currentPoint) : null;
+        const payload = {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+          front_text: objectModel.frontText || "",
+          back_text: objectModel.backText || "",
+          color: objectModel.color || "#d9c7a6",
+          pin_mode: pinMode,
+        };
+        if (pinMode === "world") {
+          payload.world_x = worldPoint.x;
+          payload.world_y = worldPoint.y;
+          payload.screen_x = null;
+          payload.screen_y = null;
+        } else {
+          payload.world_x = null;
+          payload.world_y = null;
+          payload.screen_x = overlayPoint.screen_x;
+          payload.screen_y = overlayPoint.screen_y;
+        }
+        const sent = sendAction("update/index_card", payload);
+        const placementSent = sendAction("act/place_element", {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+          venue_slug: "the-cave",
+          layer: "stage",
+          x: currentPoint.x,
+          y: currentPoint.y,
+          order: Number(objectModel.position?.order ?? 0),
+        });
+        if (sent) {
+          updateLocalCardPinModel(objectModel, (model) => {
+            model.source.data = {
+              ...(model.source.data || {}),
+              pin_mode: pinMode,
+              world_x: pinMode === "world" ? worldPoint.x : null,
+              world_y: pinMode === "world" ? worldPoint.y : null,
+              screen_x: pinMode === "overlay" ? overlayPoint.screen_x : null,
+              screen_y: pinMode === "overlay" ? overlayPoint.screen_y : null,
+            };
+            model.position = setLocalPositionOverrideForModel(model, currentPoint) || model.position;
+          });
+        }
+        setStageStatus(sent && placementSent ? `${action === "pin" ? "Attached" : "Pinned"} ${objectModel.label}.` : "Socket unavailable.");
+        setMovementReport(sent && placementSent ? `${action === "pin" ? "Attached" : "Pinned"} ${objectModel.label}.` : "Socket unavailable.");
         closeContextMenu();
         return;
       }
@@ -2475,7 +2873,25 @@
           setStageStatus("Move here needs a stage point.");
           return;
         }
-        const sent = sendAction("act/place_element", {
+        const moveTarget = cardMoveTargetForModel(objectModel, point);
+        if (!moveTarget) {
+          setStageStatus("Move here needs a stage point.");
+          closeContextMenu();
+          return;
+        }
+        const sent = sendAction("update/index_card", {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+          front_text: objectModel.frontText || "",
+          back_text: objectModel.backText || "",
+          color: objectModel.color || "#d9c7a6",
+          pin_mode: moveTarget.pinMode,
+          world_x: moveTarget.world_x,
+          world_y: moveTarget.world_y,
+          screen_x: moveTarget.screen_x,
+          screen_y: moveTarget.screen_y,
+        });
+        const placementSent = sendAction("act/place_element", {
           element_id: objectModel.elementId || "",
           element_slug: objectModel.elementSlug || "",
           venue_slug: "the-cave",
@@ -2485,40 +2901,51 @@
           order: Number(objectModel.position?.order ?? 0),
         });
         if (sent) {
-          updateLocalObjectModel(objectModel, (model) => {
-            model.position = {
-              ...(model.position || {}),
-              anchor: "stage",
-              x: point.x,
-              y: point.y,
-              z: 0,
-              order: Number(objectModel.position?.order ?? 0),
-              frame: "top-left",
+          updateLocalCardPinModel(objectModel, (model) => {
+            model.source.data = {
+              ...(model.source.data || {}),
+              pin_mode: moveTarget.pinMode,
+              world_x: moveTarget.world_x,
+              world_y: moveTarget.world_y,
+              screen_x: moveTarget.screen_x,
+              screen_y: moveTarget.screen_y,
             };
+            model.position = setLocalPositionOverrideForModel(model, point) || model.position;
           });
         }
-        setMovementLine(sent ? `Move sent to x ${point.x}, y ${point.y}.` : "Socket unavailable.");
-        setStageStatus(sent ? `Moving ${objectModel.label} to x ${point.x}, y ${point.y}.` : "Socket unavailable.");
+        const moveLabel = moveTarget.pinMode === "world"
+          ? `world x ${moveTarget.world_x}, y ${moveTarget.world_y}`
+          : `overlay x ${moveTarget.screen_x}, y ${moveTarget.screen_y}`;
+        setMovementLine(sent && placementSent ? `Move sent for ${objectModel.label} to ${moveLabel}.` : "Socket unavailable.");
+        setStageStatus(sent && placementSent ? `Moving ${objectModel.label} to ${moveLabel}.` : "Socket unavailable.");
         closeContextMenu();
         return;
       }
 
       if (action === "duplicate") {
-        if (!point) {
-          setStageStatus("Duplicate on stage needs a stage point.");
-          return;
-        }
+        const duplicatePlacement = cardDuplicatePlacementForModel(objectModel);
         const sent = sendAction("act/duplicate_element", {
           element_id: objectModel.elementId || "",
           element_slug: objectModel.elementSlug || "",
           venue_slug: "the-cave",
           layer: "stage",
-          x: point.x,
-          y: point.y,
+          x: duplicatePlacement.x,
+          y: duplicatePlacement.y,
           order: Number(objectModel.position?.order ?? 0),
+          pin_mode: duplicatePlacement.pinMode,
+          world_x: duplicatePlacement.world_x,
+          world_y: duplicatePlacement.world_y,
+          screen_x: duplicatePlacement.screen_x,
+          screen_y: duplicatePlacement.screen_y,
         });
-        setMovementLine(sent ? `Duplicate sent to x ${point.x}, y ${point.y}.` : "Socket unavailable.");
-        setStageStatus(sent ? `Duplicating ${objectModel.label} to x ${point.x}, y ${point.y}.` : "Socket unavailable.");
+        const duplicateLabel = duplicatePlacement.pinMode === "world"
+          ? `world x ${duplicatePlacement.world_x}, y ${duplicatePlacement.world_y}`
+          : `overlay x ${duplicatePlacement.screen_x}, y ${duplicatePlacement.screen_y}`;
+        setMovementLine(sent ? `Duplicate sent for ${objectModel.label} to ${duplicateLabel}.` : "Socket unavailable.");
+        setStageStatus(sent ? `Duplicating ${objectModel.label} to ${duplicateLabel}.` : "Socket unavailable.");
+        if (sent) {
+          setLocalPositionOverrideForModel(objectModel, { x: duplicatePlacement.x, y: duplicatePlacement.y });
+        }
         closeContextMenu();
         return;
       }
@@ -2589,8 +3016,10 @@
       contextMenuTarget = objectModel;
       const clientPoint = eventClientPoint(event);
       const stagePoint = stagePlacementFromEvent(event);
+      const screenPoint = stageScreenPointFromClient(clientPoint.clientX, clientPoint.clientY);
       if (objectModel.kind === "stage" || objectModel.kind === "fire" || (objectModel.live && isLiveStageObject(objectModel))) {
         stagePlacementCandidate = stagePoint;
+        stagePlacementScreenCandidate = screenPoint;
         if (stagePlacementCandidate) {
           updatePointerReadout(clientPoint.clientX || 0, clientPoint.clientY || 0, stagePlacementCandidate, `${objectModel.kind === "fire" ? "Fire" : "Stage"} menu`);
         }
@@ -2667,6 +3096,8 @@
       ];
 
       if (model.kind === "card") {
+        const pin = cardDisplayMode(model);
+        lines.push(`Pin: ${pin}`);
         lines.push(`Front: ${model.frontText || "(blank)"}`);
         lines.push(`Back: ${model.backText || "(blank)"}`);
         lines.push(`Color: ${model.color || "#d9c7a6"}`);
@@ -2767,8 +3198,14 @@
 
     function clearSceneNodes() {
       currentNodeMap = new Map();
-      if (objectLayer) {
-        objectLayer.removeChildren();
+      if (pinnedObjectLayer) {
+        pinnedObjectLayer.removeChildren();
+      }
+      if (overlayObjectLayer) {
+        overlayObjectLayer.removeChildren();
+      }
+      if (floatingObjectLayer) {
+        floatingObjectLayer.removeChildren();
       }
       if (facadeLayer) {
         facadeLayer.removeChildren();
@@ -2917,15 +3354,26 @@
             setMovementReport("Locked objects cannot be dragged.");
             return;
           }
-          const local = event.data.getLocalPosition(sceneRoot);
+          const clientPoint = eventClientPoint(event);
+          const screenPoint = stageScreenPointFromClient(clientPoint.clientX, clientPoint.clientY);
+          const space = cardDisplayMode(model) === "world" ? "world" : "screen";
+          const renderedPoint = { x: container.x, y: container.y };
+          const floatingPoint = {
+            x: Math.round(Number(screenPoint.x || 0)),
+            y: Math.round(Number(screenPoint.y || 0)),
+          };
           dragState = {
             node: container,
             model,
-            offsetX: local.x - container.x,
-            offsetY: local.y - container.y,
+            space,
+            originalPinMode: space,
+            originalData: { ...(model.source?.data || {}) },
+            floatingPoint,
+            offsetX: floatingPoint.x - renderedPoint.x,
+            offsetY: floatingPoint.y - renderedPoint.y,
           };
           setMovementReport("Dragging live object...");
-          setStageStatus("Release to try act/place_element.");
+          setStageStatus("Release to update the card.");
         }
       });
 
@@ -3037,8 +3485,9 @@
         return;
       }
 
-      pendingStageCardPlacement = stagePlacementCandidate;
+      pendingStageCardPlacement = stagePlacementScreenCandidate || null;
       stagePlacementCandidate = null;
+      stagePlacementScreenCandidate = null;
       const placementLabel = `x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}`;
       const queued = !!(ws && ws.readyState === WebSocket.CONNECTING && currentSessionId);
 
@@ -3054,7 +3503,7 @@
         return;
       }
 
-      setStageStatus(queued ? `Index card queued. Placing at ${placementLabel} when the connection opens...` : `Index card created. Placing at ${placementLabel}...`);
+      setStageStatus(queued ? `Index card queued. Attaching to screen at ${placementLabel} when the connection opens...` : `Index card created. Attaching to screen at ${placementLabel}...`);
       setMovementReport(queued ? `Queued placement at ${placementLabel}.` : `Awaiting placement at ${placementLabel}.`);
       if (smokeMode) {
         setSmokeLine(queued ? `Create queued for ${placementLabel}.` : `Create sent for ${placementLabel}.`);
@@ -3101,10 +3550,37 @@
           frame: "top-left",
         },
       }, `Index card created at x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}.`);
+      const createdCardModel = {
+        elementId,
+        elementSlug,
+        key: `live:${elementId || elementSlug}`,
+      };
+      createdCardModel.position = setLocalPositionOverrideForModel(createdCardModel, pendingStageCardPlacement) || createdCardModel.position;
       if (smokeMode) {
         setRecentPlacementMarker(pendingStageCardPlacement, createdCard?.name || createdCard?.data?.front_text || "Index card");
       } else {
         setRecentPlacementMarker(null);
+      }
+
+      const normalizedPlacement = normalizeOverlayPoint(pendingStageCardPlacement);
+      const updated = sendAction("update/index_card", {
+        element_id: elementId,
+        element_slug: elementSlug,
+        front_text: createdCard?.data?.front_text || createdCard?.name || "New Index Card",
+        back_text: String(createdCard?.data?.back_text || ""),
+        color: String(createdCard?.data?.color || "#d9c7a6"),
+        pin_mode: "overlay",
+        screen_x: normalizedPlacement.screen_x,
+        screen_y: normalizedPlacement.screen_y,
+        world_x: null,
+        world_y: null,
+      });
+
+      if (!updated) {
+        setStageStatus(`Card created but the screen attachment could not be sent from x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}.`);
+        pendingStageCardPlacement = null;
+        closeContextMenu();
+        return;
       }
 
       const ok = sendAction("act/place_element", {
@@ -3118,10 +3594,12 @@
       });
 
       if (!ok) {
-        setStageStatus(`Card created but the placement could not be sent from x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}.`);
+        setStageStatus(`Card created but the stage placement could not be sent from x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}.`);
         if (smokeMode) {
           setSmokeLine(`Create succeeded, placement failed at ${pendingStageCardPlacement.x}, ${pendingStageCardPlacement.y}.`);
         }
+        pendingStageCardPlacement = null;
+        closeContextMenu();
         return;
       }
 
@@ -3134,13 +3612,14 @@
     }
 
     function renderPixiScene() {
-      if (!pixiApp || !sceneRoot || !backgroundLayer || !objectLayer) return;
+      if (!pixiApp || !sceneRoot || !backgroundLayer || !worldLayer || !mapLayer || !overlayObjectLayer) return;
 
       clearSceneNodes();
 
       const size = getStageSize();
       const width = Math.max(320, size.width);
       const height = Math.max(320, size.height);
+      const playableBounds = computeStagePlayableBounds(width, height);
       backgroundLayer.removeChildren();
 
       const atmosphere = new PIXI.Graphics();
@@ -3237,8 +3716,19 @@
         facadeLayer.addChild(stageLip);
       }
 
-      renderVenueMapLayer(width, height);
-      renderVenueGridLayer(width, height);
+      const worldBounds = renderVenueMapLayer(width, height) || playableBounds;
+      currentVenueMapBounds = worldBounds || playableBounds;
+      renderVenueGridLayer(currentVenueMapBounds);
+
+      if (stageCamera) {
+        stageCamera.setPlayableBounds?.(playableBounds);
+        stageCamera.setWorldBounds?.(worldBounds);
+        const activeMapId = String(currentVenueMapState?.asset_id || currentVenueMapAssetID || "");
+        if (activeMapId && String(stageCamera.getView?.().activeMapId || "") !== activeMapId) {
+          stageCamera.setActiveMapId?.(activeMapId, { reset: false });
+        }
+        updateCameraControls(stageCamera.getView?.());
+      }
 
       if (smokeGridEnabled) {
         const grid = new PIXI.Graphics();
@@ -3293,7 +3783,31 @@
         });
         const markerLabel = new PIXI.Text(recentPlacementMarker.label ? `${recentPlacementMarker.label} @ ${recentPlacementMarker.x}, ${recentPlacementMarker.y}` : `${recentPlacementMarker.x}, ${recentPlacementMarker.y}`, markerLabelStyle);
         markerLabel.position.set(recentPlacementMarker.x + 18, recentPlacementMarker.y - 28);
-        backgroundLayer.addChild(marker, markerLabel);
+        pinnedObjectLayer.addChild(marker, markerLabel);
+      }
+
+      if (recentFocusMarker && Date.now() - recentFocusMarker.at < 15000) {
+        const marker = new PIXI.Graphics();
+        marker.lineStyle(2, 0x7fd7ff, 0.95);
+        marker.drawCircle(0, 0, 18);
+        marker.moveTo(-24, 0);
+        marker.lineTo(24, 0);
+        marker.moveTo(0, -24);
+        marker.lineTo(0, 24);
+        marker.beginFill(0x7fd7ff, 0.14);
+        marker.drawCircle(0, 0, 30);
+        marker.endFill();
+        marker.position.set(recentFocusMarker.x, recentFocusMarker.y);
+
+        const markerLabelStyle = new PIXI.TextStyle({
+          fontFamily: "Arial",
+          fontSize: 11,
+          fontWeight: "700",
+          fill: 0x7fd7ff,
+        });
+        const markerLabel = new PIXI.Text(recentFocusMarker.label ? `${recentFocusMarker.label} @ ${recentFocusMarker.x}, ${recentFocusMarker.y}` : `${recentFocusMarker.x}, ${recentFocusMarker.y}`, markerLabelStyle);
+        markerLabel.position.set(recentFocusMarker.x + 18, recentFocusMarker.y - 34);
+        pinnedObjectLayer.addChild(marker, markerLabel);
       }
 
       let liveCount = 0;
@@ -3307,10 +3821,24 @@
           node = makePlaceholderNode(model);
         }
 
-        const pos = toStagePoint(model, { width, height }, { baseY: model.kind === "fire" ? 0.6 : 0.5, orderOffset: 12 });
-        node.container.position.set(pos.x, pos.y);
-        node.container.zIndex = 10 + index;
-        objectLayer.addChild(node.container);
+        const floatingPoint = floatingCardStateForModel(model);
+        if (floatingPoint && floatingObjectLayer) {
+          node.container.position.set(floatingPoint.x, floatingPoint.y);
+          node.container.zIndex = 100 + index;
+          floatingObjectLayer.addChild(node.container);
+          if (dragState && updateObjectMatches(dragState.model, model)) {
+            dragState.node = node.container;
+          }
+        } else {
+          const pin = cardPinData(model);
+          const isWorldObject = model.kind === "fire" || pin.mode === "world";
+          const displayedPoint = currentDisplayedPointForModel(model);
+          const position = isWorldObject ? worldPointForStagePoint(displayedPoint) : displayedPoint;
+          node.container.position.set(position.x, position.y);
+          node.container.zIndex = 10 + index;
+          const targetLayer = isWorldObject ? pinnedObjectLayer : overlayObjectLayer;
+          targetLayer.addChild(node.container);
+        }
         currentNodeMap.set(model.key, node);
         node.updateSelected(currentSelection?.key === model.key);
 
@@ -3386,20 +3914,43 @@
       });
       backgroundLayer = new PIXI.Container();
       backgroundLayer.zIndex = 0;
+      worldLayer = new PIXI.Container();
+      worldLayer.zIndex = 5;
       mapLayer = new PIXI.Container();
-      mapLayer.zIndex = 5;
+      mapLayer.zIndex = 0;
       gridLayer = new PIXI.Container();
-      gridLayer.zIndex = 6;
+      gridLayer.zIndex = 1;
+      pinnedObjectLayer = new PIXI.Container();
+      pinnedObjectLayer.zIndex = 2;
       facadeLayer = new PIXI.Container();
       facadeLayer.zIndex = 8;
-      objectLayer = new PIXI.Container();
-      objectLayer.zIndex = 10;
+      overlayObjectLayer = new PIXI.Container();
+      overlayObjectLayer.zIndex = 10;
+      floatingObjectLayer = new PIXI.Container();
+      floatingObjectLayer.zIndex = 15;
       uiLayer = new PIXI.Container();
       uiLayer.zIndex = 20;
       pixiApp.stage.addChild(sceneRoot);
-      sceneRoot.addChild(backgroundLayer, mapLayer, gridLayer, facadeLayer, objectLayer, uiLayer);
+      worldLayer.addChild(mapLayer, gridLayer, pinnedObjectLayer);
+      sceneRoot.addChild(backgroundLayer, worldLayer, facadeLayer, overlayObjectLayer, floatingObjectLayer, uiLayer);
+
+      stageCamera = window.VictoryStageCamera?.mount?.({
+        stageElement: stageHost,
+        worldLayer,
+        venueSlug: "first-theater",
+        userScope: String(currentIdentity?.user_id || currentIdentity?.handle || currentIdentity?.display_name || "browser"),
+        minZoom: cameraDefaults.minZoom,
+        maxZoom: cameraDefaults.maxZoom,
+        getPlayableBounds,
+        worldBounds: getPlayableBounds(),
+        onChange(view) {
+          updateCameraControls(view);
+        },
+      }) || null;
+      updateCameraControls(stageCamera?.getView?.());
 
       stageHost.addEventListener("pointermove", (event) => {
+        const screenPoint = stageScreenPointFromClient(event.clientX, event.clientY);
         const point = stagePointFromClient(event.clientX, event.clientY);
         const stageX = Math.round(point.x);
         const stageY = Math.round(point.y);
@@ -3411,14 +3962,18 @@
           syncSelectedActions();
         }
         if (!dragState || !dragState.node) return;
-        dragState.node.position.set(point.x - dragState.offsetX, point.y - dragState.offsetY);
-        const dropX = Math.round(point.x - dragState.offsetX);
-        const dropY = Math.round(point.y - dragState.offsetY);
+        dragState.floatingPoint = {
+          x: Math.round(Number(screenPoint.x || 0)) - dragState.offsetX,
+          y: Math.round(Number(screenPoint.y || 0)) - dragState.offsetY,
+        };
+        dragState.node.position.set(dragState.floatingPoint.x, dragState.floatingPoint.y);
+        const dropX = Math.round(dragState.floatingPoint.x);
+        const dropY = Math.round(dragState.floatingPoint.y);
         setMovementReport(`Dragging to x ${dropX}, y ${dropY}`);
       });
 
       window.addEventListener("pointerup", finishDrag, true);
-      window.addEventListener("pointercancel", finishDrag, true);
+      window.addEventListener("pointercancel", cancelDrag, true);
       cardEditorHeader?.addEventListener("pointerdown", beginCardEditorDrag);
       window.addEventListener("pointermove", moveCardEditorDrag, true);
       window.addEventListener("pointerup", endCardEditorDrag, true);
@@ -3452,14 +4007,69 @@
     function finishDrag(event) {
       if (!dragState) return;
 
-      const { model, node } = dragState;
+      const { model, node, space } = dragState;
       dragState = null;
 
-      const stagePoint = toStageCoordinates(node.x, node.y);
-      setMovementReport(`Dropped at x ${stagePoint.x}, y ${stagePoint.y}`);
+      const screenPoint = toStageCoordinates(node.x, node.y);
+      const worldPoint = space === "world" && stageCamera?.screenToWorld
+        ? stageCamera.screenToWorld(screenPoint.x, screenPoint.y)
+        : null;
+      const stagePoint = worldPoint
+        ? toStageCoordinates(worldPoint.x, worldPoint.y)
+        : screenPoint;
+      setMovementReport(`Dropped at x ${screenPoint.x}, y ${screenPoint.y}`);
 
       if (!model.live) {
         setStageStatus("Non-live object moved only in Pixi.");
+        return;
+      }
+
+      if (isCardObject(model)) {
+        const pinMode = space === "world" ? "world" : "overlay";
+        const payload = {
+          element_id: model.elementId || "",
+          element_slug: model.elementSlug || "",
+          front_text: model.frontText || "",
+          back_text: model.backText || "",
+          color: model.color || "#d9c7a6",
+          pin_mode: pinMode,
+        };
+        if (pinMode === "world") {
+          payload.world_x = stagePoint.x;
+          payload.world_y = stagePoint.y;
+        } else {
+          const normalized = normalizeOverlayPoint(screenPoint);
+          payload.screen_x = normalized.screen_x;
+          payload.screen_y = normalized.screen_y;
+        }
+
+        const sent = sendAction("update/index_card", payload);
+        const placementSent = sendAction("act/place_element", {
+          element_id: model.elementId || "",
+          element_slug: model.elementSlug || "",
+          venue_slug: "the-cave",
+          layer: "stage",
+          x: stagePoint.x,
+          y: stagePoint.y,
+          order: Number(model.position?.order ?? 0),
+        });
+        if (sent) {
+          updateLocalCardPinModel(model, (m) => {
+            m.source.data = {
+              ...(m.source.data || {}),
+              pin_mode: pinMode,
+              world_x: pinMode === "world" ? stagePoint.x : null,
+              world_y: pinMode === "world" ? stagePoint.y : null,
+              screen_x: pinMode === "overlay" ? normalizeOverlayPoint(screenPoint).screen_x : null,
+              screen_y: pinMode === "overlay" ? normalizeOverlayPoint(screenPoint).screen_y : null,
+            };
+            m.position = setLocalPositionOverrideForModel(m, stagePoint) || m.position;
+          });
+        }
+        setStageStatus(sent && placementSent ? `${model.label} updated.` : "Move could not be sent. Socket unavailable.");
+        if (smokeMode) {
+          setSmokeLine(sent && placementSent ? `Drop sent at ${screenPoint.x}, ${screenPoint.y}.` : `Drop failed at ${screenPoint.x}, ${screenPoint.y}.`);
+        }
         return;
       }
 
@@ -3491,14 +4101,32 @@
       if (sent) {
         setStageStatus("Move sent through act/place_element.");
         if (smokeMode) {
-          setSmokeLine(`Drop sent at ${stagePoint.x}, ${stagePoint.y}.`);
+          setSmokeLine(`Drop sent at ${screenPoint.x}, ${screenPoint.y}.`);
         }
       } else {
         setStageStatus("Move could not be sent. Socket unavailable.");
         if (smokeMode) {
-          setSmokeLine(`Drop failed at ${stagePoint.x}, ${stagePoint.y}.`);
+          setSmokeLine(`Drop failed at ${screenPoint.x}, ${screenPoint.y}.`);
         }
       }
+    }
+
+    function cancelDrag() {
+      if (!dragState) return;
+      const { model, originalPinMode, originalData } = dragState;
+      dragState = null;
+      if (model?.live && isCardObject(model) && originalData) {
+        updateLocalCardPinModel(model, (m) => {
+          m.source.data = {
+            ...(originalData || {}),
+            pin_mode: originalPinMode === "world" ? "world" : "overlay",
+          };
+        });
+      } else {
+        renderPixiScene();
+      }
+      setMovementReport("Drag cancelled.");
+      setStageStatus("Drag cancelled.");
     }
 
     function beginCardEditorDrag(event) {
@@ -3646,6 +4274,77 @@
         ...extra,
       }));
       return true;
+    }
+
+    function buildFocusPingPayload() {
+      const view = stageCamera?.getView?.() || {};
+      const size = getStageSize();
+      const centerWorld = stageCamera?.screenToWorld?.(size.width / 2, size.height / 2) || { x: 0, y: 0 };
+      const focusWorld = lastStagePoint || centerWorld;
+      return {
+        venue_slug: "the-cave",
+        focus_x: Math.round(Number(focusWorld.x || 0)),
+        focus_y: Math.round(Number(focusWorld.y || 0)),
+        camera_center_x: Math.round(Number(centerWorld.x || 0)),
+        camera_center_y: Math.round(Number(centerWorld.y || 0)),
+        camera_pan_x: Number(view.panX || 0),
+        camera_pan_y: Number(view.panY || 0),
+        camera_zoom_relative_to_fit: Number(view.zoomRelativeToFit || 1),
+        event_id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      };
+    }
+
+    function sendPing() {
+      if (!canSendStageAction() && !(ws && ws.readyState === WebSocket.CONNECTING && currentSessionId)) {
+        return false;
+      }
+      pendingPingStartedAt = performance.now();
+      return sendAction("ping");
+    }
+
+    function sendFocusPing() {
+      if (!canSendStageAction() && !(ws && ws.readyState === WebSocket.CONNECTING && currentSessionId)) {
+        return false;
+      }
+      if (!stageCamera) {
+        setStageStatus("Camera is not ready.");
+        return false;
+      }
+      const sent = sendAction("venue/focus_ping", buildFocusPingPayload());
+      if (sent) {
+        setStageStatus("Focused venue.");
+        setMovementLine("Focused venue.");
+      }
+      return sent;
+    }
+
+    function applyVenueFocusPing(data) {
+      if (!data) return;
+      const stamp = Number(Date.parse(String(data.ts || "")) || Date.now());
+      if (stamp < latestFocusEventStamp) {
+        return;
+      }
+      latestFocusEventStamp = stamp;
+
+      const targetPanX = Number.isFinite(Number(data.camera_pan_x)) ? Number(data.camera_pan_x) : Number(data.camera_center_x || 0);
+      const targetPanY = Number.isFinite(Number(data.camera_pan_y)) ? Number(data.camera_pan_y) : Number(data.camera_center_y || 0);
+      const targetZoom = Number.isFinite(Number(data.camera_zoom_relative_to_fit))
+        ? Number(data.camera_zoom_relative_to_fit)
+        : 1;
+      stageCamera?.animateToView?.({
+        panX: targetPanX,
+        panY: targetPanY,
+        zoomRelativeToFit: targetZoom,
+      }, { duration: 250 });
+
+      setRecentFocusMarker({
+        x: Number(data.focus_x || 0),
+        y: Number(data.focus_y || 0),
+      }, "Director focus");
+      const isSelf = String(data.sender_user_id || "") === String(currentActorId || "");
+      setStageStatus(isSelf ? "Focused venue." : "Director focus.");
+      setMovementLine(isSelf ? "Focused venue." : "Director focus.");
+      renderPixiScene();
     }
 
     function applySnapshot(snapshot) {
@@ -3843,6 +4542,20 @@
           return;
         }
 
+        if (msg.type === "pong") {
+          if (pendingPingStartedAt !== null) {
+            lastPingMs = Math.max(0, Math.round(performance.now() - Number(pendingPingStartedAt)));
+            pendingPingStartedAt = null;
+            updateShellMetaPresentation();
+          }
+          return;
+        }
+
+        if (msg.type === "venue/focus_ping" && msg.data) {
+          applyVenueFocusPing(msg.data);
+          return;
+        }
+
         if (msg.type === "action" && msg.data) {
           const actionType = msg.data.type || "";
           if (actionType === "chat/message") {
@@ -4023,22 +4736,10 @@
     }
 
     topBar?.addEventListener("pointerenter", (event) => syncHeaderHoverState(event.clientY));
-    topBar?.addEventListener("pointerleave", (event) => syncHeaderHoverState(event.clientY));
-    topBar?.addEventListener("focusin", updateHeaderPresentation);
-    topBar?.addEventListener("focusout", (event) => {
-      if (!topBar?.contains(event.relatedTarget)) {
-        updateHeaderPresentation();
-      }
-    });
+    topBar?.addEventListener("pointerleave", () => closeHeaderHoverState());
     topBar?.addEventListener("pointerdown", (event) => {
       syncHeaderHoverState(event.clientY);
     });
-    document.addEventListener("pointermove", (event) => {
-      syncHeaderHoverState(event.clientY);
-    }, { passive: true });
-    document.addEventListener("pointerdown", (event) => {
-      syncHeaderHoverState(event.clientY);
-    }, { passive: true });
 
     headerPinButton?.addEventListener("click", () => {
       setHeaderPinned(!isHeaderPinned());
@@ -4080,6 +4781,9 @@
         setDrawerHoverState("left", false);
       }
     });
+    leftDrawerEdgeTrigger?.addEventListener("pointerenter", () => setDrawerHoverState("left", true));
+    leftDrawerEdgeTrigger?.addEventListener("pointerleave", () => setDrawerHoverState("left", false));
+    leftDrawerEdgeTrigger?.addEventListener("focusin", () => setDrawerHoverState("left", true));
 
     rightDrawer?.addEventListener("pointerenter", () => setDrawerHoverState("right", true));
     rightDrawer?.addEventListener("pointerleave", () => setDrawerHoverState("right", false));
@@ -4089,6 +4793,9 @@
         setDrawerHoverState("right", false);
       }
     });
+    rightDrawerEdgeTrigger?.addEventListener("pointerenter", () => setDrawerHoverState("right", true));
+    rightDrawerEdgeTrigger?.addEventListener("pointerleave", () => setDrawerHoverState("right", false));
+    rightDrawerEdgeTrigger?.addEventListener("focusin", () => setDrawerHoverState("right", true));
 
     leftSettingsButton?.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -4152,6 +4859,39 @@
     chatSend?.addEventListener("click", sendChatDraft);
     rightCardEditorButton?.addEventListener("click", () => {
       toggleCardEditorFromSelection();
+    });
+
+    cameraZoomOutButton?.addEventListener("click", () => {
+      if (!stageCamera) return;
+      const view = stageCamera.getView?.();
+      stageCamera.setView?.({
+        zoomRelativeToFit: Math.max(cameraDefaults.minZoom, Number(view?.zoomRelativeToFit || 1) * 0.9),
+      });
+      updateCameraControls(stageCamera.getView?.());
+    });
+
+    cameraZoomInButton?.addEventListener("click", () => {
+      if (!stageCamera) return;
+      const view = stageCamera.getView?.();
+      stageCamera.setView?.({
+        zoomRelativeToFit: Math.min(cameraDefaults.maxZoom, Number(view?.zoomRelativeToFit || 1) * 1.1),
+      });
+      updateCameraControls(stageCamera.getView?.());
+    });
+
+    cameraFitButton?.addEventListener("click", () => {
+      resetCameraToFit(currentVenueMapState?.asset_id || currentVenueMapAssetID || "");
+    });
+
+    pingButton?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.shiftKey) {
+        sendFocusPing();
+      } else {
+        const sent = sendPing();
+        setStageStatus(sent ? "Ping sent." : "Socket unavailable.");
+      }
     });
 
     accountMenuToggle?.addEventListener("click", (event) => {
@@ -4477,7 +5217,9 @@
       event.preventDefault();
       event.stopPropagation();
       const point = stagePointFromClient(event.clientX, event.clientY);
+      const screenPoint = stageScreenPointFromClient(event.clientX, event.clientY);
       stagePlacementCandidate = point;
+      stagePlacementScreenCandidate = screenPoint;
       updatePointerReadout(event.clientX || 0, event.clientY || 0, point, "Overlay menu");
       openContextMenu(event, stageContextMenuModel());
     });

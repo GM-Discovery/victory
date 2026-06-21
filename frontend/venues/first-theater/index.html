@@ -166,20 +166,22 @@
     }
 
     .stage-status {
-      position: absolute;
-      left: 16px;
-      top: 16px;
-      z-index: 8;
-      padding: 10px 12px;
-      max-width: min(360px, calc(100vw - 64px));
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      max-width: min(340px, calc(100vw - 64px));
       border-radius: 999px;
       background: rgba(12, 14, 19, 0.72);
       border: 1px solid rgba(240, 208, 155, 0.14);
       color: #f8eedf;
-      line-height: 1.45;
+      line-height: 1.35;
       backdrop-filter: blur(10px);
-      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.22);
-      font-size: 0.92rem;
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+      font-size: 0.84rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .stage-empty-state {
@@ -317,6 +319,47 @@
       color: #d8c9b0;
       line-height: 1.45;
       font-size: 0.94rem;
+    }
+
+    .camera-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 999px;
+      background: rgba(13, 12, 14, 0.78);
+      border: 1px solid rgba(240, 208, 155, 0.16);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(10px);
+      pointer-events: auto;
+    }
+
+    .camera-button {
+      min-width: 2.2rem;
+      height: 2.2rem;
+      padding: 0 0.7rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .camera-button:hover,
+    .camera-button:focus-visible {
+      background: rgba(240, 208, 155, 0.14);
+      border-color: rgba(240, 208, 155, 0.34);
+      outline: none;
+    }
+
+    .camera-zoom {
+      min-width: 4rem;
+      text-align: center;
+      color: var(--accent-strong);
+      font-size: 0.88rem;
+      letter-spacing: 0.04em;
     }
 
     .pixi-stage-host {
@@ -491,11 +534,13 @@
     .top-bar[data-open="false"] .header-left,
     .top-bar[data-open="false"] .header-center,
     .top-bar[data-open="false"] .header-right,
+    .top-bar[data-open="false"] .camera-controls,
     .top-bar[data-open="false"] .header-settings-panel {
       opacity: 0;
       transform: translateY(-8px);
       pointer-events: none;
       visibility: hidden;
+      display: none;
     }
 
     .brand {
@@ -842,6 +887,26 @@
       opacity: 0.34;
     }
 
+    .drawer-edge-trigger {
+      position: fixed;
+      top: 66px;
+      bottom: 60px;
+      width: 22px;
+      z-index: 85;
+      pointer-events: auto;
+      background: transparent;
+    }
+
+    .drawer-edge-trigger--left {
+      left: 0;
+      cursor: w-resize;
+    }
+
+    .drawer-edge-trigger--right {
+      right: 0;
+      cursor: e-resize;
+    }
+
     .drawer[data-open="false"] .drawer-head {
       padding: 0;
       justify-content: center;
@@ -929,6 +994,25 @@
     .header-settings-value {
       color: #eef4ff;
       font-size: 0.84rem;
+    }
+
+    .header-settings-button {
+      justify-self: start;
+      border: 1px solid rgba(240, 208, 155, 0.24);
+      background: rgba(240, 208, 155, 0.08);
+      color: #f7e4be;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .header-settings-button:hover,
+    .header-settings-button:focus-visible {
+      background: rgba(240, 208, 155, 0.16);
+      border-color: rgba(240, 208, 155, 0.44);
+      outline: none;
     }
 
     .drawer-body {
@@ -1748,6 +1832,12 @@
         width: 34px;
       }
 
+      .drawer-edge-trigger {
+        top: 80px;
+        bottom: 72px;
+        width: 24px;
+      }
+
       #left-drawer {
         left: 10px;
         width: 34px;
@@ -1787,7 +1877,6 @@
     <div class="page">
       <section class="stage-section panel">
         <div class="stage-shell" id="stage-shell">
-          <div id="stage-status" class="stage-status" hidden>Stage ready.</div>
           <div id="stage-empty-state" class="stage-empty-state" hidden>
             <div class="stage-empty-card">
               <em>First Theater</em>
@@ -2022,14 +2111,21 @@
                   <div class="brand">
                     <h1>First Theater</h1>
                   </div>
-                  <div class="status-strip">
-                    <span class="chip">Role <strong id="role-value">Audience</strong></span>
-                    <span class="chip">Connection <strong id="connection-value">Waiting</strong></span>
-                    <span class="chip">Session <strong id="session-status">Idle</strong></span>
-                    <div id="discord-mic-status" class="chip" data-venue-slug="first-theater">House Mic: Loading</div>
-                  </div>
+                <div class="status-strip">
+                  <span class="chip">Role <strong id="role-value">Audience</strong></span>
+                  <span class="chip">Connection <strong id="connection-value">Waiting</strong></span>
+                  <span class="chip">Session <strong id="session-status">Idle</strong></span>
+                  <div id="stage-status" class="stage-status" hidden>Stage ready.</div>
+                  <div id="discord-mic-status" class="chip" data-venue-slug="first-theater">House Mic: Loading</div>
                 </div>
+              </div>
                 <div class="header-center">
+                  <div id="camera-controls" class="camera-controls" aria-label="Camera controls">
+                    <button id="camera-zoom-out" class="camera-button" type="button" aria-label="Zoom out">−</button>
+                    <div id="camera-zoom-value" class="camera-zoom">100%</div>
+                    <button id="camera-zoom-in" class="camera-button" type="button" aria-label="Zoom in">+</button>
+                    <button id="camera-fit" class="camera-button" type="button">Fit</button>
+                  </div>
                   <button id="target-info" class="chip chip--target" type="button" aria-label="Selected target information" title="No target selected">
                     <span class="chip-stack">
                       <span><strong id="target-value">No Target</strong></span>
@@ -2078,7 +2174,8 @@
                     <label>Viewing As
                       <span id="view-value" class="header-settings-value">Self</span>
                     </label>
-                    <label>Ping
+                    <button id="ping-button" class="header-settings-button" type="button">Ping</button>
+                    <label>Ping RTT
                       <span id="ping-value" class="header-settings-value">—</span>
                     </label>
                   </div>
@@ -2148,6 +2245,9 @@
                 </div>
               </aside>
 
+              <div id="left-drawer-edge-trigger" class="drawer-edge-trigger drawer-edge-trigger--left" aria-hidden="true"></div>
+              <div id="right-drawer-edge-trigger" class="drawer-edge-trigger drawer-edge-trigger--right" aria-hidden="true"></div>
+
               <aside id="right-drawer" class="drawer drawer--collapsed" data-open-mode="hover" data-open="false" data-rail-label="Character / Notes">
                 <div class="drawer-inner">
                   <div class="drawer-head">
@@ -2212,6 +2312,7 @@
   <script src="/lib/forbidden.js"></script>
   <script src="/lib/victory-pixi-stage.js"></script>
   <script src="/lib/victory-pixi-grid.js"></script>
+  <script src="/lib/victory-stage-camera.js"></script>
   <script src="/venues/shared/venue-shell.js"></script>
   <script src="/lib/discord-mic.js?v=kernel40-1"></script>
   <script src="/lib/discord-audio.js?v=kernel43-2"></script>
@@ -2228,7 +2329,7 @@
       window.__firstTheaterBootWiring = true;
 
       const script = document.createElement("script");
-      script.src = "/venues/first-theater/runtime.js?v=boot-24";
+      script.src = "/venues/first-theater/runtime.js?v=boot-25";
       script.dataset.victoryRuntime = "first-theater";
       script.addEventListener("load", () => {
         window.VictoryFirstTheater?.start?.();

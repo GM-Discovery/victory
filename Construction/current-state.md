@@ -1,14 +1,14 @@
 # Victory Current State
 
 ## Purpose
-This document is the current-state canon for Victory as of Kernel 47.
+This document is the current-state canon for Victory as of Kernel 48.1.
 
 Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful as history, but this file is the current source of truth when they disagree.
 
 ## Kernel State
-- Current kernel label: **Kernel 47**
-- Current kernel purpose: **Pixi Grid Primitive + Map Alignment v1**
-- Product state: **Kernel 47 is complete**
+- Current kernel label: **Kernel 48.1**
+- Current kernel purpose: **Card Attachment Repair + Director Focus Ping**
+- Product state: **Kernel 48.1 is complete**
 - Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
 
 ## Current Stack
@@ -16,6 +16,7 @@ Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful 
 - Shared frontend shell helper: `frontend/venues/shared/venue-shell.js`
 - Shared Pixi helper: `frontend/lib/victory-pixi-stage.js`
 - Shared Pixi grid helper: `frontend/lib/victory-pixi-grid.js`
+- Shared First Theater camera helper: `frontend/lib/victory-stage-camera.js`
 - Backend: Go `1.25` in `/opt/victory/backend`
 - Reverse proxy/static serving: Caddy. Repo config lives at `/opt/victory/Caddyfile`; the current live shared Caddy container mounts `/opt/bread-exchange/Caddyfile` and serves Victory from `/opt/victory/frontend`.
 - Database: PostgreSQL `16-alpine`
@@ -134,8 +135,13 @@ World, session, and venue runtime:
 Discord audio remains a Discord pass-through surface. Victory does not capture or stream audio.
 Voice-state participant presence is tracked from Discord Gateway events. Active speaker detection and per-user volume controls remain deferred because the current bot/Gateway path cannot truthfully provide them.
 Venue shells now share reusable helper methods for slug normalization, slot registration, presence preview rendering, and safe refresh hooks.
-First Theater keeps its original stage façade; the active map renders on a dedicated Pixi map layer and does not replace the façade or the existing DOM controls. The map can be removed via the map editor's Remove Map action, and supports a `display_mode` of `theater` (masked to the proscenium opening) or `fullscreen` (stretched to the full canvas, façade hidden).
-A persistent square/hex grid renders on its own Pixi layer (`grid`, zIndex 6) directly above the map layer (zIndex 5) and below the façade (zIndex 8) and stage elements/cards (zIndex 10). Grid configuration (type, hex orientation, cell size, offsets, opacity, line width, line style, visibility) is server-persisted per venue in `venue_grid_configs` and is visual-only — no snapping, measurement, or pan/zoom yet. Configured via a "Configure Grid" stage context-menu item and callout panel with live preview, Save, Close (reverts to last saved), Reset, and Hide/Show.
+First Theater keeps its original stage façade; the active map renders in the shared world layer and does not replace the façade or the existing DOM controls. The map can be removed via the map editor's Remove Map action, and supports a `display_mode` of `theater` (masked to the proscenium opening) or `fullscreen` (stretched to the full canvas, façade hidden).
+A persistent square/hex grid renders in that same world layer, aligned with the active map and pinned cards, while unpinned cards stay in the fixed overlay layer above the interactive view. Grid configuration (type, hex orientation, cell size, offsets, opacity, line width, line style, visibility) is server-persisted per venue in `venue_grid_configs` and is visual-only — no snapping or measurement. Configured via a "Configure Grid" stage context-menu item and callout panel with live preview, Save, Close (reverts to last saved), Reset, and Hide/Show.
+First Theater now has a personal browser camera over that shared map/grid world. Middle-mouse drag pans, wheel zoom centers toward the cursor, edge scrolling respects the playable stage rectangle, and the visible `− / 100% / + / Fit` control stays fixed in the safe interface region. Camera state is personal and browser-local, keyed by user/browser plus venue and active map, and `Fit` resets to 100%.
+Index cards default to Pin to Screen. Cards may Attach to Map or Pin to Screen without jumping, Floating is a temporary drag state, map-attached cards move/scale with the world, screen-pinned cards keep a stable viewport size, overlay cards stay readable above the interactive view, and the card update path now carries optional pin metadata for `world_x`, `world_y`, `screen_x`, `screen_y`, and `pin_mode`. Move Here and Duplicate now respect that same placement mode so cards stay in the correct space without accidental extra copies.
+Shift+Ping broadcasts a Director-and-above focus ping within the current venue, animates the recipient camera in about 250ms, and leaves the browser's personal camera persistent afterward.
+The First Theater map editor now activates existing map assets directly from the asset list, and the grid renderer follows the rendered map bounds so larger maps stay fully covered when zoomed out.
+Director focus/broadcast and touch controls remain deferred.
 
 WebSocket:
 - `GET /ws/the-cave`
@@ -157,11 +163,14 @@ Client-to-server actions currently handled in The Cave:
 - `persona/equip`
 - `persona/unequip`
 
+`update/index_card` and `act/duplicate_element` now also accept optional pin metadata for First Theater card attachment behavior.
+
 Server-to-client event shapes currently emitted:
 - `snapshot`
 - `action`
 - `error`
 - `pong`
+- `venue/focus_ping`
 - `presence/snapshot`
 - `presence/join`
 - `presence/leave`

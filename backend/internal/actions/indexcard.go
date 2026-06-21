@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -16,13 +17,18 @@ import (
 )
 
 type IndexCardRequest struct {
-	SessionID   string `json:"session_id"`
-	ActorID     string `json:"actor_id"`
-	ElementID   string `json:"element_id"`
-	ElementSlug string `json:"element_slug"`
-	FrontText   string `json:"front_text"`
-	BackText    string `json:"back_text"`
-	Color       string `json:"color"`
+	SessionID   string  `json:"session_id"`
+	ActorID     string  `json:"actor_id"`
+	ElementID   string  `json:"element_id"`
+	ElementSlug string  `json:"element_slug"`
+	FrontText   string  `json:"front_text"`
+	BackText    string  `json:"back_text"`
+	Color       string  `json:"color"`
+	PinMode     string  `json:"pin_mode"`
+	WorldX      float64 `json:"world_x"`
+	WorldY      float64 `json:"world_y"`
+	ScreenX     float64 `json:"screen_x"`
+	ScreenY     float64 `json:"screen_y"`
 }
 
 func StoreIndexCardCreate(ctx context.Context, pool *pgxpool.Pool, req IndexCardRequest) (*StoredAction, error) {
@@ -157,10 +163,6 @@ func StoreIndexCardUpdate(ctx context.Context, pool *pgxpool.Pool, req IndexCard
 	if req.ElementID == "" && req.ElementSlug == "" {
 		return nil, errors.New("element_id or element_slug is required")
 	}
-	if err := validateIndexCardLength(req.FrontText, req.BackText); err != nil {
-		return nil, err
-	}
-
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -452,6 +454,11 @@ func createIndexCard(ctx context.Context, tx pgx.Tx, req IndexCardRequest) (inde
 		"front_text":              req.FrontText,
 		"back_text":               req.BackText,
 		"color":                   req.Color,
+		"pin_mode":                "overlay",
+		"screen_x":                0.5,
+		"screen_y":                0.5,
+		"world_x":                 nil,
+		"world_y":                 nil,
 		"created_by":              req.ActorID,
 		"created_by_display_name": creatorDisplayName,
 		"created_by_handle":       creatorHandle,
@@ -552,6 +559,25 @@ func updateIndexCard(ctx context.Context, tx pgx.Tx, req IndexCardRequest) (inde
 		existing = map[string]any{}
 	}
 
+	existingFrontText := stringValue(existing["front_text"])
+	existingBackText := stringValue(existing["back_text"])
+	existingColor := stringValue(existing["color"])
+	frontText := req.FrontText
+	backText := req.BackText
+	color := req.Color
+	if frontText == "" {
+		frontText = existingFrontText
+	}
+	if backText == "" {
+		backText = existingBackText
+	}
+	if color == "" {
+		color = normalizeIndexCardColor(existingColor)
+	}
+	if err := validateIndexCardLength(frontText, backText); err != nil {
+		return indexCardRecord{}, "", err
+	}
+
 	createdBy := stringValue(existing["created_by"])
 	createdByDisplayName := stringValue(existing["created_by_display_name"])
 	createdByHandle := stringValue(existing["created_by_handle"])
@@ -563,23 +589,26 @@ func updateIndexCard(ctx context.Context, tx pgx.Tx, req IndexCardRequest) (inde
 		venueSlug = "the-cave"
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-
-	updatedData := map[string]any{
-		"type":                    "index_card",
-		"context_class":           "card",
-		"front_text":              req.FrontText,
-		"back_text":               req.BackText,
-		"color":                   req.Color,
-		"created_by":              createdBy,
-		"created_by_display_name": createdByDisplayName,
-		"created_by_handle":       createdByHandle,
-		"created_by_role":         createdByRole,
-		"created_at":              createdAt,
-		"updated_at":              now,
-		"production_id":           productionID,
-		"session_id":              req.SessionID,
-		"venue_slug":              venueSlug,
+	updatedData := map[string]any{}
+	for key, value := range existing {
+		updatedData[key] = value
 	}
+	updatedData["type"] = "index_card"
+	updatedData["context_class"] = "card"
+	updatedData["front_text"] = frontText
+	updatedData["back_text"] = backText
+	updatedData["color"] = color
+	updatedData["created_by"] = createdBy
+	updatedData["created_by_display_name"] = createdByDisplayName
+	updatedData["created_by_handle"] = createdByHandle
+	updatedData["created_by_role"] = createdByRole
+	updatedData["created_at"] = createdAt
+	updatedData["updated_at"] = now
+	updatedData["production_id"] = productionID
+	updatedData["session_id"] = req.SessionID
+	updatedData["venue_slug"] = venueSlug
+	applyIndexCardPinUpdate(updatedData, req)
+
 	dataJSON, _ := json.Marshal(updatedData)
 
 	if _, err := tx.Exec(ctx, `
@@ -589,17 +618,17 @@ func updateIndexCard(ctx context.Context, tx pgx.Tx, req IndexCardRequest) (inde
 		    data = $3
 		WHERE id = $1
 		  AND element_type = 'index_card'
-	`, resolvedID, indexCardDisplayName(req.FrontText), dataJSON); err != nil {
+	`, resolvedID, indexCardDisplayName(frontText), dataJSON); err != nil {
 		return indexCardRecord{}, "", err
 	}
 
 	return indexCardRecord{
 		ElementID:    resolvedID,
 		Slug:         resolvedSlug,
-		Name:         indexCardDisplayName(req.FrontText),
-		FrontText:    req.FrontText,
-		BackText:     req.BackText,
-		Color:        req.Color,
+		Name:         indexCardDisplayName(frontText),
+		FrontText:    frontText,
+		BackText:     backText,
+		Color:        color,
 		CreatedBy:    createdBy,
 		CreatedAt:    createdAt,
 		UpdatedAt:    now,
@@ -776,6 +805,11 @@ func sanitizeIndexCardRequest(req IndexCardRequest) IndexCardRequest {
 	req.FrontText = truncateRunes(strings.TrimSpace(req.FrontText), 2000)
 	req.BackText = truncateRunes(strings.TrimSpace(req.BackText), 2000)
 	req.Color = normalizeIndexCardColor(req.Color)
+	req.PinMode = normalizeIndexCardPinMode(req.PinMode)
+	req.WorldX = normalizeIndexCardCoordinate(req.WorldX)
+	req.WorldY = normalizeIndexCardCoordinate(req.WorldY)
+	req.ScreenX = normalizeIndexCardCoordinate(req.ScreenX)
+	req.ScreenY = normalizeIndexCardCoordinate(req.ScreenY)
 	return req
 }
 
@@ -818,6 +852,47 @@ func normalizeIndexCardColor(color string) string {
 	return "#d9c7a6"
 }
 
+func normalizeIndexCardPinMode(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "world":
+		return "world"
+	case "overlay":
+		return "overlay"
+	default:
+		return ""
+	}
+}
+
+func normalizeIndexCardCoordinate(value float64) float64 {
+	if math.IsNaN(value) {
+		return 0
+	}
+	if math.IsInf(value, 0) {
+		return 0
+	}
+	return value
+}
+
+func applyIndexCardPinUpdate(data map[string]any, req IndexCardRequest) {
+	if data == nil {
+		return
+	}
+	switch req.PinMode {
+	case "world":
+		data["pin_mode"] = "world"
+		data["world_x"] = req.WorldX
+		data["world_y"] = req.WorldY
+		data["screen_x"] = nil
+		data["screen_y"] = nil
+	case "overlay":
+		data["pin_mode"] = "overlay"
+		data["world_x"] = nil
+		data["world_y"] = nil
+		data["screen_x"] = req.ScreenX
+		data["screen_y"] = req.ScreenY
+	}
+}
+
 func indexCardTarget(card indexCardRecord) map[string]any {
 	return map[string]any{
 		"kind":         "index_card",
@@ -827,6 +902,11 @@ func indexCardTarget(card indexCardRecord) map[string]any {
 }
 
 func indexCardPayload(card indexCardRecord, productionID string) map[string]any {
+	pinMode := stringValue(card.Data["pin_mode"])
+	worldX := card.Data["world_x"]
+	worldY := card.Data["world_y"]
+	screenX := card.Data["screen_x"]
+	screenY := card.Data["screen_y"]
 	return map[string]any{
 		"front_text":              card.FrontText,
 		"back_text":               card.BackText,
@@ -840,6 +920,11 @@ func indexCardPayload(card indexCardRecord, productionID string) map[string]any 
 		"production_id":           productionID,
 		"session_id":              card.SessionID,
 		"venue_slug":              card.VenueSlug,
+		"pin_mode":                pinMode,
+		"world_x":                 worldX,
+		"world_y":                 worldY,
+		"screen_x":                screenX,
+		"screen_y":                screenY,
 	}
 }
 

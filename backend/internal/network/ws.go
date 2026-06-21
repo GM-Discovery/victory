@@ -251,6 +251,94 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 			"ts":   time.Now().UTC().Format(time.RFC3339),
 		})
 
+	case "venue/focus_ping":
+		{
+			sessionID := c.SessionID
+			if strings.TrimSpace(sessionID) == "" {
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": "not_session_participant",
+				})
+				return
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			allowed, err := canAccessDirectorConsole(ctx, pool, c.UserID)
+			cancel()
+			if err != nil {
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": "access_check_failed",
+				})
+				return
+			}
+			if !allowed {
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": "forbidden",
+				})
+				return
+			}
+
+			venueSlug := "the-cave"
+
+			focusX := 0.0
+			if raw, ok := payload["focus_x"].(float64); ok {
+				focusX = raw
+			}
+			focusY := 0.0
+			if raw, ok := payload["focus_y"].(float64); ok {
+				focusY = raw
+			}
+			cameraCenterX := 0.0
+			if raw, ok := payload["camera_center_x"].(float64); ok {
+				cameraCenterX = raw
+			}
+			cameraCenterY := 0.0
+			if raw, ok := payload["camera_center_y"].(float64); ok {
+				cameraCenterY = raw
+			}
+			cameraPanX := 0.0
+			if raw, ok := payload["camera_pan_x"].(float64); ok {
+				cameraPanX = raw
+			}
+			cameraPanY := 0.0
+			if raw, ok := payload["camera_pan_y"].(float64); ok {
+				cameraPanY = raw
+			}
+			cameraZoom := 1.0
+			if raw, ok := payload["camera_zoom_relative_to_fit"].(float64); ok {
+				cameraZoom = raw
+			}
+			eventID, _ := payload["event_id"].(string)
+			if strings.TrimSpace(eventID) == "" {
+				eventID = time.Now().UTC().Format(time.RFC3339Nano)
+			}
+			ts := time.Now().UTC().Format(time.RFC3339)
+
+			msgOut, _ := json.Marshal(map[string]any{
+				"type": "venue/focus_ping",
+				"data": map[string]any{
+					"venue_slug":                  venueSlug,
+					"session_id":                  sessionID,
+					"sender_user_id":              c.UserID,
+					"sender_display_name":         c.Presence.DisplayName,
+					"sender_handle":               c.Presence.Handle,
+					"sender_role":                 c.Presence.Role,
+					"focus_x":                     focusX,
+					"focus_y":                     focusY,
+					"camera_center_x":             cameraCenterX,
+					"camera_center_y":             cameraCenterY,
+					"camera_pan_x":                cameraPanX,
+					"camera_pan_y":                cameraPanY,
+					"camera_zoom_relative_to_fit": cameraZoom,
+					"event_id":                    eventID,
+					"ts":                          ts,
+				},
+			})
+			hub.BroadcastSession(sessionID, msgOut)
+		}
+
 	case "react/emote":
 		{
 			sessionID, _ := payload["session_id"].(string)
@@ -531,6 +619,23 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 			if raw, ok := payload["order"].(float64); ok {
 				order = int(raw)
 			}
+			pinMode, _ := payload["pin_mode"].(string)
+			worldX := 0.0
+			if raw, ok := payload["world_x"].(float64); ok {
+				worldX = raw
+			}
+			worldY := 0.0
+			if raw, ok := payload["world_y"].(float64); ok {
+				worldY = raw
+			}
+			screenX := 0.0
+			if raw, ok := payload["screen_x"].(float64); ok {
+				screenX = raw
+			}
+			screenY := 0.0
+			if raw, ok := payload["screen_y"].(float64); ok {
+				screenY = raw
+			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			storedAction, err := storeDuplicateElementFunc(ctx, pool, actions.DuplicateElementRequest{
@@ -543,6 +648,11 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 				X:           x,
 				Y:           y,
 				Order:       order,
+				PinMode:     pinMode,
+				WorldX:      worldX,
+				WorldY:      worldY,
+				ScreenX:     screenX,
+				ScreenY:     screenY,
 			})
 			cancel()
 
@@ -717,6 +827,23 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 			frontText, _ := payload["front_text"].(string)
 			backText, _ := payload["back_text"].(string)
 			color, _ := payload["color"].(string)
+			pinMode, _ := payload["pin_mode"].(string)
+			worldX := 0.0
+			if raw, ok := payload["world_x"].(float64); ok {
+				worldX = raw
+			}
+			worldY := 0.0
+			if raw, ok := payload["world_y"].(float64); ok {
+				worldY = raw
+			}
+			screenX := 0.0
+			if raw, ok := payload["screen_x"].(float64); ok {
+				screenX = raw
+			}
+			screenY := 0.0
+			if raw, ok := payload["screen_y"].(float64); ok {
+				screenY = raw
+			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			storedAction, err := storeIndexCardUpdateFunc(ctx, pool, actions.IndexCardRequest{
@@ -727,6 +854,11 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 				FrontText:   frontText,
 				BackText:    backText,
 				Color:       color,
+				PinMode:     pinMode,
+				WorldX:      worldX,
+				WorldY:      worldY,
+				ScreenX:     screenX,
+				ScreenY:     screenY,
 			})
 			cancel()
 

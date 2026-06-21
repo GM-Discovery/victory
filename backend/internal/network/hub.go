@@ -54,6 +54,22 @@ func (h *Hub) Broadcast(msg []byte) {
 	}
 }
 
+func (h *Hub) BroadcastSession(sessionID string, msg []byte) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for c := range h.clients {
+		if c == nil || c.SessionID != sessionID {
+			continue
+		}
+		select {
+		case c.Send <- msg:
+		default:
+			log.Printf("dropping slow websocket client")
+		}
+	}
+}
+
 func (h *Hub) UpdateClientPresence(sessionID, userID string, persona any) {
 	h.mu.Lock()
 	defer h.mu.Unlock()

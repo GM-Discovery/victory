@@ -24,6 +24,11 @@ type DuplicateElementRequest struct {
 	X           float64 `json:"x"`
 	Y           float64 `json:"y"`
 	Order       int     `json:"order"`
+	PinMode     string  `json:"pin_mode"`
+	WorldX      float64 `json:"world_x"`
+	WorldY      float64 `json:"world_y"`
+	ScreenX     float64 `json:"screen_x"`
+	ScreenY     float64 `json:"screen_y"`
 }
 
 func StoreDuplicateElement(ctx context.Context, pool *pgxpool.Pool, req DuplicateElementRequest) (*StoredAction, error) {
@@ -119,6 +124,7 @@ func StoreDuplicateElement(ctx context.Context, pool *pgxpool.Pool, req Duplicat
 		newData["created_by_display_name"] = displayName
 		newData["created_by_handle"] = handle
 		newData["created_by_role"] = role
+		applyDuplicateIndexCardPinUpdate(newData, req)
 	}
 
 	newDataJSON, _ := json.Marshal(newData)
@@ -317,10 +323,35 @@ func sanitizeDuplicateElementRequest(req DuplicateElementRequest) DuplicateEleme
 	req.ElementSlug = strings.TrimSpace(req.ElementSlug)
 	req.VenueSlug = strings.ToLower(strings.TrimSpace(req.VenueSlug))
 	req.Layer = strings.ToLower(strings.TrimSpace(req.Layer))
+	req.PinMode = normalizeIndexCardPinMode(req.PinMode)
+	req.WorldX = normalizeIndexCardCoordinate(req.WorldX)
+	req.WorldY = normalizeIndexCardCoordinate(req.WorldY)
+	req.ScreenX = normalizeIndexCardCoordinate(req.ScreenX)
+	req.ScreenY = normalizeIndexCardCoordinate(req.ScreenY)
 	if req.Layer == "" {
 		req.Layer = "stage"
 	}
 	return req
+}
+
+func applyDuplicateIndexCardPinUpdate(data map[string]any, req DuplicateElementRequest) {
+	if data == nil {
+		return
+	}
+	switch req.PinMode {
+	case "world":
+		data["pin_mode"] = "world"
+		data["world_x"] = req.WorldX
+		data["world_y"] = req.WorldY
+		data["screen_x"] = nil
+		data["screen_y"] = nil
+	case "overlay":
+		data["pin_mode"] = "overlay"
+		data["world_x"] = nil
+		data["world_y"] = nil
+		data["screen_x"] = req.ScreenX
+		data["screen_y"] = req.ScreenY
+	}
 }
 
 func isDuplicableStageElement(elementType, contextClass string) bool {
