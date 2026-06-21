@@ -1,14 +1,14 @@
 # Victory Current State
 
 ## Purpose
-This document is the current-state canon for Victory as of Kernel 48.1.
+This document is the current-state canon for Victory as of Kernel 49.
 
 Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful as history, but this file is the current source of truth when they disagree.
 
 ## Kernel State
-- Current kernel label: **Kernel 48.1**
-- Current kernel purpose: **Card Attachment Repair + Director Focus Ping**
-- Product state: **Kernel 48.1 is complete**
+- Current kernel label: **Kernel 49**
+- Current kernel purpose: **Workshop Token Ingestion + Warehouse Storage v1**
+- Product state: **Kernel 49 is complete**
 - Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
 
 ## Current Stack
@@ -113,10 +113,16 @@ World, session, and venue runtime:
 - `POST /api/session/the-cave/join`
 - `GET /api/workshop/venues`
 - `GET /api/workshop/assets?asset_type=map`
+- `POST /api/workshop/assets/token`
 - `POST /api/index-cards`
 - `POST /api/workshop/assets`
 - `GET /api/assets/{id}`
 - `GET /api/assets/{id}/content`
+- `GET /api/warehouse/storage`
+- `PATCH /api/warehouse/storage/settings`
+- `GET /api/warehouse/assets`
+- `GET /api/warehouse/assets/{id}`
+- `DELETE /api/warehouse/assets/{id}`
 - `GET /api/showings`
 - `GET /api/showings/{id}/review`
 - `GET /api/director-console/current`
@@ -141,6 +147,8 @@ First Theater now has a personal browser camera over that shared map/grid world.
 Index cards default to Pin to Screen. Cards may Attach to Map or Pin to Screen without jumping, Floating is a temporary drag state, map-attached cards move/scale with the world, screen-pinned cards keep a stable viewport size, overlay cards stay readable above the interactive view, and the card update path now carries optional pin metadata for `world_x`, `world_y`, `screen_x`, `screen_y`, and `pin_mode`. Move Here and Duplicate now respect that same placement mode so cards stay in the correct space without accidental extra copies.
 Shift+Ping broadcasts a Director-and-above focus ping within the current venue, animates the recipient camera in about 250ms, and leaves the browser's personal camera persistent afterward.
 The First Theater map editor now activates existing map assets directly from the asset list, and the grid renderer follows the rendered map bounds so larger maps stay fully covered when zoomed out.
+Workshop token preparation now lives in The Cave's `mode=workshop` surface, with circle/square/hex/raw previews, token uploads, and installation-wide warehouse storage policy wired to the Producer's Office.
+Warehouse asset reads now resolve deleted or missing assets to the construction fallback image instead of leaving placements blank.
 Director focus/broadcast and touch controls remain deferred.
 
 WebSocket:
@@ -211,6 +219,8 @@ World model:
 - session participants and runtime identity links
 - `venue_active_maps` - one active map placement per venue (asset, fit, crop, scale, safe margin, `display_mode`)
 - `venue_grid_configs` - one grid configuration per venue (type, hex orientation, cell size, offsets, opacity, line width, line style, visibility)
+- `warehouse_storage_settings` - installation storage policy for hard cap, upload cap, warning thresholds, retention default, and token variant sizes
+- `assets` now also carries durable warehouse metadata such as `name`, `shape`, `default_grid_width`, `default_grid_height`, `retain_original`, `status`, `crop_x`, `crop_y`, `zoom`, `stored_bytes`, `last_used_at`, and `deleted_at`
 
 Runtime history and review backbone:
 - `actions`

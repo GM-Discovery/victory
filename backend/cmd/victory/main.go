@@ -76,6 +76,9 @@ func main() {
 	if err := identity.EnsureKernel39DiscordGatewaySurface(ctx, pool); err != nil {
 		log.Fatalf("kernel 39 discord gateway bootstrap failed: %v", err)
 	}
+	if err := assets.EnsureKernel49WarehouseStorageSurface(ctx, pool); err != nil {
+		log.Fatalf("kernel 49 warehouse bootstrap failed: %v", err)
+	}
 
 	hub := network.NewHub()
 	discordAudioPresenceStore := identity.NewDiscordAudioPresenceStore()
@@ -333,7 +336,12 @@ func main() {
 	})
 
 	mux.HandleFunc("/api/workshop/assets", assets.HandleWorkshopUpload(pool, storageRoot))
+	mux.HandleFunc("/api/workshop/assets/token", assets.HandleTokenUploadAsset(pool, storageRoot))
 	mux.HandleFunc("/api/assets/", assets.HandleGetAssetMeta(pool))
+	mux.HandleFunc("/api/warehouse/storage", assets.HandleWarehouseStorage(pool))
+	mux.HandleFunc("/api/warehouse/storage/settings", assets.HandleWarehouseStorageSettings(pool))
+	mux.HandleFunc("/api/warehouse/assets", assets.HandleWarehouseAssets(pool))
+	mux.HandleFunc("/api/warehouse/assets/", assets.HandleWarehouseAssetByID(pool, storageRoot))
 	mux.HandleFunc("GET /api/venues/first-theater/map", venues.HandleVenueMap(pool))
 	mux.HandleFunc("POST /api/venues/first-theater/map", venues.HandleVenueMap(pool))
 	mux.HandleFunc("GET /api/venues/first-theater/grid", venues.HandleVenueGrid(pool))

@@ -1,7 +1,7 @@
 # Victory Roadmap
 
 ## Purpose
-This roadmap reflects current priorities after Kernel 48.1.
+This roadmap reflects current priorities after Kernel 49.
 
 Kernel numbers are labels, but from here they should remain stable once assigned so planning, reportbacks, and future agents all refer to the same landmarks.
 
@@ -52,6 +52,8 @@ Kernel numbers are labels, but from here they should remain stable once assigned
   - First Theater now has a browser-local personal pan/zoom camera with cursor-centered wheel zoom, middle-mouse pan, edge scrolling, bounded Fit controls, and shared index-card pin/unpin state between world-space and fixed overlay rendering
 - `48.1 — Card Attachment Repair + Director Focus Ping`
   - First Theater now defaults new cards to screen pinning, lets cards Attach to Map or Pin to Screen without jumping, repairs floating drag behavior, and adds Director-and-above Shift+Ping focus broadcasts with a ~250ms camera transition inside the current venue
+- `49 — Workshop Token Ingestion + Warehouse Storage v1`
+  - Workshop token preparation now uploads circle, square, hex, and raw token assets into the installation-wide Warehouse, with configurable storage policy, generated variants, and tombstone-safe deletion that falls back to the construction asset
 
 Ordering note:
 - Showing Review comes before polish-only work
@@ -67,6 +69,7 @@ Ordering note:
 - The grid primitive follows the map-layer pass directly so alignment tooling has a real map to align against; stage navigation (pan/zoom) is deferred to a later kernel so the grid first ships as a fixed-viewport visual layer
 - Kernel 48 closes that stage-navigation gap for First Theater only, while keeping the camera reusable for later venues without making it global
 - Kernel 48.1 tightens the card attachment model and adds the one-time venue focus ping without turning the camera into a shared persistent state
+- Kernel 49 extends the existing asset system into a Warehouse model for reusable token and map assets, while keeping Theater placement deferred to Kernel 50
 
 ## Medium Roadmap: Kernels 38–62
 - strengthen showing/review surfaces and auditability

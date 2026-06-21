@@ -11,6 +11,26 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-06-21 — Kernel 49 Workshop Token Ingestion + Warehouse Storage
+
+### Backend
+- Extended the existing workshop asset flow with token uploads at `POST /api/workshop/assets/token`.
+- Added Warehouse storage policy and stats endpoints for installation-wide limits, warning thresholds, retention defaults, and token variant sizing.
+- Added tombstone deletion support that removes durable files, preserves the asset record, and resolves broken reads to the construction fallback.
+- Extended the asset model with durable warehouse metadata such as token shape, default footprint, crop/zoom settings, storage bytes, and deleted-state timestamps.
+
+### Frontend
+- Added a token preparation surface inside The Cave's `mode=workshop` route with circle, square, hex, and raw masks.
+- Added a Producer's Office warehouse storage panel with policy editing, storage metrics, and a warehouse asset browser.
+- Wired recent token browsing into the Workshop surface and asset deletion into the warehouse browser.
+
+### Docs
+- Updated current-state, roadmap, and this operator log to Kernel 49.
+
+### Notes
+- Workshop token preparation now uses the existing Workshop/asset flow rather than a parallel token-only architecture.
+- Deleted or missing assets now fall back to the construction image rather than leaving existing placements blank.
+
 ## 2026-06-21 — Kernel 48.1 Completion Reportback and Map Asset Reliability Notes
 
 ### Docs

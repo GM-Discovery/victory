@@ -1317,6 +1317,116 @@
       font-size: 0.95rem;
     }
 
+    .token-workshop-panel {
+      margin-top: 18px;
+      padding: 18px;
+      border-radius: 18px;
+      border: 1px solid rgba(123, 176, 127, 0.22);
+      background:
+        radial-gradient(circle at top right, rgba(111, 147, 99, 0.18), transparent 34%),
+        linear-gradient(180deg, rgba(24, 31, 25, 0.98), rgba(13, 18, 15, 0.96));
+      box-shadow: 0 18px 38px rgba(0, 0, 0, 0.22);
+    }
+
+    .token-workshop-panel[hidden] {
+      display: none;
+    }
+
+    .token-workshop-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr);
+      align-items: start;
+    }
+
+    .token-workshop-preview {
+      display: grid;
+      gap: 10px;
+    }
+
+    .token-workshop-preview-canvas {
+      width: 100%;
+      max-width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 16px;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.06), transparent 56%),
+        linear-gradient(180deg, rgba(11, 14, 12, 0.98), rgba(20, 24, 20, 0.98));
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .token-workshop-preview-meta {
+      color: #c7d8c7;
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .token-workshop-form {
+      display: grid;
+      gap: 10px;
+    }
+
+    .token-workshop-form input[type="range"] {
+      margin-bottom: 8px;
+    }
+
+    .token-workshop-list,
+    .warehouse-asset-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .token-workshop-asset,
+    .warehouse-asset-card {
+      display: grid;
+      gap: 4px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .token-workshop-asset small,
+    .warehouse-asset-card small {
+      color: #b7c4b4;
+    }
+
+    .warehouse-panel {
+      margin-top: 18px;
+      padding: 18px;
+      border-radius: 18px;
+      border: 1px solid rgba(195, 148, 64, 0.18);
+      background:
+        radial-gradient(circle at top left, rgba(163, 123, 48, 0.14), transparent 36%),
+        linear-gradient(180deg, rgba(29, 22, 17, 0.98), rgba(16, 12, 9, 0.96));
+      box-shadow: 0 18px 38px rgba(0, 0, 0, 0.22);
+    }
+
+    .warehouse-panel[hidden] {
+      display: none;
+    }
+
+    .warehouse-metrics {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-bottom: 14px;
+    }
+
+    .metric {
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 1.1rem;
+      margin-top: 2px;
+    }
+
     #chat-input {
       flex: 1;
       padding: 10px 12px;
@@ -1527,13 +1637,79 @@
             </div>
           </div>
         </div>
-        <div class="index-card-history">
-          <h3>Save History</h3>
-          <div id="index-card-history" class="index-card-tray">
-            <div class="index-card-empty">No card saves yet.</div>
+      <div class="index-card-history">
+        <h3>Save History</h3>
+        <div id="index-card-history" class="index-card-tray">
+          <div class="index-card-empty">No card saves yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="token-workshop-panel" class="token-workshop-panel" hidden>
+      <div class="index-card-section-header">
+        <h3>Token Workshop</h3>
+        <div id="token-workshop-status" class="index-card-workshop-status">Loading token storage policy...</div>
+      </div>
+      <div class="token-workshop-grid">
+        <div class="token-workshop-preview">
+          <canvas id="token-workshop-preview" class="token-workshop-preview-canvas" width="512" height="512"></canvas>
+          <div id="token-workshop-preview-meta" class="token-workshop-preview-meta">Upload a PNG, JPEG, or WebP to preview the selected mask.</div>
+        </div>
+        <div class="token-workshop-form">
+          <label for="token-workshop-file">Select image</label>
+          <input id="token-workshop-file" type="file" accept="image/png,image/jpeg,image/webp" />
+
+          <label for="token-workshop-name">Token name</label>
+          <input id="token-workshop-name" type="text" placeholder="Token name" />
+
+          <label for="token-workshop-shape">Shape</label>
+          <select id="token-workshop-shape">
+            <option value="circle">Circle</option>
+            <option value="square">Square</option>
+            <option value="hex">Hex</option>
+            <option value="raw">Raw</option>
+          </select>
+
+          <label for="token-workshop-zoom">Zoom</label>
+          <input id="token-workshop-zoom" type="range" min="0.5" max="2.5" step="0.01" value="1" />
+
+          <div class="inline">
+            <div>
+              <label for="token-workshop-offset-x">X Position</label>
+              <input id="token-workshop-offset-x" type="range" min="-100" max="100" step="1" value="0" />
+            </div>
+            <div>
+              <label for="token-workshop-offset-y">Y Position</label>
+              <input id="token-workshop-offset-y" type="range" min="-100" max="100" step="1" value="0" />
+            </div>
+          </div>
+
+          <div class="inline">
+            <div>
+              <label>Default Footprint</label>
+              <div id="token-workshop-footprint" class="metric"><strong>1 × 1</strong></div>
+            </div>
+            <div>
+              <label>Original Retention</label>
+              <div id="token-workshop-retain" class="metric"><strong>Loading...</strong></div>
+            </div>
+          </div>
+
+          <div id="token-workshop-estimate" class="index-card-workshop-status">Estimated storage: loading...</div>
+          <div class="chip-list">
+            <button id="token-workshop-save" type="button">Save Token</button>
+            <button id="token-workshop-cancel" type="button">Cancel</button>
           </div>
         </div>
       </div>
+      <div class="index-card-section-header" style="margin-top: 18px;">
+        <h3>Recent Tokens</h3>
+        <div class="index-card-workshop-status">Latest active warehouse assets</div>
+      </div>
+      <div id="token-workshop-list" class="token-workshop-list">
+        <div class="index-card-empty">No token assets yet.</div>
+      </div>
+    </div>
 
       <div class="chat-panel-head">
         <h2>Venue Chat</h2>
@@ -1644,6 +1820,22 @@
   const indexCardPanel = document.getElementById("index-card-panel");
   const stageDebugPanel = document.getElementById("stage-debug-panel");
   const stageDebugToggle = document.getElementById("stage-debug-toggle");
+  const tokenWorkshopPanel = document.getElementById("token-workshop-panel");
+  const tokenWorkshopStatus = document.getElementById("token-workshop-status");
+  const tokenWorkshopPreview = document.getElementById("token-workshop-preview");
+  const tokenWorkshopPreviewMeta = document.getElementById("token-workshop-preview-meta");
+  const tokenWorkshopFile = document.getElementById("token-workshop-file");
+  const tokenWorkshopName = document.getElementById("token-workshop-name");
+  const tokenWorkshopShape = document.getElementById("token-workshop-shape");
+  const tokenWorkshopZoom = document.getElementById("token-workshop-zoom");
+  const tokenWorkshopOffsetX = document.getElementById("token-workshop-offset-x");
+  const tokenWorkshopOffsetY = document.getElementById("token-workshop-offset-y");
+  const tokenWorkshopFootprint = document.getElementById("token-workshop-footprint");
+  const tokenWorkshopRetain = document.getElementById("token-workshop-retain");
+  const tokenWorkshopEstimate = document.getElementById("token-workshop-estimate");
+  const tokenWorkshopSave = document.getElementById("token-workshop-save");
+  const tokenWorkshopCancel = document.getElementById("token-workshop-cancel");
+  const tokenWorkshopList = document.getElementById("token-workshop-list");
   const indexCardWorkshopTools = document.getElementById("index-card-workshop-tools");
   const workshopVenueSelect = document.getElementById("workshop-venue-select");
   const workshopSendTray = document.getElementById("workshop-send-tray");
@@ -1715,6 +1907,14 @@
   let audienceCurtainActive = false;
   let workshopVenues = [];
   let workshopAssets = [];
+  let tokenStoragePolicy = null;
+  let tokenPreviewState = {
+    file: null,
+    objectURL: "",
+    image: null,
+    width: 0,
+    height: 0,
+  };
   let pendingIndexCardSave = null;
   let pendingIndexCardSaveTimer = null;
   let contextMenuTarget = null;
@@ -1767,6 +1967,25 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#39;");
+  }
+
+  function clampNumber(value, min, max, fallback) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(max, Math.max(min, parsed));
+  }
+
+  function formatByteSize(bytes) {
+    const value = Number(bytes || 0);
+    if (!Number.isFinite(value) || value <= 0) return "0 B";
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let current = value;
+    let unitIndex = 0;
+    while (current >= 1024 && unitIndex < units.length - 1) {
+      current /= 1024;
+      unitIndex++;
+    }
+    return `${current >= 10 || unitIndex === 0 ? current.toFixed(unitIndex === 0 ? 0 : 1) : current.toFixed(2)} ${units[unitIndex]}`;
   }
 
   function normalizeRole(role) {
@@ -3638,6 +3857,308 @@
     }
   }
 
+  function setTokenWorkshopStatus(text) {
+    if (tokenWorkshopStatus) {
+      tokenWorkshopStatus.textContent = text;
+    }
+  }
+
+  function setTokenWorkshopRetain(text) {
+    if (tokenWorkshopRetain) {
+      tokenWorkshopRetain.querySelector("strong")?.replaceChildren?.();
+      tokenWorkshopRetain.innerHTML = `<strong>${escapeHtml(text)}</strong>`;
+    }
+  }
+
+  function normalizeTokenWorkshopShape(value) {
+    const shape = String(value || "circle").toLowerCase().trim();
+    if (["circle", "square", "hex", "raw"].includes(shape)) {
+      return shape;
+    }
+    return "circle";
+  }
+
+  function tokenWorkshopCleanupPreview() {
+    if (tokenPreviewState.objectURL) {
+      try {
+        URL.revokeObjectURL(tokenPreviewState.objectURL);
+      } catch (error) {
+        console.warn("token preview revoke failed", error);
+      }
+    }
+    tokenPreviewState = {
+      file: null,
+      objectURL: "",
+      image: null,
+      width: 0,
+      height: 0,
+    };
+  }
+
+  function drawTokenWorkshopMask(ctx, size, shape) {
+    const s = Number(size || 512);
+    const half = s / 2;
+    const radius = half * 0.92;
+    if (shape === "circle") {
+      ctx.beginPath();
+      ctx.arc(half, half, radius, 0, Math.PI * 2);
+      ctx.closePath();
+      return;
+    }
+    if (shape === "hex") {
+      const r = radius;
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 3) * i;
+        const x = half + Math.cos(angle) * r;
+        const y = half + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      return;
+    }
+    ctx.rect(0, 0, s, s);
+  }
+
+  function tokenWorkshopDimensions() {
+    const image = tokenPreviewState.image;
+    if (!image || !image.width || !image.height) {
+      return { master: [0, 0], stage: [0, 0], thumbnail: [0, 0] };
+    }
+    const zoom = clampNumber(tokenWorkshopZoom?.value || 1, 0.5, 2.5, 1);
+    const shape = normalizeTokenWorkshopShape(tokenWorkshopShape?.value || "circle");
+    const sourceMax = Math.max(image.width, image.height, 1);
+    const baseScale = (shape === "raw" ? Math.min(image.width, image.height) : 512) / sourceMax;
+    const scaledW = Math.max(1, Math.round(image.width * baseScale * zoom));
+    const scaledH = Math.max(1, Math.round(image.height * baseScale * zoom));
+    if (shape === "raw") {
+      return {
+        master: [scaledW, scaledH],
+        stage: [Math.max(1, Math.round(scaledW * 0.5)), Math.max(1, Math.round(scaledH * 0.5))],
+        thumbnail: [Math.max(1, Math.round(scaledW * 0.125)), Math.max(1, Math.round(scaledH * 0.125))],
+      };
+    }
+    return {
+      master: [Math.max(1, Math.min(1024, scaledW)), Math.max(1, Math.min(1024, scaledH))],
+      stage: [Math.max(1, Math.min(512, Math.round(scaledW * 0.5))), Math.max(1, Math.min(512, Math.round(scaledH * 0.5)))],
+      thumbnail: [Math.max(1, Math.min(128, Math.round(scaledW * 0.125))), Math.max(1, Math.min(128, Math.round(scaledH * 0.125)))],
+    };
+  }
+
+  function updateTokenWorkshopEstimate() {
+    if (!tokenWorkshopEstimate) return;
+    const dims = tokenWorkshopDimensions();
+    const totalPixels = (dims.master[0] * dims.master[1]) + (dims.stage[0] * dims.stage[1]) + (dims.thumbnail[0] * dims.thumbnail[1]);
+    const approxBytes = Math.max(0, Math.round(totalPixels * 0.25));
+    tokenWorkshopEstimate.textContent = tokenPreviewState.image
+      ? `Estimated output: master ${dims.master[0]}×${dims.master[1]}, stage ${dims.stage[0]}×${dims.stage[1]}, thumb ${dims.thumbnail[0]}×${dims.thumbnail[1]} · approx ${formatByteSize(approxBytes)}`
+      : "Estimated storage: load an image to see output sizes.";
+  }
+
+  function renderTokenWorkshopPreview() {
+    const canvas = tokenWorkshopPreview;
+    const image = tokenPreviewState.image;
+    if (!canvas || !image) {
+      const ctx = canvas?.getContext?.("2d");
+      if (ctx && canvas) {
+        const size = canvas.width || 512;
+        ctx.clearRect(0, 0, size, size);
+        ctx.fillStyle = "rgba(14, 18, 16, 1)";
+        ctx.fillRect(0, 0, size, size);
+        ctx.strokeStyle = "rgba(255,255,255,0.16)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(1, 1, size - 2, size - 2);
+      }
+      if (tokenWorkshopPreviewMeta) {
+        tokenWorkshopPreviewMeta.textContent = "Upload a PNG, JPEG, or WebP to preview the selected mask.";
+      }
+      updateTokenWorkshopEstimate();
+      return;
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const size = canvas.width || 512;
+    const shape = normalizeTokenWorkshopShape(tokenWorkshopShape?.value || "circle");
+    const zoom = clampNumber(tokenWorkshopZoom?.value || 1, 0.5, 2.5, 1);
+    const offsetX = clampNumber(tokenWorkshopOffsetX?.value || 0, -100, 100, 0) / 100;
+    const offsetY = clampNumber(tokenWorkshopOffsetY?.value || 0, -100, 100, 0) / 100;
+    const scale = (size / Math.max(image.width, image.height, 1)) * zoom;
+    const drawWidth = Math.max(1, Math.round(image.width * scale));
+    const drawHeight = Math.max(1, Math.round(image.height * scale));
+    const drawX = Math.round((size - drawWidth) / 2 + (offsetX * size * 0.5));
+    const drawY = Math.round((size - drawHeight) / 2 + (offsetY * size * 0.5));
+
+    ctx.clearRect(0, 0, size, size);
+    ctx.fillStyle = "rgba(14, 18, 16, 1)";
+    ctx.fillRect(0, 0, size, size);
+    ctx.save();
+    if (shape !== "raw") {
+      drawTokenWorkshopMask(ctx, size, shape);
+      ctx.clip();
+    }
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+    ctx.restore();
+
+    ctx.strokeStyle = "rgba(255,255,255,0.16)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, size - 2, size - 2);
+
+    if (tokenWorkshopPreviewMeta) {
+      tokenWorkshopPreviewMeta.textContent = `${shape} · ${drawWidth}×${drawHeight} preview · ${Math.round(zoom * 100)}% zoom`;
+    }
+    updateTokenWorkshopEstimate();
+  }
+
+  async function loadTokenWorkshopImage(file) {
+    tokenWorkshopCleanupPreview();
+    if (!file) {
+      if (tokenWorkshopPreviewMeta) {
+        tokenWorkshopPreviewMeta.textContent = "Upload a PNG, JPEG, or WebP to preview the selected mask.";
+      }
+      updateTokenWorkshopEstimate();
+      return;
+    }
+
+    const objectURL = URL.createObjectURL(file);
+    tokenPreviewState.file = file;
+    tokenPreviewState.objectURL = objectURL;
+
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => {
+      tokenPreviewState.image = image;
+      tokenPreviewState.width = image.width || 0;
+      tokenPreviewState.height = image.height || 0;
+      if (tokenWorkshopName && !String(tokenWorkshopName.value || "").trim()) {
+        tokenWorkshopName.value = file.name.replace(/\.[^.]+$/, "");
+      }
+      renderTokenWorkshopPreview();
+    };
+    image.onerror = () => {
+      setTokenWorkshopStatus("Preview decode failed.");
+      updateTokenWorkshopEstimate();
+    };
+    image.src = objectURL;
+  }
+
+  async function refreshTokenWorkshopPolicy() {
+    try {
+      const response = await fetch("/api/warehouse/storage", { credentials: "include", cache: "no-store" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
+      tokenStoragePolicy = payload.data || null;
+      const settings = tokenStoragePolicy?.settings || {};
+      const stats = tokenStoragePolicy?.stats || {};
+      const retain = Boolean(settings.retain_originals_default);
+      if (tokenWorkshopRetain) {
+        tokenWorkshopRetain.innerHTML = `<strong>${retain ? "Retained" : "Discarded"}</strong>`;
+      }
+      setTokenWorkshopStatus(
+        `Warehouse ${stats.percent_used ?? 0}% used of ${formatByteSize(settings.hard_limit_bytes || 0)}.`
+      );
+      if (tokenWorkshopFootprint) {
+        tokenWorkshopFootprint.innerHTML = "<strong>1 × 1</strong>";
+      }
+    } catch (error) {
+      console.warn("refreshTokenWorkshopPolicy failed", error);
+      setTokenWorkshopStatus(error.message || String(error));
+    }
+  }
+
+  async function refreshTokenWorkshopList() {
+    if (!tokenWorkshopList) return;
+    try {
+      const response = await fetch("/api/warehouse/assets?asset_type=token&status=active", {
+        credentials: "include",
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
+      const items = Array.isArray(payload.data) ? payload.data : [];
+      if (!items.length) {
+        tokenWorkshopList.innerHTML = `<div class="index-card-empty">No token assets yet.</div>`;
+        return;
+      }
+      tokenWorkshopList.innerHTML = items
+        .slice(0, 6)
+        .map((asset) => {
+          const name = escapeHtml(asset.name || asset.original_filename || asset.id || "Token");
+          const shape = escapeHtml(asset.shape || "circle");
+          const size = escapeHtml(`${asset.width || 0} × ${asset.height || 0}`);
+          const bytes = escapeHtml(formatByteSize(asset.stored_bytes || 0));
+          const url = escapeHtml(asset.thumbnail_url || asset.content_url || "");
+          return `
+            <div class="token-workshop-asset">
+              <strong>${name}</strong>
+              <small>${shape} · ${size} · ${bytes}</small>
+              ${url ? `<img src="${url}" alt="${name}" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;border:1px solid rgba(255,255,255,0.08);" />` : ""}
+            </div>
+          `;
+        })
+        .join("");
+    } catch (error) {
+      tokenWorkshopList.innerHTML = `<div class="index-card-empty">${escapeHtml(error.message || String(error))}</div>`;
+    }
+  }
+
+  async function saveTokenWorkshopAsset() {
+    if (!tokenPreviewState.file) {
+      setTokenWorkshopStatus("Choose an image first.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", tokenPreviewState.file);
+    formData.append("asset_type", "token");
+    formData.append("name", String(tokenWorkshopName?.value || "").trim());
+    formData.append("shape", normalizeTokenWorkshopShape(tokenWorkshopShape?.value || "circle"));
+    formData.append("crop_x", String((clampNumber(tokenWorkshopOffsetX?.value || 0, -100, 100, 0) + 100) / 200));
+    formData.append("crop_y", String((clampNumber(tokenWorkshopOffsetY?.value || 0, -100, 100, 0) + 100) / 200));
+    formData.append("zoom", String(clampNumber(tokenWorkshopZoom?.value || 1, 0.5, 2.5, 1)));
+
+    setTokenWorkshopStatus("Saving token asset...");
+    const endpoints = ["/api/workshop/assets/token", "/api/workshop/assets"];
+    let lastError = null;
+    for (const endpoint of endpoints) {
+      const requestBody = endpoint === "/api/workshop/assets" ? (() => {
+        const fallbackForm = new FormData();
+        for (const [key, value] of formData.entries()) {
+          fallbackForm.append(key, value);
+        }
+        fallbackForm.set("asset_type", "token");
+        return fallbackForm;
+      })() : formData;
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        credentials: "include",
+        body: requestBody,
+      });
+      const payload = await response.json().catch(() => null);
+      if (response.ok && payload?.ok) {
+        if (payload.data?.duplicate_warning) {
+          setTokenWorkshopStatus(String(payload.data.duplicate_warning));
+        } else {
+          setTokenWorkshopStatus("Token saved.");
+        }
+        await refreshTokenWorkshopList();
+        return;
+      }
+      lastError = new Error(payload?.error || `HTTP ${response.status}`);
+      if (response.status !== 404 || endpoint === endpoints[endpoints.length - 1]) {
+        throw lastError;
+      }
+    }
+    throw lastError || new Error("Token save failed.");
+  }
+
   async function loadWorkshopVenues() {
     if (!workshopVenueSelect) return;
 
@@ -4659,6 +5180,11 @@
 
       if (isWorkshopMode) {
         await loadWorkshopVenues();
+        if (tokenWorkshopPanel) {
+          tokenWorkshopPanel.hidden = false;
+        }
+        await refreshTokenWorkshopPolicy();
+        await refreshTokenWorkshopList();
       }
 
       await joinCave();
@@ -4729,6 +5255,57 @@
 
   workshopPlaceStage?.addEventListener("click", () => {
     sendWorkshopPlacement("stage");
+  });
+
+  tokenWorkshopFile?.addEventListener("change", async () => {
+    const file = tokenWorkshopFile.files?.[0] || null;
+    await loadTokenWorkshopImage(file);
+  });
+  tokenWorkshopName?.addEventListener("input", () => {
+    if (tokenPreviewState.image) {
+      renderTokenWorkshopPreview();
+    }
+  });
+  tokenWorkshopShape?.addEventListener("change", () => {
+    if (tokenPreviewState.image) {
+      renderTokenWorkshopPreview();
+    }
+  });
+  tokenWorkshopZoom?.addEventListener("input", () => {
+    if (tokenPreviewState.image) {
+      renderTokenWorkshopPreview();
+    } else {
+      updateTokenWorkshopEstimate();
+    }
+  });
+  tokenWorkshopOffsetX?.addEventListener("input", () => {
+    if (tokenPreviewState.image) {
+      renderTokenWorkshopPreview();
+    }
+  });
+  tokenWorkshopOffsetY?.addEventListener("input", () => {
+    if (tokenPreviewState.image) {
+      renderTokenWorkshopPreview();
+    }
+  });
+  tokenWorkshopSave?.addEventListener("click", async () => {
+    try {
+      await saveTokenWorkshopAsset();
+    } catch (error) {
+      setTokenWorkshopStatus(error.message || String(error));
+    }
+  });
+  tokenWorkshopCancel?.addEventListener("click", () => {
+    tokenWorkshopCleanupPreview();
+    if (tokenWorkshopFile) tokenWorkshopFile.value = "";
+    if (tokenWorkshopName) tokenWorkshopName.value = "";
+    if (tokenWorkshopShape) tokenWorkshopShape.value = "circle";
+    if (tokenWorkshopZoom) tokenWorkshopZoom.value = "1";
+    if (tokenWorkshopOffsetX) tokenWorkshopOffsetX.value = "0";
+    if (tokenWorkshopOffsetY) tokenWorkshopOffsetY.value = "0";
+    if (tokenWorkshopPreviewMeta) tokenWorkshopPreviewMeta.textContent = "Upload a PNG, JPEG, or WebP to preview the selected mask.";
+    setTokenWorkshopStatus("Draft cleared.");
+    updateTokenWorkshopEstimate();
   });
 
   for (const pagerButton of document.querySelectorAll("[data-tray-prev], [data-tray-next]")) {

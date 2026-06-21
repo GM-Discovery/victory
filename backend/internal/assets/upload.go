@@ -113,8 +113,17 @@ func HandleWorkshopUpload(pool *pgxpool.Pool, storageRoot string) http.HandlerFu
 			return
 		}
 
-		r.Body = http.MaxBytesReader(w, r.Body, MaxUploadBytes)
-		if err := r.ParseMultipartForm(MaxUploadBytes); err != nil {
+		settings, err := loadWarehouseStorageSettingsByLocationID(ctx, pool, locationID)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"ok":    false,
+				"error": "storage_settings_lookup_failed",
+			})
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, settings.MaxUploadBytes)
+		if err := r.ParseMultipartForm(settings.MaxUploadBytes); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{
 				"ok":    false,
 				"error": "invalid_or_oversize_multipart",
@@ -123,6 +132,11 @@ func HandleWorkshopUpload(pool *pgxpool.Pool, storageRoot string) http.HandlerFu
 		}
 
 		assetType := normalizeAssetType(r.FormValue("asset_type"))
+		if assetType == "token" {
+			handleTokenWorkshopUpload(w, r, ctx, pool, storageRoot, userID, producerUserID, locationID, settings)
+			return
+		}
+
 		tags := normalizeAssetTags(r.FormValue("tags"))
 		if assetType == "map" && !containsString(tags, "map") {
 			tags = append(tags, "map")
@@ -138,7 +152,7 @@ func HandleWorkshopUpload(pool *pgxpool.Pool, storageRoot string) http.HandlerFu
 		}
 		defer file.Close()
 
-		data, err := readBounded(file, MaxUploadBytes)
+		data, err := readBounded(file, settings.MaxUploadBytes)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{
 				"ok":    false,
@@ -211,8 +225,7 @@ func HandleWorkshopUpload(pool *pgxpool.Pool, storageRoot string) http.HandlerFu
 			)
 			VALUES (
 				$1, $2, $3, $3, 'uploader_owned',
-				$4, $5, $6, $7, $8,
-				$9, $10, $11, $12, $13, $14, ''
+				$4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, ''
 			)
 			RETURNING id
 		`,
@@ -324,6 +337,41 @@ func HandleWorkshopUpload(pool *pgxpool.Pool, storageRoot string) http.HandlerFu
 				})
 				return
 			}
+		}
+
+		var storedBytes int64 = int64(len(data))
+		for _, size := range DerivativeSizes {
+			var variantBytes int64
+			if err := tx.QueryRow(ctx, `
+				SELECT COALESCE(byte_size, 0)
+				FROM asset_derivatives
+				WHERE asset_id = $1
+				  AND variant_key = $2
+				LIMIT 1
+			`, assetID, fmt.Sprintf("%d", size)).Scan(&variantBytes); err == nil {
+				storedBytes += variantBytes
+			}
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE assets
+			SET stored_bytes = $2,
+			    name = $3,
+			    shape = 'raw',
+			    default_grid_width = 1,
+			    default_grid_height = 1,
+			    retain_original = TRUE,
+			    status = 'active',
+			    crop_x = 0.5,
+			    crop_y = 0.5,
+			    zoom = 1,
+			    updated_at = NOW()
+			WHERE id = $1
+		`, assetID, storedBytes, inheritedAssetName(header.Filename)); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"ok":    false,
+				"error": "asset_update_failed",
+			})
+			return
 		}
 
 		if err := tx.Commit(ctx); err != nil {
@@ -464,6 +512,246 @@ func handleWorkshopAssetList(w http.ResponseWriter, r *http.Request, pool *pgxpo
 		"ok":   true,
 		"data": assets,
 	})
+}
+
+func handleTokenWorkshopUpload(w http.ResponseWriter, r *http.Request, ctx context.Context, pool *pgxpool.Pool, storageRoot string, userID string, producerUserID string, locationID string, settings WarehouseStorageSettings) {
+	if r.MultipartForm == nil {
+		r.Body = http.MaxBytesReader(w, r.Body, settings.MaxUploadBytes)
+		if err := r.ParseMultipartForm(settings.MaxUploadBytes); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"ok":    false,
+				"error": "invalid_or_oversize_multipart",
+			})
+			return
+		}
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"ok":    false,
+			"error": "file_required",
+		})
+		return
+	}
+	defer file.Close()
+
+	data, err := readBounded(file, settings.MaxUploadBytes)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"ok":    false,
+			"error": "file_read_failed",
+		})
+		return
+	}
+
+	detectedMime, err := sniffAllowedMime(data)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"ok":    false,
+			"error": err.Error(),
+		})
+		return
+	}
+
+	srcImg, width, height, err := decodeImage(data, detectedMime)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"ok":    false,
+			"error": "image_decode_failed",
+		})
+		return
+	}
+	if width <= 0 || height <= 0 || width > 8192 || height > 8192 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"ok":    false,
+			"error": "image_dimensions_out_of_range",
+		})
+		return
+	}
+
+	tokenReq := parseTokenUploadRequest(r, header.Filename, settings.RetainOriginalsDefault)
+	if tokenReq.Name == "" {
+		tokenReq.Name = inheritedAssetName(header.Filename)
+	}
+
+	checksum := sha256.Sum256(data)
+	duplicateWarning, _ := findDuplicateAssetID(ctx, pool, checksum[:], locationID)
+
+	tempDir, err := os.MkdirTemp(storageRoot, "warehouse-token-*")
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "storage_create_failed"})
+		return
+	}
+	defer func() {
+		_ = os.RemoveAll(tempDir)
+	}()
+
+	prepared, err := prepareTokenVariantFiles(tempDir, srcImg, tokenReq, settings)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+
+	storedBytes := int64(0)
+	for _, file := range prepared.files {
+		storedBytes += int64(len(file.bytes))
+	}
+	if tokenReq.RetainOriginal {
+		storedBytes += int64(len(data))
+	}
+
+	usage, err := loadWarehouseStoredBytes(ctx, pool, locationID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "storage_usage_lookup_failed"})
+		return
+	}
+	if usage+storedBytes > settings.HardLimitBytes {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "warehouse_capacity_exceeded"})
+		return
+	}
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "tx_begin_failed"})
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	assetName := tokenReq.Name
+	var assetID string
+	err = tx.QueryRow(ctx, `
+		INSERT INTO assets (
+			producer_user_id,
+			location_id,
+			uploader_user_id,
+			owner_user_id,
+			owner_state,
+			asset_type,
+			name,
+			shape,
+			default_grid_width,
+			default_grid_height,
+			retain_original,
+			status,
+			crop_x,
+			crop_y,
+			zoom,
+			original_filename,
+			source_ext,
+			source_mime,
+			sniffed_mime,
+			width,
+			height,
+			byte_size,
+			stored_bytes,
+			checksum_sha256,
+			storage_root,
+			original_path
+		)
+		VALUES (
+			$1, $2, $3, $3, 'uploader_owned',
+			'token', $4, $5, 1, 1,
+			$6, 'active', $7, $8, $9,
+			$10, $11, $12, $13, $14, $15, $16, $17, $18, $19, ''
+		)
+		RETURNING id
+	`,
+		producerUserID,
+		locationID,
+		userID,
+		assetName,
+		tokenReq.Shape,
+		tokenReq.RetainOriginal,
+		tokenReq.CropX,
+		tokenReq.CropY,
+		tokenReq.Zoom,
+		header.Filename,
+		normalizeSourceExt(header.Filename, detectedMime),
+		header.Header.Get("Content-Type"),
+		detectedMime,
+		width,
+		height,
+		len(data),
+		storedBytes,
+		checksum[:],
+		storageRoot,
+	).Scan(&assetID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "asset_insert_failed"})
+		return
+	}
+
+	assetDir := filepath.Join(storageRoot, "producers", producerUserID, "assets", assetID)
+	if err := os.MkdirAll(assetDir, 0o755); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "storage_create_failed"})
+		return
+	}
+
+	if tokenReq.RetainOriginal {
+		originalPath := filepath.Join(assetDir, "original"+normalizeSourceExt(header.Filename, detectedMime))
+		if err := os.WriteFile(originalPath, data, 0o644); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "original_write_failed"})
+			return
+		}
+		if _, err := tx.Exec(ctx, `UPDATE assets SET original_path = $2 WHERE id = $1`, assetID, originalPath); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "asset_update_failed"})
+			return
+		}
+	}
+
+	for _, file := range prepared.files {
+		outPath := filepath.Join(assetDir, file.filename)
+		if err := os.WriteFile(outPath, file.bytes, 0o644); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "variant_write_failed"})
+			return
+		}
+		sum := sha256.Sum256(file.bytes)
+		_, err = tx.Exec(ctx, `
+			INSERT INTO asset_derivatives (
+				asset_id,
+				variant_key,
+				width,
+				height,
+				mime,
+				byte_size,
+				checksum_sha256,
+				path
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`, assetID, file.variantKey, file.width, file.height, file.mime, len(file.bytes), sum[:], outPath)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "variant_insert_failed"})
+			return
+		}
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE assets
+		SET stored_bytes = $2,
+		    updated_at = NOW()
+		WHERE id = $1
+	`, assetID, storedBytes); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "asset_update_failed"})
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "tx_commit_failed"})
+		return
+	}
+
+	response := map[string]any{
+		"asset_id":     assetID,
+		"asset_type":   "token",
+		"shape":        tokenReq.Shape,
+		"stored_bytes": storedBytes,
+		"content_url":  "/api/assets/" + assetID + "/content?variant=stage",
+	}
+	if duplicateWarning != "" {
+		response["duplicate_warning"] = duplicateWarning
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": response})
 }
 
 func handleWorkshopMapAssetList(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool) {

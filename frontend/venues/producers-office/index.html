@@ -277,6 +277,21 @@
       line-height: 1.45;
     }
 
+    .metric {
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 240, 216, 0.1);
+      background: linear-gradient(180deg, rgba(16, 22, 29, 0.96), rgba(10, 15, 20, 0.94));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 1.15rem;
+      color: #fff5df;
+    }
+
     .requests {
       display: grid;
       gap: 12px;
@@ -580,6 +595,84 @@
       </section>
 
       <section class="card">
+        <h2>Warehouse Storage</h2>
+        <p class="muted small">Installation-wide storage policy and asset inventory for maps, tokens, and future reusable assets.</p>
+        <div id="warehouse-storage-status" class="status">Loading warehouse storage...</div>
+        <div class="grid" style="grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 12px;">
+          <div class="metric"><span class="muted small">Used</span><strong id="warehouse-storage-used">0 B</strong></div>
+          <div class="metric"><span class="muted small">Limit</span><strong id="warehouse-storage-limit">0 B</strong></div>
+          <div class="metric"><span class="muted small">Active</span><strong id="warehouse-storage-active">0</strong></div>
+          <div class="metric"><span class="muted small">Deleted</span><strong id="warehouse-storage-deleted">0</strong></div>
+        </div>
+        <form id="warehouse-storage-form" style="margin-top: 16px;">
+          <div class="inline">
+            <div>
+              <label for="warehouse-warning-threshold">Warning Threshold %</label>
+              <input id="warehouse-warning-threshold" type="number" min="1" max="99" />
+            </div>
+            <div>
+              <label for="warehouse-critical-threshold">Critical Threshold %</label>
+              <input id="warehouse-critical-threshold" type="number" min="2" max="100" />
+            </div>
+          </div>
+          <div class="inline">
+            <div>
+              <label for="warehouse-max-upload">Max Upload Bytes</label>
+              <input id="warehouse-max-upload" type="number" min="1" step="1" />
+            </div>
+            <div>
+              <label for="warehouse-hard-limit">Hard Limit Bytes</label>
+              <input id="warehouse-hard-limit" type="number" min="1" step="1" />
+            </div>
+          </div>
+          <div class="inline">
+            <div>
+              <label for="warehouse-token-master">Token Master Max</label>
+              <input id="warehouse-token-master" type="number" min="1" step="1" />
+            </div>
+            <div>
+              <label for="warehouse-token-stage">Token Stage Max</label>
+              <input id="warehouse-token-stage" type="number" min="1" step="1" />
+            </div>
+          </div>
+          <div class="inline">
+            <div>
+              <label for="warehouse-token-thumb">Token Thumb Max</label>
+              <input id="warehouse-token-thumb" type="number" min="1" step="1" />
+            </div>
+            <div>
+              <label style="display:flex;align-items:center;gap:10px;margin-top:30px;">
+                <input id="warehouse-retain-default" type="checkbox" />
+                <span>Retain originals by default</span>
+              </label>
+            </div>
+          </div>
+          <div class="chip-list">
+            <button id="warehouse-storage-save" class="button" type="submit">Save Storage Policy</button>
+          </div>
+        </form>
+        <div class="inline" style="margin-top: 10px;">
+          <div>
+            <label for="warehouse-asset-search">Search</label>
+            <input id="warehouse-asset-search" type="text" placeholder="Search assets" />
+          </div>
+          <div>
+            <label for="warehouse-asset-type">Asset Type</label>
+            <select id="warehouse-asset-type">
+              <option value="">All</option>
+              <option value="map">Map</option>
+              <option value="token">Token</option>
+              <option value="generic">Generic</option>
+            </select>
+          </div>
+        </div>
+        <div id="warehouse-assets-status" class="status">Loading assets...</div>
+        <div id="warehouse-asset-list" class="warehouse-asset-list">
+          <div class="muted">Loading warehouse assets...</div>
+        </div>
+      </section>
+
+      <section class="card">
         <h2>Grant Access / Invite</h2>
         <p class="muted small">
           Use an audience invite for venue access, or a production invite for cast, crew, and director permissions. People will see the public display name, not the private login handle. First Theater can be granted directly from here too.
@@ -686,6 +779,25 @@
     const discordGatewayNote = document.getElementById("discord-gateway-note");
     const discordGatewayDebugToggle = document.getElementById("discord-gateway-debug-toggle");
     const discordGatewayDebugState = document.getElementById("discord-gateway-debug-state");
+    const warehouseStorageStatus = document.getElementById("warehouse-storage-status");
+    const warehouseStorageUsed = document.getElementById("warehouse-storage-used");
+    const warehouseStorageLimit = document.getElementById("warehouse-storage-limit");
+    const warehouseStorageActive = document.getElementById("warehouse-storage-active");
+    const warehouseStorageDeleted = document.getElementById("warehouse-storage-deleted");
+    const warehouseStorageForm = document.getElementById("warehouse-storage-form");
+    const warehouseWarningThreshold = document.getElementById("warehouse-warning-threshold");
+    const warehouseCriticalThreshold = document.getElementById("warehouse-critical-threshold");
+    const warehouseMaxUpload = document.getElementById("warehouse-max-upload");
+    const warehouseHardLimit = document.getElementById("warehouse-hard-limit");
+    const warehouseTokenMaster = document.getElementById("warehouse-token-master");
+    const warehouseTokenStage = document.getElementById("warehouse-token-stage");
+    const warehouseTokenThumb = document.getElementById("warehouse-token-thumb");
+    const warehouseRetainDefault = document.getElementById("warehouse-retain-default");
+    const warehouseStorageSave = document.getElementById("warehouse-storage-save");
+    const warehouseAssetSearch = document.getElementById("warehouse-asset-search");
+    const warehouseAssetType = document.getElementById("warehouse-asset-type");
+    const warehouseAssetsStatus = document.getElementById("warehouse-assets-status");
+    const warehouseAssetList = document.getElementById("warehouse-asset-list");
 
     const officeAccess = new Set(["producer"]);
     const discordBootstrapCallbackURL = `${window.location.origin}/auth/discord/server/callback`;
@@ -699,6 +811,8 @@
       "producers-office",
       "directors-chair",
     ];
+    let warehouseStorageState = null;
+    let warehouseAssetCache = [];
 
     function showForbidden() {
       if (forbiddenScreen) forbiddenScreen.hidden = false;
@@ -712,6 +826,25 @@
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#39;");
+    }
+
+    function clampNumber(value, min, max, fallback) {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return fallback;
+      return Math.min(max, Math.max(min, parsed));
+    }
+
+    function formatByteSize(bytes) {
+      const value = Number(bytes || 0);
+      if (!Number.isFinite(value) || value <= 0) return "0 B";
+      const units = ["B", "KB", "MB", "GB", "TB"];
+      let current = value;
+      let unitIndex = 0;
+      while (current >= 1024 && unitIndex < units.length - 1) {
+        current /= 1024;
+        unitIndex++;
+      }
+      return `${current >= 10 || unitIndex === 0 ? current.toFixed(unitIndex === 0 ? 0 : 1) : current.toFixed(2)} ${units[unitIndex]}`;
     }
 
     function setStatus(el, text) {
@@ -858,6 +991,148 @@
       if (discordMappingRepairState) {
         discordMappingRepairState.textContent = linked && setupAvailable ? (canManage ? "Ready" : "Read only") : "Unavailable";
       }
+    }
+
+    function renderWarehouseStorageState() {
+      const settings = warehouseStorageState?.settings || {};
+      const stats = warehouseStorageState?.stats || {};
+      if (warehouseStorageUsed) warehouseStorageUsed.textContent = formatByteSize(stats.total_stored_bytes || 0);
+      if (warehouseStorageLimit) warehouseStorageLimit.textContent = formatByteSize(stats.total_limit_bytes || settings.hard_limit_bytes || 0);
+      if (warehouseStorageActive) warehouseStorageActive.textContent = String(stats.active_assets ?? 0);
+      if (warehouseStorageDeleted) warehouseStorageDeleted.textContent = String(stats.tombstoned_assets ?? 0);
+      if (warehouseWarningThreshold) warehouseWarningThreshold.value = String(settings.warning_threshold_percent ?? 80);
+      if (warehouseCriticalThreshold) warehouseCriticalThreshold.value = String(settings.critical_threshold_percent ?? 90);
+      if (warehouseMaxUpload) warehouseMaxUpload.value = String(settings.max_upload_bytes ?? 0);
+      if (warehouseHardLimit) warehouseHardLimit.value = String(settings.hard_limit_bytes ?? 0);
+      if (warehouseTokenMaster) warehouseTokenMaster.value = String(settings.token_master_max_dimension ?? 1024);
+      if (warehouseTokenStage) warehouseTokenStage.value = String(settings.token_stage_max_dimension ?? 512);
+      if (warehouseTokenThumb) warehouseTokenThumb.value = String(settings.token_thumbnail_max_dimension ?? 128);
+      if (warehouseRetainDefault) warehouseRetainDefault.checked = Boolean(settings.retain_originals_default);
+      if (warehouseStorageStatus) {
+        warehouseStorageStatus.textContent = stats.warning_state
+          ? `Storage ${stats.warning_state} at ${stats.percent_used ?? 0}% of ${formatByteSize(stats.total_limit_bytes || settings.hard_limit_bytes || 0)}.`
+          : "Warehouse storage loaded.";
+      }
+    }
+
+    async function loadWarehouseStorageState() {
+      try {
+        const response = await fetch("/api/warehouse/storage", { credentials: "include", cache: "no-store" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || `HTTP ${response.status}`);
+        }
+        warehouseStorageState = payload.data || null;
+        renderWarehouseStorageState();
+      } catch (error) {
+        warehouseStorageState = null;
+        if (warehouseStorageStatus) {
+          warehouseStorageStatus.textContent = error.message || String(error);
+        }
+      }
+    }
+
+    async function saveWarehouseStorageState() {
+      const payload = {
+        warning_threshold_percent: clampNumber(warehouseWarningThreshold?.value || 80, 1, 99, 80),
+        critical_threshold_percent: clampNumber(warehouseCriticalThreshold?.value || 90, 2, 100, 90),
+        max_upload_bytes: clampNumber(warehouseMaxUpload?.value || 0, 1, Number.MAX_SAFE_INTEGER, 0),
+        hard_limit_bytes: clampNumber(warehouseHardLimit?.value || 0, 1, Number.MAX_SAFE_INTEGER, 0),
+        token_master_max_dimension: clampNumber(warehouseTokenMaster?.value || 1024, 1, 8192, 1024),
+        token_stage_max_dimension: clampNumber(warehouseTokenStage?.value || 512, 1, 8192, 512),
+        token_thumbnail_max_dimension: clampNumber(warehouseTokenThumb?.value || 128, 1, 4096, 128),
+        retain_originals_default: Boolean(warehouseRetainDefault?.checked),
+      };
+      if (payload.warning_threshold_percent >= payload.critical_threshold_percent) {
+        throw new Error("Warning threshold must stay below critical threshold.");
+      }
+      const response = await fetch("/api/warehouse/storage/settings", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.error || `HTTP ${response.status}`);
+      }
+      warehouseStorageState = warehouseStorageState || {};
+      warehouseStorageState.settings = result.data || payload;
+      if (warehouseStorageStatus) {
+        warehouseStorageStatus.textContent = "Warehouse storage policy saved.";
+      }
+      renderWarehouseStorageState();
+    }
+
+    async function loadWarehouseAssets() {
+      if (!warehouseAssetList) return;
+      const search = String(warehouseAssetSearch?.value || "").trim();
+      const type = String(warehouseAssetType?.value || "").trim();
+      const query = new URLSearchParams();
+      if (search) query.set("search", search);
+      if (type) query.set("asset_type", type);
+      warehouseAssetsStatus.textContent = "Loading warehouse assets...";
+      try {
+        const response = await fetch(`/api/warehouse/assets?${query.toString()}`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || `HTTP ${response.status}`);
+        }
+        warehouseAssetCache = Array.isArray(payload.data) ? payload.data : [];
+        if (!warehouseAssetCache.length) {
+          warehouseAssetList.innerHTML = `<div class="muted">No warehouse assets yet.</div>`;
+          warehouseAssetsStatus.textContent = "No assets found.";
+          return;
+        }
+        warehouseAssetsStatus.textContent = `${warehouseAssetCache.length} asset${warehouseAssetCache.length === 1 ? "" : "s"} loaded.`;
+        warehouseAssetList.innerHTML = warehouseAssetCache
+          .map((asset) => {
+            const id = escapeHtml(asset.id || "");
+            const name = escapeHtml(asset.name || asset.original_filename || id || "Asset");
+            const typeLabel = escapeHtml(asset.asset_type || "generic");
+            const shape = escapeHtml(asset.shape || "circle");
+            const bytes = escapeHtml(formatByteSize(asset.stored_bytes || 0));
+            const dims = escapeHtml(`${asset.width || 0} × ${asset.height || 0}`);
+            const thumb = escapeHtml(asset.thumbnail_url || asset.content_url || "");
+            return `
+              <div class="warehouse-asset-card" data-asset-id="${id}">
+                <strong>${name}</strong>
+                <small>${typeLabel} · ${shape} · ${dims} · ${bytes}</small>
+                ${thumb ? `<img src="${thumb}" alt="${name}" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:12px;border:1px solid rgba(255,255,255,0.08);" />` : ""}
+                <div class="chip-list" style="margin-top: 4px;">
+                  <button type="button" data-asset-delete="${id}">Delete</button>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+      } catch (error) {
+        warehouseAssetsStatus.textContent = error.message || String(error);
+        warehouseAssetList.innerHTML = `<div class="muted">${escapeHtml(error.message || String(error))}</div>`;
+      }
+    }
+
+    async function deleteWarehouseAsset(assetID) {
+      const asset = warehouseAssetCache.find((item) => item.id === assetID);
+      const name = asset?.name || asset?.original_filename || assetID;
+      const recovered = formatByteSize(asset?.stored_bytes || 0);
+      if (!window.confirm(`Delete ${name}?\n\nThis will tombstone the asset and recover about ${recovered}. Existing placements will show the construction fallback.`)) {
+        return;
+      }
+      const response = await fetch(`/api/warehouse/assets/${encodeURIComponent(assetID)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
+      await loadWarehouseStorageState();
+      await loadWarehouseAssets();
+      setStatus(warehouseAssetsStatus, `Deleted ${name}.`);
     }
 
     function refreshDiscordBootstrapHint() {
@@ -1357,7 +1632,16 @@
           }
         }
 
-        await Promise.all([loadProductions(), loadIncomingRequests(), loadDiscordServerStatus(), loadDiscordGatewayStatus(), loadDiscordChannelMappingStatus(), loadDiscordMicStatus()]);
+        await Promise.all([
+          loadProductions(),
+          loadIncomingRequests(),
+          loadDiscordServerStatus(),
+          loadDiscordGatewayStatus(),
+          loadDiscordChannelMappingStatus(),
+          loadDiscordMicStatus(),
+          loadWarehouseStorageState(),
+          loadWarehouseAssets(),
+        ]);
         if (isOperator) {
           refreshDiscordBootstrapHint();
           await loadDiscordBootstrapStatus();
@@ -1379,6 +1663,32 @@
         await respondToRequest(requestId, decision);
       } catch (error) {
         setStatus(incomingStatus, error.message || String(error));
+      }
+    });
+
+    warehouseStorageForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        await saveWarehouseStorageState();
+      } catch (error) {
+        setStatus(warehouseStorageStatus, error.message || String(error));
+      }
+    });
+    warehouseAssetSearch?.addEventListener("input", () => {
+      loadWarehouseAssets();
+    });
+    warehouseAssetType?.addEventListener("change", () => {
+      loadWarehouseAssets();
+    });
+    warehouseAssetList?.addEventListener("click", async (event) => {
+      const button = event.target.closest("button[data-asset-delete]");
+      if (!button) return;
+      const assetID = button.getAttribute("data-asset-delete");
+      if (!assetID) return;
+      try {
+        await deleteWarehouseAsset(assetID);
+      } catch (error) {
+        setStatus(warehouseAssetsStatus, error.message || String(error));
       }
     });
   </script>

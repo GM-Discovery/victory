@@ -2,6 +2,7 @@ package assets
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -45,66 +46,27 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		var id, originalFilename, sourceMime, sniffedMime, ownerState, assetType, originalPath string
-		var width, height, byteSize int
-		var producerUserID, uploaderUserID, ownerUserID, locationID string
-		var tags []string
-
-		err = pool.QueryRow(ctx, `
-			SELECT
-				id,
-				producer_user_id,
-				uploader_user_id,
-				owner_user_id,
-				location_id,
-				owner_state::text,
-				COALESCE(NULLIF(asset_type, ''), 'generic') AS asset_type,
-				COALESCE(tags, '{}'::text[]) AS tags,
-				original_filename,
-				source_mime,
-				sniffed_mime,
-				width,
-				height,
-				byte_size,
-				COALESCE(original_path, '')
-			FROM assets
-			WHERE id = $1
-			  AND is_deleted = FALSE
-			LIMIT 1
-		`, assetID).Scan(
-			&id,
-			&producerUserID,
-			&uploaderUserID,
-			&ownerUserID,
-			&locationID,
-			&ownerState,
-			&assetType,
-			&tags,
-			&originalFilename,
-			&sourceMime,
-			&sniffedMime,
-			&width,
-			&height,
-			&byteSize,
-			&originalPath,
-		)
+		rec, err := loadWarehouseAssetRecord(ctx, pool, assetID, true)
 		if err != nil {
 			if err == pgx.ErrNoRows {
-				writeJSON(w, http.StatusNotFound, map[string]any{
-					"ok":    false,
-					"error": "asset_not_found",
-				})
+				if wantContent {
+					serveConstructionFallback(w, r)
+					return
+				}
+				writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "asset_not_found"})
 				return
 			}
-			writeJSON(w, http.StatusInternalServerError, map[string]any{
-				"ok":    false,
-				"error": "asset_lookup_failed",
-			})
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "asset_lookup_failed"})
 			return
 		}
 
 		if wantContent {
-			if strings.EqualFold(strings.TrimSpace(assetType), "map") {
+			if rec.MissingAsset {
+				serveConstructionFallback(w, r)
+				return
+			}
+
+			if strings.EqualFold(strings.TrimSpace(rec.AssetType), "map") {
 				venueMapVisible, venueErr := assetIsActiveFirstTheaterMap(ctx, pool, assetID)
 				if venueErr != nil {
 					writeJSON(w, http.StatusInternalServerError, map[string]any{
@@ -129,22 +91,7 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 					return
 				}
 
-				contentPath := originalPath
-				contentType := sourceMime
-				if strings.TrimSpace(contentType) == "" {
-					contentType = sniffedMime
-				}
-				var derivativePath, derivativeMime string
-				if err := pool.QueryRow(ctx, `
-					SELECT path, COALESCE(NULLIF(mime, ''), 'image/jpeg')
-					FROM asset_derivatives
-					WHERE asset_id = $1
-					  AND variant_key = '1024'
-					LIMIT 1
-				`, assetID).Scan(&derivativePath, &derivativeMime); err == nil && strings.TrimSpace(derivativePath) != "" {
-					contentPath = derivativePath
-					contentType = derivativeMime
-				}
+				contentPath, contentType := resolveAssetContentPath(rec, r.URL.Query().Get("variant"))
 				if strings.TrimSpace(contentPath) == "" {
 					writeJSON(w, http.StatusNotFound, map[string]any{
 						"ok":    false,
@@ -169,7 +116,7 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		allowed, err := userCanReadAsset(ctx, pool, userID, producerUserID, uploaderUserID, ownerUserID, locationID)
+		allowed, err := userCanReadAsset(ctx, pool, userID, rec.ProducerUserID, rec.UploaderUserID, rec.OwnerUserID, rec.LocationID)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{
 				"ok":    false,
@@ -203,58 +150,36 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		rows, err := pool.Query(ctx, `
-			SELECT variant_key, width, height, mime
-			FROM asset_derivatives
-			WHERE asset_id = $1
-			ORDER BY width ASC
-		`, assetID)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{
-				"ok":    false,
-				"error": "asset_derivatives_lookup_failed",
-			})
-			return
-		}
-		defer rows.Close()
-
-		var variants []map[string]any
-		for rows.Next() {
-			var variantKey, mime string
-			var vWidth, vHeight int
-			if err := rows.Scan(&variantKey, &vWidth, &vHeight, &mime); err != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]any{
-					"ok":    false,
-					"error": "asset_derivatives_scan_failed",
-				})
-				return
-			}
-			variants = append(variants, map[string]any{
-				"variant_key": variantKey,
-				"width":       vWidth,
-				"height":      vHeight,
-				"mime":        mime,
-			})
-		}
-
 		writeJSON(w, http.StatusOK, map[string]any{
 			"ok": true,
 			"data": map[string]any{
-				"id":                id,
-				"producer_user_id":  producerUserID,
-				"uploader_user_id":  uploaderUserID,
-				"owner_user_id":     ownerUserID,
-				"owner_state":       ownerState,
-				"asset_type":        assetType,
-				"tags":              tags,
-				"original_filename": originalFilename,
-				"source_mime":       sourceMime,
-				"sniffed_mime":      sniffedMime,
-				"width":             width,
-				"height":            height,
-				"byte_size":         byteSize,
-				"content_url":       "/api/assets/" + id + "/content",
-				"variants":          variants,
+				"id":                  rec.ID,
+				"producer_user_id":    rec.ProducerUserID,
+				"uploader_user_id":    rec.UploaderUserID,
+				"owner_user_id":       rec.OwnerUserID,
+				"owner_state":         rec.OwnerState,
+				"asset_type":          rec.AssetType,
+				"name":                rec.Name,
+				"shape":               rec.Shape,
+				"default_grid_width":  rec.DefaultGridWidth,
+				"default_grid_height": rec.DefaultGridHeight,
+				"retain_original":     rec.RetainOriginal,
+				"status":              rec.Status,
+				"tags":                rec.Tags,
+				"original_filename":   rec.OriginalFilename,
+				"source_mime":         rec.SourceMime,
+				"sniffed_mime":        rec.SniffedMime,
+				"width":               rec.Width,
+				"height":              rec.Height,
+				"byte_size":           rec.ByteSize,
+				"stored_bytes":        rec.StoredBytes,
+				"content_url":         "/api/assets/" + rec.ID + "/content",
+				"variants":            rec.Variants,
+				"missing_asset":       rec.MissingAsset,
+				"original_asset_id":   rec.OriginalAssetID,
+				"original_asset_name": rec.OriginalAssetName,
+				"last_used_at":        rec.LastUsedAt,
+				"deleted_at":          rec.DeletedAt,
 			},
 		})
 	}
@@ -286,6 +211,63 @@ func assetIsActiveFirstTheaterMap(ctx context.Context, pool *pgxpool.Pool, asset
 		return false, err
 	}
 	return found, nil
+}
+
+func resolveAssetContentPath(rec warehouseAssetRecord, variant string) (string, string) {
+	variant = strings.ToLower(strings.TrimSpace(variant))
+	switch variant {
+	case "thumbnail", "stage", "master", "original":
+		for _, item := range rec.Variants {
+			if strings.EqualFold(strings.TrimSpace(fmt.Sprint(item["variant_key"])), variant) {
+				path := strings.TrimSpace(fmt.Sprint(item["path"]))
+				mime := strings.TrimSpace(fmt.Sprint(item["mime"]))
+				if path != "" {
+					return path, mime
+				}
+			}
+		}
+	}
+
+	if variant == "" {
+		for _, preferred := range []string{"stage", "master", "thumbnail", "original"} {
+			for _, item := range rec.Variants {
+				if strings.EqualFold(strings.TrimSpace(fmt.Sprint(item["variant_key"])), preferred) {
+					path := strings.TrimSpace(fmt.Sprint(item["path"]))
+					mime := strings.TrimSpace(fmt.Sprint(item["mime"]))
+					if path != "" {
+						return path, mime
+					}
+				}
+			}
+		}
+	}
+
+	if rec.OriginalPath != "" {
+		contentType := rec.SourceMime
+		if strings.TrimSpace(contentType) == "" {
+			contentType = rec.SniffedMime
+		}
+		return rec.OriginalPath, contentType
+	}
+
+	for _, item := range rec.Variants {
+		path := strings.TrimSpace(fmt.Sprint(item["path"]))
+		mime := strings.TrimSpace(fmt.Sprint(item["mime"]))
+		if path != "" {
+			return path, mime
+		}
+	}
+
+	return "", ""
+}
+
+func serveConstructionFallback(w http.ResponseWriter, r *http.Request) {
+	if _, err := os.Stat(constructionFallbackAssetPath); err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "asset_content_not_found"})
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	http.ServeFile(w, r, filepath.Clean(constructionFallbackAssetPath))
 }
 
 func userCanReadAsset(ctx context.Context, pool *pgxpool.Pool, userID, producerUserID, uploaderUserID, ownerUserID, locationID string) (bool, error) {
