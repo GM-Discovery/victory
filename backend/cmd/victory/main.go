@@ -336,6 +336,8 @@ func main() {
 	mux.HandleFunc("/api/assets/", assets.HandleGetAssetMeta(pool))
 	mux.HandleFunc("GET /api/venues/first-theater/map", venues.HandleVenueMap(pool))
 	mux.HandleFunc("POST /api/venues/first-theater/map", venues.HandleVenueMap(pool))
+	mux.HandleFunc("GET /api/venues/first-theater/grid", venues.HandleVenueGrid(pool))
+	mux.HandleFunc("PUT /api/venues/first-theater/grid", venues.HandleVenueGrid(pool))
 	mux.HandleFunc("/api/venues/", venues.HandleVenueMap(pool))
 
 	mux.HandleFunc("/api/session/the-cave/join", func(w http.ResponseWriter, r *http.Request) {

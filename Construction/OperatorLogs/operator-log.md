@@ -526,3 +526,29 @@ Implement `perform/speak` using the same action pipeline:
 - If Pixi fails to load, First Theater still falls back to its existing DOM-safe message
 - The older First Theater stage composition remains the preferred live presentation for now
 - The Cave was left untouched by this kernel
+
+## 2026-06-20 — Kernel 47 Pixi grid primitive + map alignment
+
+### Backend
+- Added `backend/internal/venues/grid.go`: `GET /api/venues/first-theater/grid` and `PUT /api/venues/first-theater/grid`, scoped to First Theater only, mirroring the existing map route's authority model (operator/producer/director can edit, any venue-accessible viewer can read)
+- Added migration `028_kernel47_grid_config.sql` creating `venue_grid_configs` (one row per venue: grid_type, hex_orientation, cell_size, offset_x/y, line_width, opacity, line_style, visible, updated_by_user_id)
+- Server-side validation bounds: cell size 8–500, opacity 0–1, line width 0.5–8, offsets ±2000, grid_type in {none,square,hex}, hex_orientation in {flat-top,pointy-top}, line_style in {light,neutral,dark}
+- Also fixed two regressions found and fixed mid-session on the existing map feature (Kernel 46 follow-up, same branch of work): the running `victory-backend` container had not been rebuilt since `display_mode` (theater/fullscreen) was added to `map.go`, so Save was silently reverting to theater; and added a `DELETE /api/venues/first-theater/map` endpoint plus a Remove Map button so producers/directors can clear the active map asset
+
+### Frontend
+- Added `frontend/lib/victory-pixi-grid.js`: square-grid line rendering, flat-top and pointy-top hex-grid rendering (closed hexagon outlines via axial row/column spacing), clear, and a `render(layer, config, bounds)` entry point bounded by the same playable-stage rectangle the map uses
+- Added a `grid` Pixi container layer (zIndex 6) between `mapLayer` (5) and `facadeLayer` (8) in First Theater's scene graph
+- Extracted `computeStagePlayableBounds(width, height)` in `runtime.js` so the map layer and grid layer always agree on the theater-vs-fullscreen safe-bounds rectangle
+- Added a "Configure Grid" stage context-menu item (producer/director gated, same pattern as "Add / Replace Map") and a draggable "Configure Grid" callout panel with: grid type (off/square/hex), hex orientation, cell size (+/- nudge buttons), offset X/Y (arrow nudge buttons, Shift for a larger step), opacity, line width, line style, Reset Grid, Hide/Show Grid, Save Grid, and Close (Close reverts the live preview to the last saved configuration; outside-click just closes without reverting, matching the existing map editor's convention)
+- Grid configuration is fetched on boot alongside map state and re-rendered on every `renderPixiScene()` pass, so resize and map-replacement both keep the grid aligned automatically
+
+### Documentation
+- Promoted Kernel 47 into the current-state canon
+- Updated the roadmap to mark the grid-primitive pass as the current near-term kernel and noted pan/zoom is deferred to a later kernel
+- Added a Kernel 47 reportback in the official house format
+
+### Operational Notes
+- The grid is visual-only: no snap-to-grid, measurement, coordinates, tokens, or pan/zoom were built, per kernel scope
+- The collapsed-header blur over the First Theater map top edge remains a known, deferred layout issue, untouched by this kernel
+- **Incident**: running the full backend test suite (`go test ./...`) against this environment's `DATABASE_URL` executes real `DELETE`/`INSERT` statements against the live `victory` Postgres database, not an isolated test database. This deleted the live `auth.discord_server_link_settings` row for the real `amurray-family` location (several tests in `internal/identity` and `internal/network` assume a disposable DB and clean up by deleting real location-scoped rows). The Discord gateway came up disabled until the operator re-ran their bootstrap flow. Backend test runs against this database should be scoped away from `internal/identity` and `internal/network` going forward, or run only after confirming with the operator
+- Also discovered an unrelated, pre-existing stray `victory` binary running directly on the host on port 8081 (started before this session, consistent with the documented "dev mode" `go run ./cmd/victory` workflow); confirmed Caddy's `reverse_proxy backend:8081` resolves to the Docker service, not the host process, so production routing was unaffected — flagged to the operator as a leftover process worth checking

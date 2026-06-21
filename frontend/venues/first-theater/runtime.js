@@ -49,6 +49,28 @@
     const mapEditorSave = document.getElementById("map-editor-save");
     const mapEditorRemove = document.getElementById("map-editor-remove");
     const mapEditorCancel = document.getElementById("map-editor-cancel");
+    const gridEditorPanel = document.getElementById("grid-editor");
+    const gridEditorHeader = document.getElementById("grid-editor-header");
+    const gridEditorStatus = document.getElementById("grid-editor-status");
+    const gridEditorType = document.getElementById("grid-editor-type");
+    const gridEditorHexOrientationField = document.getElementById("grid-editor-hex-orientation-field");
+    const gridEditorHexOrientation = document.getElementById("grid-editor-hex-orientation");
+    const gridEditorCellSize = document.getElementById("grid-editor-cell-size");
+    const gridEditorCellSizeUp = document.getElementById("grid-editor-cell-size-up");
+    const gridEditorCellSizeDown = document.getElementById("grid-editor-cell-size-down");
+    const gridEditorOffsetX = document.getElementById("grid-editor-offset-x");
+    const gridEditorOffsetXUp = document.getElementById("grid-editor-offset-x-up");
+    const gridEditorOffsetXDown = document.getElementById("grid-editor-offset-x-down");
+    const gridEditorOffsetY = document.getElementById("grid-editor-offset-y");
+    const gridEditorOffsetYUp = document.getElementById("grid-editor-offset-y-up");
+    const gridEditorOffsetYDown = document.getElementById("grid-editor-offset-y-down");
+    const gridEditorOpacity = document.getElementById("grid-editor-opacity");
+    const gridEditorLineWidth = document.getElementById("grid-editor-line-width");
+    const gridEditorLineStyle = document.getElementById("grid-editor-line-style");
+    const gridEditorReset = document.getElementById("grid-editor-reset");
+    const gridEditorVisibility = document.getElementById("grid-editor-visibility");
+    const gridEditorSave = document.getElementById("grid-editor-save");
+    const gridEditorCancel = document.getElementById("grid-editor-cancel");
     let pixiLoadPromise = null;
     let firstTheaterRuntimeStarted = false;
     window.VictoryVenueShell?.mount?.({
@@ -106,10 +128,15 @@
     let sceneRoot = null;
     let backgroundLayer = null;
     let mapLayer = null;
+    let gridLayer = null;
     let facadeLayer = null;
     let objectLayer = null;
     let uiLayer = null;
     let mapEditorOriginalState = null;
+    let currentVenueGridConfig = null;
+    let gridEditorOriginalState = null;
+    let gridEditorDirty = false;
+    let gridEditorDragState = null;
     let resizeObserver = null;
     let currentIdentity = null;
     let uiPreferenceKey = "";
@@ -1183,6 +1210,7 @@
       if (kind === "stage") {
         push("create-card", "Create Index Card", "create", { disabled: !canManageIndexCards(currentRole) });
         push("set-map", "Add / Replace Map", "create", { disabled: !canManageIndexCards(currentRole) });
+        push("configure-grid", "Configure Grid", "create", { disabled: !canManageIndexCards(currentRole) });
         push("inspect", "Inspect Stage", "info");
         if (currentSelection) {
           push("clear", "Clear selection", "clear");
@@ -1404,6 +1432,30 @@
       mapEditorPanel.style.bottom = "auto";
     }
 
+    function clampGridEditorPosition(left, top) {
+      const shellRect = stageShell?.getBoundingClientRect?.();
+      const panelRect = gridEditorPanel?.getBoundingClientRect?.();
+      const panelWidth = Number(panelRect?.width || 420);
+      const panelHeight = Number(panelRect?.height || 480);
+      const shellWidth = Number(shellRect?.width || 0);
+      const shellHeight = Number(shellRect?.height || 0);
+      const maxLeft = Math.max(8, shellWidth - panelWidth - 8);
+      const maxTop = Math.max(8, shellHeight - panelHeight - 8);
+      return {
+        left: Math.max(8, Math.min(Math.round(left), maxLeft)),
+        top: Math.max(8, Math.min(Math.round(top), maxTop)),
+      };
+    }
+
+    function setGridEditorPosition(left, top) {
+      if (!gridEditorPanel) return;
+      const position = clampGridEditorPosition(left, top);
+      gridEditorPanel.style.left = `${position.left}px`;
+      gridEditorPanel.style.top = `${position.top}px`;
+      gridEditorPanel.style.right = "auto";
+      gridEditorPanel.style.bottom = "auto";
+    }
+
     function syncMapEditorPreview(url) {
       if (!mapEditorPreview) return;
       if (mapEditorPreviewURL && mapEditorPreviewURL !== url && mapEditorPreviewURL.startsWith("blob:")) {
@@ -1523,6 +1575,7 @@
         return;
       }
       hideCardEditor();
+      hideGridEditor();
       mapEditorOriginalState = currentVenueMapState ? { ...currentVenueMapState } : null;
       if (mapEditorPanel.hidden) {
         setMapEditorPosition(24, 24);
@@ -1718,6 +1771,187 @@
       hideMapEditor();
     }
 
+    function defaultGridConfig() {
+      return {
+        grid_type: "none",
+        hex_orientation: "flat-top",
+        cell_size: 50,
+        offset_x: 0,
+        offset_y: 0,
+        line_width: 1,
+        opacity: 0.45,
+        line_style: "neutral",
+        visible: true,
+      };
+    }
+
+    function gridEditorDraftFromUI() {
+      const state = currentVenueGridConfig || defaultGridConfig();
+      const liveGridType = String(gridEditorType?.value || "");
+      const liveHexOrientation = String(gridEditorHexOrientation?.value || "");
+      const liveLineStyle = String(gridEditorLineStyle?.value || "");
+      return {
+        grid_type: liveGridType === "square" || liveGridType === "hex" ? liveGridType : "none",
+        hex_orientation: liveHexOrientation === "pointy-top" ? "pointy-top" : "flat-top",
+        cell_size: clampNumber(gridEditorCellSize?.value, 8, 500, 50),
+        offset_x: clampNumber(gridEditorOffsetX?.value, -2000, 2000, 0),
+        offset_y: clampNumber(gridEditorOffsetY?.value, -2000, 2000, 0),
+        line_width: clampNumber(gridEditorLineWidth?.value, 0.5, 8, 1),
+        opacity: clampNumber(gridEditorOpacity?.value, 0, 1, 0.45),
+        line_style: liveLineStyle === "light" || liveLineStyle === "dark" ? liveLineStyle : "neutral",
+        visible: state.visible !== false,
+      };
+    }
+
+    function setGridEditorStatus(text) {
+      if (gridEditorStatus) {
+        gridEditorStatus.textContent = text || "";
+      }
+    }
+
+    function syncGridEditorHexFieldVisibility() {
+      if (!gridEditorHexOrientationField) return;
+      gridEditorHexOrientationField.style.display = String(gridEditorType?.value || "") === "hex" ? "" : "none";
+    }
+
+    function syncGridEditorVisibilityButton() {
+      if (!gridEditorVisibility) return;
+      const visible = currentVenueGridConfig ? currentVenueGridConfig.visible !== false : true;
+      gridEditorVisibility.textContent = visible ? "Hide Grid" : "Show Grid";
+    }
+
+    function syncGridEditorWithState() {
+      if (!gridEditorPanel || gridEditorPanel.hidden) return;
+      const state = currentVenueGridConfig || defaultGridConfig();
+      if (gridEditorType) gridEditorType.value = String(state.grid_type || "none");
+      if (gridEditorHexOrientation) gridEditorHexOrientation.value = String(state.hex_orientation || "flat-top");
+      if (gridEditorCellSize) gridEditorCellSize.value = String(state.cell_size ?? 50);
+      if (gridEditorOffsetX) gridEditorOffsetX.value = String(state.offset_x ?? 0);
+      if (gridEditorOffsetY) gridEditorOffsetY.value = String(state.offset_y ?? 0);
+      if (gridEditorOpacity) gridEditorOpacity.value = String(state.opacity ?? 0.45);
+      if (gridEditorLineWidth) gridEditorLineWidth.value = String(state.line_width ?? 1);
+      if (gridEditorLineStyle) gridEditorLineStyle.value = String(state.line_style || "neutral");
+      syncGridEditorHexFieldVisibility();
+      syncGridEditorVisibilityButton();
+    }
+
+    function liveSyncGrid() {
+      currentVenueGridConfig = gridEditorDraftFromUI();
+      syncGridEditorHexFieldVisibility();
+      const size = getStageSize();
+      renderVenueGridLayer(Math.max(320, size.width), Math.max(320, size.height));
+    }
+
+    function nudgeGridNumberField(inputEl, delta, min, max) {
+      if (!inputEl) return;
+      const current = Number(inputEl.value) || 0;
+      const next = Math.max(min, Math.min(max, current + delta));
+      inputEl.value = String(next);
+      gridEditorDirty = true;
+      liveSyncGrid();
+    }
+
+    function openGridEditor() {
+      if (!gridEditorPanel) return;
+      if (!canManageIndexCards(currentRole)) {
+        setStageStatus("Only producers and directors can configure the First Theater grid.");
+        return;
+      }
+      hideCardEditor();
+      hideMapEditor();
+      gridEditorOriginalState = currentVenueGridConfig ? { ...currentVenueGridConfig } : defaultGridConfig();
+      if (gridEditorPanel.hidden) {
+        setGridEditorPosition(24, 24);
+      }
+      gridEditorPanel.hidden = false;
+      gridEditorDirty = false;
+      setGridEditorStatus("Choose a grid style for the First Theater stage.");
+      syncGridEditorWithState();
+    }
+
+    function hideGridEditor() {
+      gridEditorDirty = false;
+      gridEditorOriginalState = null;
+      if (gridEditorPanel) {
+        gridEditorPanel.hidden = true;
+      }
+      setGridEditorStatus("Choose a grid style for the First Theater stage.");
+    }
+
+    function cancelGridEditor() {
+      if (gridEditorOriginalState) {
+        currentVenueGridConfig = gridEditorOriginalState;
+        const size = getStageSize();
+        renderVenueGridLayer(Math.max(320, size.width), Math.max(320, size.height));
+      }
+      hideGridEditor();
+    }
+
+    function resetGridEditorDraft() {
+      if (!window.confirm("Reset grid fields to default values? Click Save Grid to persist.")) return;
+      currentVenueGridConfig = defaultGridConfig();
+      gridEditorDirty = true;
+      syncGridEditorWithState();
+      const size = getStageSize();
+      renderVenueGridLayer(Math.max(320, size.width), Math.max(320, size.height));
+      setGridEditorStatus("Grid reset to defaults. Save to persist.");
+    }
+
+    function toggleGridVisibilityDraft() {
+      const draft = gridEditorDraftFromUI();
+      draft.visible = !(currentVenueGridConfig ? currentVenueGridConfig.visible !== false : true);
+      currentVenueGridConfig = draft;
+      gridEditorDirty = true;
+      syncGridEditorVisibilityButton();
+      const size = getStageSize();
+      renderVenueGridLayer(Math.max(320, size.width), Math.max(320, size.height));
+      setGridEditorStatus(draft.visible ? "Grid will be shown after save." : "Grid will be hidden after save.");
+    }
+
+    async function saveGridConfig() {
+      if (!canManageIndexCards(currentRole)) {
+        setStageStatus("Only producers and directors can configure the First Theater grid.");
+        return;
+      }
+      const payload = gridEditorDraftFromUI();
+      setGridEditorStatus("Saving grid configuration...");
+      const response = await fetch("/api/venues/first-theater/grid", {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.error || `HTTP ${response.status}`);
+      }
+      currentVenueGridConfig = result.data || defaultGridConfig();
+      gridEditorOriginalState = { ...currentVenueGridConfig };
+      renderPixiScene();
+      setStageStatus("First Theater grid updated.");
+      hideGridEditor();
+    }
+
+    async function refreshVenueGridConfig() {
+      try {
+        const response = await fetch("/api/venues/first-theater/grid", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || `HTTP ${response.status}`);
+        }
+        currentVenueGridConfig = payload.data || defaultGridConfig();
+        renderPixiScene();
+      } catch (error) {
+        console.warn("refreshVenueGridConfig failed", error);
+        currentVenueGridConfig = defaultGridConfig();
+      }
+    }
+
     async function ensureVenueMapTexture() {
       const assetURL = String(currentVenueMapState?.asset?.content_url || "").trim();
       if (!assetURL || !window.PIXI) {
@@ -1758,6 +1992,28 @@
       return venueMapTexturePromise;
     }
 
+    function computeStagePlayableBounds(width, height) {
+      const displayMode = String(currentVenueMapState?.display_mode || "theater").trim() === "fullscreen" ? "fullscreen" : "theater";
+      if (displayMode === "fullscreen") {
+        return { x: 0, y: 0, width, height };
+      }
+      const prosceniumInset = Math.max(18, Math.round(width * 0.04));
+      const upperDrapeHeight = Math.max(80, Math.round(height * 0.16));
+      const floorBandTop = Math.max(Math.round(height * 0.72), height - 200);
+      return {
+        x: prosceniumInset,
+        y: upperDrapeHeight,
+        width: Math.max(1, width - prosceniumInset * 2),
+        height: Math.max(1, floorBandTop - upperDrapeHeight),
+      };
+    }
+
+    function renderVenueGridLayer(width, height) {
+      if (!gridLayer || !window.PIXI) return;
+      const bounds = computeStagePlayableBounds(width, height);
+      window.VictoryPixiGrid?.render?.(gridLayer, currentVenueGridConfig, bounds);
+    }
+
     function renderVenueMapLayer(width, height) {
       if (!mapLayer || !window.PIXI) return;
       mapLayer.removeChildren();
@@ -1781,22 +2037,11 @@
       }
 
       const displayMode = String(state.display_mode || "theater").trim() === "fullscreen" ? "fullscreen" : "theater";
-
-      let boundsX, boundsY, boundsWidth, boundsHeight;
-      if (displayMode === "fullscreen") {
-        boundsX = 0;
-        boundsY = 0;
-        boundsWidth = width;
-        boundsHeight = height;
-      } else {
-        const prosceniumInset = Math.max(18, Math.round(width * 0.04));
-        const upperDrapeHeight = Math.max(80, Math.round(height * 0.16));
-        const floorBandTop = Math.max(Math.round(height * 0.72), height - 200);
-        boundsX = prosceniumInset;
-        boundsY = upperDrapeHeight;
-        boundsWidth = Math.max(1, width - prosceniumInset * 2);
-        boundsHeight = Math.max(1, floorBandTop - upperDrapeHeight);
-      }
+      const bounds = computeStagePlayableBounds(width, height);
+      const boundsX = bounds.x;
+      const boundsY = bounds.y;
+      const boundsWidth = bounds.width;
+      const boundsHeight = bounds.height;
 
       const sprite = new PIXI.Sprite(venueMapTexture);
       sprite.anchor.set(0.5);
@@ -1876,6 +2121,7 @@
         return;
       }
       hideMapEditor();
+      hideGridEditor();
       showCardEditorFor(target);
       selectObject(target, `${target.label} selected.`);
       if (cardEditorFront) {
@@ -2151,10 +2397,17 @@
         return;
       }
 
+      if (action === "configure-grid") {
+        openGridEditor();
+        closeContextMenu();
+        return;
+      }
+
       if (action === "clear") {
         selectObject(null, "Selection cleared.");
         hideCardEditor();
         hideMapEditor();
+        hideGridEditor();
         closeContextMenu();
         return;
       }
@@ -2985,6 +3238,7 @@
       }
 
       renderVenueMapLayer(width, height);
+      renderVenueGridLayer(width, height);
 
       if (smokeGridEnabled) {
         const grid = new PIXI.Graphics();
@@ -3134,6 +3388,8 @@
       backgroundLayer.zIndex = 0;
       mapLayer = new PIXI.Container();
       mapLayer.zIndex = 5;
+      gridLayer = new PIXI.Container();
+      gridLayer.zIndex = 6;
       facadeLayer = new PIXI.Container();
       facadeLayer.zIndex = 8;
       objectLayer = new PIXI.Container();
@@ -3141,7 +3397,7 @@
       uiLayer = new PIXI.Container();
       uiLayer.zIndex = 20;
       pixiApp.stage.addChild(sceneRoot);
-      sceneRoot.addChild(backgroundLayer, mapLayer, facadeLayer, objectLayer, uiLayer);
+      sceneRoot.addChild(backgroundLayer, mapLayer, gridLayer, facadeLayer, objectLayer, uiLayer);
 
       stageHost.addEventListener("pointermove", (event) => {
         const point = stagePointFromClient(event.clientX, event.clientY);
@@ -3171,6 +3427,10 @@
       window.addEventListener("pointermove", moveMapEditorDrag, true);
       window.addEventListener("pointerup", endMapEditorDrag, true);
       window.addEventListener("pointercancel", endMapEditorDrag, true);
+      gridEditorHeader?.addEventListener("pointerdown", beginGridEditorDrag);
+      window.addEventListener("pointermove", moveGridEditorDrag, true);
+      window.addEventListener("pointerup", endGridEditorDrag, true);
+      window.addEventListener("pointercancel", endGridEditorDrag, true);
 
       resizeObserver = new ResizeObserver(() => layoutPixiScene());
       resizeObserver.observe(stageShell);
@@ -3178,6 +3438,7 @@
       layoutPixiScene();
       window.setTimeout(() => {
         void refreshVenueMapState();
+        void refreshVenueGridConfig();
       }, 0);
     }
 
@@ -3301,6 +3562,38 @@
       mapEditorDragState = null;
       if (mapEditorHeader) {
         mapEditorHeader.style.cursor = "move";
+      }
+    }
+
+    function beginGridEditorDrag(event) {
+      if (!gridEditorPanel || gridEditorPanel.hidden || !gridEditorHeader) return;
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const rect = gridEditorPanel.getBoundingClientRect();
+      gridEditorDragState = {
+        offsetX: event.clientX - rect.left,
+        offsetY: event.clientY - rect.top,
+      };
+      gridEditorHeader.setPointerCapture?.(event.pointerId);
+      gridEditorHeader.style.cursor = "grabbing";
+    }
+
+    function moveGridEditorDrag(event) {
+      if (!gridEditorDragState || !gridEditorPanel) return;
+      const shellRect = stageShell?.getBoundingClientRect?.();
+      if (!shellRect) return;
+      setGridEditorPosition(
+        event.clientX - shellRect.left - gridEditorDragState.offsetX,
+        event.clientY - shellRect.top - gridEditorDragState.offsetY,
+      );
+    }
+
+    function endGridEditorDrag() {
+      if (!gridEditorDragState) return;
+      gridEditorDragState = null;
+      if (gridEditorHeader) {
+        gridEditorHeader.style.cursor = "move";
       }
     }
 
@@ -4013,6 +4306,92 @@
       hideMapEditor();
     });
 
+    gridEditorType?.addEventListener("change", () => {
+      gridEditorDirty = true;
+      liveSyncGrid();
+    });
+
+    gridEditorHexOrientation?.addEventListener("change", () => {
+      gridEditorDirty = true;
+      liveSyncGrid();
+    });
+
+    gridEditorCellSize?.addEventListener("input", () => {
+      gridEditorDirty = true;
+      liveSyncGrid();
+    });
+
+    gridEditorOffsetX?.addEventListener("input", () => {
+      gridEditorDirty = true;
+      liveSyncGrid();
+    });
+
+    gridEditorOffsetY?.addEventListener("input", () => {
+      gridEditorDirty = true;
+      liveSyncGrid();
+    });
+
+    gridEditorOpacity?.addEventListener("input", () => {
+      gridEditorDirty = true;
+      liveSyncGrid();
+    });
+
+    gridEditorLineWidth?.addEventListener("input", () => {
+      gridEditorDirty = true;
+      liveSyncGrid();
+    });
+
+    gridEditorLineStyle?.addEventListener("change", () => {
+      gridEditorDirty = true;
+      liveSyncGrid();
+    });
+
+    gridEditorCellSizeUp?.addEventListener("click", (event) => {
+      nudgeGridNumberField(gridEditorCellSize, event.shiftKey ? 25 : 5, 8, 500);
+    });
+
+    gridEditorCellSizeDown?.addEventListener("click", (event) => {
+      nudgeGridNumberField(gridEditorCellSize, event.shiftKey ? -25 : -5, 8, 500);
+    });
+
+    gridEditorOffsetXUp?.addEventListener("click", (event) => {
+      nudgeGridNumberField(gridEditorOffsetX, event.shiftKey ? 20 : 4, -2000, 2000);
+    });
+
+    gridEditorOffsetXDown?.addEventListener("click", (event) => {
+      nudgeGridNumberField(gridEditorOffsetX, event.shiftKey ? -20 : -4, -2000, 2000);
+    });
+
+    gridEditorOffsetYUp?.addEventListener("click", (event) => {
+      nudgeGridNumberField(gridEditorOffsetY, event.shiftKey ? 20 : 4, -2000, 2000);
+    });
+
+    gridEditorOffsetYDown?.addEventListener("click", (event) => {
+      nudgeGridNumberField(gridEditorOffsetY, event.shiftKey ? -20 : -4, -2000, 2000);
+    });
+
+    gridEditorVisibility?.addEventListener("click", () => {
+      toggleGridVisibilityDraft();
+    });
+
+    gridEditorReset?.addEventListener("click", () => {
+      resetGridEditorDraft();
+    });
+
+    gridEditorSave?.addEventListener("click", async () => {
+      try {
+        await saveGridConfig();
+      } catch (error) {
+        console.warn("saveGridConfig failed", error);
+        setGridEditorStatus(error.message || String(error));
+        setStageStatus(error.message || String(error));
+      }
+    });
+
+    gridEditorCancel?.addEventListener("click", () => {
+      cancelGridEditor();
+    });
+
     document.addEventListener("click", (event) => {
       if (contextMenu && !contextMenu.hidden && !contextMenu.contains(event.target)) {
         closeContextMenu();
@@ -4030,6 +4409,9 @@
       }
       if (mapEditorPanel && !mapEditorPanel.hidden && !event.target.closest("#map-editor") && !event.target.closest("#map-editor-header")) {
         hideMapEditor();
+      }
+      if (gridEditorPanel && !gridEditorPanel.hidden && !event.target.closest("#grid-editor") && !event.target.closest("#grid-editor-header")) {
+        hideGridEditor();
       }
       if (leftSettingsPanel && !leftSettingsPanel.hidden && !event.target.closest("#left-settings-panel") && !event.target.closest("#left-settings-button")) {
         leftSettingsPanel.hidden = true;

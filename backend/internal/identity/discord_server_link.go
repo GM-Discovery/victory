@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -323,7 +324,8 @@ func HandleDiscordServerCallback(pool *pgxpool.Pool, cfg DiscordServerLinkConfig
 
 		guild, err := fetchDiscordGuild(ctx, runtimeCfg, guildID)
 		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "discord_guild_lookup_failed"})
+			log.Printf("discord server callback: guild lookup failed for guild_id=%s: %v", guildID, err)
+			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "discord_guild_lookup_failed", "detail": err.Error()})
 			return
 		}
 

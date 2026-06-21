@@ -1483,6 +1483,51 @@
       width: 100%;
     }
 
+    .grid-editor-fields {
+      display: grid;
+      gap: 10px;
+    }
+
+    .grid-editor-fields .editor-field select,
+    .grid-editor-fields .editor-field input[type="number"] {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(8, 7, 6, 0.78);
+      color: #f7efe5;
+      font: inherit;
+      padding: 10px 12px;
+    }
+
+    .grid-editor-fields .editor-field input[type="range"] {
+      width: 100%;
+    }
+
+    .grid-editor-nudge-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .grid-nudge-button {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.06);
+      color: #f6efe2;
+      cursor: pointer;
+      font: inherit;
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .grid-nudge-button:hover {
+      background: rgba(255, 255, 255, 0.11);
+    }
+
     .map-asset-list {
       display: grid;
       gap: 8px;
@@ -1898,6 +1943,77 @@
                 <button id="map-editor-cancel" type="button">Close</button>
               </div>
             </div>
+            <div id="grid-editor" class="map-editor grid-editor" hidden>
+              <div id="grid-editor-header" class="map-editor-header">
+                <strong>Configure Grid</strong>
+                <span class="map-editor-grip">drag</span>
+              </div>
+              <div id="grid-editor-status" class="editor-status">Choose a grid style for the First Theater stage.</div>
+              <div class="grid-editor-fields">
+                <label class="editor-field" for="grid-editor-type">
+                  <span>Grid</span>
+                  <select id="grid-editor-type">
+                    <option value="none">Off</option>
+                    <option value="square">Square</option>
+                    <option value="hex">Hex</option>
+                  </select>
+                </label>
+                <label class="editor-field" for="grid-editor-hex-orientation" id="grid-editor-hex-orientation-field">
+                  <span>Hex Orientation</span>
+                  <select id="grid-editor-hex-orientation">
+                    <option value="flat-top">Flat-top</option>
+                    <option value="pointy-top">Pointy-top</option>
+                  </select>
+                </label>
+                <label class="editor-field" for="grid-editor-cell-size">
+                  <span>Cell Size</span>
+                  <div class="grid-editor-nudge-row">
+                    <button id="grid-editor-cell-size-down" type="button" class="grid-nudge-button">&minus;</button>
+                    <input id="grid-editor-cell-size" type="number" min="8" max="500" step="1" value="50" />
+                    <button id="grid-editor-cell-size-up" type="button" class="grid-nudge-button">&plus;</button>
+                  </div>
+                </label>
+                <label class="editor-field" for="grid-editor-offset-x">
+                  <span>Offset X</span>
+                  <div class="grid-editor-nudge-row">
+                    <button id="grid-editor-offset-x-down" type="button" class="grid-nudge-button">&#8592;</button>
+                    <input id="grid-editor-offset-x" type="number" step="1" value="0" />
+                    <button id="grid-editor-offset-x-up" type="button" class="grid-nudge-button">&#8594;</button>
+                  </div>
+                </label>
+                <label class="editor-field" for="grid-editor-offset-y">
+                  <span>Offset Y</span>
+                  <div class="grid-editor-nudge-row">
+                    <button id="grid-editor-offset-y-down" type="button" class="grid-nudge-button">&#8593;</button>
+                    <input id="grid-editor-offset-y" type="number" step="1" value="0" />
+                    <button id="grid-editor-offset-y-up" type="button" class="grid-nudge-button">&#8595;</button>
+                  </div>
+                </label>
+                <label class="editor-field" for="grid-editor-opacity">
+                  <span>Opacity</span>
+                  <input id="grid-editor-opacity" type="range" min="0" max="1" step="0.01" value="0.45" />
+                </label>
+                <label class="editor-field" for="grid-editor-line-width">
+                  <span>Line Width</span>
+                  <input id="grid-editor-line-width" type="range" min="0.5" max="8" step="0.5" value="1" />
+                </label>
+                <label class="editor-field" for="grid-editor-line-style">
+                  <span>Line Style</span>
+                  <select id="grid-editor-line-style">
+                    <option value="light">Light</option>
+                    <option value="neutral">Neutral</option>
+                    <option value="dark">Dark</option>
+                  </select>
+                </label>
+                <div class="editor-status">Use the +/- and arrow buttons to nudge values. Hold Shift and click for a larger step.</div>
+              </div>
+              <div class="overlay-actions">
+                <button id="grid-editor-reset" type="button" class="overlay-action-danger">Reset Grid</button>
+                <button id="grid-editor-visibility" type="button">Hide Grid</button>
+                <button id="grid-editor-save" type="button">Save Grid</button>
+                <button id="grid-editor-cancel" type="button">Close</button>
+              </div>
+            </div>
             <div id="pixi-context-menu" class="context-menu" hidden></div>
           </div>
           <div id="shell-root" class="shell-chrome">
@@ -2095,14 +2211,24 @@
 
   <script src="/lib/forbidden.js"></script>
   <script src="/lib/victory-pixi-stage.js"></script>
+  <script src="/lib/victory-pixi-grid.js"></script>
   <script src="/venues/shared/venue-shell.js"></script>
+  <script src="/lib/discord-mic.js?v=kernel40-1"></script>
+  <script src="/lib/discord-audio.js?v=kernel43-2"></script>
+  <script src="/lib/victory-mic-chat.js?v=kernel40-1"></script>
+  <script>
+    window.VictoryDiscordAudio?.mount({
+      venueSlug: "first-theater",
+      mount: "#first-theater-audio-tray",
+    });
+  </script>
   <script>
     (function () {
       if (window.__firstTheaterBootWiring) return;
       window.__firstTheaterBootWiring = true;
 
       const script = document.createElement("script");
-      script.src = "/venues/first-theater/runtime.js?v=boot-23";
+      script.src = "/venues/first-theater/runtime.js?v=boot-24";
       script.dataset.victoryRuntime = "first-theater";
       script.addEventListener("load", () => {
         window.VictoryFirstTheater?.start?.();

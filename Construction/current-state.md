@@ -1,20 +1,21 @@
 # Victory Current State
 
 ## Purpose
-This document is the current-state canon for Victory as of Kernel 46.
+This document is the current-state canon for Victory as of Kernel 47.
 
 Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful as history, but this file is the current source of truth when they disagree.
 
 ## Kernel State
-- Current kernel label: **Kernel 46**
-- Current kernel purpose: **Pixi Map Layer + Workshop Map Upload v1**
-- Product state: **Kernel 46 is complete**
+- Current kernel label: **Kernel 47**
+- Current kernel purpose: **Pixi Grid Primitive + Map Alignment v1**
+- Product state: **Kernel 47 is complete**
 - Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
 
 ## Current Stack
 - Frontend: static HTML, CSS, and inline JavaScript under `/opt/victory/frontend`
 - Shared frontend shell helper: `frontend/venues/shared/venue-shell.js`
 - Shared Pixi helper: `frontend/lib/victory-pixi-stage.js`
+- Shared Pixi grid helper: `frontend/lib/victory-pixi-grid.js`
 - Backend: Go `1.25` in `/opt/victory/backend`
 - Reverse proxy/static serving: Caddy. Repo config lives at `/opt/victory/Caddyfile`; the current live shared Caddy container mounts `/opt/bread-exchange/Caddyfile` and serves Victory from `/opt/victory/frontend`.
 - Database: PostgreSQL `16-alpine`
@@ -124,13 +125,17 @@ World, session, and venue runtime:
 - `POST /api/venues/{slug}/chat-policy`
 - `GET /api/venues/{slug}/map`
 - `POST /api/venues/{slug}/map`
+- `DELETE /api/venues/{slug}/map`
+- `GET /api/venues/{slug}/grid`
+- `PUT /api/venues/{slug}/grid`
 - `GET /api/discord/audio/status`
 - `GET /health`
 
 Discord audio remains a Discord pass-through surface. Victory does not capture or stream audio.
 Voice-state participant presence is tracked from Discord Gateway events. Active speaker detection and per-user volume controls remain deferred because the current bot/Gateway path cannot truthfully provide them.
 Venue shells now share reusable helper methods for slug normalization, slot registration, presence preview rendering, and safe refresh hooks.
-First Theater keeps its original stage façade; the new active map renders on a dedicated Pixi map layer and does not replace the façade or the existing DOM controls.
+First Theater keeps its original stage façade; the active map renders on a dedicated Pixi map layer and does not replace the façade or the existing DOM controls. The map can be removed via the map editor's Remove Map action, and supports a `display_mode` of `theater` (masked to the proscenium opening) or `fullscreen` (stretched to the full canvas, façade hidden).
+A persistent square/hex grid renders on its own Pixi layer (`grid`, zIndex 6) directly above the map layer (zIndex 5) and below the façade (zIndex 8) and stage elements/cards (zIndex 10). Grid configuration (type, hex orientation, cell size, offsets, opacity, line width, line style, visibility) is server-persisted per venue in `venue_grid_configs` and is visual-only — no snapping, measurement, or pan/zoom yet. Configured via a "Configure Grid" stage context-menu item and callout panel with live preview, Save, Close (reverts to last saved), Reset, and Hide/Show.
 
 WebSocket:
 - `GET /ws/the-cave`
@@ -195,6 +200,8 @@ World model:
 - `placements`
 - `sessions`
 - session participants and runtime identity links
+- `venue_active_maps` - one active map placement per venue (asset, fit, crop, scale, safe margin, `display_mode`)
+- `venue_grid_configs` - one grid configuration per venue (type, hex orientation, cell size, offsets, opacity, line width, line style, visibility)
 
 Runtime history and review backbone:
 - `actions`
@@ -283,6 +290,8 @@ Strategy:
 - Equip and unequip an existing character persona in The Cave
 - Open the Director's Chair and control the current showing with live audience-view, chat-policy, presence, and overlay controls
 - Review closed showings in the Director's Chair with readable event cards
+- Add/replace/remove the First Theater stage map, including `theater` and `fullscreen` display modes
+- Configure, preview, align, save, hide, show, and reset a persistent square or hex grid over the First Theater map
 
 ## Current Known Gaps
 - Video recording does not exist and is not a near-term priority
@@ -292,7 +301,8 @@ Strategy:
 - Showing Review currently covers closed showings only
 - Kernel 30.2 was a consolidation pass for scraps, drift, and unfinished work; it documented more than it invented
 - Character sheets are links/references only, not playable sheet records
-- No rules-engine execution, dice, stats, HP, initiative, grid, tokens, or fog
+- First Theater grid (Kernel 47) is visual-only; no rules-engine execution, dice, stats, HP, initiative, snap-to-grid, tokens, fog, or pan/zoom yet
+- Collapsed header blur may visually overlap the top edge of the First Theater map (known deferred layout issue, not addressed in Kernel 47)
 - Browser-level character-sheet save confusion still needs direct front-end reproduction even though live authenticated create and PATCH both succeed against the backend
 - Starting a brand-new showing is still deferred; the live console can close a showing and control the current one, but it does not yet create a fresh run on demand
 - Some older docs still describe earlier kernel truths and are now historical

@@ -1,11 +1,11 @@
 # Victory Roadmap
 
 ## Purpose
-This roadmap reflects current priorities after Kernel 46.
+This roadmap reflects current priorities after Kernel 47.
 
 Kernel numbers are labels, but from here they should remain stable once assigned so planning, reportbacks, and future agents all refer to the same landmarks.
 
-## Near Roadmap: Kernels 26–46
+## Near Roadmap: Kernels 26–47
 - `27 — Showing Review v1`
   - review chat, stage speech, reactions, reveal/hide, overlays, cards, and persona changes
 - `28 — Director Console v1`
@@ -46,6 +46,8 @@ Kernel numbers are labels, but from here they should remain stable once assigned
   - extract reusable venue shell helpers, tighten the map shell, and make First Theater / Middle School Stage cleaner source patterns for future venues
 - `46 — Pixi Map Layer + Workshop Map Upload v1`
   - First Theater now uploads/replaces a single active map as a Workshop asset, stores the crop/fit state server-side, and renders the map on its own Pixi layer without replacing the older stage façade
+- `47 — Pixi Grid Primitive + Map Alignment v1`
+  - First Theater now supports a persistent, server-backed square or hex grid rendered above the active map and below stage elements, with a Configure Grid context-menu surface for live-preview alignment, save/cancel, hide/show, and reset; visual-only, no snapping or pan/zoom yet
 
 Ordering note:
 - Showing Review comes before polish-only work
@@ -58,6 +60,7 @@ Ordering note:
 - Voice-state presence can follow the user/session without turning Victory into an audio router
 - Venue shell extraction follows the audio pass so the reusable shell contract can capture the live patterns already proved in First Theater, The Cave, and Middle School Stage
 - The First Theater Pixi pass now follows shell extraction as a dedicated map-layer workflow instead of a backdrop swap, and the older stage composition remains the preferred live presentation around that layer
+- The grid primitive follows the map-layer pass directly so alignment tooling has a real map to align against; stage navigation (pan/zoom) is deferred to a later kernel so the grid first ships as a fixed-viewport visual layer
 
 ## Medium Roadmap: Kernels 38–62
 - strengthen showing/review surfaces and auditability
