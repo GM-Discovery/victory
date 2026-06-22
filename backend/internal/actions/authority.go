@@ -58,7 +58,7 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 		return Decision{Allowed: false, Reason: "not_session_participant"}, nil
 	}
 	if actionType != "act/reveal_element" && actionType != "act/hide_element" {
-		if actionType != "create/index_card" && actionType != "update/index_card" && actionType != "delete/index_card" && actionType != "act/place_element" && actionType != "act/duplicate_element" && actionType != "act/remove_element" && actionType != "act/show_overlay" && actionType != "act/hide_overlay" && actionType != "act/set_element_lock" && actionType != "act/set_nameplate_visibility" && actionType != "chat/message" && actionType != "persona/equip" && actionType != "persona/unequip" {
+		if actionType != "create/index_card" && actionType != "update/index_card" && actionType != "delete/index_card" && actionType != "create/token" && actionType != "update/token" && actionType != "act/place_element" && actionType != "act/duplicate_element" && actionType != "act/remove_element" && actionType != "act/show_overlay" && actionType != "act/hide_overlay" && actionType != "act/set_element_lock" && actionType != "act/set_nameplate_visibility" && actionType != "chat/message" && actionType != "persona/equip" && actionType != "persona/unequip" {
 			return Decision{Allowed: false, Reason: "unknown_action"}, nil
 		}
 	}
@@ -85,6 +85,14 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 			return canActPlaceElement(ctx, q, userID, sessionID, target)
 		}
 		return canActIndexCardInCave(ctx, q, userID, sessionID, target, actionType)
+	}
+
+	if actionType == "create/token" {
+		return canActCreateToken(ctx, q, userID, sessionID, target)
+	}
+
+	if actionType == "update/token" {
+		return canActUpdateToken(ctx, q, userID, sessionID, target)
 	}
 
 	if actionType == "act/duplicate_element" {
@@ -428,6 +436,90 @@ func canActPlaceElement(ctx context.Context, q actionQuerier, userID, sessionID 
 	}
 	if found && locked {
 		return Decision{Allowed: false, Reason: "locked"}, nil
+	}
+
+	switch normalizeActionRole(participantRole) {
+	case "producer", "director":
+		return Decision{Allowed: true, Reason: "allowed"}, nil
+	default:
+		return Decision{Allowed: false, Reason: "insufficient_role"}, nil
+	}
+}
+
+func canActCreateToken(ctx context.Context, q actionQuerier, userID, sessionID string, target ActionTarget) (Decision, error) {
+	if strings.TrimSpace(target.ElementID) == "" {
+		return Decision{Allowed: false, Reason: "unknown_target"}, nil
+	}
+	if strings.TrimSpace(target.VenueSlug) == "" || target.VenueSlug != "the-cave" {
+		return Decision{Allowed: false, Reason: "unknown_target"}, nil
+	}
+
+	asset, err := loadWarehouseTokenAsset(ctx, q, target.ElementID)
+	if err != nil {
+		if strings.Contains(err.Error(), "token_asset_not_found") {
+			return Decision{Allowed: false, Reason: "unknown_target"}, nil
+		}
+		return Decision{}, err
+	}
+	if strings.TrimSpace(asset.LocationID) == "" {
+		return Decision{Allowed: false, Reason: "unknown_target"}, nil
+	}
+
+	var participantRole string
+	err = q.QueryRow(ctx, `
+		SELECT sp.role::text
+		FROM session_participants sp
+		WHERE sp.session_id = $1
+		  AND sp.user_id = $2
+		LIMIT 1
+	`, sessionID, userID).Scan(&participantRole)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Decision{Allowed: false, Reason: "not_session_participant"}, nil
+		}
+		return Decision{}, err
+	}
+
+	switch normalizeActionRole(participantRole) {
+	case "producer", "director":
+		return Decision{Allowed: true, Reason: "allowed"}, nil
+	default:
+		return Decision{Allowed: false, Reason: "insufficient_role"}, nil
+	}
+}
+
+func canActUpdateToken(ctx context.Context, q actionQuerier, userID, sessionID string, target ActionTarget) (Decision, error) {
+	if strings.TrimSpace(target.ElementID) == "" && strings.TrimSpace(target.ElementSlug) == "" {
+		return Decision{Allowed: false, Reason: "unknown_target"}, nil
+	}
+
+	state, err := resolveVenueLayoutElementState(ctx, q, sessionID, target.ElementID, target.ElementSlug)
+	if err != nil {
+		return Decision{}, err
+	}
+	if state.VenueSlug != "the-cave" || strings.ToLower(strings.TrimSpace(state.Surface)) != "stage" {
+		return Decision{Allowed: false, Reason: "unknown_target"}, nil
+	}
+	if strings.ToLower(strings.TrimSpace(state.ElementType)) != "token" && strings.ToLower(strings.TrimSpace(state.ContextClass)) != "token" {
+		return Decision{Allowed: false, Reason: "unknown_target"}, nil
+	}
+	if visibilityBool(state.Visibility, "locked", false) {
+		return Decision{Allowed: false, Reason: "locked"}, nil
+	}
+
+	var participantRole string
+	err = q.QueryRow(ctx, `
+		SELECT sp.role::text
+		FROM session_participants sp
+		WHERE sp.session_id = $1
+		  AND sp.user_id = $2
+		LIMIT 1
+	`, sessionID, userID).Scan(&participantRole)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Decision{Allowed: false, Reason: "not_session_participant"}, nil
+		}
+		return Decision{}, err
 	}
 
 	switch normalizeActionRole(participantRole) {

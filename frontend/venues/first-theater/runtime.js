@@ -77,6 +77,26 @@
     const gridEditorVisibility = document.getElementById("grid-editor-visibility");
     const gridEditorSave = document.getElementById("grid-editor-save");
     const gridEditorCancel = document.getElementById("grid-editor-cancel");
+    const tokenPickerPanel = document.getElementById("token-picker");
+    const tokenPickerHeader = document.getElementById("token-picker-header");
+    const tokenPickerStatus = document.getElementById("token-picker-status");
+    const tokenPickerPreview = document.getElementById("token-picker-preview");
+    const tokenPickerPreviewBadge = document.getElementById("token-picker-preview-badge");
+    const tokenPickerSearch = document.getElementById("token-picker-search");
+    const tokenPickerShape = document.getElementById("token-picker-shape");
+    const tokenPickerList = document.getElementById("token-picker-list");
+    const tokenPickerRefresh = document.getElementById("token-picker-refresh");
+    const tokenPickerCancel = document.getElementById("token-picker-cancel");
+    const tokenEditorPanel = document.getElementById("token-editor");
+    const tokenEditorHeader = document.getElementById("token-editor-header");
+    const tokenEditorStatus = document.getElementById("token-editor-status");
+    const tokenEditorScale = document.getElementById("token-editor-scale");
+    const tokenEditorScaleValue = document.getElementById("token-editor-scale-value");
+    const tokenEditorSnap = document.getElementById("token-editor-snap");
+    const tokenEditorLayer = document.getElementById("token-editor-layer");
+    const tokenEditorReset = document.getElementById("token-editor-reset");
+    const tokenEditorSave = document.getElementById("token-editor-save");
+    const tokenEditorCancel = document.getElementById("token-editor-cancel");
     let pixiLoadPromise = null;
     let firstTheaterRuntimeStarted = false;
     window.VictoryVenueShell?.mount?.({
@@ -115,6 +135,27 @@
     let cardEditorDirty = false;
     let cardEditorDragState = null;
     let cardFaceState = new Map();
+    let tokenPickerState = {
+      open: false,
+      mode: "create",
+      selectedAssetID: "",
+      filterShape: "all",
+      search: "",
+      placementPoint: null,
+      placementScreenPoint: null,
+      replaceTargetKey: "",
+      replaceTargetElementID: "",
+      replaceTargetElementSlug: "",
+      replaceTargetScale: 100,
+      replaceTargetSnapMode: "grid",
+      replaceTargetTokenLayer: "public",
+    };
+    let tokenEditorTargetKey = "";
+    let tokenEditorDirty = false;
+    let warehouseTokenAssets = [];
+    let warehouseTokenAssetPreviewURL = "";
+    let tokenPickerDragState = null;
+    let tokenEditorDragState = null;
     let localPositionOverrides = new Map();
     let currentVenueMapState = null;
     let currentVenueMapAssets = [];
@@ -239,6 +280,24 @@
       return Math.min(max, Math.max(min, num));
     });
 
+    function formatByteSize(bytes) {
+      const parsed = Number(bytes);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        return "0 B";
+      }
+      if (parsed < 1024) {
+        return `${Math.round(parsed)} B`;
+      }
+      const units = ["KB", "MB", "GB", "TB"];
+      let value = parsed / 1024;
+      let unit = "KB";
+      for (let index = 0; index < units.length - 1 && value >= 1024; index += 1) {
+        value /= 1024;
+        unit = units[index + 1];
+      }
+      return `${value >= 10 || unit === "TB" ? value.toFixed(0) : value.toFixed(1)} ${unit}`;
+    }
+
     function escapeHtml(value) {
       return String(value)
         .replaceAll("&", "&amp;")
@@ -275,6 +334,10 @@
     function canManageIndexCards(role) {
       const normalized = normalizeRole(role);
       return normalized === "producer" || normalized === "director";
+    }
+
+    function canManageStageTokens(role) {
+      return canManageIndexCards(role);
     }
 
     function loadPixiLibrary() {
@@ -318,15 +381,18 @@
     }
 
     function updateCameraControls(view = null) {
+      const mapDisplayMode = String(currentVenueMapState?.display_mode || "theater").trim() === "fullscreen" ? "fullscreen" : "theater";
+      const cameraLocked = mapDisplayMode === "theater";
       if (cameraZoomValue) {
         cameraZoomValue.textContent = cameraViewLabel(view);
       }
       if (cameraZoomOutButton && cameraZoomInButton) {
         const current = view || stageCamera?.getView?.() || { zoomRelativeToFit: 1 };
         const zoom = Number(current.zoomRelativeToFit || 1);
-        cameraZoomOutButton.disabled = zoom <= 0.7001;
-        cameraZoomInButton.disabled = zoom >= 3.9999;
+        cameraZoomOutButton.disabled = cameraLocked || zoom <= 0.7001;
+        cameraZoomInButton.disabled = cameraLocked || zoom >= 3.9999;
       }
+      stageCamera?.setInteractionLocked?.(cameraLocked);
     }
 
     function getPlayableBounds() {
@@ -1170,6 +1236,9 @@
       if (state.locked) {
         return "LOCKED";
       }
+      if (isTokenObject(model)) {
+        return tokenLayerForModel(model) === "director" ? "DIR" : "TOK";
+      }
       if (isCardObject(model)) {
         return cardDisplayMode(model) === "world" ? "MAP" : "SCREEN";
       }
@@ -1189,6 +1258,19 @@
           item.source.data.front_text = item.frontText ?? item.source.data.front_text;
           item.source.data.back_text = item.backText ?? item.source.data.back_text;
           item.source.data.color = item.color ?? item.source.data.color;
+          if (item.kind === "token") {
+            item.source.data.asset_id = item.assetID ?? item.source.data.asset_id;
+            item.source.data.asset_name = item.assetName ?? item.source.data.asset_name;
+            item.source.data.asset_shape = item.assetShape ?? item.source.data.asset_shape;
+            item.source.data.asset_content_url = item.assetContentURL ?? item.source.data.asset_content_url;
+            item.source.data.asset_thumbnail_url = item.assetThumbnailURL ?? item.source.data.asset_thumbnail_url;
+            item.source.data.default_grid_width = item.defaultGridWidth ?? item.source.data.default_grid_width;
+            item.source.data.default_grid_height = item.defaultGridHeight ?? item.source.data.default_grid_height;
+            item.source.data.snap_mode = item.snapMode ?? item.source.data.snap_mode;
+            item.source.data.grid_relative = item.gridRelative ?? item.source.data.grid_relative;
+            item.source.data.token_layer = item.tokenLayer ?? item.source.data.token_layer;
+            item.source.data.scale = item.scale ?? item.source.data.scale;
+          }
         }
         if (item.source) {
           item.source.name = item.label;
@@ -1232,8 +1314,12 @@
       return objectKind(model) === "card";
     }
 
+    function isTokenObject(model) {
+      return objectKind(model) === "token";
+    }
+
     function isLiveStageObject(model) {
-      return !!model?.live && ["card", "prop", "fire"].includes(objectKind(model));
+      return !!model?.live && ["card", "prop", "fire", "token"].includes(objectKind(model));
     }
 
     function canEditLiveCard(model) {
@@ -1298,6 +1384,12 @@
     function currentDisplayedPointForModel(model) {
       const pin = cardPinData(model);
       const size = getStageSize();
+      if (isTokenObject(model)) {
+        const tokenPosition = model?.position || {};
+        const tokenX = Number(tokenPosition.x ?? model?.source?.data?.world_x ?? model?.source?.data?.x ?? 0);
+        const tokenY = Number(tokenPosition.y ?? model?.source?.data?.world_y ?? model?.source?.data?.y ?? 0);
+        return { x: tokenX, y: tokenY };
+      }
       if (pin.mode === "world") {
         if (Number.isFinite(pin.worldX) && Number.isFinite(pin.worldY)) {
           return stagePointForWorldPoint({ x: pin.worldX, y: pin.worldY });
@@ -1369,6 +1461,75 @@
       };
     }
 
+    function tokenSnapModeForModel(model) {
+      const data = model?.source?.data || {};
+      const snapMode = String(data.snap_mode || "").trim().toLowerCase();
+      if (snapMode === "grid" || snapMode === "free") {
+        return snapMode;
+      }
+      return currentVenueGridConfig && currentVenueGridConfig.grid_type !== "none" ? "grid" : "free";
+    }
+
+    function tokenLayerForModel(model) {
+      const data = model?.source?.data || {};
+      const tokenLayer = String(data.token_layer || "").trim().toLowerCase();
+      return tokenLayer === "director" ? "director" : "public";
+    }
+
+    function tokenScaleForModel(model) {
+      const data = model?.source?.data || {};
+      const scale = Number(data.scale ?? 100);
+      if (!Number.isFinite(scale) || scale <= 0) return 100;
+      return Math.max(25, Math.min(500, scale));
+    }
+
+    function tokenFootprintForModel(model) {
+      const data = model?.source?.data || {};
+      const width = Number(data.default_grid_width ?? model?.defaultGridWidth ?? 1);
+      const height = Number(data.default_grid_height ?? model?.defaultGridHeight ?? 1);
+      return {
+        width: Math.max(1, Math.round(Number.isFinite(width) ? width : 1)),
+        height: Math.max(1, Math.round(Number.isFinite(height) ? height : 1)),
+      };
+    }
+
+    function tokenPlacementBaseSize(model) {
+      const snapMode = tokenSnapModeForModel(model);
+      const gridConfig = currentVenueGridConfig || defaultGridConfig();
+      const hasGrid = Boolean(gridConfig && gridConfig.grid_type && gridConfig.grid_type !== "none");
+      return hasGrid && snapMode === "grid" ? Number(gridConfig.cell_size || 50) : 64;
+    }
+
+    function tokenDisplaySizeForModel(model) {
+      const footprint = tokenFootprintForModel(model);
+      const base = tokenPlacementBaseSize(model);
+      const scale = tokenScaleForModel(model) / 100;
+      return {
+        width: Math.max(8, Math.round(base * footprint.width * scale)),
+        height: Math.max(8, Math.round(base * footprint.height * scale)),
+      };
+    }
+
+    function tokenPlacementPointForModel(model) {
+      return currentDisplayedPointForModel(model);
+    }
+
+    function tokenPlacementPointForCreate(point, model, forcedSnapMode = "") {
+      const basePoint = point ? { x: Number(point.x || 0), y: Number(point.y || 0) } : null;
+      if (!basePoint) {
+        return null;
+      }
+      const snapMode = forcedSnapMode || tokenSnapModeForModel(model);
+      const bounds = currentVenueMapBounds || getPlayableBounds();
+      if (!window.VictoryPixiGrid?.snapPoint || snapMode !== "grid") {
+        return {
+          x: Number(basePoint.x),
+          y: Number(basePoint.y),
+        };
+      }
+      return window.VictoryPixiGrid.snapPoint(currentVenueGridConfig, bounds, basePoint);
+    }
+
     function cardDuplicatePlacementForModel(model) {
       const pinMode = cardDisplayMode(model);
       const pin = cardPinData(model);
@@ -1404,11 +1565,54 @@
       };
     }
 
+    function tokenMoveTargetForModel(model, targetPoint) {
+      const basePoint = targetPoint || stagePlacementCandidate || lastStagePoint || null;
+      if (!basePoint) {
+        return null;
+      }
+      const snapMode = tokenSnapModeForModel(model);
+      const snapped = snapMode === "grid"
+        ? tokenPlacementPointForCreate(basePoint, model)
+        : { x: Number(basePoint.x || 0), y: Number(basePoint.y || 0) };
+      return {
+        x: snapped.x,
+        y: snapped.y,
+        snapMode,
+      };
+    }
+
+    function tokenDuplicatePlacementForModel(model) {
+      const basePoint = currentDisplayedPointForModel(model);
+      const offset = { x: 24, y: 16 };
+      const duplicatePoint = {
+        x: Number(basePoint.x || 0) + offset.x,
+        y: Number(basePoint.y || 0) + offset.y,
+      };
+      const snapMode = tokenSnapModeForModel(model);
+      const snapped = snapMode === "grid"
+        ? tokenPlacementPointForCreate(duplicatePoint, model, snapMode)
+        : duplicatePoint;
+      return {
+        x: snapped.x,
+        y: snapped.y,
+        snapMode,
+      };
+    }
+
     function updateLocalCardPinModel(matchModel, updater) {
       return updateLocalObjectModel(matchModel, (model) => {
         const data = model.source?.data || {};
         model.source = model.source || {};
         model.source.data = { ...data };
+        updater(model);
+      });
+    }
+
+    function updateTokenLocalModel(matchModel, updater) {
+      if (!matchModel || typeof updater !== "function") return null;
+      return updateLocalObjectModel(matchModel, (model) => {
+        model.source = model.source || {};
+        model.source.data = { ...(model.source.data || {}) };
         updater(model);
       });
     }
@@ -1508,6 +1712,7 @@
         push("create-card", "Create Index Card", "create", { disabled: !canManageIndexCards(currentRole) });
         push("set-map", "Add / Replace Map", "create", { disabled: !canManageIndexCards(currentRole) });
         push("configure-grid", "Configure Grid", "create", { disabled: !canManageIndexCards(currentRole) });
+        push("add-token", "Add Token", "create", { disabled: !canManageStageTokens(currentRole) });
         push("inspect", "Inspect Stage", "info");
         if (currentSelection) {
           push("clear", "Clear selection", "clear");
@@ -1547,6 +1752,13 @@
 
       push("info", "Info", "info");
 
+      if (kind === "token" && canManageStageTokens(currentRole)) {
+        push("scale", `Scale (${Math.round(tokenScaleForModel(objectModel))}%)`, "edit");
+        push(tokenSnapModeForModel(objectModel) === "grid" ? "free-placement" : "snap-to-grid", tokenSnapModeForModel(objectModel) === "grid" ? "Free Placement" : "Snap to Grid", "pin");
+        push("replace-asset", "Replace Asset", "edit");
+        push(tokenLayerForModel(objectModel) === "director" ? "move-public-layer" : "move-director-layer", tokenLayerForModel(objectModel) === "director" ? "Move to Public Layer" : "Move to Director Layer", "visibility");
+      }
+
       if (kind === "card" && canEditLiveCard(objectModel)) {
         push("inspect", "Inspect", "edit");
         push("edit", "Edit", "edit");
@@ -1569,11 +1781,15 @@
         push(state.nameplateVisible ? "hide-nameplate" : "show-nameplate", state.nameplateVisible ? "Hide Nameplate" : "Show Nameplate", "visibility");
       }
 
+      if (kind === "token" && canToggleNameplate(objectModel)) {
+        push(state.nameplateVisible ? "hide-nameplate" : "show-nameplate", state.nameplateVisible ? "Hide Nameplate" : "Show Nameplate", "visibility");
+      }
+
       if (kind === "card" && canDuplicateLiveStageObject(objectModel)) {
         push("duplicate", "Duplicate Card", "duplicate");
       }
 
-      if ((kind === "card" || kind === "prop" || kind === "fire") && canRemoveLiveStageObject(objectModel)) {
+      if ((kind === "card" || kind === "prop" || kind === "fire" || kind === "token") && canRemoveLiveStageObject(objectModel)) {
         push("remove", "Remove from Stage", "remove");
       }
 
@@ -1581,8 +1797,12 @@
         push("delete-card", "Delete Card", "remove");
       }
 
-      if ((kind === "card" || kind === "fire") && canToggleLock(objectModel)) {
+      if ((kind === "card" || kind === "fire" || kind === "token") && canToggleLock(objectModel)) {
         push("lock", "Lock", "lock");
+      }
+
+      if (kind === "token" && canDuplicateLiveStageObject(objectModel)) {
+        push("duplicate", "Duplicate Token", "duplicate");
       }
 
       return actions;
@@ -2801,11 +3021,19 @@
         return;
       }
 
+      if (action === "add-token") {
+        openTokenPicker("create", null);
+        closeContextMenu();
+        return;
+      }
+
       if (action === "clear") {
         selectObject(null, "Selection cleared.");
         hideCardEditor();
         hideMapEditor();
         hideGridEditor();
+        hideTokenEditor();
+        closeTokenPicker();
         closeContextMenu();
         return;
       }
@@ -2827,6 +3055,57 @@
         if (!sent && cardEditorStatus) {
           cardEditorStatus.textContent = "Socket unavailable.";
         }
+        closeContextMenu();
+        return;
+      }
+
+      if (action === "scale" && isTokenObject(objectModel)) {
+        openTokenEditor(objectModel);
+        closeContextMenu();
+        return;
+      }
+
+      if ((action === "snap-to-grid" || action === "free-placement") && isTokenObject(objectModel)) {
+        const snapMode = action === "snap-to-grid" ? "grid" : "free";
+        const sent = sendAction("update/token", {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+          venue_slug: "the-cave",
+          layer: "stage",
+          snap_mode: snapMode,
+        });
+        if (sent) {
+          updateTokenLocalModel(objectModel, (model) => {
+            model.snapMode = snapMode;
+            model.gridRelative = snapMode === "grid";
+          });
+        }
+        setStageStatus(sent ? `${objectModel.label} set to ${snapMode === "grid" ? "Snap to Grid" : "Free Placement"}.` : "Socket unavailable.");
+        closeContextMenu();
+        return;
+      }
+
+      if ((action === "move-director-layer" || action === "move-public-layer") && isTokenObject(objectModel)) {
+        const tokenLayer = action === "move-director-layer" ? "director" : "public";
+        const sent = sendAction("update/token", {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+          venue_slug: "the-cave",
+          layer: "stage",
+          token_layer: tokenLayer,
+        });
+        if (sent) {
+          updateTokenLocalModel(objectModel, (model) => {
+            model.tokenLayer = tokenLayer;
+          });
+        }
+        setStageStatus(sent ? `${objectModel.label} moved to the ${tokenLayer === "director" ? "Director" : "Public"} layer.` : "Socket unavailable.");
+        closeContextMenu();
+        return;
+      }
+
+      if (action === "replace-asset" && isTokenObject(objectModel)) {
+        openTokenPicker("replace", objectModel);
         closeContextMenu();
         return;
       }
@@ -2873,24 +3152,34 @@
           setStageStatus("Move here needs a stage point.");
           return;
         }
-        const moveTarget = cardMoveTargetForModel(objectModel, point);
+        const moveTarget = isTokenObject(objectModel)
+          ? tokenMoveTargetForModel(objectModel, point)
+          : cardMoveTargetForModel(objectModel, point);
         if (!moveTarget) {
           setStageStatus("Move here needs a stage point.");
           closeContextMenu();
           return;
         }
-        const sent = sendAction("update/index_card", {
-          element_id: objectModel.elementId || "",
-          element_slug: objectModel.elementSlug || "",
-          front_text: objectModel.frontText || "",
-          back_text: objectModel.backText || "",
-          color: objectModel.color || "#d9c7a6",
-          pin_mode: moveTarget.pinMode,
-          world_x: moveTarget.world_x,
-          world_y: moveTarget.world_y,
-          screen_x: moveTarget.screen_x,
-          screen_y: moveTarget.screen_y,
-        });
+        const sent = isTokenObject(objectModel)
+          ? sendAction("update/token", {
+              element_id: objectModel.elementId || "",
+              element_slug: objectModel.elementSlug || "",
+              venue_slug: "the-cave",
+              layer: "stage",
+              snap_mode: moveTarget.snapMode,
+            })
+          : sendAction("update/index_card", {
+              element_id: objectModel.elementId || "",
+              element_slug: objectModel.elementSlug || "",
+              front_text: objectModel.frontText || "",
+              back_text: objectModel.backText || "",
+              color: objectModel.color || "#d9c7a6",
+              pin_mode: moveTarget.pinMode,
+              world_x: moveTarget.world_x,
+              world_y: moveTarget.world_y,
+              screen_x: moveTarget.screen_x,
+              screen_y: moveTarget.screen_y,
+            });
         const placementSent = sendAction("act/place_element", {
           element_id: objectModel.elementId || "",
           element_slug: objectModel.elementSlug || "",
@@ -2902,20 +3191,36 @@
         });
         if (sent) {
           updateLocalCardPinModel(objectModel, (model) => {
-            model.source.data = {
-              ...(model.source.data || {}),
-              pin_mode: moveTarget.pinMode,
-              world_x: moveTarget.world_x,
-              world_y: moveTarget.world_y,
-              screen_x: moveTarget.screen_x,
-              screen_y: moveTarget.screen_y,
-            };
-            model.position = setLocalPositionOverrideForModel(model, point) || model.position;
+            if (isTokenObject(model)) {
+              model.source.data = {
+                ...(model.source.data || {}),
+                snap_mode: moveTarget.snapMode,
+              };
+              model.position = {
+                ...(model.position || {}),
+                x: point.x,
+                y: point.y,
+                order: Number(model.position?.order ?? 0),
+                frame: "center",
+              };
+            } else {
+              model.source.data = {
+                ...(model.source.data || {}),
+                pin_mode: moveTarget.pinMode,
+                world_x: moveTarget.world_x,
+                world_y: moveTarget.world_y,
+                screen_x: moveTarget.screen_x,
+                screen_y: moveTarget.screen_y,
+              };
+              model.position = setLocalPositionOverrideForModel(model, point) || model.position;
+            }
           });
         }
-        const moveLabel = moveTarget.pinMode === "world"
-          ? `world x ${moveTarget.world_x}, y ${moveTarget.world_y}`
-          : `overlay x ${moveTarget.screen_x}, y ${moveTarget.screen_y}`;
+        const moveLabel = isTokenObject(objectModel)
+          ? `${moveTarget.snapMode === "grid" ? "grid" : "free"} x ${point.x}, y ${point.y}`
+          : moveTarget.pinMode === "world"
+            ? `world x ${moveTarget.world_x}, y ${moveTarget.world_y}`
+            : `overlay x ${moveTarget.screen_x}, y ${moveTarget.screen_y}`;
         setMovementLine(sent && placementSent ? `Move sent for ${objectModel.label} to ${moveLabel}.` : "Socket unavailable.");
         setStageStatus(sent && placementSent ? `Moving ${objectModel.label} to ${moveLabel}.` : "Socket unavailable.");
         closeContextMenu();
@@ -2923,7 +3228,12 @@
       }
 
       if (action === "duplicate") {
-        const duplicatePlacement = cardDuplicatePlacementForModel(objectModel);
+        const duplicatePlacement = isTokenObject(objectModel)
+          ? tokenDuplicatePlacementForModel(objectModel)
+          : cardDuplicatePlacementForModel(objectModel);
+        const duplicatePinMode = isTokenObject(objectModel)
+          ? (tokenSnapModeForModel(objectModel) === "grid" ? "world" : "overlay")
+          : duplicatePlacement.pinMode;
         const sent = sendAction("act/duplicate_element", {
           element_id: objectModel.elementId || "",
           element_slug: objectModel.elementSlug || "",
@@ -2932,19 +3242,33 @@
           x: duplicatePlacement.x,
           y: duplicatePlacement.y,
           order: Number(objectModel.position?.order ?? 0),
-          pin_mode: duplicatePlacement.pinMode,
+          pin_mode: duplicatePinMode,
           world_x: duplicatePlacement.world_x,
           world_y: duplicatePlacement.world_y,
           screen_x: duplicatePlacement.screen_x,
           screen_y: duplicatePlacement.screen_y,
         });
-        const duplicateLabel = duplicatePlacement.pinMode === "world"
-          ? `world x ${duplicatePlacement.world_x}, y ${duplicatePlacement.world_y}`
-          : `overlay x ${duplicatePlacement.screen_x}, y ${duplicatePlacement.screen_y}`;
+        const duplicateLabel = isTokenObject(objectModel)
+          ? `x ${duplicatePlacement.x}, y ${duplicatePlacement.y}`
+          : duplicatePlacement.pinMode === "world"
+            ? `world x ${duplicatePlacement.world_x}, y ${duplicatePlacement.world_y}`
+            : `overlay x ${duplicatePlacement.screen_x}, y ${duplicatePlacement.screen_y}`;
         setMovementLine(sent ? `Duplicate sent for ${objectModel.label} to ${duplicateLabel}.` : "Socket unavailable.");
         setStageStatus(sent ? `Duplicating ${objectModel.label} to ${duplicateLabel}.` : "Socket unavailable.");
         if (sent) {
-          setLocalPositionOverrideForModel(objectModel, { x: duplicatePlacement.x, y: duplicatePlacement.y });
+          if (isTokenObject(objectModel)) {
+            updateTokenLocalModel(objectModel, (model) => {
+              model.position = {
+                ...(model.position || {}),
+                x: duplicatePlacement.x,
+                y: duplicatePlacement.y,
+                order: Number(model.position?.order ?? 0),
+                frame: "center",
+              };
+            });
+          } else {
+            setLocalPositionOverrideForModel(objectModel, { x: duplicatePlacement.x, y: duplicatePlacement.y });
+          }
         }
         closeContextMenu();
         return;
@@ -2958,10 +3282,22 @@
           layer: "stage",
         });
         if (sent) {
-          updateLocalObjectModel(objectModel, (model) => {
-            model.state = { ...(model.state || {}), visible: false };
-            model.visibility = { ...(model.visibility || {}), visible: false };
-          });
+          currentObjects = currentObjects.filter((item) => !updateObjectMatches(item, objectModel));
+          if (currentSelection && updateObjectMatches(currentSelection, objectModel)) {
+            currentSelection = null;
+          }
+          if (tokenEditorTargetKey && updateObjectMatches({ key: tokenEditorTargetKey }, objectModel)) {
+            hideTokenEditor();
+          }
+          if (cardEditorTargetKey && updateObjectMatches({ key: cardEditorTargetKey }, objectModel)) {
+            cardEditorTargetKey = "";
+          }
+          updateStatusSummary();
+          updateShellTargetPresentation();
+          renderPixiScene();
+          syncSelectedActions();
+          syncCardEditorWithSelection();
+          syncTokenEditorWithSelection();
         }
         setMovementReport(sent ? `Remove sent for ${objectModel.label}.` : "Socket unavailable.");
         setStageStatus(sent ? `Removing ${objectModel.label} from the stage...` : "Socket unavailable.");
@@ -3101,6 +3437,16 @@
         lines.push(`Front: ${model.frontText || "(blank)"}`);
         lines.push(`Back: ${model.backText || "(blank)"}`);
         lines.push(`Color: ${model.color || "#d9c7a6"}`);
+      } else if (isTokenObject(model)) {
+        const footprint = tokenFootprintForModel(model);
+        const displaySize = tokenDisplaySizeForModel(model);
+        lines.push(`Asset: ${model.assetName || model.source?.data?.asset_name || "(unknown)"}`);
+        lines.push(`Shape: ${model.assetShape || model.source?.data?.asset_shape || "circle"}`);
+        lines.push(`Footprint: ${footprint.width} x ${footprint.height}`);
+        lines.push(`Scale: ${tokenScaleForModel(model)}%`);
+        lines.push(`Placement: ${tokenSnapModeForModel(model)}`);
+        lines.push(`Layer: ${tokenLayerForModel(model)}`);
+        lines.push(`Display: ${displaySize.width} x ${displaySize.height}px`);
       }
 
       return lines.join("\n");
@@ -3121,6 +3467,7 @@
       updateShellTargetPresentation();
       syncSelectedActions();
       syncCardEditorWithSelection();
+      syncTokenEditorWithSelection();
 
       for (const [key, node] of currentNodeMap.entries()) {
         node.updateSelected?.(currentSelection?.key === key);
@@ -3135,21 +3482,34 @@
       const data = element?.data || {};
       const state = element?.state || {};
       const visibility = element?.visibility || {};
+      const kind = String(element?.context_class || data.context_class || element?.element_type || "").trim().toLowerCase();
+      const assetID = String(data.asset_id || "");
       return {
         key: `live:${String(element?.element_id || element?.slug || index)}`,
-        kind: "card",
+        kind: kind === "token" ? "token" : "card",
         live: true,
         elementId: String(element?.element_id || ""),
         elementSlug: String(element?.slug || ""),
         elementType: String(element?.element_type || ""),
-        contextClass: String(element?.context_class || data.context_class || "card"),
-        label: String(element?.name || data.front_text || element?.slug || "Index card"),
+        contextClass: String(element?.context_class || data.context_class || (kind === "token" ? "token" : "card")),
+        label: String(element?.name || data.asset_name || data.front_text || element?.slug || (kind === "token" ? "Token" : "Index card")),
         frontText: String(data.front_text || element?.name || "").trim(),
         backText: String(data.back_text || "").trim(),
         color: String(data.color || "#d9c7a6").trim() || "#d9c7a6",
         position: element?.position || data.position || {},
         state,
         visibility,
+        assetID,
+        assetName: String(data.asset_name || element?.name || ""),
+        assetShape: String(data.asset_shape || data.shape || "circle"),
+        assetContentURL: String(data.asset_content_url || ""),
+        assetThumbnailURL: String(data.asset_thumbnail_url || ""),
+        defaultGridWidth: Number(data.default_grid_width || 1),
+        defaultGridHeight: Number(data.default_grid_height || 1),
+        snapMode: String(data.snap_mode || ""),
+        tokenLayer: String(data.token_layer || "public"),
+        scale: Number(data.scale || 100),
+        gridRelative: Boolean(data.grid_relative ?? false),
         source: element,
       };
     }
@@ -3184,10 +3544,30 @@
           return nameA.localeCompare(nameB);
         })
         .map((element, index) => objectFromSnapshotElement(element, index));
+      const stageTokens = elements
+        .filter((element) => String(element?.element_type || "").toLowerCase() === "token" || String(element?.context_class || element?.data?.context_class || "").toLowerCase() === "token")
+        .filter((element) => String(element?.surface || element?.data?.surface || "stage").toLowerCase() === "stage")
+        .sort((a, b) => {
+          const layerA = String(a?.data?.token_layer || "public");
+          const layerB = String(b?.data?.token_layer || "public");
+          if (layerA !== layerB) {
+            return layerA === "public" ? -1 : 1;
+          }
+          const orderA = Number(a?.position?.order ?? a?.data?.position?.order ?? 0);
+          const orderB = Number(b?.position?.order ?? b?.data?.position?.order ?? 0);
+          if (orderA !== orderB) return orderA - orderB;
+          const nameA = String(a?.name || a?.slug || "");
+          const nameB = String(b?.name || b?.slug || "");
+          return nameA.localeCompare(nameB);
+        })
+        .map((element, index) => objectFromSnapshotElement(element, index));
 
       const out = [];
       if (fireElement) {
         out.push(fireObjectFromSnapshot(fireElement));
+      }
+      if (stageTokens.length > 0) {
+        out.push(...stageTokens);
       }
       if (stageCards.length > 0) {
         out.push(...stageCards);
@@ -3469,7 +3849,137 @@
       return node;
     }
 
+    function makeTokenNode(model) {
+      const container = new PIXI.Container();
+      container.sortableChildren = true;
+      const size = tokenDisplaySizeForModel(model);
+      const assetURL = String(model.assetContentURL || model.source?.data?.asset_content_url || "").trim();
+      const thumbnailURL = String(model.assetThumbnailURL || model.source?.data?.asset_thumbnail_url || "").trim();
+      const textureSource = assetURL || thumbnailURL || "/assets/construction.png";
+      const sprite = PIXI.Sprite.from(textureSource);
+      sprite.anchor.set(0.5);
+      sprite.width = size.width;
+      sprite.height = size.height;
+      sprite.eventMode = "static";
+      sprite.cursor = "pointer";
+
+      const outline = new PIXI.Graphics();
+      outline.lineStyle(2, 0x8fb7da, 0.18);
+      outline.drawRoundedRect(-size.width / 2, -size.height / 2, size.width, size.height, Math.max(10, Math.min(size.width, size.height) * 0.18));
+
+      const layerTagStyle = new PIXI.TextStyle({
+        fontFamily: "Arial",
+        fontSize: 10,
+        fontWeight: "700",
+        fill: tokenLayerForModel(model) === "director" ? 0x9dd0ff : 0xe9f5ff,
+      });
+      const layerTag = new PIXI.Text(tokenLayerForModel(model) === "director" ? "DIR" : "TOK", layerTagStyle);
+      layerTag.anchor.set(0.5);
+      layerTag.position.set(size.width / 2 - 12, -size.height / 2 + 12);
+      layerTag.visible = Boolean(objectState(model).nameplateVisible);
+
+      const labelText = truncateCardText(model.assetName || model.label || "Token", 20) || "Token";
+      const labelStyle = new PIXI.TextStyle({
+        fontFamily: "Arial",
+        fontSize: 11,
+        fontWeight: "700",
+        fill: 0xf4e3c1,
+        align: "center",
+        wordWrap: true,
+        wordWrapWidth: Math.max(80, size.width + 16),
+      });
+      const label = new PIXI.Text(labelText, labelStyle);
+      label.anchor.set(0.5, 0);
+      label.position.set(0, size.height / 2 + 8);
+      label.visible = Boolean(objectState(model).nameplateVisible);
+
+      const badgeStyle = new PIXI.TextStyle({
+        fontFamily: "Arial",
+        fontSize: 10,
+        fontWeight: "700",
+        fill: 0x8fb7da,
+      });
+      const badge = new PIXI.Text(`${Math.round(tokenScaleForModel(model))}%`, badgeStyle);
+      badge.anchor.set(0.5);
+      badge.position.set(-size.width / 2 + 18, -size.height / 2 + 12);
+      badge.visible = Boolean(objectState(model).nameplateVisible);
+
+      const focus = new PIXI.Graphics();
+      focus.lineStyle(0, 0x000000, 0);
+      focus.drawRoundedRect(-size.width / 2 - 8, -size.height / 2 - 8, size.width + 16, size.height + 24, 16);
+
+      container.addChild(outline, sprite, badge, layerTag, label, focus);
+      container.eventMode = "static";
+      container.cursor = "pointer";
+      container.interactive = true;
+
+      const node = {
+        model,
+        container,
+        updateSelected(selected) {
+          focus.clear();
+          if (selected) {
+            focus.lineStyle(3, 0x8fb7da, 0.92);
+            focus.drawRoundedRect(-size.width / 2 - 8, -size.height / 2 - 8, size.width + 16, size.height + 24, 16);
+            container.zIndex = 60;
+          } else {
+            focus.lineStyle(0, 0x000000, 0);
+            focus.drawRoundedRect(-size.width / 2 - 8, -size.height / 2 - 8, size.width + 16, size.height + 24, 16);
+            container.zIndex = tokenLayerForModel(model) === "director" ? 35 : 25;
+          }
+          layerTag.visible = Boolean(objectState(model).nameplateVisible);
+          label.visible = Boolean(objectState(model).nameplateVisible);
+          badge.visible = Boolean(objectState(model).nameplateVisible);
+        },
+      };
+
+      const openTokenContextMenu = (event) => {
+        if (wasContextMenuHandled(event)) {
+          return;
+        }
+        cancelContextMenuEvent(event);
+        openResolvedContextMenu(event);
+      };
+
+      container.on("pointerdown", (event) => {
+        if (isSecondaryPointerEvent(event)) {
+          return;
+        }
+        event.stopPropagation();
+        selectObject(model, `${model.label} selected.`);
+
+        if (model.live) {
+          if (objectState(model).locked) {
+            setStageStatus(`${model.label} is locked.`);
+            setMovementReport("Locked objects cannot be dragged.");
+            return;
+          }
+          const clientPoint = eventClientPoint(event);
+          const screenPoint = stageScreenPointFromClient(clientPoint.clientX, clientPoint.clientY);
+          dragState = {
+            node: container,
+            model,
+            space: "world",
+            originalPinMode: tokenSnapModeForModel(model),
+            originalData: { ...(model.source?.data || {}) },
+            floatingPoint: { x: Math.round(Number(screenPoint.x || 0)), y: Math.round(Number(screenPoint.y || 0)) },
+            offsetX: Math.round(Number(screenPoint.x || 0)) - container.x,
+            offsetY: Math.round(Number(screenPoint.y || 0)) - container.y,
+          };
+          setMovementReport("Dragging live token...");
+          setStageStatus("Release to move the token.");
+        }
+      });
+
+      container.on("contextmenu", openTokenContextMenu);
+
+      return node;
+    }
+
     function makePlaceholderNode(model) {
+      if (isTokenObject(model)) {
+        return makeTokenNode(model);
+      }
       const node = makeCardNode(model);
       return node;
     }
@@ -3609,6 +4119,349 @@
         setSmokeLine(`Placed smoke card at ${pendingStageCardPlacement.x}, ${pendingStageCardPlacement.y}.`);
       }
       pendingStageCardPlacement = null;
+    }
+
+    function tokenPickerFilteredAssets() {
+      const search = String(tokenPickerState.search || "").trim().toLowerCase();
+      const shape = String(tokenPickerState.filterShape || "all").trim().toLowerCase();
+      return warehouseTokenAssets.filter((asset) => {
+        const assetShape = String(asset.shape || asset.asset_shape || "").trim().toLowerCase();
+        const haystack = [
+          asset.name || asset.asset_name,
+          asset.original_filename,
+          asset.asset_type,
+          asset.shape || asset.asset_shape,
+          asset.status,
+          asset.source_mime || asset.sourceMime,
+          asset.sniffed_mime || asset.sniffedMime,
+        ].join(" ").toLowerCase();
+        if (shape !== "all" && assetShape !== shape) {
+          return false;
+        }
+        if (search && !haystack.includes(search)) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    function tokenPickerPreviewForAsset(asset) {
+      if (!tokenPickerPreview) return;
+      if (warehouseTokenAssetPreviewURL && warehouseTokenAssetPreviewURL.startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(warehouseTokenAssetPreviewURL);
+        } catch (error) {
+          console.warn("token preview revoke failed", error);
+        }
+      }
+      warehouseTokenAssetPreviewURL = String(asset?.thumbnail_url || asset?.content_url || "").trim();
+      tokenPickerPreview.src = warehouseTokenAssetPreviewURL || "";
+      if (tokenPickerPreviewBadge) {
+        const dims = `${Number(asset?.default_grid_width || 1)} x ${Number(asset?.default_grid_height || 1)}`;
+        tokenPickerPreviewBadge.textContent = asset
+          ? `${asset.name || asset.id || "Token"} · ${asset.shape || "circle"} · ${dims}`
+          : "No token selected";
+      }
+    }
+
+    function renderTokenPickerList() {
+      if (!tokenPickerList) return;
+      const assets = tokenPickerFilteredAssets();
+      tokenPickerList.innerHTML = "";
+      if (!assets.length) {
+        const empty = document.createElement("div");
+        empty.className = "token-picker-status";
+        empty.textContent = "No matching active token assets.";
+        tokenPickerList.appendChild(empty);
+        tokenPickerPreviewForAsset(null);
+        return;
+      }
+
+      if (!tokenPickerState.selectedAssetID || !assets.some((asset) => asset.id === tokenPickerState.selectedAssetID)) {
+        tokenPickerState.selectedAssetID = String(assets[0].id || assets[0].asset_id || "");
+      }
+
+      const selected = assets.find((asset) => asset.id === tokenPickerState.selectedAssetID) || assets[0] || null;
+      if (selected) {
+        tokenPickerPreviewForAsset(selected);
+      }
+
+      assets.forEach((asset) => {
+        const assetID = String(asset.id || asset.asset_id || "").trim();
+        const assetName = String(asset.name || asset.asset_name || asset.original_filename || assetID || "Token asset");
+        const assetShape = String(asset.shape || asset.asset_shape || "circle");
+        const sourceMime = String(asset.source_mime || asset.sourceMime || asset.sniffed_mime || asset.sniffedMime || "");
+        const thumbURL = String(asset.thumbnail_url || asset.thumbnailURL || asset.content_url || asset.contentURL || "");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "token-picker-card";
+        if (assetID === tokenPickerState.selectedAssetID) {
+          button.classList.add("is-selected");
+        }
+        const bytes = formatByteSize(asset.stored_bytes || asset.byte_size || 0);
+        const dims = `${asset.default_grid_width || asset.defaultGridWidth || 1} x ${asset.default_grid_height || asset.defaultGridHeight || 1}`;
+        button.innerHTML = `
+          <img src="${escapeHtml(thumbURL)}" alt="${escapeHtml(assetName)}" />
+          <div class="token-picker-meta">
+            <strong>${escapeHtml(assetName)}</strong>
+            <small>${escapeHtml(assetShape)} · ${escapeHtml(dims)} · ${escapeHtml(bytes)}</small>
+            <small>${escapeHtml(sourceMime)}</small>
+          </div>
+        `;
+        button.addEventListener("click", () => {
+          tokenPickerState.selectedAssetID = assetID;
+          tokenPickerState.search = String(tokenPickerSearch?.value || tokenPickerState.search || "");
+          renderTokenPickerList();
+          const target = {
+            ...asset,
+            id: assetID,
+            asset_id: assetID,
+            name: assetName,
+            shape: assetShape,
+            thumbnail_url: thumbURL,
+            content_url: String(asset.content_url || asset.contentURL || ""),
+          };
+          if (tokenPickerState.mode === "replace" && tokenPickerState.replaceTargetKey) {
+            placeTokenAsset(target, tokenPickerState.placementPoint, tokenPickerState.replaceTargetKey, true);
+          } else {
+            placeTokenAsset(target, tokenPickerState.placementPoint, "", false);
+          }
+        });
+        tokenPickerList.appendChild(button);
+      });
+    }
+
+    async function refreshWarehouseTokenAssets() {
+      if (!canManageStageTokens(currentRole)) {
+        warehouseTokenAssets = [];
+        renderTokenPickerList();
+        return;
+      }
+      try {
+        if (tokenPickerStatus) {
+          tokenPickerStatus.textContent = "Loading active token assets...";
+        }
+        const params = new URLSearchParams({
+          asset_type: "token",
+          status: "active",
+          search: String(tokenPickerSearch?.value || "").trim(),
+        });
+        const response = await fetch(`/api/warehouse/assets?${params.toString()}`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || `HTTP ${response.status}`);
+        }
+        warehouseTokenAssets = Array.isArray(payload.data) ? payload.data : [];
+        if (tokenPickerStatus) {
+          tokenPickerStatus.textContent = warehouseTokenAssets.length
+            ? `${warehouseTokenAssets.length} token asset${warehouseTokenAssets.length === 1 ? "" : "s"} loaded.`
+            : "No active token assets found.";
+        }
+        renderTokenPickerList();
+      } catch (error) {
+        console.warn("refreshWarehouseTokenAssets failed", error);
+        warehouseTokenAssets = [];
+        if (tokenPickerStatus) {
+          tokenPickerStatus.textContent = error.message || String(error);
+        }
+        renderTokenPickerList();
+      }
+    }
+
+    function openTokenPicker(mode = "create", objectModel = null) {
+      if (!tokenPickerPanel) return;
+      if (!canManageStageTokens(currentRole)) {
+        setStageStatus("Only producers and directors can place First Theater tokens.");
+        return;
+      }
+      hideCardEditor();
+      hideMapEditor();
+      hideGridEditor();
+      hideTokenEditor();
+        tokenPickerState = {
+        open: true,
+        mode: mode === "replace" ? "replace" : "create",
+        selectedAssetID: "",
+        filterShape: "all",
+        search: "",
+        placementPoint: stagePlacementCandidate ? { ...stagePlacementCandidate } : (lastStagePoint ? { ...lastStagePoint } : null),
+        placementScreenPoint: stagePlacementScreenCandidate ? { ...stagePlacementScreenCandidate } : null,
+        replaceTargetKey: objectModel?.key || "",
+        replaceTargetElementID: objectModel?.elementId || "",
+        replaceTargetElementSlug: objectModel?.elementSlug || "",
+        replaceTargetScale: objectModel ? tokenScaleForModel(objectModel) : 100,
+        replaceTargetSnapMode: objectModel ? tokenSnapModeForModel(objectModel) : (currentVenueGridConfig && currentVenueGridConfig.grid_type !== "none" ? "grid" : "free"),
+        replaceTargetTokenLayer: objectModel ? tokenLayerForModel(objectModel) : "public",
+      };
+      if (tokenPickerPanel.hidden) {
+        setTokenPickerPosition(16, 220);
+      }
+      tokenPickerPanel.hidden = false;
+      if (tokenPickerSearch) tokenPickerSearch.value = "";
+      if (tokenPickerShape) tokenPickerShape.value = "all";
+      if (tokenPickerStatus) {
+        tokenPickerStatus.textContent = "Choose an active Warehouse token asset.";
+      }
+      void refreshWarehouseTokenAssets();
+      tokenPickerSearch?.focus?.({ preventScroll: true });
+    }
+
+    function closeTokenPicker() {
+      tokenPickerState.open = false;
+      tokenPickerState.replaceTargetKey = "";
+      tokenPickerState.replaceTargetElementID = "";
+      tokenPickerState.replaceTargetElementSlug = "";
+      tokenPickerState.replaceTargetScale = 100;
+      tokenPickerState.replaceTargetSnapMode = "grid";
+      tokenPickerState.replaceTargetTokenLayer = "public";
+      tokenPickerState.placementPoint = null;
+      tokenPickerState.placementScreenPoint = null;
+      if (tokenPickerPanel) {
+        tokenPickerPanel.hidden = true;
+      }
+      if (warehouseTokenAssetPreviewURL) {
+        warehouseTokenAssetPreviewURL = "";
+      }
+      if (tokenPickerStatus) {
+        tokenPickerStatus.textContent = "Choose a reusable Warehouse token.";
+      }
+    }
+
+    function placeTokenAsset(asset, point, replaceTargetKey = "", replacing = false) {
+      if (!asset) return;
+      const placementPoint = point || tokenPickerState.placementPoint || lastStagePoint || null;
+      if (!placementPoint) {
+        setStageStatus("No stage placement point available.");
+        return;
+      }
+      const snapMode = currentVenueGridConfig && currentVenueGridConfig.grid_type !== "none" ? "grid" : "free";
+      const snapped = tokenPlacementPointForCreate(placementPoint, { source: { data: { snap_mode: snapMode } } }, snapMode);
+      const targetPayload = {
+        asset_id: String(asset.id || "").trim(),
+        venue_slug: "the-cave",
+        layer: "stage",
+        x: snapped.x,
+        y: snapped.y,
+        order: 0,
+        snap_mode: replacing ? (tokenPickerState.replaceTargetSnapMode || snapMode) : snapMode,
+        token_layer: replacing ? (tokenPickerState.replaceTargetTokenLayer || "public") : "public",
+        scale: replacing ? (tokenPickerState.replaceTargetScale || 100) : 100,
+      };
+      const actionType = replacing ? "update/token" : "create/token";
+      const sent = sendAction(actionType, replacing && replaceTargetKey ? {
+        element_id: tokenPickerState.replaceTargetElementID || replaceTargetKey || "",
+        element_slug: tokenPickerState.replaceTargetElementSlug || "",
+        ...targetPayload,
+      } : targetPayload);
+      if (sent) {
+        if (tokenPickerStatus) {
+          tokenPickerStatus.textContent = replacing ? `Replacing token asset with ${asset.name || asset.id}.` : `Placing ${asset.name || asset.id}.`;
+        }
+        setStageStatus(replacing ? `Replacing token with ${asset.name || asset.id}.` : `Placing token ${asset.name || asset.id}.`);
+        setMovementLine(replacing ? `Replace sent for ${asset.name || asset.id}.` : `Create sent for ${asset.name || asset.id}.`);
+      } else {
+        setStageStatus("Socket unavailable.");
+      }
+      closeTokenPicker();
+    }
+
+    function syncTokenEditorWithSelection() {
+      if (!tokenEditorPanel || tokenEditorPanel.hidden) return;
+      const target = currentSelection && isTokenObject(currentSelection)
+        ? currentSelection
+        : currentObjects.find((item) => item.key === tokenEditorTargetKey) || null;
+      if (!target || !target.live || !isTokenObject(target)) {
+        hideTokenEditor();
+        return;
+      }
+      if (tokenEditorDirty) {
+        return;
+      }
+      if (tokenEditorScale) tokenEditorScale.value = String(Math.round(tokenScaleForModel(target)));
+      if (tokenEditorScaleValue) tokenEditorScaleValue.value = String(Math.round(tokenScaleForModel(target)));
+      if (tokenEditorSnap) tokenEditorSnap.value = tokenSnapModeForModel(target);
+      if (tokenEditorLayer) tokenEditorLayer.value = tokenLayerForModel(target);
+      if (tokenEditorStatus) {
+        tokenEditorStatus.textContent = `${target.label} ready to edit.`;
+      }
+    }
+
+    function openTokenEditor(model = null) {
+      const target = model || currentSelection;
+      if (!target || !target.live || !isTokenObject(target)) {
+        setStageStatus("Select a live token to edit it.");
+        return;
+      }
+      if (objectState(target).locked) {
+        setStageStatus("This token is locked.");
+        return;
+      }
+      hideMapEditor();
+      hideGridEditor();
+      hideCardEditor();
+      closeTokenPicker();
+      tokenEditorTargetKey = target.key;
+      tokenEditorDirty = false;
+      if (tokenEditorPanel.hidden) {
+        setTokenEditorPosition(16, 220);
+      }
+      tokenEditorPanel.hidden = false;
+      syncTokenEditorWithSelection();
+      tokenEditorScale?.focus?.({ preventScroll: true });
+    }
+
+    function hideTokenEditor() {
+      tokenEditorDirty = false;
+      tokenEditorTargetKey = "";
+      if (tokenEditorPanel) {
+        tokenEditorPanel.hidden = true;
+      }
+      if (tokenEditorStatus) {
+        tokenEditorStatus.textContent = "Adjust the selected token's placement scale.";
+      }
+    }
+
+    function saveTokenEditor() {
+      const target = currentObjects.find((item) => item.key === tokenEditorTargetKey) || currentSelection;
+      if (!target || !target.live || !isTokenObject(target)) {
+        setStageStatus("Select a live token to save edits.");
+        return;
+      }
+      const scale = clampNumber(tokenEditorScaleValue?.value ?? tokenEditorScale?.value ?? 100, 25, 500, 100);
+      const snapMode = String(tokenEditorSnap?.value || tokenSnapModeForModel(target)).trim().toLowerCase() === "free" ? "free" : "grid";
+      const tokenLayer = String(tokenEditorLayer?.value || tokenLayerForModel(target)).trim().toLowerCase() === "director" ? "director" : "public";
+      const sent = sendAction("update/token", {
+        element_id: target.elementId || "",
+        element_slug: target.elementSlug || "",
+        venue_slug: "the-cave",
+        layer: "stage",
+        scale,
+        snap_mode: snapMode,
+        token_layer: tokenLayer,
+      });
+      if (!sent) {
+        setStageStatus("Socket unavailable.");
+        if (tokenEditorStatus) {
+          tokenEditorStatus.textContent = "Save failed: socket unavailable.";
+        }
+        return;
+      }
+      updateTokenLocalModel(target, (model) => {
+        model.scale = scale;
+        model.snapMode = snapMode;
+        model.gridRelative = snapMode === "grid";
+        model.tokenLayer = tokenLayer;
+      });
+      tokenEditorDirty = false;
+      setStageStatus(`Saved ${target.label}.`);
+      if (tokenEditorStatus) {
+        tokenEditorStatus.textContent = `${target.label} save sent.`;
+      }
+      setMovementLine(`update/token sent for ${target.label}.`);
+      renderPixiScene();
     }
 
     function renderPixiScene() {
@@ -3815,6 +4668,8 @@
         let node;
         if (model.kind === "fire") {
           node = makeFireNode(model);
+        } else if (model.kind === "token" && model.live) {
+          node = makeTokenNode(model);
         } else if (model.kind === "card" && model.live) {
           node = makeCardNode(model);
         } else {
@@ -3831,11 +4686,21 @@
           }
         } else {
           const pin = cardPinData(model);
-          const isWorldObject = model.kind === "fire" || pin.mode === "world";
+          const isWorldObject = model.kind === "fire" || model.kind === "token" || pin.mode === "world";
           const displayedPoint = currentDisplayedPointForModel(model);
-          const position = isWorldObject ? worldPointForStagePoint(displayedPoint) : displayedPoint;
+          const position = model.kind === "token"
+            ? displayedPoint
+            : (isWorldObject ? worldPointForStagePoint(displayedPoint) : displayedPoint);
           node.container.position.set(position.x, position.y);
-          node.container.zIndex = 10 + index;
+          let zIndex = 10 + index;
+          if (model.kind === "token") {
+            zIndex = tokenLayerForModel(model) === "director" ? 34 + index : 24 + index;
+          } else if (model.kind === "card") {
+            zIndex = 44 + index;
+          } else if (model.kind === "fire") {
+            zIndex = 14 + index;
+          }
+          node.container.zIndex = zIndex;
           const targetLayer = isWorldObject ? pinnedObjectLayer : overlayObjectLayer;
           targetLayer.addChild(node.container);
         }
@@ -3853,7 +4718,8 @@
       setLiveFeedLine(`${liveCount} live object${liveCount === 1 ? "" : "s"} in the Pixi scene.`);
       const renderedFire = currentObjects.some((object) => object.kind === "fire");
       const renderedCards = currentObjects.filter((object) => object.kind === "card").length;
-      setSnapshotSummary(`${renderedFire ? "Fire" : "No fire"} and ${renderedCards} card object${renderedCards === 1 ? "" : "s"} are rendered from the live Cave snapshot.`);
+      const renderedTokens = currentObjects.filter((object) => object.kind === "token").length;
+      setSnapshotSummary(`${renderedFire ? "Fire" : "No fire"} and ${renderedCards} card object${renderedCards === 1 ? "" : "s"} plus ${renderedTokens} token object${renderedTokens === 1 ? "" : "s"} are rendered from the live Cave snapshot.`);
       updateStatusSummary();
       refreshNodeSelection();
       updateStageEmptyState();
@@ -3986,6 +4852,14 @@
       window.addEventListener("pointermove", moveGridEditorDrag, true);
       window.addEventListener("pointerup", endGridEditorDrag, true);
       window.addEventListener("pointercancel", endGridEditorDrag, true);
+      tokenPickerHeader?.addEventListener("pointerdown", beginTokenPickerDrag);
+      window.addEventListener("pointermove", moveTokenPickerDrag, true);
+      window.addEventListener("pointerup", endTokenPickerDrag, true);
+      window.addEventListener("pointercancel", endTokenPickerDrag, true);
+      tokenEditorHeader?.addEventListener("pointerdown", beginTokenEditorDrag);
+      window.addEventListener("pointermove", moveTokenEditorDrag, true);
+      window.addEventListener("pointerup", endTokenEditorDrag, true);
+      window.addEventListener("pointercancel", endTokenEditorDrag, true);
 
       resizeObserver = new ResizeObserver(() => layoutPixiScene());
       resizeObserver.observe(stageShell);
@@ -4225,6 +5099,118 @@
       }
     }
 
+    function clampTokenPickerPosition(left, top) {
+      const shellRect = stageShell?.getBoundingClientRect?.();
+      const panelRect = tokenPickerPanel?.getBoundingClientRect?.();
+      const panelWidth = Number(panelRect?.width || 640);
+      const panelHeight = Number(panelRect?.height || 520);
+      const shellWidth = Number(shellRect?.width || 0);
+      const shellHeight = Number(shellRect?.height || 0);
+      const maxLeft = Math.max(8, shellWidth - panelWidth - 8);
+      const maxTop = Math.max(8, shellHeight - panelHeight - 8);
+      return {
+        left: Math.max(8, Math.min(Math.round(left), maxLeft)),
+        top: Math.max(8, Math.min(Math.round(top), maxTop)),
+      };
+    }
+
+    function setTokenPickerPosition(left, top) {
+      if (!tokenPickerPanel) return;
+      const position = clampTokenPickerPosition(left, top);
+      tokenPickerPanel.style.left = `${position.left}px`;
+      tokenPickerPanel.style.top = `${position.top}px`;
+      tokenPickerPanel.style.right = "auto";
+      tokenPickerPanel.style.bottom = "auto";
+    }
+
+    function clampTokenEditorPosition(left, top) {
+      const shellRect = stageShell?.getBoundingClientRect?.();
+      const panelRect = tokenEditorPanel?.getBoundingClientRect?.();
+      const panelWidth = Number(panelRect?.width || 420);
+      const panelHeight = Number(panelRect?.height || 360);
+      const shellWidth = Number(shellRect?.width || 0);
+      const shellHeight = Number(shellRect?.height || 0);
+      const maxLeft = Math.max(8, shellWidth - panelWidth - 8);
+      const maxTop = Math.max(8, shellHeight - panelHeight - 8);
+      return {
+        left: Math.max(8, Math.min(Math.round(left), maxLeft)),
+        top: Math.max(8, Math.min(Math.round(top), maxTop)),
+      };
+    }
+
+    function setTokenEditorPosition(left, top) {
+      if (!tokenEditorPanel) return;
+      const position = clampTokenEditorPosition(left, top);
+      tokenEditorPanel.style.left = `${position.left}px`;
+      tokenEditorPanel.style.top = `${position.top}px`;
+      tokenEditorPanel.style.right = "auto";
+      tokenEditorPanel.style.bottom = "auto";
+    }
+
+    function beginTokenPickerDrag(event) {
+      if (!tokenPickerPanel || tokenPickerPanel.hidden || !tokenPickerHeader) return;
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const rect = tokenPickerPanel.getBoundingClientRect();
+      tokenPickerDragState = {
+        offsetX: event.clientX - rect.left,
+        offsetY: event.clientY - rect.top,
+      };
+      tokenPickerHeader.setPointerCapture?.(event.pointerId);
+      tokenPickerHeader.style.cursor = "grabbing";
+    }
+
+    function moveTokenPickerDrag(event) {
+      if (!tokenPickerDragState || !tokenPickerPanel) return;
+      const shellRect = stageShell?.getBoundingClientRect?.();
+      if (!shellRect) return;
+      setTokenPickerPosition(
+        event.clientX - shellRect.left - tokenPickerDragState.offsetX,
+        event.clientY - shellRect.top - tokenPickerDragState.offsetY,
+      );
+    }
+
+    function endTokenPickerDrag() {
+      if (!tokenPickerDragState) return;
+      tokenPickerDragState = null;
+      if (tokenPickerHeader) {
+        tokenPickerHeader.style.cursor = "move";
+      }
+    }
+
+    function beginTokenEditorDrag(event) {
+      if (!tokenEditorPanel || tokenEditorPanel.hidden || !tokenEditorHeader) return;
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const rect = tokenEditorPanel.getBoundingClientRect();
+      tokenEditorDragState = {
+        offsetX: event.clientX - rect.left,
+        offsetY: event.clientY - rect.top,
+      };
+      tokenEditorHeader.setPointerCapture?.(event.pointerId);
+      tokenEditorHeader.style.cursor = "grabbing";
+    }
+
+    function moveTokenEditorDrag(event) {
+      if (!tokenEditorDragState || !tokenEditorPanel) return;
+      const shellRect = stageShell?.getBoundingClientRect?.();
+      if (!shellRect) return;
+      setTokenEditorPosition(
+        event.clientX - shellRect.left - tokenEditorDragState.offsetX,
+        event.clientY - shellRect.top - tokenEditorDragState.offsetY,
+      );
+    }
+
+    function endTokenEditorDrag() {
+      if (!tokenEditorDragState) return;
+      tokenEditorDragState = null;
+      if (tokenEditorHeader) {
+        tokenEditorHeader.style.cursor = "move";
+      }
+    }
+
     function canSendStageAction() {
       return !!ws && ws.readyState === WebSocket.OPEN;
     }
@@ -4357,6 +5343,10 @@
         String(element?.element_type || "").toLowerCase() === "index_card" &&
         String(element?.surface || element?.data?.surface || "tray").toLowerCase() === "stage"
       );
+      const stageTokens = elements.filter((element) =>
+        String(element?.element_type || "").toLowerCase() === "token" &&
+        String(element?.surface || element?.data?.surface || "stage").toLowerCase() === "stage"
+      );
 
       const nextObjects = buildObjects(snapshot);
       if (localPositionOverrides.size > 0) {
@@ -4379,7 +5369,7 @@
         ? "active"
         : "closed";
       const overlayState = overlay ? `${overlay.overlay_type || "text"} overlay active` : "no overlay";
-      setSnapshotSummary(`Showing is ${showingState}; ${overlayState}; fire ${latestFire ? "is present" : "not present"}; staged cards ${stageCards.length}.`);
+      setSnapshotSummary(`Showing is ${showingState}; ${overlayState}; fire ${latestFire ? "is present" : "not present"}; staged cards ${stageCards.length}; staged tokens ${stageTokens.length}.`);
 
       if (!pixiApp) {
         return;
@@ -4405,6 +5395,7 @@
       }
       syncSelectedActions();
       syncCardEditorWithSelection();
+      syncTokenEditorWithSelection();
     }
 
     async function refreshWorld() {
@@ -4570,12 +5561,36 @@
             actionType === "act/reveal_element" ||
             actionType === "act/hide_element" ||
             actionType === "create/index_card" ||
+            actionType === "create/token" ||
+            actionType === "update/token" ||
             actionType === "update/index_card" ||
             actionType === "delete/index_card"
           ) {
             await refreshWorld();
             if (actionType === "create/index_card") {
               placeCreatedIndexCard(msg.data);
+            }
+            if (actionType === "create/token") {
+              setMovementLine("create/token accepted by the live action stream.");
+            }
+            if (actionType === "update/token") {
+              setMovementLine("update/token accepted by the live action stream.");
+            }
+            if (actionType === "create/token" || actionType === "update/token") {
+              const targetId = String(msg.data?.target?.element_id || msg.data?.payload?.element_id || "").trim();
+              const targetSlug = String(msg.data?.target?.element_slug || msg.data?.payload?.element_slug || "").trim();
+              const refreshedToken = currentObjects.find((item) =>
+                item &&
+                item.live &&
+                isTokenObject(item) &&
+                (
+                  (targetId && item.elementId === targetId) ||
+                  (targetSlug && item.elementSlug === targetSlug)
+                )
+              ) || null;
+              if (refreshedToken) {
+                selectObject(refreshedToken, actionType === "create/token" ? "Token created." : "Token updated.");
+              }
             }
             if (actionType === "act/place_element") {
               setMovementLine("act/place_element accepted by the live action stream.");
@@ -4969,6 +5984,75 @@
       }
     });
 
+    tokenPickerSearch?.addEventListener("input", () => {
+      tokenPickerState.search = String(tokenPickerSearch.value || "");
+      renderTokenPickerList();
+    });
+
+    tokenPickerShape?.addEventListener("change", () => {
+      tokenPickerState.filterShape = String(tokenPickerShape.value || "all");
+      renderTokenPickerList();
+    });
+
+    tokenPickerRefresh?.addEventListener("click", () => {
+      void refreshWarehouseTokenAssets();
+    });
+
+    tokenPickerCancel?.addEventListener("click", () => {
+      closeTokenPicker();
+    });
+
+    tokenEditorScale?.addEventListener("input", () => {
+      tokenEditorDirty = true;
+      const value = clampNumber(tokenEditorScale.value || 100, 25, 500, 100);
+      if (tokenEditorScaleValue) tokenEditorScaleValue.value = String(value);
+      if (tokenEditorStatus) {
+        tokenEditorStatus.textContent = `Scale set to ${value}%.`;
+      }
+    });
+
+    tokenEditorScaleValue?.addEventListener("input", () => {
+      tokenEditorDirty = true;
+      const value = clampNumber(tokenEditorScaleValue.value || 100, 25, 500, 100);
+      if (tokenEditorScale) tokenEditorScale.value = String(value);
+      if (tokenEditorStatus) {
+        tokenEditorStatus.textContent = `Scale set to ${value}%.`;
+      }
+    });
+
+    tokenEditorSnap?.addEventListener("change", () => {
+      tokenEditorDirty = true;
+      if (tokenEditorStatus) {
+        tokenEditorStatus.textContent = tokenEditorSnap.value === "grid" ? "Snap to Grid selected." : "Free Placement selected.";
+      }
+    });
+
+    tokenEditorLayer?.addEventListener("change", () => {
+      tokenEditorDirty = true;
+      if (tokenEditorStatus) {
+        tokenEditorStatus.textContent = tokenEditorLayer.value === "director" ? "Director layer selected." : "Public layer selected.";
+      }
+    });
+
+    tokenEditorReset?.addEventListener("click", () => {
+      tokenEditorDirty = true;
+      if (tokenEditorScale) tokenEditorScale.value = "100";
+      if (tokenEditorScaleValue) tokenEditorScaleValue.value = "100";
+      if (tokenEditorSnap) tokenEditorSnap.value = currentVenueGridConfig && currentVenueGridConfig.grid_type !== "none" ? "grid" : "free";
+      if (tokenEditorLayer) tokenEditorLayer.value = "public";
+      if (tokenEditorStatus) {
+        tokenEditorStatus.textContent = "Reset to default token settings.";
+      }
+    });
+
+    tokenEditorSave?.addEventListener("click", () => {
+      saveTokenEditor();
+    });
+
+    tokenEditorCancel?.addEventListener("click", () => {
+      hideTokenEditor();
+    });
+
     mapEditorFile?.addEventListener("change", () => {
       const selected = mapEditorFile?.files?.[0] || null;
       if (!selected) {
@@ -5153,6 +6237,12 @@
       if (gridEditorPanel && !gridEditorPanel.hidden && !event.target.closest("#grid-editor") && !event.target.closest("#grid-editor-header")) {
         hideGridEditor();
       }
+      if (tokenPickerPanel && !tokenPickerPanel.hidden && !event.target.closest("#token-picker") && !event.target.closest("#token-picker-header")) {
+        closeTokenPicker();
+      }
+      if (tokenEditorPanel && !tokenEditorPanel.hidden && !event.target.closest("#token-editor") && !event.target.closest("#token-editor-header")) {
+        hideTokenEditor();
+      }
       if (leftSettingsPanel && !leftSettingsPanel.hidden && !event.target.closest("#left-settings-panel") && !event.target.closest("#left-settings-button")) {
         leftSettingsPanel.hidden = true;
         leftSettingsButton?.setAttribute("aria-expanded", "false");
@@ -5190,6 +6280,8 @@
         headerSettingsButton?.setAttribute("aria-expanded", "false");
         leftSettingsButton?.setAttribute("aria-expanded", "false");
         rightSettingsButton?.setAttribute("aria-expanded", "false");
+        closeTokenPicker();
+        hideTokenEditor();
         if (currentSelection) {
           selectObject(null, "Selection cleared.");
         }

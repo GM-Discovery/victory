@@ -1703,8 +1703,10 @@
         </div>
       </div>
       <div class="index-card-section-header" style="margin-top: 18px;">
-        <h3>Recent Tokens</h3>
-        <div class="index-card-workshop-status">Latest active warehouse assets</div>
+        <h3>Warehouse Assets</h3>
+        <div class="chip-list" style="margin-top: 0;">
+          <a class="chip" href="/venues/warehouse/">Open Warehouse</a>
+        </div>
       </div>
       <div id="token-workshop-list" class="token-workshop-list">
         <div class="index-card-empty">No token assets yet.</div>
@@ -1865,6 +1867,7 @@
   const audienceHoldingScreen = document.getElementById("audience-holding-screen");
   const fireEl = document.getElementById("fire");
   const fireNameplate = document.getElementById("fire-nameplate");
+  const presencePanel = document.querySelector(".presence-panel");
   const presenceList = document.getElementById("presence-list");
   const presenceCount = document.getElementById("presence-count");
   const isWorkshopMode = new URLSearchParams(window.location.search).get("mode") === "workshop";
@@ -5179,12 +5182,52 @@
       }
 
       if (isWorkshopMode) {
-        await loadWorkshopVenues();
         if (tokenWorkshopPanel) {
           tokenWorkshopPanel.hidden = false;
         }
+        if (indexCardWorkshopTools) {
+          indexCardWorkshopTools.hidden = true;
+        }
+        if (indexCardPanel) {
+          indexCardPanel.hidden = true;
+        }
+        if (workshopVenueSelect) {
+          workshopVenueSelect.hidden = true;
+        }
+        if (workshopSendTray) {
+          workshopSendTray.hidden = true;
+        }
+        if (workshopPlaceStage) {
+          workshopPlaceStage.hidden = true;
+        }
+        if (stageDebugPanel) {
+          stageDebugPanel.hidden = true;
+        }
+        if (workshopAssetPicker) {
+          workshopAssetPicker.hidden = true;
+        }
+        if (chatPanel) {
+          chatPanel.hidden = true;
+        }
+        if (noteCardPanel) {
+          noteCardPanel.hidden = true;
+        }
+        if (elementContextMenu) {
+          elementContextMenu.hidden = true;
+        }
+        if (stageContextMenu) {
+          stageContextMenu.hidden = true;
+        }
+        if (elementInfoPopup) {
+          elementInfoPopup.hidden = true;
+        }
+        if (presencePanel) {
+          presencePanel.hidden = true;
+        }
         await refreshTokenWorkshopPolicy();
         await refreshTokenWorkshopList();
+        setConnectionStatus("Workshop assets ready.");
+        return;
       }
 
       await joinCave();

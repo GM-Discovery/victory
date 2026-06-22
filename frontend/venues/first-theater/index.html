@@ -1595,6 +1595,185 @@
       align-items: center;
     }
 
+    .token-editor,
+    .token-picker {
+      position: absolute;
+      right: 16px;
+      top: 220px;
+      z-index: 18;
+      width: min(640px, calc(100vw - 32px));
+      border-radius: 18px;
+      padding: 16px;
+      background: rgba(10, 13, 18, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+      pointer-events: auto;
+      backdrop-filter: blur(8px);
+      display: grid;
+      gap: 10px;
+      touch-action: none;
+    }
+
+    .token-editor-header,
+    .token-picker-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: move;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .token-editor-header strong,
+    .token-picker-header strong {
+      color: #f4e3c1;
+      font-size: 0.96rem;
+    }
+
+    .token-editor-grip,
+    .token-picker-grip {
+      color: #cdb892;
+      font-size: 0.88rem;
+      letter-spacing: 0.1em;
+    }
+
+    .token-picker-body {
+      display: grid;
+      grid-template-columns: minmax(180px, 0.84fr) minmax(0, 1.16fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .token-picker-preview {
+      position: relative;
+      min-height: 220px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background:
+        radial-gradient(circle at 50% 50%, rgba(123, 194, 255, 0.18), rgba(0, 0, 0, 0.58)),
+        rgba(4, 5, 8, 0.9);
+    }
+
+    .token-picker-preview img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: 50% 50%;
+      opacity: 0.96;
+    }
+
+    .token-picker-preview-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 2;
+      border-radius: 999px;
+      background: rgba(10, 12, 16, 0.76);
+      border: 1px solid rgba(123, 194, 255, 0.28);
+      color: #d4ecff;
+      padding: 5px 10px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .token-picker-preview-outline {
+      position: absolute;
+      inset: 18px;
+      border-radius: 18px;
+      border: 1px dashed rgba(123, 194, 255, 0.45);
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    .token-picker-fields,
+    .token-editor-fields {
+      display: grid;
+      gap: 10px;
+    }
+
+    .token-picker-fields .editor-field select,
+    .token-picker-fields .editor-field input[type="text"],
+    .token-editor-fields .editor-field select,
+    .token-editor-fields .editor-field input[type="number"],
+    .token-editor-fields .editor-field input[type="range"] {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(8, 7, 6, 0.78);
+      color: #f7efe5;
+      font: inherit;
+      padding: 10px 12px;
+    }
+
+    .token-picker-fields .editor-field input[type="text"] {
+      min-height: 44px;
+    }
+
+    .token-picker-list {
+      display: grid;
+      gap: 8px;
+      max-height: 290px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .token-picker-card {
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: #f6efe2;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .token-picker-card:hover,
+    .token-picker-card.is-selected {
+      background: rgba(123, 194, 255, 0.12);
+      border-color: rgba(123, 194, 255, 0.36);
+    }
+
+    .token-picker-card img {
+      display: block;
+      width: 72px;
+      height: 72px;
+      object-fit: contain;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.22);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .token-picker-meta {
+      display: grid;
+      gap: 3px;
+    }
+
+    .token-picker-meta strong {
+      color: #f4e3c1;
+    }
+
+    .token-picker-meta small {
+      color: #cdb892;
+      line-height: 1.35;
+    }
+
+    .token-picker-status {
+      color: #cdb892;
+      font-size: 0.86rem;
+      line-height: 1.45;
+    }
+
     .grid-nudge-button {
       width: 32px;
       height: 32px;
@@ -2101,6 +2280,80 @@
                 <button id="grid-editor-visibility" type="button">Hide Grid</button>
                 <button id="grid-editor-save" type="button">Save Grid</button>
                 <button id="grid-editor-cancel" type="button">Close</button>
+              </div>
+            </div>
+            <div id="token-picker" class="token-picker" hidden>
+              <div id="token-picker-header" class="token-picker-header">
+                <strong>Add Token</strong>
+                <span class="token-picker-grip">drag</span>
+              </div>
+              <div id="token-picker-status" class="token-picker-status">Choose a reusable Warehouse token.</div>
+              <div class="token-picker-body">
+                <div class="token-picker-preview">
+                  <div id="token-picker-preview-badge" class="token-picker-preview-badge">No token selected</div>
+                  <img id="token-picker-preview" alt="Selected token preview" />
+                  <div class="token-picker-preview-outline" aria-hidden="true"></div>
+                </div>
+                <div class="token-picker-fields">
+                  <label class="editor-field" for="token-picker-search">
+                    <span>Search</span>
+                    <input id="token-picker-search" type="text" placeholder="Search token assets" />
+                  </label>
+                  <label class="editor-field" for="token-picker-shape">
+                    <span>Shape</span>
+                    <select id="token-picker-shape">
+                      <option value="all">All shapes</option>
+                      <option value="circle">Circle</option>
+                      <option value="square">Square</option>
+                      <option value="hex">Hex</option>
+                      <option value="raw">Raw</option>
+                    </select>
+                  </label>
+                  <label class="editor-field">
+                    <span>Active Warehouse Tokens</span>
+                    <div id="token-picker-list" class="token-picker-list"></div>
+                  </label>
+                </div>
+              </div>
+              <div class="overlay-actions">
+                <button id="token-picker-refresh" type="button">Refresh</button>
+                <button id="token-picker-cancel" type="button">Cancel</button>
+              </div>
+            </div>
+            <div id="token-editor" class="token-editor" hidden>
+              <div id="token-editor-header" class="token-editor-header">
+                <strong>Scale Token</strong>
+                <span class="token-editor-grip">drag</span>
+              </div>
+              <div id="token-editor-status" class="editor-status">Adjust the selected token's placement scale.</div>
+              <div class="token-editor-fields">
+                <label class="editor-field" for="token-editor-scale">
+                  <span>Scale</span>
+                  <input id="token-editor-scale" type="range" min="25" max="500" step="1" value="100" />
+                </label>
+                <label class="editor-field" for="token-editor-scale-value">
+                  <span>Scale Value</span>
+                  <input id="token-editor-scale-value" type="number" min="25" max="500" step="1" value="100" />
+                </label>
+                <label class="editor-field" for="token-editor-snap">
+                  <span>Placement Mode</span>
+                  <select id="token-editor-snap">
+                    <option value="grid">Snap to Grid</option>
+                    <option value="free">Free Placement</option>
+                  </select>
+                </label>
+                <label class="editor-field" for="token-editor-layer">
+                  <span>Layer</span>
+                  <select id="token-editor-layer">
+                    <option value="public">Public Token Layer</option>
+                    <option value="director">Director Layer</option>
+                  </select>
+                </label>
+              </div>
+              <div class="overlay-actions">
+                <button id="token-editor-reset" type="button">Reset</button>
+                <button id="token-editor-save" type="button">Save</button>
+                <button id="token-editor-cancel" type="button">Close</button>
               </div>
             </div>
             <div id="pixi-context-menu" class="context-menu" hidden></div>

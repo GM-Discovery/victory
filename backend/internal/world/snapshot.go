@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/showings"
@@ -215,6 +216,23 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 		return nil, err
 	}
 
+	placementIndex := make(map[string]int, len(snap.Elements))
+	for i, el := range snap.Elements {
+		placementIndex[placedElementKey(el)] = i
+	}
+
+	if err := reconcilePlacedElementsFromActions(ctx, pool, snap.Session.ID, &snap.Elements, placementIndex); err != nil {
+		return nil, err
+	}
+	compactElements := snap.Elements[:0]
+	for _, el := range snap.Elements {
+		if strings.TrimSpace(el.ElementID) == "" {
+			continue
+		}
+		compactElements = append(compactElements, el)
+	}
+	snap.Elements = compactElements
+
 	if snap.Session.ID == "" {
 		return nil, errors.New("no active session found for the-cave")
 	}
@@ -374,6 +392,296 @@ func decodeJSONMap(raw []byte) map[string]any {
 		return map[string]any{}
 	}
 	return out
+}
+
+func reconcilePlacedElementsFromActions(ctx context.Context, pool *pgxpool.Pool, sessionID string, elements *[]PlacedElement, placementIndex map[string]int) error {
+	rows, err := pool.Query(ctx, `
+		SELECT
+			a.type,
+			a.target,
+			a.payload
+		FROM actions a
+		WHERE a.session_id = $1
+		  AND a.type IN ('act/place_element', 'act/remove_element', 'create/token', 'update/token', 'act/duplicate_element')
+		ORDER BY a.moment_id ASC, a.ts ASC
+	`, sessionID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var actionType string
+		var targetRaw, payloadRaw []byte
+		if err := rows.Scan(&actionType, &targetRaw, &payloadRaw); err != nil {
+			return err
+		}
+
+		action := Action{
+			Type:    actionType,
+			Target:  decodeJSONMap(targetRaw),
+			Payload: decodeJSONMap(payloadRaw),
+		}
+
+		switch actionType {
+		case "act/remove_element":
+			removePlacedElementByAction(elements, placementIndex, action)
+		case "act/place_element":
+			if err := upsertPlacedElementFromAction(ctx, pool, elements, placementIndex, action, false); err != nil {
+				return err
+			}
+		case "create/token":
+			if err := upsertPlacedElementFromAction(ctx, pool, elements, placementIndex, action, true); err != nil {
+				return err
+			}
+		case "update/token":
+			if err := upsertPlacedElementFromAction(ctx, pool, elements, placementIndex, action, true); err != nil {
+				return err
+			}
+		case "act/duplicate_element":
+			if err := upsertDuplicatePlacedElementFromAction(ctx, pool, elements, placementIndex, action); err != nil {
+				return err
+			}
+		}
+	}
+
+	return rows.Err()
+}
+
+func upsertPlacedElementFromAction(ctx context.Context, pool *pgxpool.Pool, elements *[]PlacedElement, placementIndex map[string]int, action Action, tokenOnly bool) error {
+	elementID := strings.TrimSpace(actionTargetElementID(action))
+	if elementID == "" {
+		return nil
+	}
+
+	if tokenOnly {
+		if _, ok := action.Target["asset_id"].(string); !ok {
+			return nil
+		}
+	}
+
+	var row struct {
+		ElementID    string
+		Name         string
+		Slug         string
+		ElementType  string
+		ContextClass string
+		Data         map[string]any
+	}
+	var dataRaw []byte
+	if err := pool.QueryRow(ctx, `
+		SELECT
+			e.id::text,
+			e.name,
+			e.slug,
+			e.element_type,
+			COALESCE(NULLIF(e.context_class, ''), '') AS context_class,
+			e.data
+		FROM elements e
+		WHERE e.id = $1
+		  AND COALESCE(e.state::text, '') <> 'deleted'
+		LIMIT 1
+	`, elementID).Scan(&row.ElementID, &row.Name, &row.Slug, &row.ElementType, &row.ContextClass, &dataRaw); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	row.Data = decodeJSONMap(dataRaw)
+
+	surface := strings.ToLower(strings.TrimSpace(actionTargetLayer(action)))
+	if surface == "" {
+		surface = strings.ToLower(strings.TrimSpace(stringValueMap(action.Payload, "surface")))
+	}
+	if surface == "" {
+		surface = "stage"
+	}
+
+	position := map[string]any{
+		"anchor": surface,
+		"x":      numberValueMap(action.Payload, "x", 0),
+		"y":      numberValueMap(action.Payload, "y", 0),
+		"z":      0,
+		"order":  int(numberValueMap(action.Payload, "order", 0)),
+	}
+	if tokenOnly {
+		position["frame"] = "center"
+	} else {
+		position["frame"] = "top-left"
+	}
+
+	visibility := map[string]any{
+		"toRoles":           []string{"director", "producer"},
+		"privateTo":         []string{},
+		"visible":           true,
+		"nameplate_visible": true,
+		"locked":            false,
+	}
+	if layer, _ := action.Payload["token_layer"].(string); strings.EqualFold(strings.TrimSpace(layer), "director") {
+		visibility["visible"] = false
+	}
+
+	placement := PlacedElement{
+		ElementID:    row.ElementID,
+		Name:         row.Name,
+		Slug:         row.Slug,
+		ElementType:  row.ElementType,
+		ContextClass: strings.ToLower(strings.TrimSpace(row.ContextClass)),
+		Surface:      surface,
+		Position:     position,
+		Visibility:   visibility,
+		State: map[string]any{
+			"locked":            false,
+			"nameplate_visible": true,
+			"visible":           visibilityBool(visibility, "visible", true),
+		},
+		Data: row.Data,
+	}
+	if placement.ContextClass == "" {
+		placement.ContextClass = deriveElementContextClass(row.ElementType, row.Slug, row.Data)
+	}
+
+	key := placedElementKey(placement)
+	if existingIndex, ok := placementIndex[key]; ok {
+		(*elements)[existingIndex] = placement
+		return nil
+	}
+
+	*elements = append(*elements, placement)
+	placementIndex[key] = len(*elements) - 1
+	return nil
+}
+
+func upsertDuplicatePlacedElementFromAction(ctx context.Context, pool *pgxpool.Pool, elements *[]PlacedElement, placementIndex map[string]int, action Action) error {
+	newElementID := strings.TrimSpace(stringValueMap(action.Target, "new_element_id"))
+	if newElementID == "" {
+		newElementID = strings.TrimSpace(actionTargetElementID(action))
+	}
+	if newElementID == "" {
+		return nil
+	}
+
+	surface := strings.ToLower(strings.TrimSpace(actionTargetLayer(action)))
+	if surface == "" {
+		surface = "stage"
+	}
+
+	var row struct {
+		ElementID    string
+		Name         string
+		Slug         string
+		ElementType  string
+		ContextClass string
+		Data         map[string]any
+	}
+	var dataRaw []byte
+	if err := pool.QueryRow(ctx, `
+		SELECT
+			e.id::text,
+			e.name,
+			e.slug,
+			e.element_type,
+			COALESCE(NULLIF(e.context_class, ''), '') AS context_class,
+			e.data
+		FROM elements e
+		WHERE e.id = $1
+		  AND COALESCE(e.state::text, '') <> 'deleted'
+		LIMIT 1
+	`, newElementID).Scan(&row.ElementID, &row.Name, &row.Slug, &row.ElementType, &row.ContextClass, &dataRaw); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	row.Data = decodeJSONMap(dataRaw)
+
+	position := map[string]any{
+		"anchor": surface,
+		"x":      numberValueMap(action.Payload, "x", 0),
+		"y":      numberValueMap(action.Payload, "y", 0),
+		"z":      0,
+		"order":  int(numberValueMap(action.Payload, "order", 0)),
+		"frame":  "top-left",
+	}
+	visibility := map[string]any{
+		"toRoles":           []string{"director", "producer"},
+		"privateTo":         []string{},
+		"visible":           true,
+		"nameplate_visible": true,
+		"locked":            false,
+	}
+	placement := PlacedElement{
+		ElementID:    row.ElementID,
+		Name:         row.Name,
+		Slug:         row.Slug,
+		ElementType:  row.ElementType,
+		ContextClass: strings.ToLower(strings.TrimSpace(row.ContextClass)),
+		Surface:      surface,
+		Position:     position,
+		Visibility:   visibility,
+		State: map[string]any{
+			"locked":            false,
+			"nameplate_visible": true,
+			"visible":           true,
+		},
+		Data: row.Data,
+	}
+	if placement.ContextClass == "" {
+		placement.ContextClass = deriveElementContextClass(row.ElementType, row.Slug, row.Data)
+	}
+
+	key := placedElementKey(placement)
+	if existingIndex, ok := placementIndex[key]; ok {
+		(*elements)[existingIndex] = placement
+		return nil
+	}
+
+	*elements = append(*elements, placement)
+	placementIndex[key] = len(*elements) - 1
+	return nil
+}
+
+func removePlacedElementByAction(elements *[]PlacedElement, placementIndex map[string]int, action Action) {
+	elementID := strings.ToLower(strings.TrimSpace(actionTargetElementID(action)))
+	if elementID == "" {
+		return
+	}
+
+	for key, idx := range placementIndex {
+		if strings.HasPrefix(key, elementID+":") {
+			delete(placementIndex, key)
+			if idx >= 0 && idx < len(*elements) {
+				(*elements)[idx] = PlacedElement{}
+			}
+		}
+	}
+}
+
+func placedElementKey(el PlacedElement) string {
+	return strings.ToLower(strings.TrimSpace(el.ElementID)) + ":" + strings.ToLower(strings.TrimSpace(el.Surface))
+}
+
+func numberValueMap(m map[string]any, key string, fallback float64) float64 {
+	if m == nil {
+		return fallback
+	}
+	switch raw := m[key].(type) {
+	case float64:
+		return raw
+	case float32:
+		return float64(raw)
+	case int:
+		return float64(raw)
+	case int32:
+		return float64(raw)
+	case int64:
+		return float64(raw)
+	case json.Number:
+		if v, err := raw.Float64(); err == nil {
+			return v
+		}
+	}
+	return fallback
 }
 
 func deriveElementContextClass(elementType, slug string, data map[string]any) string {

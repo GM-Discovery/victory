@@ -74,6 +74,16 @@ func StorePlaceElement(ctx context.Context, pool *pgxpool.Pool, req PlaceElement
 		return nil, err
 	}
 
+	elementType := ""
+	if err := tx.QueryRow(ctx, `
+		SELECT COALESCE(NULLIF(e.element_type, ''), '')
+		FROM elements e
+		WHERE e.id = $1
+		LIMIT 1
+	`, elementID).Scan(&elementType); err != nil {
+		return nil, err
+	}
+
 	venueID, enabled, err := resolvePlacementVenue(ctx, tx, req.VenueSlug)
 	if err != nil {
 		return nil, err
@@ -98,13 +108,17 @@ func StorePlaceElement(ctx context.Context, pool *pgxpool.Pool, req PlaceElement
 	`, venueID, elementID).Scan(&existingVisibility); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
+	positionFrame := "top-left"
+	if strings.EqualFold(strings.TrimSpace(elementType), "token") {
+		positionFrame = "center"
+	}
 	placementPosition := map[string]any{
 		"anchor": req.Layer,
 		"x":      req.X,
 		"y":      req.Y,
 		"z":      0,
 		"order":  req.Order,
-		"frame":  "top-left",
+		"frame":  positionFrame,
 	}
 	placementVisibility := mergeVisibilityState(existingVisibility, map[string]any{
 		"toRoles":           []string{"director", "producer"},

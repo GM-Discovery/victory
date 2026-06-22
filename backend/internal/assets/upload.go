@@ -246,8 +246,9 @@ func HandleWorkshopUpload(pool *pgxpool.Pool, storageRoot string) http.HandlerFu
 		).Scan(&assetID)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{
-				"ok":    false,
-				"error": "asset_insert_failed",
+				"ok":     false,
+				"error":  "asset_insert_failed",
+				"detail": err.Error(),
 			})
 			return
 		}
@@ -678,7 +679,11 @@ func handleTokenWorkshopUpload(w http.ResponseWriter, r *http.Request, ctx conte
 		storageRoot,
 	).Scan(&assetID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "asset_insert_failed"})
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"ok":     false,
+			"error":  "asset_insert_failed",
+			"detail": err.Error(),
+		})
 		return
 	}
 
@@ -897,6 +902,8 @@ func normalizeAssetType(value string) string {
 	switch assetType {
 	case "map":
 		return "map"
+	case "token":
+		return "token"
 	case "generic", "":
 		return "generic"
 	default:

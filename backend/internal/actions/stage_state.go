@@ -201,6 +201,8 @@ func deriveElementContextClass(elementType, slug string, data map[string]any) st
 		return "card"
 	case "prop":
 		return "prop"
+	case "token":
+		return "token"
 	case "scenery":
 		return "scenery"
 	case "surface":

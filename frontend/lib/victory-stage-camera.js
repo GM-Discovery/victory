@@ -75,6 +75,7 @@
     let animationFrameHandle = null;
     let animationToken = 0;
     let disposed = false;
+    let interactionLocked = false;
 
     function emitChange() {
       onChange(getView());
@@ -395,6 +396,7 @@
 
     function handleWheel(event) {
       if (disposed) return;
+      if (interactionLocked) return;
       if (!stageElement || !stageElement.contains(event.target)) return;
       event.preventDefault();
       const delta = Number(event.deltaY || 0);
@@ -403,6 +405,7 @@
     }
 
     function beginMiddleDrag(event) {
+      if (interactionLocked) return;
       if (!stageElement || event.button !== 1) return;
       event.preventDefault();
       event.stopPropagation();
@@ -417,6 +420,11 @@
     function movePointer(event) {
       if (disposed) return;
       setPointerFromEvent(event);
+
+      if (interactionLocked) {
+        stopEdgeScroll();
+        return;
+      }
 
       if (middleDragging) {
         const nextPoint = { x: Number(event.clientX || 0), y: Number(event.clientY || 0) };
@@ -485,6 +493,17 @@
       window.addEventListener("pointercancel", endMiddleDrag, true);
     }
 
+    function setInteractionLocked(nextLocked) {
+      interactionLocked = Boolean(nextLocked);
+      if (interactionLocked) {
+        endMiddleDrag();
+        stopEdgeScroll();
+        if (stageElement) {
+          stageElement.style.cursor = "";
+        }
+      }
+    }
+
     restore();
 
     return {
@@ -495,6 +514,7 @@
       setWorldBounds,
       setPlayableBounds,
       setActiveMapId,
+      setInteractionLocked,
       screenToWorld,
       worldToScreen,
       zoomAt,

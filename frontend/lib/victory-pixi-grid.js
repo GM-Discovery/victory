@@ -35,6 +35,94 @@
     };
   }
 
+  function resolveOrigin(bounds, config) {
+    return {
+      x: Number(bounds?.x || 0) + Number(config.offsetX || 0),
+      y: Number(bounds?.y || 0) + Number(config.offsetY || 0),
+    };
+  }
+
+  function snapSquarePoint(point, config, bounds) {
+    const cellSize = Math.max(8, config.cellSize);
+    const offsetX = Number(bounds?.x || 0) + (((config.offsetX % cellSize) + cellSize) % cellSize);
+    const offsetY = Number(bounds?.y || 0) + (((config.offsetY % cellSize) + cellSize) % cellSize);
+    return {
+      x: Math.round(offsetX + (Math.round((point.x - offsetX) / cellSize) * cellSize) + (cellSize / 2)),
+      y: Math.round(offsetY + (Math.round((point.y - offsetY) / cellSize) * cellSize) + (cellSize / 2)),
+    };
+  }
+
+  function hexCenterCandidates(point, config, bounds) {
+    const size = Math.max(4, config.cellSize / 2);
+    const orientation = config.hexOrientation;
+    const { x, y } = bounds;
+    const origin = resolveOrigin(bounds, config);
+
+    const hexWidth = orientation === "pointy-top" ? Math.sqrt(3) * size : 2 * size;
+    const hexHeight = orientation === "pointy-top" ? 2 * size : Math.sqrt(3) * size;
+    const horizSpacing = orientation === "pointy-top" ? hexWidth : hexWidth * 0.75;
+    const vertSpacing = orientation === "pointy-top" ? hexHeight * 0.75 : hexHeight;
+
+    const approxCol = Math.round((point.x - origin.x) / horizSpacing);
+    const approxRow = Math.round((point.y - origin.y) / vertSpacing);
+    const candidates = [];
+    for (let col = approxCol - 2; col <= approxCol + 2; col += 1) {
+      for (let row = approxRow - 2; row <= approxRow + 2; row += 1) {
+        let cx;
+        let cy;
+        if (orientation === "pointy-top") {
+          cx = origin.x + (col * horizSpacing) + ((row % 2 !== 0) ? horizSpacing / 2 : 0);
+          cy = origin.y + (row * vertSpacing);
+        } else {
+          cx = origin.x + (col * horizSpacing);
+          cy = origin.y + (row * vertSpacing) + ((col % 2 !== 0) ? vertSpacing / 2 : 0);
+        }
+        if (cx < x - hexWidth || cx > x + bounds.width + hexWidth) continue;
+        if (cy < y - hexHeight || cy > y + bounds.height + hexHeight) continue;
+        candidates.push({ x: cx, y: cy, dx: Math.abs(cx - point.x), dy: Math.abs(cy - point.y) });
+      }
+    }
+    return candidates;
+  }
+
+  function snapHexPoint(point, config, bounds) {
+    const candidates = hexCenterCandidates(point, config, bounds);
+    if (!candidates.length) {
+      return { x: Math.round(point.x), y: Math.round(point.y) };
+    }
+    let best = candidates[0];
+    let bestDistance = Infinity;
+    candidates.forEach((candidate) => {
+      const distance = (candidate.dx * candidate.dx) + (candidate.dy * candidate.dy);
+      if (distance < bestDistance) {
+        best = candidate;
+        bestDistance = distance;
+      }
+    });
+    return { x: Math.round(best.x), y: Math.round(best.y) };
+  }
+
+  function snapPoint(rawConfig, bounds, point) {
+    const config = normalizeConfig(rawConfig);
+    const sourcePoint = {
+      x: Number(point?.x || 0),
+      y: Number(point?.y || 0),
+    };
+    if (!bounds || !bounds.width || !bounds.height) {
+      return { x: Math.round(sourcePoint.x), y: Math.round(sourcePoint.y) };
+    }
+    if (!config.visible || config.gridType === "none") {
+      return { x: Math.round(sourcePoint.x), y: Math.round(sourcePoint.y) };
+    }
+    if (config.gridType === "square") {
+      return snapSquarePoint(sourcePoint, config, bounds);
+    }
+    if (config.gridType === "hex") {
+      return snapHexPoint(sourcePoint, config, bounds);
+    }
+    return { x: Math.round(sourcePoint.x), y: Math.round(sourcePoint.y) };
+  }
+
   function clear(layer) {
     if (!layer) return;
     layer.removeChildren();
@@ -155,5 +243,6 @@
     render,
     clear,
     normalizeConfig,
+    snapPoint,
   };
 })();

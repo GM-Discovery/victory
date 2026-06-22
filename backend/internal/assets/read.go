@@ -66,7 +66,15 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 
-			if strings.EqualFold(strings.TrimSpace(rec.AssetType), "map") {
+			allowed, err := userCanReadAsset(ctx, pool, userID, rec.ProducerUserID, rec.UploaderUserID, rec.OwnerUserID, rec.LocationID)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{
+					"ok":    false,
+					"error": "asset_access_check_failed",
+				})
+				return
+			}
+			if !allowed {
 				venueMapVisible, venueErr := assetIsActiveFirstTheaterMap(ctx, pool, assetID)
 				if venueErr != nil {
 					writeJSON(w, http.StatusInternalServerError, map[string]any{
@@ -90,30 +98,30 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 					})
 					return
 				}
+			}
 
-				contentPath, contentType := resolveAssetContentPath(rec, r.URL.Query().Get("variant"))
-				if strings.TrimSpace(contentPath) == "" {
-					writeJSON(w, http.StatusNotFound, map[string]any{
-						"ok":    false,
-						"error": "asset_content_not_found",
-					})
-					return
-				}
-				if stat, statErr := os.Stat(contentPath); statErr != nil || stat.IsDir() {
-					writeJSON(w, http.StatusNotFound, map[string]any{
-						"ok":    false,
-						"error": "asset_content_not_found",
-					})
-					return
-				}
-				if strings.TrimSpace(contentType) == "" {
-					contentType = "application/octet-stream"
-				}
-				w.Header().Set("Content-Type", contentType)
-				w.Header().Set("Cache-Control", "private, max-age=0, must-revalidate")
-				http.ServeFile(w, r, filepath.Clean(contentPath))
+			contentPath, contentType := resolveAssetContentPath(rec, r.URL.Query().Get("variant"))
+			if strings.TrimSpace(contentPath) == "" {
+				writeJSON(w, http.StatusNotFound, map[string]any{
+					"ok":    false,
+					"error": "asset_content_not_found",
+				})
 				return
 			}
+			if stat, statErr := os.Stat(contentPath); statErr != nil || stat.IsDir() {
+				writeJSON(w, http.StatusNotFound, map[string]any{
+					"ok":    false,
+					"error": "asset_content_not_found",
+				})
+				return
+			}
+			if strings.TrimSpace(contentType) == "" {
+				contentType = "application/octet-stream"
+			}
+			w.Header().Set("Content-Type", contentType)
+			w.Header().Set("Cache-Control", "private, max-age=0, must-revalidate")
+			http.ServeFile(w, r, filepath.Clean(contentPath))
+			return
 		}
 
 		allowed, err := userCanReadAsset(ctx, pool, userID, rec.ProducerUserID, rec.UploaderUserID, rec.OwnerUserID, rec.LocationID)

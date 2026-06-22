@@ -47,6 +47,8 @@ var storePlaceElementFunc = actions.StorePlaceElement
 var storeDuplicateElementFunc = actions.StoreDuplicateElement
 var storeSetElementLockFunc = actions.StoreSetElementLock
 var storeSetNameplateVisibilityFunc = actions.StoreSetNameplateVisibility
+var storeCreateTokenFunc = actions.StoreCreateToken
+var storeUpdateTokenFunc = actions.StoreUpdateToken
 var storePersonaEquipFunc = actions.StorePersonaEquip
 var storePersonaUnequipFunc = actions.StorePersonaUnequip
 var discordBridgeConfig identity.DiscordServerLinkConfig
@@ -589,6 +591,131 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 					"error": err.Error(),
 				})
 				log.Printf("place element failed: user=%s session=%s venue=%s target=%s err=%v", actorID, sessionID, venueSlug, elementSlug, err)
+				return
+			}
+
+			msgOut, _ := json.Marshal(map[string]any{
+				"type": "action",
+				"data": storedAction,
+			})
+			hub.Broadcast(msgOut)
+		}
+
+	case "create/token":
+		{
+			sessionID, _ := payload["session_id"].(string)
+			assetID, _ := payload["asset_id"].(string)
+			venueSlug, _ := payload["venue_slug"].(string)
+			layer, _ := payload["layer"].(string)
+
+			x := 0.0
+			if raw, ok := payload["x"].(float64); ok {
+				x = raw
+			}
+			y := 0.0
+			if raw, ok := payload["y"].(float64); ok {
+				y = raw
+			}
+			order := 0
+			if raw, ok := payload["order"].(float64); ok {
+				order = int(raw)
+			}
+			scale := 100.0
+			if raw, ok := payload["scale"].(float64); ok {
+				scale = raw
+			}
+			snapMode, _ := payload["snap_mode"].(string)
+			tokenLayer, _ := payload["token_layer"].(string)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			storedAction, err := storeCreateTokenFunc(ctx, pool, actions.TokenPlacementRequest{
+				SessionID:  sessionID,
+				ActorID:    c.UserID,
+				AssetID:    assetID,
+				VenueSlug:  venueSlug,
+				Layer:      layer,
+				X:          x,
+				Y:          y,
+				Order:      order,
+				SnapMode:   snapMode,
+				TokenLayer: tokenLayer,
+				Scale:      scale,
+			})
+			cancel()
+
+			if err != nil {
+				var denied *actions.ActionDeniedError
+				if errors.As(err, &denied) {
+					_ = c.Conn.WriteJSON(map[string]any{
+						"type":  "error",
+						"error": denied.Reason,
+					})
+					log.Printf("create token denied: user=%s session=%s asset=%s reason=%s", c.UserID, sessionID, assetID, denied.Reason)
+					return
+				}
+
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": err.Error(),
+				})
+				log.Printf("create token failed: user=%s session=%s asset=%s err=%v", c.UserID, sessionID, assetID, err)
+				return
+			}
+
+			msgOut, _ := json.Marshal(map[string]any{
+				"type": "action",
+				"data": storedAction,
+			})
+			hub.Broadcast(msgOut)
+		}
+
+	case "update/token":
+		{
+			sessionID, _ := payload["session_id"].(string)
+			elementID, _ := payload["element_id"].(string)
+			elementSlug, _ := payload["element_slug"].(string)
+			assetID, _ := payload["asset_id"].(string)
+			venueSlug, _ := payload["venue_slug"].(string)
+			layer, _ := payload["layer"].(string)
+			snapMode, _ := payload["snap_mode"].(string)
+			tokenLayer, _ := payload["token_layer"].(string)
+
+			scale := 0.0
+			if raw, ok := payload["scale"].(float64); ok {
+				scale = raw
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			storedAction, err := storeUpdateTokenFunc(ctx, pool, actions.TokenUpdateRequest{
+				SessionID:   sessionID,
+				ActorID:     c.UserID,
+				ElementID:   elementID,
+				ElementSlug: elementSlug,
+				AssetID:     assetID,
+				VenueSlug:   venueSlug,
+				Layer:       layer,
+				SnapMode:    snapMode,
+				TokenLayer:  tokenLayer,
+				Scale:       scale,
+			})
+			cancel()
+
+			if err != nil {
+				var denied *actions.ActionDeniedError
+				if errors.As(err, &denied) {
+					_ = c.Conn.WriteJSON(map[string]any{
+						"type":  "error",
+						"error": denied.Reason,
+					})
+					log.Printf("update token denied: user=%s session=%s target=%s reason=%s", c.UserID, sessionID, elementSlug, denied.Reason)
+					return
+				}
+
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": err.Error(),
+				})
+				log.Printf("update token failed: user=%s session=%s target=%s err=%v", c.UserID, sessionID, elementSlug, err)
 				return
 			}
 

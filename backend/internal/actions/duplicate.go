@@ -356,12 +356,12 @@ func applyDuplicateIndexCardPinUpdate(data map[string]any, req DuplicateElementR
 
 func isDuplicableStageElement(elementType, contextClass string) bool {
 	switch strings.ToLower(strings.TrimSpace(contextClass)) {
-	case "card", "prop":
+	case "card", "prop", "token":
 		return true
 	}
 
 	switch strings.ToLower(strings.TrimSpace(elementType)) {
-	case "index_card", "prop":
+	case "index_card", "prop", "token":
 		return true
 	}
 
