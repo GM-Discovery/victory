@@ -4,37 +4,79 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Warehouse</title>
-  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
   <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0e1116;
+      --panel: rgba(18, 23, 30, 0.94);
+      --panel-soft: rgba(255, 255, 255, 0.04);
+      --border: rgba(255, 255, 255, 0.1);
+      --border-strong: rgba(255, 255, 255, 0.16);
+      --text: #f7ede0;
+      --muted: #c3cfdb;
+      --accent: #a6c4eb;
+      --accent-2: #f0d39a;
+      --shadow: 0 24px 64px rgba(0, 0, 0, 0.34);
+    }
+
+    * { box-sizing: border-box; }
+
     body {
       margin: 0;
       min-height: 100vh;
-      display: grid;
-      place-items: center;
       font-family: Arial, Helvetica, sans-serif;
-      color: #f7ede0;
+      color: var(--text);
       background:
         radial-gradient(circle at top, rgba(84, 114, 149, 0.18), transparent 24%),
         linear-gradient(180deg, #11161d 0%, #0a0d12 100%);
     }
 
-    .card {
-      width: min(760px, calc(100vw - 32px));
-      padding: 28px;
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .shell {
+      min-height: 100vh;
+      padding: 24px;
+      display: grid;
+      gap: 18px;
+      grid-template-rows: auto auto 1fr;
+    }
+
+    .hero,
+    .panel {
+      border: 1px solid var(--border);
       border-radius: 22px;
-      border: 1px solid rgba(255, 242, 214, 0.12);
-      background: rgba(18, 23, 30, 0.92);
-      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.34);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 24px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .eyebrow {
+      margin: 0;
+      color: var(--accent-2);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-size: 0.76rem;
+      font-weight: 700;
     }
 
     h1 {
-      margin: 0 0 10px;
-      font-size: clamp(2rem, 4vw, 3rem);
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      line-height: 1;
     }
 
-    p {
-      margin: 0 0 18px;
-      color: #c3cfdb;
+    .lead {
+      margin: 0;
+      color: var(--muted);
+      max-width: 920px;
       line-height: 1.55;
     }
 
@@ -44,45 +86,320 @@
       gap: 10px;
     }
 
+    .chip,
     .button {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 11px 16px;
+      min-height: 42px;
+      padding: 0 16px;
       border-radius: 999px;
-      text-decoration: none;
-      color: #fff6e8;
-      background: linear-gradient(180deg, rgba(81, 109, 142, 0.96), rgba(44, 63, 84, 0.96));
-      border: 1px solid rgba(166, 196, 235, 0.28);
+      border: 1px solid var(--border-strong);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
       font-weight: 700;
     }
 
-    .chip {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 11px 16px;
-      border-radius: 999px;
-      text-decoration: none;
-      color: #f7ede0;
-      background: rgba(31, 38, 47, 0.9);
-      border: 1px solid rgba(255, 242, 214, 0.12);
+    .button {
+      background: linear-gradient(180deg, rgba(81, 109, 142, 0.96), rgba(44, 63, 84, 0.96));
+      border-color: rgba(166, 196, 235, 0.28);
+    }
+
+    .button:hover,
+    .chip:hover {
+      background-color: rgba(255,255,255,0.08);
+    }
+
+    .toolbar {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: minmax(240px, 1fr) auto auto;
+      align-items: end;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+      color: var(--accent-2);
+      font-size: 0.92rem;
       font-weight: 700;
+    }
+
+    .field input,
+    .field select {
+      width: 100%;
+      min-height: 44px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.11);
+      background: #0d1116;
+      color: var(--text);
+      padding: 10px 14px;
+      font: inherit;
+    }
+
+    .panel {
+      padding: 18px;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 1.18rem;
+    }
+
+    .status {
+      color: var(--muted);
+    }
+
+    .metrics {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-bottom: 18px;
+    }
+
+    .metric {
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: var(--panel-soft);
+      padding: 12px;
+      color: var(--muted);
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 4px;
+      color: var(--text);
+      font-size: 1.05rem;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+
+    .asset {
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.035);
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+
+    .asset img {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: #0c1015;
+    }
+
+    .asset strong {
+      display: block;
+      font-size: 1rem;
+      margin-bottom: 2px;
+    }
+
+    .asset small {
+      display: block;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-style: italic;
+      padding: 16px 0;
+    }
+
+    @media (max-width: 920px) {
+      .toolbar,
+      .metrics {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
 <body>
-  <main class="card">
-    <h1>Warehouse</h1>
-    <p>
-      Warehouse storage and asset management live in Producer's Office for now.
-      Use that page to review storage policy, browse assets, and delete tombstoned entries.
-    </p>
-    <div class="actions">
-      <a class="button" href="/venues/producers-office/#warehouse-storage-card">Open Warehouse Storage</a>
-      <a class="chip" href="/venues/producers-office/">Open Producer's Office</a>
-      <a class="chip" href="/">Back to Map</a>
-    </div>
-  </main>
+  <div class="shell">
+    <section class="hero">
+      <p class="eyebrow">Warehouse</p>
+      <h1>Asset warehouse</h1>
+      <p class="lead">
+        Browse every stored asset as thumbnails. Use Producer's Office for policy and deletion, or Workshop for token preparation.
+      </p>
+      <div class="actions">
+        <a class="button" href="/venues/workshop/">Open Workshop</a>
+        <a class="chip" href="/venues/producers-office/#warehouse-storage-card">Storage Settings</a>
+        <a class="chip" href="/venues/producers-office/">Producer's Office</a>
+        <a class="chip" href="/">Back to Map</a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Warehouse Metrics</h2>
+        <div id="status" class="status">Loading...</div>
+      </div>
+      <div class="metrics">
+        <div class="metric">Used<strong id="used">Loading...</strong></div>
+        <div class="metric">Limit<strong id="limit">Loading...</strong></div>
+        <div class="metric">Active<strong id="active">Loading...</strong></div>
+        <div class="metric">Tombstoned<strong id="tombstoned">Loading...</strong></div>
+      </div>
+      <div class="toolbar">
+        <label class="field">
+          Search
+          <input id="search" type="search" placeholder="Search assets" />
+        </label>
+        <label class="field">
+          Type
+          <select id="type">
+            <option value="">All types</option>
+            <option value="token">Token</option>
+            <option value="map">Map</option>
+            <option value="generic">Generic</option>
+          </select>
+        </label>
+        <button id="refresh" class="button" type="button">Refresh</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Asset Thumbnails</h2>
+        <div id="asset-status" class="status">Loading assets...</div>
+      </div>
+      <div id="grid" class="grid">
+        <div class="empty">Loading assets...</div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const usedEl = document.getElementById("used");
+    const limitEl = document.getElementById("limit");
+    const activeEl = document.getElementById("active");
+    const tombstonedEl = document.getElementById("tombstoned");
+    const assetStatusEl = document.getElementById("asset-status");
+    const gridEl = document.getElementById("grid");
+    const searchEl = document.getElementById("search");
+    const typeEl = document.getElementById("type");
+    const refreshBtn = document.getElementById("refresh");
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function formatByteSize(bytes) {
+      const value = Number(bytes || 0);
+      if (!Number.isFinite(value) || value <= 0) return "0 B";
+      const units = ["B", "KB", "MB", "GB", "TB"];
+      let size = value;
+      let unit = 0;
+      while (size >= 1024 && unit < units.length - 1) {
+        size /= 1024;
+        unit += 1;
+      }
+      const precision = unit === 0 ? 0 : size >= 10 ? 1 : 2;
+      return `${size.toFixed(precision)} ${units[unit]}`;
+    }
+
+    async function loadWarehouse() {
+      const params = new URLSearchParams();
+      const search = String(searchEl.value || "").trim();
+      const type = String(typeEl.value || "").trim();
+      if (search) params.set("search", search);
+      if (type) params.set("asset_type", type);
+
+      assetStatusEl.textContent = "Loading assets...";
+      try {
+        const [storageResponse, assetsResponse] = await Promise.all([
+          fetch("/api/warehouse/storage", { credentials: "include", cache: "no-store" }),
+          fetch(`/api/warehouse/assets?${params.toString()}`, { credentials: "include", cache: "no-store" }),
+        ]);
+
+        const storagePayload = await storageResponse.json().catch(() => null);
+        const assetsPayload = await assetsResponse.json().catch(() => null);
+
+        if (!storageResponse.ok || !storagePayload?.ok) {
+          throw new Error(storagePayload?.error || `HTTP ${storageResponse.status}`);
+        }
+        if (!assetsResponse.ok || !assetsPayload?.ok) {
+          throw new Error(assetsPayload?.error || `HTTP ${assetsResponse.status}`);
+        }
+
+        const settings = storagePayload.data?.settings || {};
+        const stats = storagePayload.data?.stats || {};
+        usedEl.textContent = formatByteSize(stats.total_stored_bytes || 0);
+        limitEl.textContent = formatByteSize(settings.hard_limit_bytes || 0);
+        activeEl.textContent = String(stats.active_assets || 0);
+        tombstonedEl.textContent = String(stats.tombstoned_assets || 0);
+        statusEl.textContent = `Warehouse ${stats.percent_used ?? 0}% used.`;
+
+        const items = Array.isArray(assetsPayload.data) ? assetsPayload.data : [];
+        assetStatusEl.textContent = items.length
+          ? `${items.length} asset${items.length === 1 ? "" : "s"} loaded.`
+          : "No assets found.";
+
+        if (!items.length) {
+          gridEl.innerHTML = '<div class="empty">No warehouse assets yet.</div>';
+          return;
+        }
+
+        gridEl.innerHTML = items.map((asset) => {
+          const id = escapeHtml(asset.id || "");
+          const name = escapeHtml(asset.name || asset.original_filename || id || "Asset");
+          const typeLabel = escapeHtml(asset.asset_type || "generic");
+          const shape = escapeHtml(asset.shape || "circle");
+          const dims = escapeHtml(`${asset.default_grid_width || 1} × ${asset.default_grid_height || 1}`);
+          const bytes = escapeHtml(formatByteSize(asset.stored_bytes || 0));
+          const mime = escapeHtml(asset.source_mime || asset.sniffed_mime || "");
+          const thumb = escapeHtml(asset.thumbnail_url || asset.content_url || "");
+          return `
+            <article class="asset">
+              ${thumb ? `<img src="${thumb}" alt="${name}" />` : `<div class="empty">No preview</div>`}
+              <div>
+                <strong>${name}</strong>
+                <small>${typeLabel} · ${shape}</small>
+                <small>${dims}</small>
+                <small>${bytes}</small>
+                <small>${mime}</small>
+              </div>
+            </article>
+          `;
+        }).join("");
+      } catch (error) {
+        assetStatusEl.textContent = error.message || String(error);
+        gridEl.innerHTML = `<div class="empty">${escapeHtml(error.message || String(error))}</div>`;
+      }
+    }
+
+    searchEl.addEventListener("input", () => {
+      clearTimeout(searchEl._timer);
+      searchEl._timer = setTimeout(loadWarehouse, 250);
+    });
+    typeEl.addEventListener("change", loadWarehouse);
+    refreshBtn.addEventListener("click", loadWarehouse);
+    loadWarehouse();
+  </script>
 </body>
 </html>

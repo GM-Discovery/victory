@@ -3,6 +3,8 @@ package assets
 import (
 	"context"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -46,35 +48,46 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		rec, err := loadWarehouseAssetRecord(ctx, pool, assetID, true)
-		if err != nil {
-			if err == pgx.ErrNoRows {
-				if wantContent {
+		if wantContent {
+			log.Printf("asset content request start: asset=%s variant=%s", assetID, r.URL.Query().Get("variant"))
+			rec, err := loadAssetContentRecord(ctx, pool, assetID)
+			if err != nil {
+				log.Printf("asset content load failed: asset=%s err=%v", assetID, err)
+				if err == pgx.ErrNoRows {
 					serveConstructionFallback(w, r)
 					return
 				}
-				writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "asset_not_found"})
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "asset_lookup_failed"})
 				return
 			}
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "asset_lookup_failed"})
-			return
-		}
 
-		if wantContent {
 			if rec.MissingAsset {
+				log.Printf("asset content missing asset fallback: asset=%s", assetID)
 				serveConstructionFallback(w, r)
 				return
 			}
 
-			allowed, err := userCanReadAsset(ctx, pool, userID, rec.ProducerUserID, rec.UploaderUserID, rec.OwnerUserID, rec.LocationID)
-			if err != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]any{
+			contentPath, contentType := resolveAssetContentPathFromParts(rec.Variants, rec.OriginalPath, rec.SourceMime, rec.SniffedMime, r.URL.Query().Get("variant"))
+			log.Printf("asset content resolved: asset=%s path=%s type=%s variants=%d", assetID, contentPath, contentType, len(rec.Variants))
+			if strings.TrimSpace(contentPath) == "" {
+				writeJSON(w, http.StatusNotFound, map[string]any{
 					"ok":    false,
-					"error": "asset_access_check_failed",
+					"error": "asset_content_not_found",
 				})
 				return
 			}
-			if !allowed {
+			if stat, statErr := os.Stat(contentPath); statErr != nil || stat.IsDir() {
+				writeJSON(w, http.StatusNotFound, map[string]any{
+					"ok":    false,
+					"error": "asset_content_not_found",
+				})
+				return
+			}
+			if strings.TrimSpace(contentType) == "" {
+				contentType = "application/octet-stream"
+			}
+
+			if strings.EqualFold(strings.TrimSpace(rec.AssetType), "map") {
 				venueMapVisible, venueErr := assetIsActiveFirstTheaterMap(ctx, pool, assetID)
 				if venueErr != nil {
 					writeJSON(w, http.StatusInternalServerError, map[string]any{
@@ -100,27 +113,41 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 				}
 			}
 
-			contentPath, contentType := resolveAssetContentPath(rec, r.URL.Query().Get("variant"))
-			if strings.TrimSpace(contentPath) == "" {
+			file, openErr := os.Open(filepath.Clean(contentPath))
+			if openErr != nil {
+				log.Printf("asset content open failed: asset=%s path=%s err=%v", assetID, contentPath, openErr)
 				writeJSON(w, http.StatusNotFound, map[string]any{
 					"ok":    false,
 					"error": "asset_content_not_found",
 				})
 				return
 			}
-			if stat, statErr := os.Stat(contentPath); statErr != nil || stat.IsDir() {
+			defer file.Close()
+
+			if stat, statErr := file.Stat(); statErr != nil || stat.IsDir() {
 				writeJSON(w, http.StatusNotFound, map[string]any{
 					"ok":    false,
 					"error": "asset_content_not_found",
 				})
 				return
 			}
-			if strings.TrimSpace(contentType) == "" {
-				contentType = "application/octet-stream"
-			}
+
 			w.Header().Set("Content-Type", contentType)
 			w.Header().Set("Cache-Control", "private, max-age=0, must-revalidate")
-			http.ServeFile(w, r, filepath.Clean(contentPath))
+			w.WriteHeader(http.StatusOK)
+			if _, err := io.Copy(w, file); err != nil {
+				log.Printf("asset content copy failed: asset=%s path=%s err=%v", assetID, contentPath, err)
+			}
+			return
+		}
+
+		rec, err := loadWarehouseAssetRecord(ctx, pool, assetID, true)
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "asset_not_found"})
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "asset_lookup_failed"})
 			return
 		}
 
@@ -221,11 +248,80 @@ func assetIsActiveFirstTheaterMap(ctx context.Context, pool *pgxpool.Pool, asset
 	return found, nil
 }
 
+type assetContentRecord struct {
+	AssetType    string
+	MissingAsset bool
+	OriginalPath string
+	SourceMime   string
+	SniffedMime  string
+	Variants     []map[string]any
+}
+
+func loadAssetContentRecord(ctx context.Context, pool *pgxpool.Pool, assetID string) (assetContentRecord, error) {
+	var rec assetContentRecord
+	var deleted bool
+	err := pool.QueryRow(ctx, `
+		SELECT
+			COALESCE(NULLIF(a.asset_type, ''), 'generic'),
+			COALESCE(a.deleted_at IS NOT NULL, FALSE),
+			COALESCE(NULLIF(a.original_path, ''), ''),
+			COALESCE(a.source_mime, ''),
+			COALESCE(a.sniffed_mime, '')
+		FROM assets a
+		WHERE a.id = $1
+		LIMIT 1
+	`, assetID).Scan(
+		&rec.AssetType,
+		&deleted,
+		&rec.OriginalPath,
+		&rec.SourceMime,
+		&rec.SniffedMime,
+	)
+	if err != nil {
+		return assetContentRecord{}, err
+	}
+	if deleted {
+		rec.MissingAsset = true
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT variant_key, mime, path
+		FROM asset_derivatives
+		WHERE asset_id = $1
+		ORDER BY width ASC
+	`, assetID)
+	if err != nil {
+		return assetContentRecord{}, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var variantKey, mime, path string
+		if err := rows.Scan(&variantKey, &mime, &path); err != nil {
+			return assetContentRecord{}, err
+		}
+		rec.Variants = append(rec.Variants, map[string]any{
+			"variant_key": variantKey,
+			"mime":        mime,
+			"path":        path,
+			"url":         "/api/assets/" + assetID + "/content?variant=" + variantKey,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return assetContentRecord{}, err
+	}
+	return rec, nil
+}
+
 func resolveAssetContentPath(rec warehouseAssetRecord, variant string) (string, string) {
+	return resolveAssetContentPathFromParts(rec.Variants, rec.OriginalPath, rec.SourceMime, rec.SniffedMime, variant)
+}
+
+func resolveAssetContentPathFromParts(variants []map[string]any, originalPath, sourceMime, sniffedMime, variant string) (string, string) {
 	variant = strings.ToLower(strings.TrimSpace(variant))
 	switch variant {
 	case "thumbnail", "stage", "master", "original":
-		for _, item := range rec.Variants {
+		for _, item := range variants {
 			if strings.EqualFold(strings.TrimSpace(fmt.Sprint(item["variant_key"])), variant) {
 				path := strings.TrimSpace(fmt.Sprint(item["path"]))
 				mime := strings.TrimSpace(fmt.Sprint(item["mime"]))
@@ -238,7 +334,7 @@ func resolveAssetContentPath(rec warehouseAssetRecord, variant string) (string, 
 
 	if variant == "" {
 		for _, preferred := range []string{"stage", "master", "thumbnail", "original"} {
-			for _, item := range rec.Variants {
+			for _, item := range variants {
 				if strings.EqualFold(strings.TrimSpace(fmt.Sprint(item["variant_key"])), preferred) {
 					path := strings.TrimSpace(fmt.Sprint(item["path"]))
 					mime := strings.TrimSpace(fmt.Sprint(item["mime"]))
@@ -250,15 +346,15 @@ func resolveAssetContentPath(rec warehouseAssetRecord, variant string) (string, 
 		}
 	}
 
-	if rec.OriginalPath != "" {
-		contentType := rec.SourceMime
+	if originalPath != "" {
+		contentType := sourceMime
 		if strings.TrimSpace(contentType) == "" {
-			contentType = rec.SniffedMime
+			contentType = sniffedMime
 		}
-		return rec.OriginalPath, contentType
+		return originalPath, contentType
 	}
 
-	for _, item := range rec.Variants {
+	for _, item := range variants {
 		path := strings.TrimSpace(fmt.Sprint(item["path"]))
 		mime := strings.TrimSpace(fmt.Sprint(item["mime"]))
 		if path != "" {

@@ -1196,7 +1196,16 @@
     }
 
     function objectKind(model) {
-      return String(model?.kind || model?.contextClass || model?.elementType || "").trim().toLowerCase();
+      const kind = String(model?.kind || model?.contextClass || model?.elementType || "").trim().toLowerCase();
+      if (kind === "token") {
+        return "token";
+      }
+      const assetID = String(model?.assetID || model?.asset_id || model?.source?.data?.asset_id || "").trim();
+      const assetURL = String(model?.assetContentURL || model?.assetThumbnailURL || model?.source?.data?.asset_content_url || model?.source?.data?.asset_thumbnail_url || "").trim();
+      if (assetID || assetURL) {
+        return "token";
+      }
+      return kind;
     }
 
     function objectState(model) {
@@ -3483,16 +3492,17 @@
       const state = element?.state || {};
       const visibility = element?.visibility || {};
       const kind = String(element?.context_class || data.context_class || element?.element_type || "").trim().toLowerCase();
+      const inferredKind = (kind === "token" || String(data.asset_id || "").trim() || String(data.asset_content_url || "").trim() || String(data.asset_thumbnail_url || "").trim()) ? "token" : "card";
       const assetID = String(data.asset_id || "");
       return {
         key: `live:${String(element?.element_id || element?.slug || index)}`,
-        kind: kind === "token" ? "token" : "card",
+        kind: inferredKind,
         live: true,
         elementId: String(element?.element_id || ""),
         elementSlug: String(element?.slug || ""),
         elementType: String(element?.element_type || ""),
-        contextClass: String(element?.context_class || data.context_class || (kind === "token" ? "token" : "card")),
-        label: String(element?.name || data.asset_name || data.front_text || element?.slug || (kind === "token" ? "Token" : "Index card")),
+        contextClass: String(element?.context_class || data.context_class || inferredKind),
+        label: String(element?.name || data.asset_name || data.front_text || element?.slug || (inferredKind === "token" ? "Token" : "Index card")),
         frontText: String(data.front_text || element?.name || "").trim(),
         backText: String(data.back_text || "").trim(),
         color: String(data.color || "#d9c7a6").trim() || "#d9c7a6",

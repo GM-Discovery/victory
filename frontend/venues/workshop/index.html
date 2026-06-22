@@ -4,40 +4,750 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Workshop</title>
-  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0e0c0a;
+      --bg-2: #16120f;
+      --panel: rgba(20, 16, 12, 0.92);
+      --panel-2: rgba(255, 255, 255, 0.04);
+      --border: rgba(255, 255, 255, 0.1);
+      --border-strong: rgba(255, 255, 255, 0.18);
+      --text: #f5efe4;
+      --muted: #beaf95;
+      --accent: #ead19a;
+      --accent-2: #8fc7ff;
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top, rgba(144, 97, 52, 0.14), transparent 30%),
+        linear-gradient(180deg, #17130f 0%, #0e0c0a 100%);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    a { color: var(--accent-2); }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .hero {
+      padding: 24px 24px 12px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .hero-card {
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(25, 20, 15, 0.96), rgba(14, 12, 10, 0.96));
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      color: var(--accent);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      line-height: 1;
+    }
+
+    .subhead {
+      margin: 10px 0 0;
+      color: var(--muted);
+      max-width: 860px;
+      line-height: 1.5;
+    }
+
+    .top-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border-strong);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .chip:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .content {
+      padding: 0 24px 24px;
+      display: grid;
+      gap: 18px;
+      grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
+      align-items: start;
+    }
+
+    .panel {
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      padding: 18px 18px 0;
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 1.18rem;
+    }
+
+    .panel-head p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .panel-body {
+      padding: 18px;
+    }
+
+    .split {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 0.92fr);
+    }
+
+    .preview-shell {
+      min-height: 420px;
+      display: grid;
+      place-items: center;
+    }
+
+    .preview-canvas {
+      width: min(100%, 460px);
+      aspect-ratio: 1 / 1;
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: #0f1313;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+    }
+
+    .preview-meta {
+      margin-top: 10px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .form {
+      display: grid;
+      gap: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 7px;
+      color: var(--accent);
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    input[type="text"], input[type="file"], select, input[type="range"] {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.11);
+      background: #0d0b09;
+      color: var(--text);
+      padding: 12px 14px;
+      font: inherit;
+    }
+
+    input[type="range"] {
+      padding: 12px 0;
+      accent-color: #efcf81;
+    }
+
+    .grid-2 {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .metrics {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .metric {
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+      padding: 12px;
+      color: var(--muted);
+    }
+
+    .metric strong {
+      display: block;
+      color: var(--text);
+      font-size: 1.02rem;
+      margin-top: 3px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    button {
+      min-height: 42px;
+      border-radius: 999px;
+      border: 1px solid var(--border-strong);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      padding: 0 16px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover { background: rgba(255,255,255,0.1); }
+
+    .status {
+      margin-top: 10px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .asset-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .asset-card {
+      display: grid;
+      grid-template-columns: 88px minmax(0, 1fr);
+      gap: 12px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.035);
+      padding: 12px;
+      align-items: center;
+    }
+
+    .asset-card img {
+      width: 88px;
+      height: 88px;
+      object-fit: cover;
+      border-radius: 14px;
+      background: #0f1313;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .asset-card strong {
+      display: block;
+      color: var(--text);
+      font-size: 1rem;
+      margin-bottom: 4px;
+    }
+
+    .asset-card small {
+      display: block;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-style: italic;
+      padding: 10px 0;
+    }
+
+    @media (max-width: 1100px) {
+      .content, .split {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body>
-  <div id="forbidden-screen" class="forbidden-screen" hidden>
-    <div class="forbidden-card">
-      <img src="/assets/redirect.png" alt="Security redirect" />
-      <h1>Error: Forbidden Access Entry</h1>
-      <p>Security redirects you to the pathway.</p>
-      <a href="/" class="back-map-button">← Back to Map</a>
-    </div>
+  <div class="shell">
+    <section class="hero">
+      <div class="hero-card">
+        <p class="eyebrow">Workshop</p>
+        <h1>Asset-only token workshop</h1>
+        <p class="subhead">
+          Prepare token art here, then use the Warehouse and First Theater tools to browse or place the saved asset.
+          This surface does not include Cave stage controls.
+        </p>
+        <div class="top-actions">
+          <a class="chip" href="/venues/warehouse/">Open Warehouse</a>
+          <a class="chip" href="/venues/producers-office/#warehouse-storage-card">Producer's Office Storage</a>
+          <a class="chip" href="/venues/the-cave/">The Cave</a>
+        </div>
+      </div>
+    </section>
+
+    <main class="content">
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Token Prep</h2>
+          <p>Upload a PNG, JPEG, or WebP, adjust the crop mask, then save the asset into the Warehouse.</p>
+        </div>
+        <div class="panel-body split">
+          <div>
+            <div class="preview-shell">
+              <div>
+                <canvas id="preview" class="preview-canvas" width="512" height="512"></canvas>
+                <div id="preview-meta" class="preview-meta">Upload an image to preview the masked token output.</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="form">
+              <label>
+                Select image
+                <input id="file" type="file" accept="image/png,image/jpeg,image/webp" />
+              </label>
+              <label>
+                Token name
+                <input id="name" type="text" placeholder="Token name" />
+              </label>
+              <label>
+                Shape
+                <select id="shape">
+                  <option value="circle">Circle</option>
+                  <option value="square">Square</option>
+                  <option value="hex">Hex</option>
+                  <option value="raw">Raw</option>
+                </select>
+              </label>
+              <label>
+                Zoom
+                <input id="zoom" type="range" min="0.5" max="2.5" step="0.01" value="1" />
+              </label>
+              <div class="grid-2">
+                <label>
+                  X Position
+                  <input id="offset-x" type="range" min="-100" max="100" step="1" value="0" />
+                </label>
+                <label>
+                  Y Position
+                  <input id="offset-y" type="range" min="-100" max="100" step="1" value="0" />
+                </label>
+              </div>
+              <div class="metrics">
+                <div class="metric">
+                  Estimated footprint
+                  <strong id="footprint">1 × 1</strong>
+                </div>
+                <div class="metric">
+                  Original retention
+                  <strong id="retain">Loading...</strong>
+                </div>
+              </div>
+              <div id="estimate" class="status">Estimated storage: loading...</div>
+              <div class="actions">
+                <button id="save" type="button">Save Token</button>
+                <button id="cancel" type="button">Cancel</button>
+              </div>
+              <div id="status" class="status">Loading warehouse policy...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Active Warehouse Tokens</h2>
+          <p>These are the reusable tokens stored in the Warehouse. Their images should be visible below.</p>
+        </div>
+        <div class="panel-body">
+          <div id="asset-list" class="asset-list">
+            <div class="empty">Loading token assets...</div>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
 
   <script>
-    (async () => {
-      const forbiddenScreen = document.getElementById("forbidden-screen");
+    const preview = document.getElementById("preview");
+    const previewMeta = document.getElementById("preview-meta");
+    const fileInput = document.getElementById("file");
+    const nameInput = document.getElementById("name");
+    const shapeInput = document.getElementById("shape");
+    const zoomInput = document.getElementById("zoom");
+    const offsetXInput = document.getElementById("offset-x");
+    const offsetYInput = document.getElementById("offset-y");
+    const footprint = document.getElementById("footprint");
+    const retain = document.getElementById("retain");
+    const estimate = document.getElementById("estimate");
+    const status = document.getElementById("status");
+    const saveBtn = document.getElementById("save");
+    const cancelBtn = document.getElementById("cancel");
+    const assetList = document.getElementById("asset-list");
 
-      try {
-      const response = await fetch("/api/session/me", {
-        credentials: "include",
-      });
-      const payload = await response.json().catch(() => null);
-      const role = String(payload?.data?.role || "").toLowerCase();
-      const performer = ["producer", "director", "cast", "crew"].includes(role);
-      if (!payload?.signed_in || !performer) {
-        if (forbiddenScreen) forbiddenScreen.hidden = false;
+    const previewState = {
+      file: null,
+      objectURL: "",
+      image: null,
+    };
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function formatByteSize(bytes) {
+      const value = Number(bytes || 0);
+      if (!Number.isFinite(value) || value <= 0) {
+        return "0 B";
+      }
+      const units = ["B", "KB", "MB", "GB", "TB"];
+      let size = value;
+      let unit = 0;
+      while (size >= 1024 && unit < units.length - 1) {
+        size /= 1024;
+        unit += 1;
+      }
+      const precision = unit === 0 ? 0 : size >= 10 ? 1 : 2;
+      return `${size.toFixed(precision)} ${units[unit]}`;
+    }
+
+    function clampNumber(value, min, max, fallback) {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return fallback;
+      return Math.min(max, Math.max(min, parsed));
+    }
+
+    function normalizeShape(value) {
+      const shape = String(value || "circle").toLowerCase().trim();
+      return ["circle", "square", "hex", "raw"].includes(shape) ? shape : "circle";
+    }
+
+    function cleanupPreview() {
+      if (previewState.objectURL) {
+        try {
+          URL.revokeObjectURL(previewState.objectURL);
+        } catch (error) {
+          console.warn("preview revoke failed", error);
+        }
+      }
+      previewState.file = null;
+      previewState.objectURL = "";
+      previewState.image = null;
+    }
+
+    function drawMask(ctx, size, shape) {
+      const half = size / 2;
+      const radius = half * 0.92;
+      if (shape === "circle") {
+        ctx.beginPath();
+        ctx.arc(half, half, radius, 0, Math.PI * 2);
+        ctx.closePath();
+        return;
+      }
+      if (shape === "hex") {
+        ctx.beginPath();
+        for (let i = 0; i < 6; i += 1) {
+          const angle = (Math.PI / 3) * i;
+          const x = half + Math.cos(angle) * radius;
+          const y = half + Math.sin(angle) * radius;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        return;
+      }
+      ctx.rect(0, 0, size, size);
+    }
+
+    function tokenDimensions() {
+      const image = previewState.image;
+      if (!image || !image.width || !image.height) {
+        return { master: [0, 0], stage: [0, 0], thumbnail: [0, 0] };
+      }
+      const zoom = clampNumber(zoomInput.value || 1, 0.5, 2.5, 1);
+      const shape = normalizeShape(shapeInput.value || "circle");
+      const sourceMax = Math.max(image.width, image.height, 1);
+      const baseScale = (shape === "raw" ? Math.min(image.width, image.height) : 512) / sourceMax;
+      const scaledW = Math.max(1, Math.round(image.width * baseScale * zoom));
+      const scaledH = Math.max(1, Math.round(image.height * baseScale * zoom));
+      if (shape === "raw") {
+        return {
+          master: [scaledW, scaledH],
+          stage: [Math.max(1, Math.round(scaledW * 0.5)), Math.max(1, Math.round(scaledH * 0.5))],
+          thumbnail: [Math.max(1, Math.round(scaledW * 0.125)), Math.max(1, Math.round(scaledH * 0.125))],
+        };
+      }
+      return {
+        master: [Math.max(1, Math.min(1024, scaledW)), Math.max(1, Math.min(1024, scaledH))],
+        stage: [Math.max(1, Math.min(512, Math.round(scaledW * 0.5))), Math.max(1, Math.min(512, Math.round(scaledH * 0.5)))],
+        thumbnail: [Math.max(1, Math.min(128, Math.round(scaledW * 0.125))), Math.max(1, Math.min(128, Math.round(scaledH * 0.125)))],
+      };
+    }
+
+    function updateEstimate() {
+      const dims = tokenDimensions();
+      const totalPixels =
+        (dims.master[0] * dims.master[1]) +
+        (dims.stage[0] * dims.stage[1]) +
+        (dims.thumbnail[0] * dims.thumbnail[1]);
+      const approxBytes = Math.max(0, Math.round(totalPixels * 0.25));
+      estimate.textContent = previewState.image
+        ? `Estimated output: master ${dims.master[0]}×${dims.master[1]}, stage ${dims.stage[0]}×${dims.stage[1]}, thumb ${dims.thumbnail[0]}×${dims.thumbnail[1]} · approx ${formatByteSize(approxBytes)}`
+        : "Estimated storage: load an image to see output sizes.";
+    }
+
+    function renderPreview() {
+      const ctx = preview.getContext("2d");
+      const image = previewState.image;
+      const size = preview.width || 512;
+      if (!ctx) return;
+      ctx.clearRect(0, 0, size, size);
+      ctx.fillStyle = "rgba(14, 18, 16, 1)";
+      ctx.fillRect(0, 0, size, size);
+      ctx.strokeStyle = "rgba(255,255,255,0.16)";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, size - 2, size - 2);
+      if (!image) {
+        if (previewMeta) {
+          previewMeta.textContent = "Upload an image to preview the selected mask.";
+        }
+        updateEstimate();
         return;
       }
 
-        window.location.replace("/venues/the-cave/?mode=workshop");
-      } catch (err) {
-        if (forbiddenScreen) forbiddenScreen.hidden = false;
-        console.error(err);
+      const shape = normalizeShape(shapeInput.value || "circle");
+      const zoom = clampNumber(zoomInput.value || 1, 0.5, 2.5, 1);
+      const offsetX = clampNumber(offsetXInput.value || 0, -100, 100, 0) / 100;
+      const offsetY = clampNumber(offsetYInput.value || 0, -100, 100, 0) / 100;
+      const scale = (size / Math.max(image.width, image.height, 1)) * zoom;
+      const drawWidth = Math.max(1, Math.round(image.width * scale));
+      const drawHeight = Math.max(1, Math.round(image.height * scale));
+      const drawX = Math.round((size - drawWidth) / 2 + (offsetX * size * 0.5));
+      const drawY = Math.round((size - drawHeight) / 2 + (offsetY * size * 0.5));
+
+      ctx.save();
+      if (shape !== "raw") {
+        drawMask(ctx, size, shape);
+        ctx.clip();
       }
-    })();
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+      ctx.restore();
+
+      if (previewMeta) {
+        previewMeta.textContent = `${shape} · ${drawWidth}×${drawHeight} preview · ${Math.round(zoom * 100)}% zoom`;
+      }
+      updateEstimate();
+    }
+
+    async function loadImage(file) {
+      cleanupPreview();
+      if (!file) {
+        if (previewMeta) {
+          previewMeta.textContent = "Upload an image to preview the selected mask.";
+        }
+        updateEstimate();
+        return;
+      }
+
+      const objectURL = URL.createObjectURL(file);
+      previewState.file = file;
+      previewState.objectURL = objectURL;
+
+      const image = new Image();
+      image.decoding = "async";
+      image.onload = () => {
+        previewState.image = image;
+        if (nameInput && !String(nameInput.value || "").trim()) {
+          nameInput.value = file.name.replace(/\.[^.]+$/, "");
+        }
+        renderPreview();
+      };
+      image.onerror = () => {
+        status.textContent = "Preview decode failed.";
+        updateEstimate();
+      };
+      image.src = objectURL;
+    }
+
+    async function refreshPolicy() {
+      try {
+        const response = await fetch("/api/warehouse/storage", { credentials: "include", cache: "no-store" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || `HTTP ${response.status}`);
+        }
+        const settings = payload.data?.settings || {};
+        const stats = payload.data?.stats || {};
+        retain.innerHTML = `<strong>${settings.retain_originals_default ? "Retained" : "Discarded"}</strong>`;
+        status.textContent = `Warehouse ${stats.percent_used ?? 0}% used of ${formatByteSize(settings.hard_limit_bytes || 0)}.`;
+      } catch (error) {
+        console.warn("refreshPolicy failed", error);
+        status.textContent = error.message || String(error);
+      }
+    }
+
+    async function refreshList() {
+      try {
+        const response = await fetch("/api/warehouse/assets?asset_type=token&status=active", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || `HTTP ${response.status}`);
+        }
+        const items = Array.isArray(payload.data) ? payload.data : [];
+        if (!items.length) {
+          assetList.innerHTML = '<div class="empty">No token assets yet.</div>';
+          return;
+        }
+        assetList.innerHTML = items.map((asset) => {
+          const name = escapeHtml(asset.name || asset.original_filename || asset.id || "Token");
+          const shape = escapeHtml(asset.shape || "circle");
+          const dims = escapeHtml(`${asset.default_grid_width || 1} × ${asset.default_grid_height || 1}`);
+          const bytes = escapeHtml(formatByteSize(asset.stored_bytes || 0));
+          const mime = escapeHtml(asset.source_mime || asset.sniffed_mime || "");
+          const url = escapeHtml(asset.thumbnail_url || asset.content_url || "");
+          return `
+            <div class="asset-card">
+              ${url ? `<img src="${url}" alt="${name}" />` : `<div class="empty" style="padding:24px 0;text-align:center;">No image</div>`}
+              <div>
+                <strong>${name}</strong>
+                <small>${shape} · ${dims}</small>
+                <small>${bytes}</small>
+                <small>${mime}</small>
+              </div>
+            </div>
+          `;
+        }).join("");
+      } catch (error) {
+        assetList.innerHTML = `<div class="empty">${escapeHtml(error.message || String(error))}</div>`;
+      }
+    }
+
+    async function saveAsset() {
+      if (!previewState.file) {
+        status.textContent = "Choose an image first.";
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", previewState.file);
+      formData.append("asset_type", "token");
+      formData.append("name", String(nameInput.value || "").trim());
+      formData.append("shape", normalizeShape(shapeInput.value || "circle"));
+      formData.append("crop_x", String((clampNumber(offsetXInput.value || 0, -100, 100, 0) + 100) / 200));
+      formData.append("crop_y", String((clampNumber(offsetYInput.value || 0, -100, 100, 0) + 100) / 200));
+      formData.append("zoom", String(clampNumber(zoomInput.value || 1, 0.5, 2.5, 1)));
+
+      status.textContent = "Saving token asset...";
+      const endpoints = ["/api/workshop/assets/token", "/api/workshop/assets"];
+
+      for (const endpoint of endpoints) {
+        const body = endpoint === "/api/workshop/assets" ? (() => {
+          const fallbackForm = new FormData();
+          for (const [key, value] of formData.entries()) {
+            fallbackForm.append(key, value);
+          }
+          fallbackForm.set("asset_type", "token");
+          return fallbackForm;
+        })() : formData;
+
+        const response = await fetch(endpoint, {
+          method: "POST",
+          credentials: "include",
+          body,
+        });
+        const payload = await response.json().catch(() => null);
+        if (response.ok && payload?.ok) {
+          status.textContent = payload.data?.duplicate_warning || "Token saved.";
+          await refreshList();
+          return;
+        }
+        if (response.status !== 404 || endpoint === endpoints[endpoints.length - 1]) {
+          throw new Error(payload?.error || `HTTP ${response.status}`);
+        }
+      }
+    }
+
+    fileInput.addEventListener("change", async () => {
+      await loadImage(fileInput.files?.[0] || null);
+    });
+    nameInput.addEventListener("input", () => {
+      if (previewState.image) renderPreview();
+    });
+    shapeInput.addEventListener("change", () => {
+      if (previewState.image) renderPreview();
+    });
+    zoomInput.addEventListener("input", () => {
+      if (previewState.image) renderPreview();
+      else updateEstimate();
+    });
+    offsetXInput.addEventListener("input", () => {
+      if (previewState.image) renderPreview();
+    });
+    offsetYInput.addEventListener("input", () => {
+      if (previewState.image) renderPreview();
+    });
+    saveBtn.addEventListener("click", async () => {
+      try {
+        await saveAsset();
+      } catch (error) {
+        status.textContent = error.message || String(error);
+      }
+    });
+    cancelBtn.addEventListener("click", () => {
+      cleanupPreview();
+      fileInput.value = "";
+      nameInput.value = "";
+      shapeInput.value = "circle";
+      zoomInput.value = "1";
+      offsetXInput.value = "0";
+      offsetYInput.value = "0";
+      if (previewMeta) previewMeta.textContent = "Upload an image to preview the selected mask.";
+      status.textContent = "Draft cleared.";
+      updateEstimate();
+    });
+
+    renderPreview();
+    updateEstimate();
+    refreshPolicy();
+    refreshList();
   </script>
 </body>
 </html>
