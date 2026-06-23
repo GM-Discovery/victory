@@ -11,6 +11,34 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-06-23 — Workshop Route Cleanup
+
+### Frontend
+- Redirected The Cave `?mode=workshop` path to the dedicated asset-only `/venues/workshop/` surface before the Cave shell paints.
+
+### Notes
+- The Workshop surface is now the standalone asset-prep page rather than a hybrid Cave shell.
+- This change removes the brief flash of Cave controls before the workshop view appears.
+
+## 2026-06-22 — Kernel 50 First Theater Token Placement + 50+ Refresh Persistence Hardening
+
+### Backend
+- Added First Theater token placement through the existing live action stream with `create/token` and `update/token`.
+- Kept Warehouse assets reusable and used the existing `elements` plus `venue_layout_elements` canonical state for stage token instances.
+- Hardened replay so token moves survive refresh even when older `update/token` records are sparse.
+
+### Frontend
+- Added the First Theater `Add Token` picker and stage token context-menu actions.
+- Added grid-aware sizing, snap/free placement, and nameplate toggling for placed tokens.
+- Hardened First Theater token rendering so hidden nameplates stay hidden on refresh.
+
+### Docs
+- Added the Kernel 50 reportback and the Kernel 50+ hardening reportback in the house template format.
+
+### Notes
+- Placement permission is currently director/producer only.
+- No new placement table or placement HTTP route was introduced; the live websocket action stream remains the source of truth.
+
 ## 2026-06-21 — Kernel 49 Workshop Token Ingestion + Warehouse Storage
 
 ### Backend

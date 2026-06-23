@@ -257,7 +257,6 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 		LEFT JOIN session_participants sp ON sp.session_id = a.session_id AND sp.user_id = a.actor_id
 		WHERE a.session_id = $1
 		ORDER BY a.moment_id DESC
-		LIMIT 50
 	`, snap.Session.ID)
 	if err != nil {
 		return nil, err
@@ -402,13 +401,15 @@ func reconcilePlacedElementsFromActions(ctx context.Context, pool *pgxpool.Pool,
 			a.payload
 		FROM actions a
 		WHERE a.session_id = $1
-		  AND a.type IN ('act/place_element', 'act/remove_element', 'create/token', 'update/token', 'act/duplicate_element')
+		  AND a.type IN ('act/place_element', 'act/remove_element', 'create/token', 'update/token', 'act/duplicate_element', 'delete/index_card')
 		ORDER BY a.moment_id ASC, a.ts ASC
 	`, sessionID)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
+
+	deletedIndexCards := map[string]struct{}{}
 
 	for rows.Next() {
 		var actionType string
@@ -424,9 +425,24 @@ func reconcilePlacedElementsFromActions(ctx context.Context, pool *pgxpool.Pool,
 		}
 
 		switch actionType {
+		case "delete/index_card":
+			elementID := strings.ToLower(strings.TrimSpace(actionTargetElementID(action)))
+			if elementID == "" {
+				continue
+			}
+			deletedIndexCards[elementID] = struct{}{}
+			removePlacedElementByAction(elements, placementIndex, Action{
+				Type:   "delete/index_card",
+				Target: action.Target,
+			})
 		case "act/remove_element":
 			removePlacedElementByAction(elements, placementIndex, action)
 		case "act/place_element":
+			if elementID := strings.ToLower(strings.TrimSpace(actionTargetElementID(action))); elementID != "" {
+				if _, deleted := deletedIndexCards[elementID]; deleted {
+					continue
+				}
+			}
 			if err := upsertPlacedElementFromAction(ctx, pool, elements, placementIndex, action, false); err != nil {
 				return err
 			}
@@ -453,11 +469,16 @@ func upsertPlacedElementFromAction(ctx context.Context, pool *pgxpool.Pool, elem
 	if elementID == "" {
 		return nil
 	}
-
-	if tokenOnly {
-		if _, ok := action.Target["asset_id"].(string); !ok {
-			return nil
-		}
+	venueSlug := strings.ToLower(strings.TrimSpace(stringValueMap(action.Target, "venue_slug")))
+	if venueSlug == "" {
+		venueSlug = "the-cave"
+	}
+	surface := strings.ToLower(strings.TrimSpace(actionTargetLayer(action)))
+	if surface == "" {
+		surface = strings.ToLower(strings.TrimSpace(stringValueMap(action.Payload, "surface")))
+	}
+	if surface == "" {
+		surface = "stage"
 	}
 
 	var row struct {
@@ -468,6 +489,7 @@ func upsertPlacedElementFromAction(ctx context.Context, pool *pgxpool.Pool, elem
 		ContextClass string
 		Data         map[string]any
 	}
+	var positionRaw []byte
 	var dataRaw []byte
 	if err := pool.QueryRow(ctx, `
 		SELECT
@@ -476,38 +498,49 @@ func upsertPlacedElementFromAction(ctx context.Context, pool *pgxpool.Pool, elem
 			e.slug,
 			e.element_type,
 			COALESCE(NULLIF(e.context_class, ''), '') AS context_class,
-			e.data
+			e.data,
+			COALESCE(vle.position, '{}'::jsonb) AS position
 		FROM elements e
-		WHERE e.id = $1
+		JOIN venues v ON v.slug = $1
+		LEFT JOIN venue_layout_elements vle ON vle.venue_id = v.id AND vle.element_id = e.id AND vle.surface = $2
+		WHERE e.id = $3
 		  AND COALESCE(e.state::text, '') <> 'deleted'
 		LIMIT 1
-	`, elementID).Scan(&row.ElementID, &row.Name, &row.Slug, &row.ElementType, &row.ContextClass, &dataRaw); err != nil {
+	`, venueSlug, surface, elementID).Scan(&row.ElementID, &row.Name, &row.Slug, &row.ElementType, &row.ContextClass, &dataRaw, &positionRaw); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
 		return err
 	}
 	row.Data = decodeJSONMap(dataRaw)
-
-	surface := strings.ToLower(strings.TrimSpace(actionTargetLayer(action)))
-	if surface == "" {
-		surface = strings.ToLower(strings.TrimSpace(stringValueMap(action.Payload, "surface")))
-	}
-	if surface == "" {
-		surface = "stage"
+	positionData := decodeJSONMap(positionRaw)
+	if assetID := strings.TrimSpace(stringValueMap(row.Data, "asset_id")); assetID != "" {
+		if assetDeleted, err := tokenAssetDeleted(ctx, pool, assetID); err == nil && assetDeleted {
+			row.Data["asset_content_url"] = "/assets/construction.png"
+			row.Data["asset_thumbnail_url"] = "/assets/construction.png"
+			row.Data["asset_status"] = "deleted"
+		}
 	}
 
 	position := map[string]any{
 		"anchor": surface,
-		"x":      numberValueMap(action.Payload, "x", 0),
-		"y":      numberValueMap(action.Payload, "y", 0),
+		"x":      numberValueMap(action.Payload, "x", numberValueMap(positionData, "x", 0)),
+		"y":      numberValueMap(action.Payload, "y", numberValueMap(positionData, "y", 0)),
 		"z":      0,
-		"order":  int(numberValueMap(action.Payload, "order", 0)),
+		"order":  int(numberValueMap(action.Payload, "order", numberValueMap(positionData, "order", 0))),
 	}
 	if tokenOnly {
-		position["frame"] = "center"
+		if frame := strings.TrimSpace(stringValueMap(positionData, "frame")); frame != "" {
+			position["frame"] = frame
+		} else {
+			position["frame"] = "center"
+		}
 	} else {
-		position["frame"] = "top-left"
+		if frame := strings.TrimSpace(stringValueMap(positionData, "frame")); frame != "" {
+			position["frame"] = frame
+		} else {
+			position["frame"] = "top-left"
+		}
 	}
 
 	visibility := map[string]any{
@@ -516,6 +549,21 @@ func upsertPlacedElementFromAction(ctx context.Context, pool *pgxpool.Pool, elem
 		"visible":           true,
 		"nameplate_visible": true,
 		"locked":            false,
+	}
+	if existingIndex, ok := placementIndex[placedElementKey(PlacedElement{ElementID: row.ElementID, Surface: surface})]; ok {
+		existing := (*elements)[existingIndex]
+		for k, v := range existing.Visibility {
+			visibility[k] = v
+		}
+		if nameplateVisible, ok := existing.State["nameplate_visible"]; ok {
+			visibility["nameplate_visible"] = nameplateVisible
+		}
+		if locked, ok := existing.State["locked"]; ok {
+			visibility["locked"] = locked
+		}
+		if visible, ok := existing.State["visible"]; ok {
+			visibility["visible"] = visible
+		}
 	}
 	if layer, _ := action.Payload["token_layer"].(string); strings.EqualFold(strings.TrimSpace(layer), "director") {
 		visibility["visible"] = false
@@ -532,7 +580,7 @@ func upsertPlacedElementFromAction(ctx context.Context, pool *pgxpool.Pool, elem
 		Visibility:   visibility,
 		State: map[string]any{
 			"locked":            false,
-			"nameplate_visible": true,
+			"nameplate_visible": visibilityBool(visibility, "nameplate_visible", true),
 			"visible":           visibilityBool(visibility, "visible", true),
 		},
 		Data: row.Data,
@@ -560,6 +608,10 @@ func upsertDuplicatePlacedElementFromAction(ctx context.Context, pool *pgxpool.P
 	if newElementID == "" {
 		return nil
 	}
+	venueSlug := strings.ToLower(strings.TrimSpace(stringValueMap(action.Target, "venue_slug")))
+	if venueSlug == "" {
+		venueSlug = "the-cave"
+	}
 
 	surface := strings.ToLower(strings.TrimSpace(actionTargetLayer(action)))
 	if surface == "" {
@@ -574,6 +626,7 @@ func upsertDuplicatePlacedElementFromAction(ctx context.Context, pool *pgxpool.P
 		ContextClass string
 		Data         map[string]any
 	}
+	var positionRaw []byte
 	var dataRaw []byte
 	if err := pool.QueryRow(ctx, `
 		SELECT
@@ -582,25 +635,36 @@ func upsertDuplicatePlacedElementFromAction(ctx context.Context, pool *pgxpool.P
 			e.slug,
 			e.element_type,
 			COALESCE(NULLIF(e.context_class, ''), '') AS context_class,
-			e.data
+			e.data,
+			COALESCE(vle.position, '{}'::jsonb) AS position
 		FROM elements e
-		WHERE e.id = $1
+		JOIN venues v ON v.slug = $1
+		LEFT JOIN venue_layout_elements vle ON vle.venue_id = v.id AND vle.element_id = e.id AND vle.surface = $2
+		WHERE e.id = $3
 		  AND COALESCE(e.state::text, '') <> 'deleted'
 		LIMIT 1
-	`, newElementID).Scan(&row.ElementID, &row.Name, &row.Slug, &row.ElementType, &row.ContextClass, &dataRaw); err != nil {
+	`, venueSlug, surface, newElementID).Scan(&row.ElementID, &row.Name, &row.Slug, &row.ElementType, &row.ContextClass, &dataRaw, &positionRaw); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
 		return err
 	}
 	row.Data = decodeJSONMap(dataRaw)
+	positionData := decodeJSONMap(positionRaw)
+	if assetID := strings.TrimSpace(stringValueMap(row.Data, "asset_id")); assetID != "" {
+		if assetDeleted, err := tokenAssetDeleted(ctx, pool, assetID); err == nil && assetDeleted {
+			row.Data["asset_content_url"] = "/assets/construction.png"
+			row.Data["asset_thumbnail_url"] = "/assets/construction.png"
+			row.Data["asset_status"] = "deleted"
+		}
+	}
 
 	position := map[string]any{
 		"anchor": surface,
-		"x":      numberValueMap(action.Payload, "x", 0),
-		"y":      numberValueMap(action.Payload, "y", 0),
+		"x":      numberValueMap(action.Payload, "x", numberValueMap(positionData, "x", 0)),
+		"y":      numberValueMap(action.Payload, "y", numberValueMap(positionData, "y", 0)),
 		"z":      0,
-		"order":  int(numberValueMap(action.Payload, "order", 0)),
+		"order":  int(numberValueMap(action.Payload, "order", numberValueMap(positionData, "order", 0))),
 		"frame":  "top-left",
 	}
 	visibility := map[string]any{
@@ -609,6 +673,21 @@ func upsertDuplicatePlacedElementFromAction(ctx context.Context, pool *pgxpool.P
 		"visible":           true,
 		"nameplate_visible": true,
 		"locked":            false,
+	}
+	if existingIndex, ok := placementIndex[placedElementKey(PlacedElement{ElementID: row.ElementID, Surface: surface})]; ok {
+		existing := (*elements)[existingIndex]
+		for k, v := range existing.Visibility {
+			visibility[k] = v
+		}
+		if nameplateVisible, ok := existing.State["nameplate_visible"]; ok {
+			visibility["nameplate_visible"] = nameplateVisible
+		}
+		if locked, ok := existing.State["locked"]; ok {
+			visibility["locked"] = locked
+		}
+		if visible, ok := existing.State["visible"]; ok {
+			visibility["visible"] = visible
+		}
 	}
 	placement := PlacedElement{
 		ElementID:    row.ElementID,
@@ -621,7 +700,7 @@ func upsertDuplicatePlacedElementFromAction(ctx context.Context, pool *pgxpool.P
 		Visibility:   visibility,
 		State: map[string]any{
 			"locked":            false,
-			"nameplate_visible": true,
+			"nameplate_visible": visibilityBool(visibility, "nameplate_visible", true),
 			"visible":           true,
 		},
 		Data: row.Data,
@@ -647,13 +726,19 @@ func removePlacedElementByAction(elements *[]PlacedElement, placementIndex map[s
 		return
 	}
 
-	for key, idx := range placementIndex {
-		if strings.HasPrefix(key, elementID+":") {
-			delete(placementIndex, key)
-			if idx >= 0 && idx < len(*elements) {
-				(*elements)[idx] = PlacedElement{}
-			}
+	filtered := (*elements)[:0]
+	for _, el := range *elements {
+		if strings.ToLower(strings.TrimSpace(el.ElementID)) == elementID {
+			continue
 		}
+		filtered = append(filtered, el)
+	}
+	*elements = filtered
+	for key := range placementIndex {
+		delete(placementIndex, key)
+	}
+	for idx, el := range *elements {
+		placementIndex[placedElementKey(el)] = idx
 	}
 }
 
@@ -956,6 +1041,27 @@ func visibilityBool(visibility map[string]any, key string, fallback bool) bool {
 		}
 	}
 	return fallback
+}
+
+func tokenAssetDeleted(ctx context.Context, pool *pgxpool.Pool, assetID string) (bool, error) {
+	var deletedAt *time.Time
+	var status string
+	err := pool.QueryRow(ctx, `
+		SELECT deleted_at, COALESCE(status::text, '')
+		FROM assets
+		WHERE id = $1
+		LIMIT 1
+	`, assetID).Scan(&deletedAt, &status)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return true, nil
+		}
+		return false, err
+	}
+	if deletedAt != nil {
+		return true, nil
+	}
+	return strings.EqualFold(strings.TrimSpace(status), "deleted"), nil
 }
 
 func stringValueMap(m map[string]any, key string) string {

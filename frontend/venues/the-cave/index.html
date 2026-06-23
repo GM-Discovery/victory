@@ -6,6 +6,11 @@
   <title>The Cave</title>
   <link rel="icon" type="image/png" href="/assets/favicon.png" />
   <link rel="apple-touch-icon" href="/assets/favicon.png" />
+  <script>
+    if (new URLSearchParams(window.location.search).get("mode") === "workshop") {
+      window.location.replace("/venues/workshop/");
+    }
+  </script>
   <style>
     body {
       margin: 0;
@@ -1897,6 +1902,9 @@
   let currentRole = "none";
   let selectedElement = null;
   let selectedIndexCard = null;
+  let indexCardCreateIntent = false;
+  const suppressedIndexCardStorageKey = "victory.the-cave.suppressed-index-card-ids";
+  let suppressedIndexCardIDs = new Set();
   let presenceUsers = {};
   let characterCards = [];
   let canDraftCharacters = false;
@@ -2902,7 +2910,7 @@
   }
 
   function stageContextMenuActions() {
-    return ["add-workshop", "create-card"];
+    return ["add-workshop"];
   }
 
   function scrollToIndexCardPanel() {
@@ -2914,42 +2922,18 @@
       setIndexCardStatus("Only producers and directors can create cards.");
       return;
     }
+    indexCardCreateIntent = true;
     if (!pendingStagePlacement) {
       setPendingStagePlacement(stagePlacementPoint(), "create");
     }
     clearIndexCardEditor();
+    indexCardCreateIntent = true;
     scrollToIndexCardPanel();
     indexCardFront?.focus();
     if (pendingStagePlacement) {
       setIndexCardStatus("Save this card and it will be placed at the clicked point.");
     }
     closeElementContextMenu();
-  }
-
-  function createCardAtStagePoint() {
-    if (!canManageIndexCards(currentRole)) {
-      setIndexCardStatus("Only producers and directors can create cards.");
-      return;
-    }
-    clearIndexCardEditor();
-    scrollToIndexCardPanel();
-    indexCardFront?.focus();
-    setPendingStagePlacement(stagePlacementPoint(), "create");
-    setIndexCardStatus("Create a card, then save it to place it where you clicked.");
-    closeStageContextMenu();
-  }
-
-  function createCardInTrayFromMenu() {
-    if (!canManageIndexCards(currentRole)) {
-      setIndexCardStatus("Only producers and directors can create cards.");
-      return;
-    }
-    clearPendingStagePlacement();
-    clearIndexCardEditor();
-    scrollToIndexCardPanel();
-    indexCardFront?.focus();
-    setIndexCardStatus("Create a card, then save it to keep it in the venue tray.");
-    closeStageContextMenu();
   }
 
   function openWorkshopFromStageMenu() {
@@ -3115,6 +3099,7 @@
       return;
     }
 
+    suppressIndexCardID(element.element_id || element.slug || "");
     setConnectionStatus("Delete sent.");
     closeElementContextMenu();
   }
@@ -3301,7 +3286,6 @@
 
     stageContextMenu.innerHTML = `
       <button type="button" data-stage-menu-action="add-workshop">Add from Workshop</button>
-      <button type="button" data-stage-menu-action="create-card">Create / Place Index Card</button>
       <div class="menu-separator"></div>
       <button type="button" data-stage-menu-action="inspect-stage">Inspect Stage</button>
       <button type="button" data-stage-menu-action="copy" disabled>Copy</button>
@@ -3336,9 +3320,7 @@
 
     if (!stageContextMenu) return;
 
-    const createDisabled = canManageIndexCards(currentRole) ? "" : " disabled";
     stageContextMenu.innerHTML = `
-      <button type="button" data-stage-menu-action="create-card-tray"${createDisabled}>Create Index Card</button>
       <div class="menu-separator"></div>
       <button type="button" data-stage-menu-action="inspect-tray">Info</button>
       <button type="button" data-stage-menu-action="copy" disabled>Copy</button>
@@ -3372,6 +3354,38 @@
     if (indexCardStatus) {
       indexCardStatus.textContent = text;
     }
+  }
+
+  function loadSuppressedIndexCardIDs() {
+    try {
+      const raw = window.localStorage?.getItem(suppressedIndexCardStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      suppressedIndexCardIDs = new Set(parsed.map((value) => String(value || "").trim()).filter(Boolean));
+    } catch (error) {
+      console.warn("loadSuppressedIndexCardIDs failed", error);
+    }
+  }
+
+  function saveSuppressedIndexCardIDs() {
+    try {
+      window.localStorage?.setItem(suppressedIndexCardStorageKey, JSON.stringify([...suppressedIndexCardIDs]));
+    } catch (error) {
+      console.warn("saveSuppressedIndexCardIDs failed", error);
+    }
+  }
+
+  function suppressIndexCardID(cardID) {
+    const value = String(cardID || "").trim();
+    if (!value) return;
+    if (suppressedIndexCardIDs.has(value)) return;
+    suppressedIndexCardIDs.add(value);
+    saveSuppressedIndexCardIDs();
+  }
+
+  function isSuppressedIndexCard(card) {
+    return !!card && suppressedIndexCardIDs.has(String(card.element_id || "").trim());
   }
 
   function clearPendingIndexCardSave() {
@@ -3438,6 +3452,7 @@
   function clearIndexCardEditor() {
     selectedIndexCard = null;
     selectedElement = null;
+    indexCardCreateIntent = false;
     if (indexCardFront) indexCardFront.value = "";
     if (indexCardBack) indexCardBack.value = "";
     if (indexCardColor) indexCardColor.value = "#d9c7a6";
@@ -3455,6 +3470,7 @@
     }
 
     selectedIndexCard = card;
+    indexCardCreateIntent = false;
     selectedElement = {
       element_id: card.element_id,
       slug: card.slug,
@@ -3479,6 +3495,7 @@
   function sortIndexCards(elements) {
     return (Array.isArray(elements) ? elements : [])
       .filter((el) => String(el?.element_type || "").toLowerCase() === "index_card")
+      .filter((el) => !isSuppressedIndexCard(el))
       .sort((a, b) => {
         const updatedA = String(a?.data?.updated_at || a?.data?.created_at || "");
         const updatedB = String(b?.data?.updated_at || b?.data?.created_at || "");
@@ -3541,21 +3558,23 @@
   function renderIndexCardSurface(container, cards, emptyText, trayKey = "tray") {
     if (!container) return;
 
-    if (cards.length === 0) {
+    const visibleCards = cards.filter((card) => !isSuppressedIndexCard(card));
+
+    if (visibleCards.length === 0) {
       container.innerHTML = `<div class="index-card-empty">${escapeHtml(emptyText)}</div>`;
       updateTrayPager(trayKey, 0, 1);
       return;
     }
 
-    const totalPages = trayPageCount(cards);
+    const totalPages = trayPageCount(visibleCards);
     const currentPage = Math.min(indexCardTrayPage[trayKey] || 0, totalPages - 1);
     setTrayPage(trayKey, currentPage);
     updateTrayPager(trayKey, currentPage, totalPages);
 
     const start = currentPage * INDEX_CARD_PAGE_SIZE;
-    const visibleCards = cards.slice(start, start + INDEX_CARD_PAGE_SIZE);
+    const pageCards = visibleCards.slice(start, start + INDEX_CARD_PAGE_SIZE);
 
-    container.innerHTML = visibleCards
+    container.innerHTML = pageCards
       .map((card) => {
         const front = escapeHtml(indexCardTextFromData(card, "front_text"));
         const back = escapeHtml(indexCardTextFromData(card, "back_text"));
@@ -3590,7 +3609,7 @@
         }
         if (event.target.closest("button")) return;
         const cardId = cardEl.getAttribute("data-card-id");
-        const card = cards.find((item) => item.element_id === cardId);
+        const card = visibleCards.find((item) => item.element_id === cardId);
         if (card) {
           loadIndexCardEditor(card);
         }
@@ -3598,7 +3617,7 @@
 
       cardEl.addEventListener("contextmenu", (event) => {
         const cardId = cardEl.getAttribute("data-card-id");
-        const card = cards.find((item) => item.element_id === cardId);
+        const card = visibleCards.find((item) => item.element_id === cardId);
         if (card) {
           openElementContextMenu(event, card, "object");
         }
@@ -3623,7 +3642,7 @@
     for (const stageButton of container.querySelectorAll("[data-card-stage]")) {
       stageButton.addEventListener("click", () => {
         const cardId = stageButton.getAttribute("data-card-stage");
-        const card = visibleCards.find((item) => item.element_id === cardId);
+        const card = pageCards.find((item) => item.element_id === cardId);
         if (card) {
           placeIndexCardOnStage(card);
         }
@@ -3634,18 +3653,20 @@
   function renderStageIndexCards(container, elements) {
     if (!container) return;
 
-    if (elements.length === 0) {
+    const visibleElements = elements.filter((element) => !isSuppressedIndexCard(element));
+
+    if (visibleElements.length === 0) {
       container.innerHTML = "";
       return;
     }
 
-    const mid = (elements.length - 1) / 2;
+    const mid = (visibleElements.length - 1) / 2;
     const baseLeft = 50;
     const baseTop = 50;
     const spreadX = 8;
     const spreadY = 5;
 
-    container.innerHTML = elements
+    container.innerHTML = visibleElements
       .map((element, index) => {
         const isCard = isIndexCardElement(element);
         const contextClass = contextClassForElement(element);
@@ -3709,7 +3730,7 @@
         }
 
         const cardId = cardEl.getAttribute("data-card-id");
-        const card = elements.find((item) => item.element_id === cardId);
+        const card = visibleElements.find((item) => item.element_id === cardId);
         if (!card) return;
         if (isIndexCardElement(card)) {
           loadIndexCardEditor(card);
@@ -3731,7 +3752,7 @@
 
       cardEl.addEventListener("contextmenu", (event) => {
         const cardId = cardEl.getAttribute("data-card-id");
-        const card = elements.find((item) => item.element_id === cardId);
+        const card = visibleElements.find((item) => item.element_id === cardId);
         if (card) {
           openElementContextMenu(event, card, "object");
         }
@@ -3787,6 +3808,9 @@
     const ref = elementOrRef || {};
     return latestSnapshotElements.find((el) => {
       if (!el) return false;
+      if (String(el.element_type || "").toLowerCase() === "index_card" && isSuppressedIndexCard(el)) {
+        return false;
+      }
       return (
         (ref.element_id && el.element_id === ref.element_id) ||
         (ref.slug && el.slug === ref.slug)
@@ -4227,14 +4251,24 @@
       color: draft.color,
     };
 
-    if (type === "update/index_card" && selectedIndexCard?.element_id) {
+    if (type === "update/index_card") {
+      if (!selectedIndexCard?.element_id) {
+        setIndexCardStatus("Select a card before updating it.");
+        return;
+      }
       payload.element_id = selectedIndexCard.element_id;
       payload.element_slug = selectedIndexCard.slug || "";
     }
 
-    if (type === "create/index_card" && selectedIndexCard?.element_id) {
-      payload.element_id = selectedIndexCard.element_id;
-      payload.element_slug = selectedIndexCard.slug || "";
+    if (type === "create/index_card") {
+      if (!indexCardCreateIntent) {
+        setIndexCardStatus("Use New Card or the stage menu to create a new card.");
+        return;
+      }
+      if (selectedIndexCard?.element_id) {
+        payload.element_id = selectedIndexCard.element_id;
+        payload.element_slug = selectedIndexCard.slug || "";
+      }
     }
 
     pendingIndexCardSave = {
@@ -4270,7 +4304,11 @@
 
         await confirmPendingIndexCardSaveFromSnapshot();
         if (pendingIndexCardSave) {
+          const savedType = pendingIndexCardSave.type;
           clearPendingIndexCardSave();
+          if (savedType === "create/index_card") {
+            indexCardCreateIntent = false;
+          }
           setIndexCardStatus("Card saved.");
         }
       })
@@ -4926,6 +4964,9 @@
           if (isOwnAction) {
             setLastActionState(actionType, actionTargetLabel, "accepted");
           }
+          if (actionType === "delete/index_card") {
+            suppressIndexCardID(action?.target?.element_id || action?.payload?.element_id || actionTargetLabel);
+          }
           if (actionType === "act/duplicate_element") {
             const newElementId = String(action?.payload?.new_element_id || action?.target?.new_element_id || "");
             const newElementSlug = String(action?.payload?.new_element_slug || action?.target?.new_element_slug || "");
@@ -5165,6 +5206,7 @@
 
   async function startCave() {
     try {
+      loadSuppressedIndexCardIDs();
       fireEl.hidden = true;
       speechEl.textContent = "";
       clearSelectedElement();
@@ -5341,6 +5383,7 @@
     }
 
     clearIndexCardEditor();
+    indexCardCreateIntent = true;
   });
 
   workshopSendTray?.addEventListener("click", () => {
@@ -5595,14 +5638,6 @@
     }
     if (action === "add-workshop") {
       openWorkshopFromStageMenu();
-      return;
-    }
-    if (action === "create-card") {
-      createCardAtStagePoint();
-      return;
-    }
-    if (action === "create-card-tray") {
-      createCardInTrayFromMenu();
       return;
     }
   });

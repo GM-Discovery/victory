@@ -1,14 +1,14 @@
 # Victory Current State
 
 ## Purpose
-This document is the current-state canon for Victory as of Kernel 49.
+This document is the current-state canon for Victory as of Kernel 50.
 
 Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful as history, but this file is the current source of truth when they disagree.
 
 ## Kernel State
-- Current kernel label: **Kernel 49**
-- Current kernel purpose: **Workshop Token Ingestion + Warehouse Storage v1**
-- Product state: **Kernel 49 is complete**
+- Current kernel label: **Kernel 50**
+- Current kernel purpose: **Warehouse Token Placement + Grid Snapping v1**
+- Product state: **Kernel 50 is complete**
 - Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
 
 ## Current Stack
@@ -148,7 +148,8 @@ Index cards default to Pin to Screen. Cards may Attach to Map or Pin to Screen w
 Shift+Ping broadcasts a Director-and-above focus ping within the current venue, animates the recipient camera in about 250ms, and leaves the browser's personal camera persistent afterward.
 The First Theater map editor now activates existing map assets directly from the asset list, and the grid renderer follows the rendered map bounds so larger maps stay fully covered when zoomed out.
 Workshop token preparation now lives in The Cave's `mode=workshop` surface, with circle/square/hex/raw previews, token uploads, and installation-wide warehouse storage policy wired to the Producer's Office.
-Warehouse asset reads now resolve deleted or missing assets to the construction fallback image instead of leaving placements blank.
+First Theater now consumes reusable Warehouse token assets through an `Add Token` picker, and placed tokens persist through refresh with grid-aware sizing and snap/free placement.
+Warehouse asset reads still resolve deleted or missing assets to the construction fallback image instead of leaving placements blank.
 Director focus/broadcast and touch controls remain deferred.
 
 WebSocket:

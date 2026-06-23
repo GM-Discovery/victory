@@ -1212,9 +1212,10 @@
       const source = model?.source || {};
       const state = model?.state || source?.state || {};
       const visibility = model?.visibility || source?.visibility || {};
+      const nameplateVisible = state.nameplate_visible ?? state.nameplateVisible ?? visibility.nameplate_visible ?? visibility.nameplateVisible ?? true;
       return {
         locked: Boolean(state.locked ?? visibility.locked ?? false),
-        nameplateVisible: Boolean(state.nameplate_visible ?? visibility.nameplate_visible ?? true),
+        nameplateVisible: Boolean(nameplateVisible),
         visible: Boolean(state.visible ?? visibility.visible ?? true),
       };
     }
@@ -1718,7 +1719,6 @@
       };
 
       if (kind === "stage") {
-        push("create-card", "Create Index Card", "create", { disabled: !canManageIndexCards(currentRole) });
         push("set-map", "Add / Replace Map", "create", { disabled: !canManageIndexCards(currentRole) });
         push("configure-grid", "Configure Grid", "create", { disabled: !canManageIndexCards(currentRole) });
         push("add-token", "Add Token", "create", { disabled: !canManageStageTokens(currentRole) });
@@ -1732,7 +1732,6 @@
       if (kind === "fire") {
         push("select", "Select", "info");
         push("info", "Info", "info");
-        push("create-card", "Create Index Card", "create", { disabled: !canManageIndexCards(currentRole) });
         if (canRemoveLiveStageObject(objectModel)) {
           push("remove", "Remove from Stage", "remove");
         }
@@ -3076,17 +3075,32 @@
 
       if ((action === "snap-to-grid" || action === "free-placement") && isTokenObject(objectModel)) {
         const snapMode = action === "snap-to-grid" ? "grid" : "free";
+        const snappedPoint = snapMode === "grid"
+          ? tokenPlacementPointForCreate(currentDisplayedPointForModel(objectModel), objectModel, snapMode)
+          : currentDisplayedPointForModel(objectModel);
         const sent = sendAction("update/token", {
           element_id: objectModel.elementId || "",
           element_slug: objectModel.elementSlug || "",
           venue_slug: "the-cave",
           layer: "stage",
+          x: Number(snappedPoint?.x ?? objectModel.position?.x ?? 0),
+          y: Number(snappedPoint?.y ?? objectModel.position?.y ?? 0),
+          order: Number(objectModel.position?.order ?? 0),
           snap_mode: snapMode,
         });
         if (sent) {
           updateTokenLocalModel(objectModel, (model) => {
             model.snapMode = snapMode;
             model.gridRelative = snapMode === "grid";
+            if (snapMode === "grid" && snappedPoint) {
+              model.position = {
+                ...(model.position || {}),
+                x: Math.round(Number(snappedPoint.x || 0)),
+                y: Math.round(Number(snappedPoint.y || 0)),
+                order: Number(model.position?.order ?? 0),
+                frame: "center",
+              };
+            }
           });
         }
         setStageStatus(sent ? `${objectModel.label} set to ${snapMode === "grid" ? "Snap to Grid" : "Free Placement"}.` : "Socket unavailable.");
@@ -3101,6 +3115,9 @@
           element_slug: objectModel.elementSlug || "",
           venue_slug: "the-cave",
           layer: "stage",
+          x: Number(objectModel.position?.x ?? 0),
+          y: Number(objectModel.position?.y ?? 0),
+          order: Number(objectModel.position?.order ?? 0),
           token_layer: tokenLayer,
         });
         if (sent) {
@@ -3129,7 +3146,7 @@
         });
         if (sent) {
           updateLocalObjectModel(objectModel, (model) => {
-            model.state = { ...(model.state || {}), nameplateVisible: visible };
+            model.state = { ...(model.state || {}), nameplate_visible: visible, nameplateVisible: visible };
             model.visibility = { ...(model.visibility || {}), nameplate_visible: visible };
           });
         }
@@ -3175,7 +3192,12 @@
               element_slug: objectModel.elementSlug || "",
               venue_slug: "the-cave",
               layer: "stage",
+              x: point.x,
+              y: point.y,
+              order: Number(objectModel.position?.order ?? 0),
               snap_mode: moveTarget.snapMode,
+              token_layer: tokenLayerForModel(objectModel),
+              scale: tokenScaleForModel(objectModel),
             })
           : sendAction("update/index_card", {
               element_id: objectModel.elementId || "",
@@ -3189,21 +3211,25 @@
               screen_x: moveTarget.screen_x,
               screen_y: moveTarget.screen_y,
             });
-        const placementSent = sendAction("act/place_element", {
-          element_id: objectModel.elementId || "",
-          element_slug: objectModel.elementSlug || "",
-          venue_slug: "the-cave",
-          layer: "stage",
-          x: point.x,
-          y: point.y,
-          order: Number(objectModel.position?.order ?? 0),
-        });
+        const placementSent = isTokenObject(objectModel)
+          ? true
+          : sendAction("act/place_element", {
+              element_id: objectModel.elementId || "",
+              element_slug: objectModel.elementSlug || "",
+              venue_slug: "the-cave",
+              layer: "stage",
+              x: point.x,
+              y: point.y,
+              order: Number(objectModel.position?.order ?? 0),
+            });
         if (sent) {
           updateLocalCardPinModel(objectModel, (model) => {
             if (isTokenObject(model)) {
               model.source.data = {
                 ...(model.source.data || {}),
                 snap_mode: moveTarget.snapMode,
+                token_layer: tokenLayerForModel(model),
+                scale: tokenScaleForModel(model),
               };
               model.position = {
                 ...(model.position || {}),
@@ -3230,8 +3256,9 @@
           : moveTarget.pinMode === "world"
             ? `world x ${moveTarget.world_x}, y ${moveTarget.world_y}`
             : `overlay x ${moveTarget.screen_x}, y ${moveTarget.screen_y}`;
-        setMovementLine(sent && placementSent ? `Move sent for ${objectModel.label} to ${moveLabel}.` : "Socket unavailable.");
-        setStageStatus(sent && placementSent ? `Moving ${objectModel.label} to ${moveLabel}.` : "Socket unavailable.");
+        const moveOk = isTokenObject(objectModel) ? sent : (sent && placementSent);
+        setMovementLine(moveOk ? `Move sent for ${objectModel.label} to ${moveLabel}.` : "Socket unavailable.");
+        setStageStatus(moveOk ? `Moving ${objectModel.label} to ${moveLabel}.` : "Socket unavailable.");
         closeContextMenu();
         return;
       }
@@ -3863,6 +3890,21 @@
       const container = new PIXI.Container();
       container.sortableChildren = true;
       const size = tokenDisplaySizeForModel(model);
+      const applyNameplateVisibility = () => {
+        const show = Boolean(objectState(model).nameplateVisible);
+        const hasBadge = badge.parent === container;
+        const hasLayerTag = layerTag.parent === container;
+        const hasLabel = label.parent === container;
+        if (show) {
+          if (!hasBadge) container.addChild(badge);
+          if (!hasLayerTag) container.addChild(layerTag);
+          if (!hasLabel) container.addChild(label);
+        } else {
+          if (hasBadge) container.removeChild(badge);
+          if (hasLayerTag) container.removeChild(layerTag);
+          if (hasLabel) container.removeChild(label);
+        }
+      };
       const assetURL = String(model.assetContentURL || model.source?.data?.asset_content_url || "").trim();
       const thumbnailURL = String(model.assetThumbnailURL || model.source?.data?.asset_thumbnail_url || "").trim();
       const textureSource = assetURL || thumbnailURL || "/assets/construction.png";
@@ -3886,8 +3928,6 @@
       const layerTag = new PIXI.Text(tokenLayerForModel(model) === "director" ? "DIR" : "TOK", layerTagStyle);
       layerTag.anchor.set(0.5);
       layerTag.position.set(size.width / 2 - 12, -size.height / 2 + 12);
-      layerTag.visible = Boolean(objectState(model).nameplateVisible);
-
       const labelText = truncateCardText(model.assetName || model.label || "Token", 20) || "Token";
       const labelStyle = new PIXI.TextStyle({
         fontFamily: "Arial",
@@ -3901,8 +3941,6 @@
       const label = new PIXI.Text(labelText, labelStyle);
       label.anchor.set(0.5, 0);
       label.position.set(0, size.height / 2 + 8);
-      label.visible = Boolean(objectState(model).nameplateVisible);
-
       const badgeStyle = new PIXI.TextStyle({
         fontFamily: "Arial",
         fontSize: 10,
@@ -3912,13 +3950,12 @@
       const badge = new PIXI.Text(`${Math.round(tokenScaleForModel(model))}%`, badgeStyle);
       badge.anchor.set(0.5);
       badge.position.set(-size.width / 2 + 18, -size.height / 2 + 12);
-      badge.visible = Boolean(objectState(model).nameplateVisible);
 
       const focus = new PIXI.Graphics();
       focus.lineStyle(0, 0x000000, 0);
       focus.drawRoundedRect(-size.width / 2 - 8, -size.height / 2 - 8, size.width + 16, size.height + 24, 16);
 
-      container.addChild(outline, sprite, badge, layerTag, label, focus);
+      container.addChild(outline, sprite, focus);
       container.eventMode = "static";
       container.cursor = "pointer";
       container.interactive = true;
@@ -3937,11 +3974,11 @@
             focus.drawRoundedRect(-size.width / 2 - 8, -size.height / 2 - 8, size.width + 16, size.height + 24, 16);
             container.zIndex = tokenLayerForModel(model) === "director" ? 35 : 25;
           }
-          layerTag.visible = Boolean(objectState(model).nameplateVisible);
-          label.visible = Boolean(objectState(model).nameplateVisible);
-          badge.visible = Boolean(objectState(model).nameplateVisible);
+          applyNameplateVisibility();
         },
       };
+
+      applyNameplateVisibility();
 
       const openTokenContextMenu = (event) => {
         if (wasContextMenuHandled(event)) {
@@ -4448,6 +4485,9 @@
         element_slug: target.elementSlug || "",
         venue_slug: "the-cave",
         layer: "stage",
+        x: Number(target.position?.x ?? 0),
+        y: Number(target.position?.y ?? 0),
+        order: Number(target.position?.order ?? 0),
         scale,
         snap_mode: snapMode,
         token_layer: tokenLayer,
@@ -4957,33 +4997,62 @@
         return;
       }
 
-      const sent = sendAction("act/place_element", {
-        element_id: model.elementId || "",
-        element_slug: model.elementSlug || "",
-        venue_slug: "first-theater",
-        layer: "stage",
-        x: stagePoint.x,
-        y: stagePoint.y,
-        order: Number(model.position?.order ?? 0),
-      });
+      const tokenSnapMode = isTokenObject(model) ? tokenSnapModeForModel(model) : "";
+      const snappedStagePoint = isTokenObject(model) && tokenSnapMode === "grid"
+        ? tokenPlacementPointForCreate(stagePoint, model, tokenSnapMode)
+        : stagePoint;
+
+      const sent = isTokenObject(model)
+        ? (() => {
+            const snapMode = tokenSnapMode;
+            return sendAction("update/token", {
+              element_id: model.elementId || "",
+              element_slug: model.elementSlug || "",
+              venue_slug: "the-cave",
+              layer: "stage",
+              x: Number(snappedStagePoint?.x ?? stagePoint.x ?? 0),
+              y: Number(snappedStagePoint?.y ?? stagePoint.y ?? 0),
+              order: Number(model.position?.order ?? 0),
+              snap_mode: snapMode,
+              token_layer: tokenLayerForModel(model),
+              scale: tokenScaleForModel(model),
+            });
+          })()
+        : sendAction("act/place_element", {
+            element_id: model.elementId || "",
+            element_slug: model.elementSlug || "",
+            venue_slug: "first-theater",
+            layer: "stage",
+            x: stagePoint.x,
+            y: stagePoint.y,
+            order: Number(model.position?.order ?? 0),
+          });
 
       const overrideKey = String(model.elementId || model.elementSlug || model.key || "");
       const overridePos = {
         ...(model.position || {}),
-        x: stagePoint.x,
-        y: stagePoint.y,
+        x: Number(snappedStagePoint?.x ?? stagePoint.x ?? 0),
+        y: Number(snappedStagePoint?.y ?? stagePoint.y ?? 0),
         order: Number(model.position?.order ?? 0),
-        frame: "top-left",
+        frame: isTokenObject(model) && tokenSnapMode === "grid" ? "center" : "top-left",
       };
       if (overrideKey) {
         localPositionOverrides.set(overrideKey, overridePos);
       }
       updateLocalObjectModel(model, (m) => {
         m.position = overridePos;
+        if (isTokenObject(m)) {
+          m.source.data = {
+            ...(m.source.data || {}),
+            snap_mode: tokenSnapModeForModel(m),
+            token_layer: tokenLayerForModel(m),
+            scale: tokenScaleForModel(m),
+          };
+        }
       });
 
       if (sent) {
-        setStageStatus("Move sent through act/place_element.");
+        setStageStatus(isTokenObject(model) ? "Token move sent through update/token." : "Move sent through act/place_element.");
         if (smokeMode) {
           setSmokeLine(`Drop sent at ${screenPoint.x}, ${screenPoint.y}.`);
         }

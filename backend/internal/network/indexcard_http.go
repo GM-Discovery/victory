@@ -89,11 +89,11 @@ func HandleIndexCardSave(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 
 		actionType := strings.TrimSpace(req.ActionType)
 		if actionType == "" {
-			if strings.TrimSpace(req.ElementID) != "" || strings.TrimSpace(req.ElementSlug) != "" {
-				actionType = "update/index_card"
-			} else {
-				actionType = "create/index_card"
-			}
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"ok":    false,
+				"error": "missing_action_type",
+			})
+			return
 		}
 
 		var storedAction *actions.StoredAction

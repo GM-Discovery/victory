@@ -677,6 +677,18 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 			assetID, _ := payload["asset_id"].(string)
 			venueSlug, _ := payload["venue_slug"].(string)
 			layer, _ := payload["layer"].(string)
+			x := 0.0
+			if raw, ok := payload["x"].(float64); ok {
+				x = raw
+			}
+			y := 0.0
+			if raw, ok := payload["y"].(float64); ok {
+				y = raw
+			}
+			order := 0
+			if raw, ok := payload["order"].(float64); ok {
+				order = int(raw)
+			}
 			snapMode, _ := payload["snap_mode"].(string)
 			tokenLayer, _ := payload["token_layer"].(string)
 
@@ -694,6 +706,9 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 				AssetID:     assetID,
 				VenueSlug:   venueSlug,
 				Layer:       layer,
+				X:           x,
+				Y:           y,
+				Order:       order,
 				SnapMode:    snapMode,
 				TokenLayer:  tokenLayer,
 				Scale:       scale,

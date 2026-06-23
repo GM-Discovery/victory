@@ -37,6 +37,9 @@ type TokenUpdateRequest struct {
 	AssetID     string  `json:"asset_id"`
 	VenueSlug   string  `json:"venue_slug"`
 	Layer       string  `json:"layer"`
+	X           float64 `json:"x"`
+	Y           float64 `json:"y"`
+	Order       int     `json:"order"`
 	SnapMode    string  `json:"snap_mode"`
 	TokenLayer  string  `json:"token_layer"`
 	Scale       float64 `json:"scale"`
@@ -404,6 +407,27 @@ func StoreUpdateToken(ctx context.Context, pool *pgxpool.Pool, req TokenUpdateRe
 		state.Visibility = visibility
 	}
 
+	positionFrame := "center"
+	if snapMode := normalizeTokenSnapMode(req.SnapMode); snapMode == "free" {
+		positionFrame = "top-left"
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE venue_layout_elements
+		SET position = jsonb_build_object(
+			'anchor', surface,
+			'x', $4::double precision,
+			'y', $5::double precision,
+			'z', 0,
+			'order', $6::integer,
+			'frame', $7::text
+		)
+		WHERE venue_id = $1
+		  AND element_id = $2
+		  AND surface = $3
+	`, state.VenueID, state.ElementID, state.Surface, req.X, req.Y, req.Order, positionFrame); err != nil {
+		return nil, err
+	}
+
 	var asset warehouseTokenAssetRef
 	if req.AssetID != "" && !strings.EqualFold(strings.TrimSpace(req.AssetID), strings.TrimSpace(stringValue(updatedData["asset_id"]))) {
 		asset, err = loadWarehouseTokenAsset(ctx, tx, req.AssetID)
@@ -465,6 +489,9 @@ func StoreUpdateToken(ctx context.Context, pool *pgxpool.Pool, req TokenUpdateRe
 		"scale":         updatedData["scale"],
 		"snap_mode":     updatedData["snap_mode"],
 		"token_layer":   updatedData["token_layer"],
+		"x":             req.X,
+		"y":             req.Y,
+		"order":         req.Order,
 		"actor_persona": persona,
 	}
 	scope := map[string]any{

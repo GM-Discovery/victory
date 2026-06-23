@@ -69,7 +69,7 @@ Ordering note:
 - The grid primitive follows the map-layer pass directly so alignment tooling has a real map to align against; stage navigation (pan/zoom) is deferred to a later kernel so the grid first ships as a fixed-viewport visual layer
 - Kernel 48 closes that stage-navigation gap for First Theater only, while keeping the camera reusable for later venues without making it global
 - Kernel 48.1 tightens the card attachment model and adds the one-time venue focus ping without turning the camera into a shared persistent state
-- Kernel 49 extends the existing asset system into a Warehouse model for reusable token and map assets, while keeping Theater placement deferred to Kernel 50
+- Kernel 49 extends the existing asset system into a Warehouse model for reusable token and map assets, while Kernel 50 adds First Theater token placement and grid snapping on top of that warehouse model
 
 ## Medium Roadmap: Kernels 38–62
 - strengthen showing/review surfaces and auditability
