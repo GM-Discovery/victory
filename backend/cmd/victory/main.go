@@ -41,6 +41,10 @@ import (
 )
 
 func main() {
+	if strings.TrimSpace(os.Getenv("OPERATOR_HANDLE")) == "" {
+		_ = os.Setenv("OPERATOR_HANDLE", "straturli")
+	}
+
 	port := getenv("PORT", "8081")
 	databaseURL := getenv("DATABASE_URL", "postgres://victory:REDACTED@victory-postgres:5432/victory?sslmode=disable")
 	secureCookie := cookieSecureFromEnv()
@@ -338,7 +342,8 @@ func main() {
 	mux.HandleFunc("/api/workshop/assets", assets.HandleWorkshopUpload(pool, storageRoot))
 	mux.HandleFunc("/api/workshop/assets/token", assets.HandleTokenUploadAsset(pool, storageRoot))
 	mux.HandleFunc("/api/assets/", assets.HandleGetAssetMeta(pool))
-	mux.HandleFunc("/api/warehouse/storage", assets.HandleWarehouseStorage(pool))
+	mux.HandleFunc("/api/warehouse/storage", assets.HandleWarehouseStorage(pool, storageRoot))
+	mux.HandleFunc("/api/warehouse/storage/filesystem", assets.HandleWarehouseFilesystemStorage(pool, storageRoot))
 	mux.HandleFunc("/api/warehouse/storage/settings", assets.HandleWarehouseStorageSettings(pool))
 	mux.HandleFunc("/api/warehouse/assets", assets.HandleWarehouseAssets(pool))
 	mux.HandleFunc("/api/warehouse/assets/", assets.HandleWarehouseAssetByID(pool, storageRoot))

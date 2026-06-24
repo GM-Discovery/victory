@@ -78,6 +78,73 @@
       color: #f7e6c9;
     }
 
+    .details {
+      margin-top: 18px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .details-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .detail-card {
+      border-radius: 14px;
+      border: 1px solid rgba(255, 235, 209, 0.12);
+      background: rgba(255, 255, 255, 0.03);
+      padding: 14px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .detail-card h2 {
+      margin: 0;
+      font-size: 1rem;
+      color: #f8eedf;
+    }
+
+    .detail-card p {
+      margin: 0;
+    }
+
+    .detail-card code {
+      color: #f0d39a;
+    }
+
+    .stat-row {
+      display: grid;
+      gap: 6px;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: baseline;
+    }
+
+    .stat-row strong {
+      color: #fff8ea;
+    }
+
+    .meter {
+      height: 12px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 235, 209, 0.14);
+    }
+
+    .meter > span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #9ec17d, #e7bd53, #d45e4a);
+      border-radius: 999px;
+      transition: width 0.18s ease;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
     .button {
       display: inline-flex;
       align-items: center;
@@ -121,12 +188,53 @@
             This cabin is invite-only and still under construction. It is intended for a very small, trusted circle and may never be broadly visible on the map.
           </p>
           <p id="access-line">Checking access...</p>
-          <div id="access-note" class="note hidden">
-            If you need access, email <strong>grant@amurray.family</strong>.
+      <div id="access-note" class="note hidden">
+        If you need access, email <strong>grant@amurray.family</strong>.
+      </div>
+      <div class="details">
+        <div class="details-grid">
+          <div class="detail-card">
+            <h2>Operator Access</h2>
+            <p id="operator-line">Checking operator status...</p>
+            <p class="muted">If you are running this backend locally, <code>OPERATOR_HANDLE</code> defaults to <code>straturli</code> unless you override it. You can also pin a specific account with <code>OPERATOR_USER_ID</code>. Operator sessions see this cabin in <code>/api/map/visibility</code>.</p>
           </div>
-          <a href="/" class="button">← Back to Map</a>
+          <div class="detail-card">
+            <h2>Operator Log</h2>
+            <p>Current log file: <code>Construction/OperatorLogs/operator-log.md</code></p>
+            <p>Current reportback: <code>Construction/OperatorLogs/kernel-51-reportback.md</code></p>
+          </div>
+        </div>
+        <div class="detail-card">
+          <h2>Storage Diagnostics</h2>
+          <p id="storage-line" class="muted">Loading warehouse diagnostics...</p>
+          <div class="meter" aria-hidden="true"><span id="storage-meter"></span></div>
+          <div class="details-grid">
+            <div class="detail-card">
+              <h2>Filesystem</h2>
+              <p id="filesystem-line">Loading...</p>
+            </div>
+            <div class="detail-card">
+              <h2>Hard Limit</h2>
+              <p id="hard-limit">Loading...</p>
+            </div>
+            <div class="detail-card">
+              <h2>Upload Cap</h2>
+              <p id="upload-cap">Loading...</p>
+            </div>
+            <div class="detail-card">
+              <h2>Warnings</h2>
+              <p id="warning-thresholds">Loading...</p>
+            </div>
+            <div class="detail-card">
+              <h2>Token Variants</h2>
+              <p id="variant-sizes">Loading...</p>
+            </div>
+          </div>
         </div>
       </div>
+      <a href="/" class="button">← Back to Map</a>
+    </div>
+  </div>
     </div>
   </div>
 
@@ -134,6 +242,82 @@
   <script>
     const accessLine = document.getElementById("access-line");
     const accessNote = document.getElementById("access-note");
+    const operatorLine = document.getElementById("operator-line");
+    const storageLine = document.getElementById("storage-line");
+    const storageMeter = document.getElementById("storage-meter");
+    const filesystemLine = document.getElementById("filesystem-line");
+    const hardLimit = document.getElementById("hard-limit");
+    const uploadCap = document.getElementById("upload-cap");
+    const warningThresholds = document.getElementById("warning-thresholds");
+    const variantSizes = document.getElementById("variant-sizes");
+
+    function formatBytes(value) {
+      const bytes = Number(value || 0);
+      if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+      const units = ["B", "KB", "MB", "GB", "TB"];
+      let idx = 0;
+      let amount = bytes;
+      while (amount >= 1024 && idx < units.length - 1) {
+        amount /= 1024;
+        idx += 1;
+      }
+      return `${amount.toFixed(amount >= 100 || idx === 0 ? 0 : 1)} ${units[idx]}`;
+    }
+
+    function formatPercent(value) {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return "n/a";
+      return `${Math.max(0, Math.min(100, Math.round(parsed)))}%`;
+    }
+
+    function setStatusLine(node, text) {
+      if (node) {
+        node.textContent = text;
+      }
+    }
+
+    async function loadStorageDiagnostics() {
+      try {
+        const [storageResponse, filesystemResponse] = await Promise.all([
+          fetch("/api/warehouse/storage", { credentials: "include", cache: "no-store" }),
+          fetch("/api/warehouse/storage/filesystem", { credentials: "include", cache: "no-store" }),
+        ]);
+        const storagePayload = await storageResponse.json().catch(() => null);
+        if (!storageResponse.ok || !storagePayload?.ok) {
+          throw new Error(storagePayload?.error || `HTTP ${storageResponse.status}`);
+        }
+        const filesystemPayload = await filesystemResponse.json().catch(() => null);
+        if (!filesystemResponse.ok || !filesystemPayload?.ok) {
+          throw new Error(filesystemPayload?.error || `HTTP ${filesystemResponse.status}`);
+        }
+
+        const data = storagePayload.data || {};
+        const settings = data.settings || {};
+        const stats = data.stats || {};
+        const filesystem = filesystemPayload.data || {};
+        const used = Number(stats.total_stored_bytes || 0);
+        const limit = Number(stats.total_limit_bytes || settings.hard_limit_bytes || 0);
+        const percent = limit > 0 ? (used / limit) * 100 : 0;
+        if (storageLine) {
+          storageLine.textContent = `${formatBytes(used)} used of ${formatBytes(limit)} total. Status: ${String(stats.warning_state || "normal")}.`;
+        }
+        if (filesystemLine) {
+          filesystemLine.textContent = `${formatBytes(filesystem.used_bytes || 0)} used of ${formatBytes(filesystem.total_bytes || 0)} total. ${formatBytes(filesystem.available_bytes || 0)} free. Reserve: ${formatBytes(filesystem.reserve_bytes || 0)}. Safe uploads: ${formatBytes(filesystem.usable_upload_bytes || 0)}.`;
+        }
+        if (storageMeter) {
+          storageMeter.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+        }
+        setStatusLine(hardLimit, `${formatBytes(settings.hard_limit_bytes || limit)} total`);
+        setStatusLine(uploadCap, `${formatBytes(settings.max_upload_bytes || 0)} per upload`);
+        setStatusLine(warningThresholds, `${formatPercent(settings.warning_threshold_percent)} warning / ${formatPercent(settings.critical_threshold_percent)} critical`);
+        setStatusLine(variantSizes, `${settings.token_master_max_dimension || 1024} / ${settings.token_stage_max_dimension || 512} / ${settings.token_thumbnail_max_dimension || 128}px`);
+      } catch (error) {
+        console.error("grant's cabin storage diagnostics failed", error);
+        if (storageLine) {
+          storageLine.textContent = "Storage diagnostics unavailable.";
+        }
+      }
+    }
 
     async function bootstrapCabin() {
       try {
@@ -141,8 +325,18 @@
         const sessionPayload = await sessionResponse.json().catch(() => null);
 
         if (!sessionPayload?.signed_in) {
+          if (operatorLine) {
+            operatorLine.textContent = "Signed out.";
+          }
           showForbiddenScreen();
           return;
+        }
+
+        const isOperator = Boolean(sessionPayload?.data?.is_operator);
+        if (operatorLine) {
+          operatorLine.textContent = isOperator
+            ? "Operator access detected. This cabin is visible because your backend user matches OPERATOR_HANDLE or OPERATOR_USER_ID."
+            : "Signed in, but this account is not being recognized as the operator.";
         }
 
         const visibilityResponse = await fetch("/api/map/visibility", { credentials: "include" });
@@ -159,6 +353,10 @@
           accessLine.textContent = "Invite-only venue";
           accessLine.style.color = "#d2c0aa";
           accessNote.classList.remove("hidden");
+        }
+
+        if (visible || isOperator) {
+          await loadStorageDiagnostics();
         }
       } catch (error) {
         console.error("grant's cabin bootstrap failed", error);

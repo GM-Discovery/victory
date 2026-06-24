@@ -26,9 +26,9 @@ function identityDisplayName(identity) {
   }
 
   const displayName = typeof identity.display_name === "string" ? identity.display_name.trim() : "";
-  if (displayName) return displayName;
-
   const handle = typeof identity.handle === "string" ? identity.handle.trim() : "";
+  const genericDisplayNames = new Set(["web user", "webuser", "browser user", "browser", "account", "user"]);
+  if (displayName && !genericDisplayNames.has(displayName.toLowerCase())) return displayName;
   if (handle) return handle;
 
   return shortUserID(identity.user_id);

@@ -11,6 +11,170 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-06-24 — Kernel 51A Finalization, Warehouse Repair, and Discord Link Fixes
+
+### Frontend
+- Added direct delete controls to the Warehouse browser asset cards.
+- Kept Producer's Office and Warehouse storage panels aligned with the same live warehouse storage numbers.
+
+### Backend
+- Reworked warehouse storage accounting to use a direct location-ID path for the live `amurray-family` data instead of collapsing to zeroes.
+- Fixed the Discord server-link runtime merge so the live env bot token wins over the stale bootstrap token.
+
+### Ops
+- Removed the stray live `Gateway Edit Venue` fixture rows from the production database.
+- Rebuilt and restarted the backend container after the storage and Discord fixes landed.
+
+### Notes
+- Warehouse usage is now reporting the real stored bytes and asset counts again.
+- Small utilization can still round down to `0%` because the percent display is integer-based.
+- The Kernel 51 runtime decomposition remains partial; `runtime.js` is smaller, but the maps/grids/camera/cards/tokens cluster still needs the follow-on pass.
+
+## 2026-06-23 — Kernel 51 First Theater Geometry, Placement, and Lifecycle Split
+
+### Frontend
+- Extracted the First Theater geometry and placement cluster into `frontend/venues/first-theater/runtime/geometry.js`.
+- Kept the shared placement rules testable for:
+  - stage playable bounds
+  - screen/world conversion
+  - card coordinate conversion
+  - token footprint and size math
+  - square and hex snapping
+  - token move/duplicate placement
+- Added a lifecycle bag at `frontend/venues/first-theater/runtime/lifecycle.js` for tracked listeners, timers, animation frames, and cleanup callbacks.
+- Wired the First Theater runtime to use the new geometry/lifecycle modules before `runtime.js` starts.
+
+### Tests
+- Added `tests/first-theater/geometry.test.js` covering the pure geometry and placement helpers.
+- Kept the existing logic, state, and socket tests green after the split.
+
+### Notes
+- `runtime.js` is still not down to bootstrap-only composition.
+- Map/grid editors, context menus, token picker/editor flows, Pixi rendering, and socket orchestration still remain inline for later extraction.
+
+## 2026-06-23 — Kernel 51 First Theater Stage Controls Split
+
+### Frontend
+- Added `frontend/venues/first-theater/runtime/stage-controls.js`.
+- Moved camera label and lock-state calculations into the stage-controls helper.
+- Moved map editor draft normalization into the stage-controls helper.
+- Moved default grid configuration and grid draft normalization into the stage-controls helper.
+- Moved grid hex-field visibility and grid visibility button labeling into the stage-controls helper.
+- Wired `frontend/venues/first-theater/index.html` to load the new helper before `runtime.js`.
+
+### Tests
+- Added `tests/first-theater/stage-controls.test.js`.
+- Covered camera label/lock behavior, map draft normalization, grid defaults, grid draft normalization, and grid UI labels.
+
+### Notes
+- This is another partial decomposition pass, not the completed First Theater refactor.
+- `runtime.js` still owns the map/grid editor workflows, Pixi scene orchestration, context menus, token picker/editor flows, and live socket-driven behavior.
+
+## 2026-06-23 — Kernel 51 First Theater Map/Grid Workflow Split
+
+### Frontend
+- Added `frontend/venues/first-theater/runtime/map-grid.js`.
+- Moved the map editor draft normalization and payload shaping into the map-grid helper.
+- Moved the map/grid panel clamping helper into the map-grid helper.
+- Moved the default grid config and grid draft normalization into the map-grid helper.
+- Moved the grid hex-field visibility and visibility-button label helpers into the map-grid helper.
+- Wired `frontend/venues/first-theater/index.html` to load the new helper before `runtime.js`.
+
+### Tests
+- Added `tests/first-theater/map-grid.test.js`.
+- Covered panel clamping, map draft normalization, map payload shaping, grid defaults, grid draft normalization, and grid UI labels.
+
+### Notes
+- This is still an incremental decomposition pass.
+- `runtime.js` remains responsible for the live map and grid fetch/update flows, Pixi rendering, token/card placement, context menus, and socket orchestration.
+
+## 2026-06-23 — Kernel 51 First Theater Scene Node Split
+
+### Frontend
+- Added `frontend/venues/first-theater/runtime/scene-nodes.js`.
+- Moved First Theater card, fire, and token Pixi node construction into the scene-node helper.
+- Moved scene-node clearing and selection refresh responsibilities into the scene-node helper.
+- Wired `frontend/venues/first-theater/index.html` to load the scene-node helper before `runtime.js`.
+
+### Notes
+- This continues the incremental First Theater decomposition.
+- `runtime.js` is smaller and now leans on shared helpers for geometry, lifecycle, stage controls, map/grid workflow, and scene-node construction.
+
+## 2026-06-23 — Kernel 51 First Theater Token UI Split
+
+### Frontend
+- Added `frontend/venues/first-theater/runtime/token-ui.js`.
+- Moved the First Theater token picker flow into the token-ui helper.
+- Moved the Warehouse token asset filtering and preview logic into the token-ui helper.
+- Moved token placement and replacement action shaping into the token-ui helper.
+- Moved the token editor open/save/close flow into the token-ui helper.
+- Wired `frontend/venues/first-theater/index.html` to load the new helper before `runtime.js`.
+
+### Tests
+- Added `tests/first-theater/token-ui.test.js`.
+- Covered token asset filtering by shape/search.
+
+### Notes
+- This is still incremental decomposition, not a finished refactor.
+- `runtime.js` still owns context-menu orchestration, live socket wiring, and the remaining venue shell integration.
+
+## 2026-06-23 — Kernel 51 First Theater Logic Module Split
+
+### Frontend
+- Extracted the First Theater object/permission/menu helper layer into `frontend/venues/first-theater/runtime/logic.js`.
+- Wired `frontend/venues/first-theater/index.html` to load the new helper module before `runtime.js`.
+- Redirected the First Theater runtime to use the helper module for object-kind detection, visibility state, permission checks, token metadata, card draft generation, and stage-action resolution.
+
+### Tests
+- Added a dedicated Node regression suite at `tests/first-theater/logic.test.js` covering:
+  - object-kind normalization
+  - visibility and lock state normalization
+  - permission gating
+  - token metadata and sizing
+  - card editor draft generation
+  - stage and token action resolution
+
+### Notes
+- This is a targeted decomposition pass, not the full remaining First Theater runtime split.
+- The scene, geometry, and placement code still remain in `runtime.js` for later extraction.
+
+## 2026-06-23 — Kernel 51A Capacity Guardrail Correction
+
+### Backend
+- Lowered the warehouse hard limit default from 15 GB to 8 GB in code and in the warehouse storage settings migration.
+- Added a physical filesystem diagnostics route at `/api/warehouse/storage/filesystem`.
+- Enforced an 8 GB physical reserve during uploads so new writes are rejected before disk space drops below the reserve.
+- Defaulted blank operator handles to `straturli` at backend startup so local runs and recreated containers share the same operator identity default.
+
+### Frontend
+- Updated Grant's Cabin to show actual filesystem capacity, free space, reserve size, and safe upload capacity alongside warehouse policy values.
+
+### Notes
+- This is a corrective pass for the Kernel 51 reportback and not a claim that the broader First Theater runtime decomposition is finished.
+- The runtime is still only partially decomposed; the feature monolith remains for maps, grids, cards, tokens, pickers, and menus.
+
+---
+
+## 2026-06-23 — Kernel 51 First Theater Runtime Decomposition + Cabin Diagnostics
+
+### Frontend
+- Split the First Theater runtime into dedicated projected-state and WebSocket-dispatch modules at:
+  - `frontend/venues/first-theater/runtime/state.js`
+  - `frontend/venues/first-theater/runtime/socket.js`
+- Wired the First Theater bootstrap to load those modules before `runtime.js` starts.
+- Kept the existing First Theater UI behavior intact while reducing the inline runtime's responsibility surface.
+- Added Grant's Cabin operator guidance and live warehouse storage diagnostics to explain how operator access is granted and how storage limits are currently configured.
+- The cabin now also reports actual filesystem capacity and reserve headroom via the new filesystem diagnostics route.
+
+### Ops
+- Verified the current operator cleanup target and safely pruned the Docker build cache once the stale resources were confirmed.
+- Reclaimed the unused Docker build cache after checking the running containers, the filesystem footprint, and the current storage pressure.
+
+### Notes
+- Operator cabin access is still governed by `OPERATOR_HANDLE` or `OPERATOR_USER_ID` in the backend environment.
+- The cabin now tells the operator where the log lives and shows the active warehouse hard limit, upload cap, warning thresholds, token variant sizes, and filesystem reserve data.
+- The First Theater refactor is still only a first cut; state and socket handling moved out, but most venue feature logic remains in `runtime.js`.
+
 ## 2026-06-23 — Workshop Route Cleanup
 
 ### Frontend
@@ -649,3 +813,73 @@ Implement `perform/speak` using the same action pipeline:
 - The collapsed-header blur over the First Theater map top edge remains a known, deferred layout issue, untouched by this kernel
 - **Incident**: running the full backend test suite (`go test ./...`) against this environment's `DATABASE_URL` executes real `DELETE`/`INSERT` statements against the live `victory` Postgres database, not an isolated test database. This deleted the live `auth.discord_server_link_settings` row for the real `amurray-family` location (several tests in `internal/identity` and `internal/network` assume a disposable DB and clean up by deleting real location-scoped rows). The Discord gateway came up disabled until the operator re-ran their bootstrap flow. Backend test runs against this database should be scoped away from `internal/identity` and `internal/network` going forward, or run only after confirming with the operator
 - Also discovered an unrelated, pre-existing stray `victory` binary running directly on the host on port 8081 (started before this session, consistent with the documented "dev mode" `go run ./cmd/victory` workflow); confirmed Caddy's `reverse_proxy backend:8081` resolves to the Docker service, not the host process, so production routing was unaffected — flagged to the operator as a leftover process worth checking
+
+## 2026-06-23 — Kernel 51 First Theater action-router extraction
+
+### Frontend
+- Extracted the remaining First Theater context-menu and stage-action orchestration into `frontend/venues/first-theater/runtime/action-router.js`
+- Added an explicit loader for the router script in `frontend/venues/first-theater/index.html`
+- Routed the live runtime through the extracted module for:
+  - context-menu target resolution
+  - native stage context-menu handling
+  - resolved context-menu opening
+  - stage object actions
+- Fixed the extracted token move path so token updates now flow through `updateTokenLocalModel` instead of the card pin updater
+
+### Tests
+- Added focused coverage in `tests/first-theater/action-router.test.js` for:
+  - token move-here
+  - card move-here
+  - hide-nameplate
+  - remove
+  - context-menu resolution/opening
+- Re-ran the First Theater pure-module suite after the split:
+  - `tests/first-theater/action-router.test.js`
+  - `tests/first-theater/token-ui.test.js`
+  - `tests/first-theater/map-grid.test.js`
+  - `tests/first-theater/stage-controls.test.js`
+  - `tests/first-theater/geometry.test.js`
+  - `tests/first-theater/logic.test.js`
+  - `tests/first-theater/state.test.js`
+  - `tests/first-theater/socket.test.js`
+- Verified `node --check` on `frontend/venues/first-theater/runtime.js` and `frontend/venues/first-theater/runtime/action-router.js`
+- Verified `git diff --check`
+- Verified backend health with `curl -s http://127.0.0.1:8081/health`
+
+### Operational Notes
+- The router extraction stayed dependency-injected and did not introduce a second socket path or state store
+- The live runtime still owns the UI shell, but the action routing is now isolated and directly testable
+- No new user-facing feature was added in this pass
+
+## 2026-06-23 — Kernel 51 socket transport extraction
+
+### Frontend
+- Extracted First Theater socket transport into `frontend/venues/first-theater/runtime/socket-controller.js`
+- Kept `frontend/venues/first-theater/runtime/socket.js` as the pure dispatcher/parser layer
+- Moved the live runtime over to the controller for:
+  - action queueing while connecting
+  - reconnect scheduling
+  - `sendAction`
+  - `sendPing`
+  - `sendFocusPing`
+  - socket connection bootstrap
+- Preserved the message semantics in runtime-side handling for snapshot, focus ping, action, showing update, and error messages
+
+### Tests
+- Added `tests/first-theater/socket-controller.test.js` covering:
+  - queued sends while connecting
+  - flush on socket open
+  - focus ping payload composition
+  - focus ping send/status behavior
+- Re-ran the First Theater pure-module suite after the transport split
+- Verified `node --check` for:
+  - `frontend/venues/first-theater/runtime.js`
+  - `frontend/venues/first-theater/runtime/socket-controller.js`
+  - `frontend/venues/first-theater/runtime/socket.js`
+- Verified `git diff --check`
+- Verified backend health with `curl -s http://127.0.0.1:8081/health`
+
+### Operational Notes
+- The socket controller owns transport mechanics only; it does not replace projected state or the dispatcher
+- No new user-facing feature was added in this pass
+- Fixed a missing `onPong` guard in the socket controller so pong handling no longer risks a runtime ReferenceError

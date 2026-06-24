@@ -1125,16 +1125,17 @@
     .chat-panel {
       position: fixed;
       left: 50%;
-      bottom: 14px;
+      bottom: -4px;
       z-index: 82;
       overflow: hidden;
       transition: opacity 180ms ease, transform 180ms ease, box-shadow 180ms ease, background 180ms ease, border-color 180ms ease;
-      transform: translateX(-50%) translateY(calc(100% - var(--chat-rail-height, 38px)));
-      border-radius: 18px 18px 0 0;
+      transform: translateX(-50%) translateY(calc(100% - var(--chat-rail-height, 24px)));
+      border-radius: 18px;
       box-shadow: 0 16px 42px rgba(0, 0, 0, 0.34);
-      width: var(--chat-panel-width, min(50vw, 720px));
+      width: var(--chat-panel-width, min(32vw, 420px));
       max-width: calc(100vw - 32px);
-      --chat-surface-opacity: 0.9;
+      --chat-surface-opacity: 0.88;
+      --chat-rail-height: 24px;
       opacity: 0.05;
       background: linear-gradient(180deg, rgba(15, 18, 25, var(--chat-surface-opacity)), rgba(8, 10, 15, calc(var(--chat-surface-opacity) - 0.06)));
     }
@@ -1151,14 +1152,13 @@
     }
 
     .chat-panel[data-open="true"] {
-      --chat-panel-width: min(50vw, 720px);
+      --chat-panel-width: min(32vw, 420px);
       opacity: 1;
     }
 
     .chat-panel:hover,
     .chat-panel:focus-within {
       opacity: 1;
-      transform: translateX(-50%) translateY(0);
     }
 
     .chat-head {
@@ -1166,8 +1166,8 @@
       align-items: center;
       justify-content: center;
       gap: 10px;
-      min-height: 38px;
-      padding: 7px 11px;
+      min-height: 24px;
+      padding: 4px 10px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       background: rgba(255, 255, 255, 0.03);
       cursor: pointer;
@@ -1200,14 +1200,14 @@
     }
 
     .chat-body {
-      padding: 10px 12px 12px;
+      padding: 6px 8px 7px;
       display: none;
       gap: 12px;
       grid-template-rows: auto minmax(0, 1fr) auto;
       opacity: 1;
       transition: opacity 180ms ease;
       background: rgba(8, 10, 15, 0.96);
-      height: min(15vh, 140px);
+      height: min(13vh, 128px);
       min-height: 0;
       overflow: hidden;
       width: 100%;
@@ -1247,20 +1247,16 @@
       display: grid;
     }
 
-    .chat-panel:hover .chat-body,
-    .chat-panel:focus-within .chat-body {
-      display: grid;
-    }
-
     .chat-log {
       min-height: 0;
       height: 100%;
-      padding: 10px;
+      padding: 8px 10px;
       border-radius: 14px;
       border: 1px solid rgba(255, 255, 255, 0.08);
       background: rgba(255, 255, 255, 0.04);
       color: #b5c5de;
       overflow: auto;
+      line-height: 1.35;
     }
 
     .chat-entry {
@@ -2029,8 +2025,8 @@
 
       .chat-panel {
         left: 50%;
-        bottom: 10px;
-        width: calc(100vw - 20px);
+        bottom: -2px;
+        width: calc(100vw - 16px);
       }
 
       #left-drawer .drawer-settings-panel,
@@ -2563,6 +2559,7 @@
   </div>
 
   <script src="/lib/forbidden.js"></script>
+  <script src="/lib/pixi.min.js"></script>
   <script src="/lib/victory-pixi-stage.js"></script>
   <script src="/lib/victory-pixi-grid.js"></script>
   <script src="/lib/victory-stage-camera.js"></script>
@@ -2570,6 +2567,17 @@
   <script src="/lib/discord-mic.js?v=kernel40-1"></script>
   <script src="/lib/discord-audio.js?v=kernel43-2"></script>
   <script src="/lib/victory-mic-chat.js?v=kernel40-1"></script>
+  <script src="/venues/first-theater/runtime/state.js?v=kernel51-1"></script>
+  <script src="/venues/first-theater/runtime/socket.js?v=kernel51-1"></script>
+  <script src="/venues/first-theater/runtime/logic.js?v=kernel51-1"></script>
+  <script src="/venues/first-theater/runtime/geometry.js?v=kernel51-1"></script>
+  <script src="/venues/first-theater/runtime/stage-controls.js?v=kernel51-2"></script>
+  <script src="/venues/first-theater/runtime/map-grid.js?v=kernel51-3"></script>
+  <script src="/venues/first-theater/runtime/scene-nodes.js?v=kernel51-4"></script>
+  <script src="/venues/first-theater/runtime/token-ui.js?v=kernel51-5"></script>
+  <script src="/venues/first-theater/runtime/action-router.js?v=kernel51-6"></script>
+  <script src="/venues/first-theater/runtime/socket-controller.js?v=kernel51-7"></script>
+  <script src="/venues/first-theater/runtime/lifecycle.js?v=kernel51-1"></script>
   <script>
     window.VictoryDiscordAudio?.mount({
       venueSlug: "first-theater",
@@ -2582,7 +2590,7 @@
       window.__firstTheaterBootWiring = true;
 
       const script = document.createElement("script");
-      script.src = "/venues/first-theater/runtime.js?v=boot-26";
+      script.src = "/venues/first-theater/runtime.js?v=boot-31";
       script.dataset.victoryRuntime = "first-theater";
       script.addEventListener("load", () => {
         window.VictoryFirstTheater?.start?.();

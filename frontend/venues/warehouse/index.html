@@ -299,6 +299,7 @@
     const searchEl = document.getElementById("search");
     const typeEl = document.getElementById("type");
     const refreshBtn = document.getElementById("refresh");
+    let warehouseAssetCache = [];
 
     function escapeHtml(value) {
       return String(value ?? "")
@@ -356,6 +357,7 @@
         statusEl.textContent = `Warehouse ${stats.percent_used ?? 0}% used.`;
 
         const items = Array.isArray(assetsPayload.data) ? assetsPayload.data : [];
+        warehouseAssetCache = items;
         assetStatusEl.textContent = items.length
           ? `${items.length} asset${items.length === 1 ? "" : "s"} loaded.`
           : "No assets found.";
@@ -383,6 +385,7 @@
                 <small>${dims}</small>
                 <small>${bytes}</small>
                 <small>${mime}</small>
+                <button type="button" data-asset-delete="${id}" style="margin-top:10px;">Delete</button>
               </div>
             </article>
           `;
@@ -392,6 +395,36 @@
         gridEl.innerHTML = `<div class="empty">${escapeHtml(error.message || String(error))}</div>`;
       }
     }
+
+    async function deleteWarehouseAsset(assetID) {
+      const asset = warehouseAssetCache.find((item) => item.id === assetID);
+      const name = asset?.name || asset?.original_filename || assetID;
+      const recovered = formatByteSize(asset?.stored_bytes || 0);
+      if (!window.confirm(`Delete ${name}?\n\nThis will tombstone the asset and recover about ${recovered}. Existing placements will show the construction fallback.`)) {
+        return;
+      }
+      const response = await fetch(`/api/warehouse/assets/${encodeURIComponent(assetID)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
+      await loadWarehouse();
+      assetStatusEl.textContent = `Deleted ${name}.`;
+    }
+
+    gridEl.addEventListener("click", async (event) => {
+      const button = event.target.closest("[data-asset-delete]");
+      if (!button) return;
+      event.preventDefault();
+      try {
+        await deleteWarehouseAsset(button.getAttribute("data-asset-delete"));
+      } catch (error) {
+        assetStatusEl.textContent = error.message || String(error);
+      }
+    });
 
     searchEl.addEventListener("input", () => {
       clearTimeout(searchEl._timer);

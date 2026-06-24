@@ -1,7 +1,7 @@
 # Victory Roadmap
 
 ## Purpose
-This roadmap reflects current priorities after Kernel 49.
+This roadmap reflects current priorities after Kernel 51A.
 
 Kernel numbers are labels, but from here they should remain stable once assigned so planning, reportbacks, and future agents all refer to the same landmarks.
 
@@ -54,6 +54,12 @@ Kernel numbers are labels, but from here they should remain stable once assigned
   - First Theater now defaults new cards to screen pinning, lets cards Attach to Map or Pin to Screen without jumping, repairs floating drag behavior, and adds Director-and-above Shift+Ping focus broadcasts with a ~250ms camera transition inside the current venue
 - `49 — Workshop Token Ingestion + Warehouse Storage v1`
   - Workshop token preparation now uploads circle, square, hex, and raw token assets into the installation-wide Warehouse, with configurable storage policy, generated variants, and tombstone-safe deletion that falls back to the construction asset
+- `50 — First Theater Token Placement + Grid Snapping v1`
+  - First Theater now consumes Warehouse token assets through an `Add Token` picker and places them persistently on stage with grid-aware sizing and snap/free placement
+- `50+ — First Theater Token Persistence Hardening`
+  - token moves survive refresh and nameplate visibility now persists through reloads and hover interactions
+- `51A — First Theater Runtime Decomposition + Capacity Guardrails v1`
+  - Kernel 51A hardens the projected First Theater runtime and Grant's Cabin diagnostics path, while the broader runtime decomposition and operator-console work remain intentionally deferred
 
 Ordering note:
 - Showing Review comes before polish-only work
@@ -70,6 +76,7 @@ Ordering note:
 - Kernel 48 closes that stage-navigation gap for First Theater only, while keeping the camera reusable for later venues without making it global
 - Kernel 48.1 tightens the card attachment model and adds the one-time venue focus ping without turning the camera into a shared persistent state
 - Kernel 49 extends the existing asset system into a Warehouse model for reusable token and map assets, while Kernel 50 adds First Theater token placement and grid snapping on top of that warehouse model
+- Kernel 51A hardens the First Theater projected runtime, adds cabin-facing warehouse policy plus filesystem diagnostics, and lowers the warehouse cap to 8 GB with an 8 GB physical reserve check instead of adding another major VTT feature
 
 ## Medium Roadmap: Kernels 38–62
 - strengthen showing/review surfaces and auditability

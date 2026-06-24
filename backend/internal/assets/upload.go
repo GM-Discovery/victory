@@ -115,11 +115,18 @@ func HandleWorkshopUpload(pool *pgxpool.Pool, storageRoot string) http.HandlerFu
 
 		settings, err := loadWarehouseStorageSettingsByLocationID(ctx, pool, locationID)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{
-				"ok":    false,
-				"error": "storage_settings_lookup_failed",
-			})
-			return
+			settings = WarehouseStorageSettings{
+				LocationID:                 locationID,
+				HardLimitBytes:             DefaultWarehouseHardLimitBytes,
+				WarningThresholdPercent:    80,
+				CriticalThresholdPercent:   90,
+				MaxUploadBytes:             DefaultWarehouseMaxUploadBytes,
+				RetainOriginalsDefault:     false,
+				TokenMasterMaxDimension:    DefaultTokenMasterMaxDimension,
+				TokenStageMaxDimension:     DefaultTokenStageMaxDimension,
+				TokenThumbnailMaxDimension: DefaultTokenThumbnailMaxDimension,
+				ImageQuality:               85,
+			}
 		}
 
 		r.Body = http.MaxBytesReader(w, r.Body, settings.MaxUploadBytes)
@@ -344,19 +351,34 @@ func HandleWorkshopUpload(pool *pgxpool.Pool, storageRoot string) http.HandlerFu
 		for _, size := range DerivativeSizes {
 			var variantBytes int64
 			if err := tx.QueryRow(ctx, `
-				SELECT COALESCE(byte_size, 0)
+					SELECT COALESCE(byte_size, 0)
 				FROM asset_derivatives
 				WHERE asset_id = $1
 				  AND variant_key = $2
 				LIMIT 1
-			`, assetID, fmt.Sprintf("%d", size)).Scan(&variantBytes); err == nil {
+				`, assetID, fmt.Sprintf("%d", size)).Scan(&variantBytes); err == nil {
 				storedBytes += variantBytes
 			}
 		}
+		if errorCode, err := checkWarehouseUploadCapacity(ctx, pool, locationID, storageRoot, storedBytes, settings.HardLimitBytes); err != nil {
+			_ = os.RemoveAll(assetDir)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"ok":    false,
+				"error": errorCode,
+			})
+			return
+		} else if errorCode != "" {
+			_ = os.RemoveAll(assetDir)
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"ok":    false,
+				"error": errorCode,
+			})
+			return
+		}
 		if _, err := tx.Exec(ctx, `
-			UPDATE assets
-			SET stored_bytes = $2,
-			    name = $3,
+				UPDATE assets
+				SET stored_bytes = $2,
+				    name = $3,
 			    shape = 'raw',
 			    default_grid_width = 1,
 			    default_grid_height = 1,

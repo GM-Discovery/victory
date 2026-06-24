@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"victory/backend/internal/access"
@@ -29,13 +30,29 @@ import (
 )
 
 const (
-	DefaultWarehouseHardLimitBytes    = int64(15 * 1024 * 1024 * 1024)
+	DefaultWarehouseHardLimitBytes    = int64(8 * 1024 * 1024 * 1024)
 	DefaultWarehouseMaxUploadBytes    = int64(25 * 1024 * 1024)
 	DefaultTokenMasterMaxDimension    = 1024
 	DefaultTokenStageMaxDimension     = 512
 	DefaultTokenThumbnailMaxDimension = 128
+	WarehousePhysicalReserveBytes     = int64(8 * 1024 * 1024 * 1024)
 	constructionFallbackAssetPath     = "frontend/assets/construction.png"
 )
+
+func defaultWarehouseStorageSettings(locationID string) WarehouseStorageSettings {
+	return WarehouseStorageSettings{
+		LocationID:                 locationID,
+		HardLimitBytes:             DefaultWarehouseHardLimitBytes,
+		WarningThresholdPercent:    80,
+		CriticalThresholdPercent:   90,
+		MaxUploadBytes:             DefaultWarehouseMaxUploadBytes,
+		RetainOriginalsDefault:     false,
+		TokenMasterMaxDimension:    DefaultTokenMasterMaxDimension,
+		TokenStageMaxDimension:     DefaultTokenStageMaxDimension,
+		TokenThumbnailMaxDimension: DefaultTokenThumbnailMaxDimension,
+		ImageQuality:               85,
+	}
+}
 
 type WarehouseStorageSettings struct {
 	LocationID                 string    `json:"location_id"`
@@ -124,6 +141,22 @@ type warehouseAssetStats struct {
 	OriginalsBytes   int64  `json:"originals_bytes"`
 }
 
+func defaultWarehouseAssetStats() warehouseAssetStats {
+	return warehouseAssetStats{
+		WarningState: "normal",
+	}
+}
+
+type warehouseFilesystemStats struct {
+	Path              string `json:"path"`
+	TotalBytes        int64  `json:"total_bytes"`
+	FreeBytes         int64  `json:"free_bytes"`
+	AvailableBytes    int64  `json:"available_bytes"`
+	UsedBytes         int64  `json:"used_bytes"`
+	ReserveBytes      int64  `json:"reserve_bytes"`
+	UsableUploadBytes int64  `json:"usable_upload_bytes"`
+}
+
 func EnsureKernel49WarehouseStorageSurface(ctx context.Context, pool *pgxpool.Pool) error {
 	statements := []string{
 		`ALTER TABLE assets ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT '';`,
@@ -140,7 +173,7 @@ func EnsureKernel49WarehouseStorageSurface(ctx context.Context, pool *pgxpool.Po
 		`ALTER TABLE assets ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;`,
 		`CREATE TABLE IF NOT EXISTS warehouse_storage_settings (
 			location_id UUID PRIMARY KEY REFERENCES locations(id) ON DELETE CASCADE,
-			hard_limit_bytes BIGINT NOT NULL DEFAULT 16106127360,
+			hard_limit_bytes BIGINT NOT NULL DEFAULT 8589934592,
 			warning_threshold_percent INTEGER NOT NULL DEFAULT 80,
 			critical_threshold_percent INTEGER NOT NULL DEFAULT 90,
 			max_upload_bytes BIGINT NOT NULL DEFAULT 26214400,
@@ -195,6 +228,16 @@ func EnsureKernel49WarehouseStorageSurface(ctx context.Context, pool *pgxpool.Po
 	}
 
 	_, err = pool.Exec(ctx, `
+		UPDATE warehouse_storage_settings
+		SET hard_limit_bytes = $2
+		WHERE location_id = $1::uuid
+		  AND hard_limit_bytes = 16106127360
+	`, locationID, DefaultWarehouseHardLimitBytes)
+	if err != nil {
+		return err
+	}
+
+	_, err = pool.Exec(ctx, `
 		UPDATE assets
 		SET stored_bytes = COALESCE(stored_bytes, 0),
 		    name = COALESCE(NULLIF(name, ''), COALESCE(NULLIF(original_filename, ''), id::text)),
@@ -204,7 +247,7 @@ func EnsureKernel49WarehouseStorageSurface(ctx context.Context, pool *pgxpool.Po
 	return err
 }
 
-func HandleWarehouseStorage(pool *pgxpool.Pool) http.HandlerFunc {
+func HandleWarehouseStorage(pool *pgxpool.Pool, storageRoot string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method_not_allowed"})
@@ -224,16 +267,35 @@ func HandleWarehouseStorage(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		settings, err := loadWarehouseStorageSettings(ctx, pool)
+		locationID, err := resolveWarehouseStorageLocationID(ctx, pool)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "storage_settings_lookup_failed"})
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "location_lookup_failed"})
 			return
 		}
 
-		stats, err := loadWarehouseStorageStats(ctx, pool)
+		settings, err := loadWarehouseStorageSettingsByLocationID(ctx, pool, locationID)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "storage_stats_lookup_failed"})
-			return
+			settings = defaultWarehouseStorageSettings(locationID)
+		}
+
+		stats, err := loadWarehouseStorageStats(ctx, pool, locationID)
+		if err != nil {
+			stats = defaultWarehouseAssetStats()
+		}
+		stats.TotalLimitBytes = settings.HardLimitBytes
+		stats.PercentUsed = 0
+		if stats.TotalLimitBytes > 0 {
+			stats.PercentUsed = int(math.Round((float64(stats.TotalStoredBytes) / float64(stats.TotalLimitBytes)) * 100))
+		}
+		switch {
+		case stats.PercentUsed >= 100:
+			stats.WarningState = "critical"
+		case stats.PercentUsed >= 90:
+			stats.WarningState = "critical"
+		case stats.PercentUsed >= 80:
+			stats.WarningState = "warning"
+		default:
+			stats.WarningState = "normal"
 		}
 
 		canManageHardLimit, canManagePolicy := warehouseStoragePermission(ctx, pool, userID)
@@ -247,6 +309,50 @@ func HandleWarehouseStorage(pool *pgxpool.Pool) http.HandlerFunc {
 			},
 		})
 	}
+}
+
+func HandleWarehouseFilesystemStorage(pool *pgxpool.Pool, storageRoot string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method_not_allowed"})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+
+		_, ok, err := requireWarehouseAccess(ctx, pool, r)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "access_check_failed"})
+			return
+		}
+		if !ok {
+			writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "forbidden"})
+			return
+		}
+
+		stats, err := loadWarehouseFilesystemStats(storageRoot)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "filesystem_stats_lookup_failed"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": stats})
+	}
+}
+
+func resolveWarehouseStorageLocationID(ctx context.Context, pool *pgxpool.Pool) (string, error) {
+	var locationID string
+	err := pool.QueryRow(ctx, `
+		SELECT id::text
+		FROM locations
+		WHERE slug = 'amurray-family'
+		LIMIT 1
+	`).Scan(&locationID)
+	if err != nil {
+		return "", err
+	}
+	return locationID, nil
 }
 
 func HandleWarehouseStorageSettings(pool *pgxpool.Pool) http.HandlerFunc {
@@ -271,8 +377,7 @@ func HandleWarehouseStorageSettings(pool *pgxpool.Pool) http.HandlerFunc {
 
 		settings, err := loadWarehouseStorageSettings(ctx, pool)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "storage_settings_lookup_failed"})
-			return
+			settings = defaultWarehouseStorageSettings("")
 		}
 
 		var req map[string]any
@@ -592,8 +697,7 @@ func HandleTokenUploadAsset(pool *pgxpool.Pool, storageRoot string) http.Handler
 
 		settings, err := loadWarehouseStorageSettingsByLocationID(ctx, pool, locationID)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "storage_settings_lookup_failed"})
-			return
+			settings = defaultWarehouseStorageSettings(locationID)
 		}
 
 		r.Body = http.MaxBytesReader(w, r.Body, settings.MaxUploadBytes)
@@ -662,13 +766,11 @@ func HandleTokenUploadAsset(pool *pgxpool.Pool, storageRoot string) http.Handler
 			storedBytes += int64(len(data))
 		}
 
-		usage, err := loadWarehouseStoredBytes(ctx, pool, locationID)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "storage_usage_lookup_failed"})
+		if errorCode, err := checkWarehouseUploadCapacity(ctx, pool, locationID, storageRoot, storedBytes, settings.HardLimitBytes); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": errorCode})
 			return
-		}
-		if usage+storedBytes > settings.HardLimitBytes {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "warehouse_capacity_exceeded"})
+		} else if errorCode != "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": errorCode})
 			return
 		}
 
@@ -858,6 +960,9 @@ func loadWarehouseStorageSettings(ctx context.Context, pool *pgxpool.Pool) (Ware
 		&settings.UpdatedBy,
 		&settings.UpdatedAt,
 	)
+	if err != nil && errors.Is(err, pgx.ErrNoRows) {
+		return defaultWarehouseStorageSettings(""), nil
+	}
 	return settings, err
 }
 
@@ -911,7 +1016,7 @@ func loadWarehouseStorageSettingsByLocationID(ctx context.Context, pool *pgxpool
 	return settings, err
 }
 
-func loadWarehouseStorageStats(ctx context.Context, pool *pgxpool.Pool) (warehouseAssetStats, error) {
+func loadWarehouseStorageStats(ctx context.Context, pool *pgxpool.Pool, locationID string) (warehouseAssetStats, error) {
 	var stats warehouseAssetStats
 	err := pool.QueryRow(ctx, `
 		SELECT
@@ -922,31 +1027,64 @@ func loadWarehouseStorageStats(ctx context.Context, pool *pgxpool.Pool) (warehou
 			COALESCE(sum(CASE WHEN COALESCE(a.is_deleted, FALSE) = FALSE AND a.deleted_at IS NULL AND COALESCE(a.asset_type, 'generic') = 'token' THEN a.stored_bytes ELSE 0 END), 0),
 			COALESCE(sum(CASE WHEN COALESCE(a.is_deleted, FALSE) = FALSE AND a.deleted_at IS NULL AND a.retain_original THEN a.byte_size ELSE 0 END), 0)
 		FROM assets a
-		WHERE a.location_id = (SELECT id FROM locations WHERE slug = 'amurray-family' LIMIT 1)
-	`).Scan(&stats.TotalStoredBytes, &stats.ActiveAssets, &stats.TombstonedAssets, &stats.MapBytes, &stats.TokenBytes, &stats.OriginalsBytes)
+		WHERE a.location_id = $1::uuid
+	`, locationID).Scan(&stats.TotalStoredBytes, &stats.ActiveAssets, &stats.TombstonedAssets, &stats.MapBytes, &stats.TokenBytes, &stats.OriginalsBytes)
 	if err != nil {
 		return warehouseAssetStats{}, err
-	}
-	settings, err := loadWarehouseStorageSettings(ctx, pool)
-	if err != nil {
-		return warehouseAssetStats{}, err
-	}
-	stats.TotalLimitBytes = settings.HardLimitBytes
-	stats.PercentUsed = 0
-	if stats.TotalLimitBytes > 0 {
-		stats.PercentUsed = int(math.Round((float64(stats.TotalStoredBytes) / float64(stats.TotalLimitBytes)) * 100))
-	}
-	switch {
-	case stats.PercentUsed >= 100:
-		stats.WarningState = "critical"
-	case stats.PercentUsed >= 90:
-		stats.WarningState = "critical"
-	case stats.PercentUsed >= 80:
-		stats.WarningState = "warning"
-	default:
-		stats.WarningState = "normal"
 	}
 	return stats, nil
+}
+
+func loadWarehouseFilesystemStats(storageRoot string) (warehouseFilesystemStats, error) {
+	root := strings.TrimSpace(storageRoot)
+	if root == "" {
+		root = "/opt/victory/storage"
+	}
+
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(root, &stat); err != nil {
+		return warehouseFilesystemStats{}, err
+	}
+
+	blockSize := int64(stat.Bsize)
+	totalBytes := int64(stat.Blocks) * blockSize
+	freeBytes := int64(stat.Bfree) * blockSize
+	availableBytes := int64(stat.Bavail) * blockSize
+	usedBytes := totalBytes - freeBytes
+	usableUploadBytes := availableBytes - WarehousePhysicalReserveBytes
+	if usableUploadBytes < 0 {
+		usableUploadBytes = 0
+	}
+
+	return warehouseFilesystemStats{
+		Path:              root,
+		TotalBytes:        totalBytes,
+		FreeBytes:         freeBytes,
+		AvailableBytes:    availableBytes,
+		UsedBytes:         usedBytes,
+		ReserveBytes:      WarehousePhysicalReserveBytes,
+		UsableUploadBytes: usableUploadBytes,
+	}, nil
+}
+
+func checkWarehouseUploadCapacity(ctx context.Context, pool *pgxpool.Pool, locationID, storageRoot string, additionalBytes, hardLimitBytes int64) (string, error) {
+	usage, err := loadWarehouseStoredBytes(ctx, pool, locationID)
+	if err != nil {
+		return "storage_usage_lookup_failed", err
+	}
+	if usage+additionalBytes > hardLimitBytes {
+		return "warehouse_capacity_exceeded", nil
+	}
+
+	filesystemStats, err := loadWarehouseFilesystemStats(storageRoot)
+	if err != nil {
+		return "filesystem_stats_lookup_failed", err
+	}
+	if filesystemStats.AvailableBytes-additionalBytes < WarehousePhysicalReserveBytes {
+		return "warehouse_physical_reserve_exceeded", nil
+	}
+
+	return "", nil
 }
 
 func loadWarehouseStoredBytes(ctx context.Context, pool *pgxpool.Pool, locationID string) (int64, error) {

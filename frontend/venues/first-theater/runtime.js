@@ -116,6 +116,37 @@
     let currentSessionId = "";
     let currentActorId = "";
     let currentRole = "audience";
+    const firstTheaterStateModule = window.VictoryFirstTheaterState || null;
+    const firstTheaterSocketModule = window.VictoryFirstTheaterSocket || null;
+    const firstTheaterLogicModule = window.VictoryFirstTheaterLogic || null;
+    const firstTheaterGeometryModule = window.VictoryFirstTheaterGeometry || null;
+    const firstTheaterStageControlsModule = window.VictoryFirstTheaterStageControls || null;
+    const firstTheaterMapGridModule = window.VictoryFirstTheaterMapGrid || null;
+    const firstTheaterSceneNodesModule = window.VictoryFirstTheaterSceneNodes || null;
+    const firstTheaterTokenUiModule = window.VictoryFirstTheaterTokenUI || null;
+    const firstTheaterActionRouterModule = window.VictoryFirstTheaterActionRouter || null;
+    const firstTheaterSocketControllerModule = window.VictoryFirstTheaterSocketController || null;
+    const firstTheaterLifecycleModule = window.VictoryFirstTheaterLifecycle || null;
+    const projectedState = firstTheaterStateModule?.createProjectedState?.({
+      viewerRole: currentRole,
+    }) || null;
+    const firstTheaterDispatcher = firstTheaterSocketModule?.createDispatcher?.({
+      state: projectedState,
+      parseMessage(raw) {
+        return JSON.parse(raw);
+      },
+    }) || null;
+    const runtimeLifecycle = firstTheaterLifecycleModule?.createLifecycleBag?.() || {
+      track: (dispose) => dispose,
+      listen: (target, type, handler, options) => {
+        target?.addEventListener?.(type, handler, options);
+        return () => target?.removeEventListener?.(type, handler, options);
+      },
+      timeout: (callback, delay) => window.setTimeout(callback, delay),
+      interval: (callback, delay) => window.setInterval(callback, delay),
+      animationFrame: (callback) => window.requestAnimationFrame(callback),
+      dispose: () => {},
+    };
     let joinPromise = null;
     let currentSnapshot = null;
     let currentObjects = [];
@@ -203,12 +234,40 @@
     let chatHoverOpen = false;
     let chatPinnedOpen = false;
     let chatDismissedUntilPointerLeavesRail = false;
+    let chatHoverTransitionTimer = null;
     let lastChatPointerY = Number.NaN;
     let headerHoverOpen = false;
     let lastHeaderPointerY = Number.NaN;
     let drawerHoverOpen = { left: false, right: false };
     let drawerHoverCloseTimers = { left: null, right: null };
     let latestFocusEventStamp = 0;
+    const stageSceneState = {
+      get currentNodeMap() {
+        return currentNodeMap;
+      },
+      set currentNodeMap(value) {
+        currentNodeMap = value;
+      },
+      get pinnedObjectLayer() {
+        return pinnedObjectLayer;
+      },
+      get overlayObjectLayer() {
+        return overlayObjectLayer;
+      },
+      get floatingObjectLayer() {
+        return floatingObjectLayer;
+      },
+      get facadeLayer() {
+        return facadeLayer;
+      },
+      get currentSelection() {
+        return currentSelection;
+      },
+    };
+    let sceneNodeFactory = null;
+    let tokenUi = null;
+    let actionRouter = null;
+    let socketController = null;
     const shellDefaults = {
       header: { pinned: false, opacity: 100 },
       chat: { opacity: 96 },
@@ -374,25 +433,22 @@
       return pixiLoadPromise;
     }
 
-    function cameraViewLabel(view = null) {
-      const current = view || stageCamera?.getView?.() || { zoomRelativeToFit: 1 };
-      const zoom = clampNumber((Number(current.zoomRelativeToFit || 1) * 100), 70, 400, 100);
-      return `${Math.round(zoom)}%`;
-    }
-
     function updateCameraControls(view = null) {
       const mapDisplayMode = String(currentVenueMapState?.display_mode || "theater").trim() === "fullscreen" ? "fullscreen" : "theater";
-      const cameraLocked = mapDisplayMode === "theater";
+      const cameraState = firstTheaterStageControlsModule?.cameraControlsState?.(view || stageCamera?.getView?.(), mapDisplayMode, cameraDefaults) || {
+        label: "100%",
+        zoomOutDisabled: false,
+        zoomInDisabled: false,
+        interactionLocked: false,
+      };
       if (cameraZoomValue) {
-        cameraZoomValue.textContent = cameraViewLabel(view);
+        cameraZoomValue.textContent = cameraState.label;
       }
       if (cameraZoomOutButton && cameraZoomInButton) {
-        const current = view || stageCamera?.getView?.() || { zoomRelativeToFit: 1 };
-        const zoom = Number(current.zoomRelativeToFit || 1);
-        cameraZoomOutButton.disabled = cameraLocked || zoom <= 0.7001;
-        cameraZoomInButton.disabled = cameraLocked || zoom >= 3.9999;
+        cameraZoomOutButton.disabled = cameraState.zoomOutDisabled;
+        cameraZoomInButton.disabled = cameraState.zoomInDisabled;
       }
-      stageCamera?.setInteractionLocked?.(cameraLocked);
+      stageCamera?.setInteractionLocked?.(cameraState.interactionLocked);
     }
 
     function getPlayableBounds() {
@@ -502,8 +558,9 @@
 
     function updateConnectionPresentation() {
       if (!connectionValue) return;
-      const socketOpen = ws && ws.readyState === WebSocket.OPEN;
-      const socketConnecting = ws && ws.readyState === WebSocket.CONNECTING;
+      const socket = socketController?.getWebSocket?.() || ws;
+      const socketOpen = socket && socket.readyState === WebSocket.OPEN;
+      const socketConnecting = socket && socket.readyState === WebSocket.CONNECTING;
       connectionValue.textContent = socketOpen ? "Live" : (socketConnecting || currentSessionId ? "Connecting" : "Waiting");
     }
 
@@ -930,6 +987,10 @@
     }
 
     function setChatHoverOpen(open) {
+      if (chatHoverTransitionTimer) {
+        window.clearTimeout(chatHoverTransitionTimer);
+        chatHoverTransitionTimer = null;
+      }
       chatHoverOpen = Boolean(open);
       if (!chatHoverOpen && !chatPinnedOpen && !isChatActive()) {
         lastChatPointerY = Number.NaN;
@@ -938,6 +999,10 @@
     }
 
     function setChatPinnedOpen(open) {
+      if (chatHoverTransitionTimer) {
+        window.clearTimeout(chatHoverTransitionTimer);
+        chatHoverTransitionTimer = null;
+      }
       chatPinnedOpen = Boolean(open);
       if (!chatPinnedOpen && !isChatActive()) {
         chatHoverOpen = false;
@@ -947,6 +1012,10 @@
     }
 
     function closeChatPanel() {
+      if (chatHoverTransitionTimer) {
+        window.clearTimeout(chatHoverTransitionTimer);
+        chatHoverTransitionTimer = null;
+      }
       if (chatPanel?.contains(document.activeElement)) {
         document.activeElement?.blur?.();
       }
@@ -1058,8 +1127,8 @@
       const pointerY = Number.isFinite(lastChatPointerY) ? lastChatPointerY : clientY;
       const pointerX = Number.isFinite(clientX) ? clientX : Number.NaN;
       if (!Number.isFinite(pointerX) || !Number.isFinite(pointerY)) return;
-      const insideRail = pointerX >= chatRect.left - 16 && pointerX <= chatRect.right + 16 && pointerY >= chatRect.top - 10 && pointerY <= chatRect.bottom + 10;
-      const nearRail = pointerY >= window.innerHeight - 92;
+      const insideRail = pointerX >= chatRect.left - 6 && pointerX <= chatRect.right + 6 && pointerY >= chatRect.top - 4 && pointerY <= chatRect.bottom + 4;
+      const nearRail = pointerY >= window.innerHeight - 24;
 
       const nextOpen = insideRail || nearRail;
 
@@ -1071,12 +1140,28 @@
           }
           return;
         }
-        chatDismissedUntilPointerLeavesRail = false;
+        if (pointerY < window.innerHeight - 72) {
+          chatDismissedUntilPointerLeavesRail = false;
+        } else {
+          return;
+        }
       }
 
-      if (nextOpen !== chatHoverOpen) {
-        chatHoverOpen = nextOpen;
-        updateChatPresentation();
+      if (chatHoverTransitionTimer) {
+        window.clearTimeout(chatHoverTransitionTimer);
+      }
+      chatHoverTransitionTimer = window.setTimeout(() => {
+        chatHoverTransitionTimer = null;
+        if (chatPinnedOpen || isChatActive()) {
+          return;
+        }
+        if (chatHoverOpen !== nextOpen) {
+          chatHoverOpen = nextOpen;
+          updateChatPresentation();
+        }
+      }, nextOpen ? 70 : 180);
+      if (nextOpen) {
+        chatDismissedUntilPointerLeavesRail = false;
       }
     }
 
@@ -1124,6 +1209,10 @@
       chatHoverOpen = true;
       chatPinnedOpen = false;
       chatDismissedUntilPointerLeavesRail = false;
+      if (chatHoverTransitionTimer) {
+        window.clearTimeout(chatHoverTransitionTimer);
+        chatHoverTransitionTimer = null;
+      }
       lastChatPointerY = Number.NaN;
       drawerHoverOpen = { left: true, right: true };
       if (drawerHoverCloseTimers.left) {
@@ -1155,6 +1244,7 @@
       contextMenuTarget = null;
       stagePlacementCandidate = null;
       stagePlacementScreenCandidate = null;
+      suppressStageContextMenu = false;
     }
 
     function setRecentPlacementMarker(point, label = "") {
@@ -1183,77 +1273,14 @@
       };
     }
 
-    function venueConfigFlag(key, fallback = false) {
-      const config = currentSnapshot?.venue?.config || {};
-      const value = config[key];
-      if (typeof value === "boolean") return value;
-      if (typeof value === "string") {
-        const lowered = value.trim().toLowerCase();
-        if (["true", "1", "yes", "on"].includes(lowered)) return true;
-        if (["false", "0", "no", "off"].includes(lowered)) return false;
-      }
-      return fallback;
-    }
-
-    function objectKind(model) {
-      const kind = String(model?.kind || model?.contextClass || model?.elementType || "").trim().toLowerCase();
-      if (kind === "token") {
-        return "token";
-      }
-      const assetID = String(model?.assetID || model?.asset_id || model?.source?.data?.asset_id || "").trim();
-      const assetURL = String(model?.assetContentURL || model?.assetThumbnailURL || model?.source?.data?.asset_content_url || model?.source?.data?.asset_thumbnail_url || "").trim();
-      if (assetID || assetURL) {
-        return "token";
-      }
-      return kind;
-    }
-
+    const venueConfigFlag = firstTheaterLogicModule?.venueConfigFlag || ((config, key, fallback = false) => fallback);
+    const objectKind = firstTheaterLogicModule?.objectKind || (() => "");
     function objectState(model) {
-      const source = model?.source || {};
-      const state = model?.state || source?.state || {};
-      const visibility = model?.visibility || source?.visibility || {};
-      const nameplateVisible = state.nameplate_visible ?? state.nameplateVisible ?? visibility.nameplate_visible ?? visibility.nameplateVisible ?? true;
-      return {
-        locked: Boolean(state.locked ?? visibility.locked ?? false),
-        nameplateVisible: Boolean(nameplateVisible),
-        visible: Boolean(state.visible ?? visibility.visible ?? true),
-      };
+      return firstTheaterLogicModule?.objectState?.(model) || { locked: false, nameplateVisible: true, visible: true };
     }
-
-    function updateObjectMatches(a, b) {
-      if (!a || !b) return false;
-      const aKey = String(a.key || "");
-      const bKey = String(b.key || "");
-      const aElementId = String(a.elementId || "");
-      const bElementId = String(b.elementId || "");
-      const aElementSlug = String(a.elementSlug || "");
-      const bElementSlug = String(b.elementSlug || "");
-      return (aKey && aKey === bKey) || (aElementId && aElementId === bElementId) || (aElementSlug && aElementSlug === bElementSlug);
-    }
-
-    function viewerCanSeeHiddenCards() {
-      return normalizeRole(currentRole) !== "audience";
-    }
-
-    function cardStatusBadgeText(model) {
-      const state = objectState(model);
-      if (!state.nameplateVisible) {
-        return "";
-      }
-      if (!state.visible) {
-        return "HIDDEN";
-      }
-      if (state.locked) {
-        return "LOCKED";
-      }
-      if (isTokenObject(model)) {
-        return tokenLayerForModel(model) === "director" ? "DIR" : "TOK";
-      }
-      if (isCardObject(model)) {
-        return cardDisplayMode(model) === "world" ? "MAP" : "SCREEN";
-      }
-      return "";
-    }
+    const updateObjectMatches = firstTheaterLogicModule?.updateObjectMatches || (() => false);
+    const viewerCanSeeHiddenCards = firstTheaterLogicModule?.viewerCanSeeHiddenCards || (() => true);
+    const cardStatusBadgeText = firstTheaterLogicModule?.cardStatusBadgeText || (() => "");
 
     function updateLocalObjectModel(matchModel, mutator) {
       if (!matchModel || typeof mutator !== "function") return null;
@@ -1312,302 +1339,321 @@
       return updated;
     }
 
-    function canActorRevealHideStageObjects() {
-      const role = normalizeRole(currentRole);
-      if (role === "producer" || role === "director") {
-        return true;
-      }
-      return (role === "cast" || role === "actor") && venueConfigFlag("actors_can_reveal", false);
-    }
+    const canActorRevealHideStageObjects = firstTheaterLogicModule?.canActorRevealHideStageObjects || (() => false);
+    const isCardObject = firstTheaterLogicModule?.isCardObject || (() => false);
+    const isTokenObject = firstTheaterLogicModule?.isTokenObject || (() => false);
+    const isLiveStageObject = firstTheaterLogicModule?.isLiveStageObject || (() => false);
+    const canEditLiveCard = firstTheaterLogicModule?.canEditLiveCard || (() => false);
+    const canMoveLiveStageObject = firstTheaterLogicModule?.canMoveLiveStageObject || (() => false);
+    const canDuplicateLiveStageObject = firstTheaterLogicModule?.canDuplicateLiveStageObject || (() => false);
+    const canRemoveLiveStageObject = firstTheaterLogicModule?.canRemoveLiveStageObject || (() => false);
+    const canDeleteLiveCard = firstTheaterLogicModule?.canDeleteLiveCard || (() => false);
 
-    function isCardObject(model) {
-      return objectKind(model) === "card";
-    }
+    sceneNodeFactory = firstTheaterSceneNodesModule?.createSceneNodeFactory?.({
+      PIXI: window.PIXI,
+      objectState: (...args) => objectState(...args),
+      canEditLiveCard: (...args) => canEditLiveCard(...args),
+      canToggleLock: (...args) => canToggleLock(...args),
+      canManageIndexCards: (...args) => canManageIndexCards(...args),
+      currentRole: () => currentRole,
+      cardFaceForModel: (...args) => cardFaceForModel(...args),
+      cardStatusBadgeText: (...args) => cardStatusBadgeText(...args),
+      viewerCanSeeHiddenCards: (...args) => viewerCanSeeHiddenCards(...args),
+      tokenDisplayNameForModel: (...args) => tokenDisplayNameForModel(...args),
+      tokenStatusPercentForModel: (...args) => tokenStatusPercentForModel(...args),
+      tokenLayerForModel: (...args) => tokenLayerForModel(...args),
+      tokenDisplaySizeForModel: (...args) => tokenDisplaySizeForModel(...args),
+      truncateCardText: (...args) => truncateCardText(...args),
+      isTokenObject: (...args) => isTokenObject(...args),
+      selectObject: (...args) => selectObject(...args),
+      setStageStatus: (...args) => setStageStatus(...args),
+      setMovementReport: (...args) => setMovementReport(...args),
+      openCardEditor: (...args) => openCardEditor(...args),
+      wasContextMenuHandled: (...args) => wasContextMenuHandled(...args),
+      cancelContextMenuEvent: (...args) => cancelContextMenuEvent(...args),
+      openResolvedContextMenu: (...args) => openResolvedContextMenu(...args),
+      eventClientPoint: (...args) => eventClientPoint(...args),
+      stageScreenPointFromClient: (...args) => stageScreenPointFromClient(...args),
+      cardDisplayMode: (...args) => cardDisplayMode(...args),
+      tokenSnapModeForModel: (...args) => tokenSnapModeForModel(...args),
+      renderPixiScene: () => renderPixiScene(),
+      stageState: stageSceneState,
+      cardFaceState,
+      setDragState(value) {
+        dragState = value;
+      },
+    }) || null;
 
-    function isTokenObject(model) {
-      return objectKind(model) === "token";
-    }
+    tokenUi = firstTheaterTokenUiModule?.createTokenUi?.({
+      state: tokenPickerState,
+      canManageStageTokens: () => canManageStageTokens(currentRole),
+      tokenPlacementPointForCreate: (...args) => tokenPlacementPointForCreate(...args),
+      tokenScaleForModel: (...args) => tokenScaleForModel(...args),
+      tokenSnapModeForModel: (...args) => tokenSnapModeForModel(...args),
+      tokenLayerForModel: (...args) => tokenLayerForModel(...args),
+      renderPixiScene: () => renderPixiScene(),
+      setStageStatus: (...args) => setStageStatus(...args),
+      setMovementLine: (...args) => setMovementLine(...args),
+      formatByteSize: (...args) => formatByteSize(...args),
+      escapeHtml: (...args) => escapeHtml(...args),
+      sendAction: (...args) => sendAction(...args),
+      refreshVenueMapAssets: (...args) => refreshVenueMapAssets(...args),
+      currentGridConfig: () => currentVenueGridConfig,
+      lastStagePoint: () => lastStagePoint,
+      stagePlacementCandidate: () => stagePlacementCandidate,
+      stagePlacementScreenCandidate: () => stagePlacementScreenCandidate,
+      setPlacementState: (next) => {
+        if (next?.point !== undefined) stagePlacementCandidate = next.point;
+        if (next?.screenPoint !== undefined) stagePlacementScreenCandidate = next.screenPoint;
+      },
+      openEditor: (kind) => {
+        if (kind === "card") hideCardEditor();
+        if (kind === "map") hideMapEditor();
+        if (kind === "grid") hideGridEditor();
+        if (kind === "token") hideTokenEditor();
+      },
+      closeEditor: (kind) => {
+        if (kind === "card") hideCardEditor();
+        if (kind === "map") hideMapEditor();
+        if (kind === "grid") hideGridEditor();
+        if (kind === "token") hideTokenEditor();
+      },
+      setEditorStatus: (kind, text) => {
+        if (kind === "token") {
+          if (tokenEditorStatus) tokenEditorStatus.textContent = text || "";
+        }
+      },
+      getEditorState: () => ({
+        panel: tokenEditorPanel,
+        currentSelection,
+        tokenEditorTargetKey,
+        tokenEditorDirty,
+        scale: tokenEditorScale,
+        scaleValue: tokenEditorScaleValue,
+        snap: tokenEditorSnap,
+        layer: tokenEditorLayer,
+        status: tokenEditorStatus,
+        setPosition: setTokenEditorPosition,
+      }),
+      getTokenAssets: () => warehouseTokenAssets,
+      setTokenAssets: (assets) => {
+        warehouseTokenAssets = Array.isArray(assets) ? assets : [];
+      },
+      getTokenPickerElements: () => ({
+        panel: tokenPickerPanel,
+        status: tokenPickerStatus,
+        preview: tokenPickerPreview,
+        previewBadge: tokenPickerPreviewBadge,
+        search: tokenPickerSearch,
+        shape: tokenPickerShape,
+        list: tokenPickerList,
+        setPosition: setTokenPickerPosition,
+      }),
+      refreshWarehouseTokenAssets: () => refreshWarehouseTokenAssets(),
+      clampNumber: (...args) => clampNumber(...args),
+      objectState: (...args) => objectState(...args),
+      isTokenObject: (...args) => isTokenObject(...args),
+      currentObjects: () => currentObjects,
+      updateTokenLocalModel: (...args) => updateTokenLocalModel(...args),
+    }) || null;
 
-    function isLiveStageObject(model) {
-      return !!model?.live && ["card", "prop", "fire", "token"].includes(objectKind(model));
-    }
+    actionRouter = firstTheaterActionRouterModule?.createActionRouter?.({
+      objectState: (...args) => objectState(...args),
+      objectKind: (...args) => objectKind(...args),
+      isTokenObject: (...args) => isTokenObject(...args),
+      isLiveStageObject: (...args) => isLiveStageObject(...args),
+      setStageStatus: (...args) => setStageStatus(...args),
+      setMovementReport: (...args) => setMovementReport(...args),
+      selectObject: (...args) => selectObject(...args),
+      closeContextMenu: () => closeContextMenu(),
+      openTokenPicker: (...args) => openTokenPicker(...args),
+      openTokenEditor: (...args) => openTokenEditor(...args),
+      openMapEditor: (...args) => openMapEditor(...args),
+      openGridEditor: (...args) => openGridEditor(...args),
+      updateLocalObjectModel: (...args) => updateLocalObjectModel(...args),
+      updateLocalCardPinModel: (...args) => updateLocalCardPinModel(...args),
+      updateTokenLocalModel: (...args) => updateTokenLocalModel(...args),
+      setLocalPositionOverrideForModel: (...args) => setLocalPositionOverrideForModel(...args),
+      tokenMoveTargetForModel: (...args) => tokenMoveTargetForModel(...args),
+      cardMoveTargetForModel: (...args) => cardMoveTargetForModel(...args),
+      tokenLayerForModel: (...args) => tokenLayerForModel(...args),
+      tokenScaleForModel: (...args) => tokenScaleForModel(...args),
+      tokenPlacementPointForCreate: (...args) => tokenPlacementPointForCreate(...args),
+      currentDisplayedPointForModel: (...args) => currentDisplayedPointForModel(...args),
+      tokenDuplicatePlacementForModel: (...args) => tokenDuplicatePlacementForModel(...args),
+      cardDuplicatePlacementForModel: (...args) => cardDuplicatePlacementForModel(...args),
+      sendAction: (...args) => sendAction(...args),
+      removeLocalObject: (objectModel) => {
+        currentObjects = currentObjects.filter((item) => !updateObjectMatches(item, objectModel));
+      },
+      setPlacementState: (point, screenPoint) => {
+        stagePlacementCandidate = point || null;
+        stagePlacementScreenCandidate = screenPoint || null;
+      },
+      getStagePoint: () => stagePlacementCandidate || lastStagePoint || null,
+      stageScreenPointFromClient: (...args) => stageScreenPointFromClient(...args),
+      stagePointFromClient: (...args) => stagePointFromClient(...args),
+      stagePlacementFromEvent: (...args) => stagePlacementFromEvent(...args),
+      hitTestContextMenuTarget: (...args) => hitTestContextMenuTarget(...args),
+      stageContextMenuModel: () => stageContextMenuModel(),
+      eventClientPoint: (...args) => eventClientPoint(...args),
+      resolveStageObjectActions: (...args) => resolveStageObjectActions(...args),
+      resolveStageObjectActionsContext: () => ({
+        role: currentRole,
+        canManageIndexCards: canManageIndexCards(currentRole),
+        canManageStageTokens: canManageStageTokens(currentRole),
+        canActorRevealHideStageObjects: canActorRevealHideStageObjects(currentRole, currentSnapshot?.venue?.config || {}),
+        hasSelection: Boolean(currentSelection),
+        gridConfig: currentVenueGridConfig,
+        cardFaceForModel,
+        cardDisplayMode,
+        tokenScaleForModel,
+        tokenSnapModeForModel,
+        tokenLayerForModel,
+      }),
+      contextMenu: () => contextMenu,
+      pixiApp: () => pixiApp,
+      cameraControlsContains: (target) => cameraControls?.contains?.(target),
+      isStageEvent: (event) => {
+        const target = event?.target;
+        const composedPath = typeof event?.composedPath === "function" ? event.composedPath() : [];
+        return target === stageHost || target === stageShell || stageShell?.contains?.(target) || stageHost?.contains?.(target) || composedPath.includes(stageHost) || composedPath.includes(stageShell) || composedPath.includes(pixiApp?.view);
+      },
+      isSecondaryPointerEvent: (...args) => isSecondaryPointerEvent(...args),
+      markContextMenuHandled: (...args) => markContextMenuHandled(...args),
+      openMapEditor: (...args) => openMapEditor(...args),
+      openGridEditor: (...args) => openGridEditor(...args),
+      renderContextMenu: (items) => {
+        contextMenu.innerHTML = items
+          .map((item, index) => {
+            let separator = "";
+            if (index > 0 && items[index - 1].group !== item.group) {
+              separator = '<div class="menu-separator"></div>';
+            }
+            const disabled = item.disabled ? " disabled" : "";
+            return `${separator}<button type="button" data-menu-action="${escapeHtml(item.action)}"${disabled}>${escapeHtml(item.label)}</button>`;
+          })
+          .join("") + `<div class="menu-separator"></div><button type="button" data-menu-action="copy" disabled>Copy</button><button type="button" data-menu-action="paste" disabled>Paste</button>`;
+      },
+      positionContextMenu: (x, y) => {
+        contextMenu.hidden = false;
+        contextMenu.style.left = "0px";
+        contextMenu.style.top = "0px";
+        const rect = contextMenu.getBoundingClientRect();
+        const maxX = Math.max(8, window.innerWidth - rect.width - 8);
+        const maxY = Math.max(8, window.innerHeight - rect.height - 8);
+        contextMenu.style.left = `${Math.max(8, Math.min(x || 0, maxX))}px`;
+        contextMenu.style.top = `${Math.max(8, Math.min(y || 0, maxY))}px`;
+      },
+      setContextMenuTarget: (model) => {
+        contextMenuTarget = model;
+      },
+      closeContextMenuUI: () => {
+        if (contextMenu) {
+          contextMenu.hidden = true;
+          contextMenu.innerHTML = "";
+        }
+        contextMenuTarget = null;
+        stagePlacementCandidate = null;
+        stagePlacementScreenCandidate = null;
+      },
+      setStagePlacementCandidate: (point, screenPoint) => {
+        stagePlacementCandidate = point;
+        stagePlacementScreenCandidate = screenPoint;
+      },
+    }) || null;
 
-    function canEditLiveCard(model) {
-      return isCardObject(model) && model?.live && !objectState(model).locked && canManageIndexCards(currentRole);
-    }
+    socketController = firstTheaterSocketControllerModule?.createSocketController?.({
+      getSessionId: () => currentSessionId,
+      getStageCamera: () => stageCamera,
+      getLastStagePoint: () => lastStagePoint,
+      getStageSize: () => getStageSize(),
+      getLocation: () => location,
+      getWebSocketCtor: () => window.WebSocket,
+      getPerformanceNow: () => performance.now(),
+      setStageStatus: (...args) => setStageStatus(...args),
+      setMovementLine: (...args) => setMovementLine(...args),
+      updateShellMetaPresentation: () => updateShellMetaPresentation(),
+      refreshWorld: () => refreshWorld(),
+      onMessage: (raw) => {
+        const msg = firstTheaterDispatcher?.dispatch?.(raw) || null;
+        if (msg) {
+          void handleSocketMessage(msg);
+        }
+        return msg;
+      },
+      onPong: (value) => {
+        if (Number.isFinite(Number(value))) {
+          lastPingMs = Number(value);
+          pendingPingStartedAt = null;
+          updateShellMetaPresentation();
+        }
+      },
+    }) || null;
 
-    function canMoveLiveStageObject(model) {
-      return isLiveStageObject(model) && !objectState(model).locked && canManageIndexCards(currentRole);
-    }
-
-    function canDuplicateLiveStageObject(model) {
-      return isLiveStageObject(model) && !objectState(model).locked && canManageIndexCards(currentRole);
-    }
-
-    function canRemoveLiveStageObject(model) {
-      return isLiveStageObject(model) && !objectState(model).locked && canManageIndexCards(currentRole);
-    }
-
-    function canDeleteLiveCard(model) {
-      return isCardObject(model) && model?.live && !objectState(model).locked && canManageIndexCards(currentRole);
-    }
-
-    function cardFaceForModel(model) {
+    const cardFaceForModel = (model) => {
       const cardKey = String(model?.elementId || model?.elementSlug || model?.key || "");
       return String(cardFaceState.get(cardKey) || "front").toLowerCase() === "back" ? "back" : "front";
-    }
-
-    function cardPinData(model) {
-      const data = model?.source?.data || model?.data || {};
-      const position = model?.position || {};
-      const readNumber = (value) => {
-        if (value === null || value === undefined || value === "") {
-          return Number.NaN;
-        }
-        const parsed = Number(value);
-        return Number.isFinite(parsed) ? parsed : Number.NaN;
-      };
-      const pinMode = String(data.pin_mode || position.frame || "").trim().toLowerCase();
-      return {
-        mode: pinMode === "world" ? "world" : "overlay",
-        worldX: readNumber(data.world_x),
-        worldY: readNumber(data.world_y),
-        screenX: readNumber(data.screen_x),
-        screenY: readNumber(data.screen_y),
-      };
-    }
-
-    function cardDisplayMode(model) {
-      return cardPinData(model).mode;
-    }
-
-    function stagePointForWorldPoint(point) {
-      if (!point || !stageCamera) return { x: Number(point?.x || 0), y: Number(point?.y || 0) };
-      return stageCamera.worldToScreen?.(point.x, point.y) || { x: Number(point.x || 0), y: Number(point.y || 0) };
-    }
-
-    function worldPointForStagePoint(point) {
-      if (!point || !stageCamera) return { x: Number(point?.x || 0), y: Number(point?.y || 0) };
-      return stageCamera.screenToWorld?.(point.x, point.y) || { x: Number(point.x || 0), y: Number(point.y || 0) };
-    }
-
-    function currentDisplayedPointForModel(model) {
-      const pin = cardPinData(model);
-      const size = getStageSize();
-      if (isTokenObject(model)) {
-        const tokenPosition = model?.position || {};
-        const tokenX = Number(tokenPosition.x ?? model?.source?.data?.world_x ?? model?.source?.data?.x ?? 0);
-        const tokenY = Number(tokenPosition.y ?? model?.source?.data?.world_y ?? model?.source?.data?.y ?? 0);
-        return { x: tokenX, y: tokenY };
-      }
-      if (pin.mode === "world") {
-        if (Number.isFinite(pin.worldX) && Number.isFinite(pin.worldY)) {
-          return stagePointForWorldPoint({ x: pin.worldX, y: pin.worldY });
-        }
-        const fallback = toStagePoint(model, size, { baseY: 0.5, orderOffset: 12 });
-        return stagePointForWorldPoint(fallback);
-      }
-
-      if (Number.isFinite(pin.screenX) && Number.isFinite(pin.screenY)) {
-        const bounds = getPlayableBounds();
-        return {
-          x: bounds.x + (bounds.width * pin.screenX),
-          y: bounds.y + (bounds.height * pin.screenY),
-        };
-      }
-
-      return toStagePoint(model, size, { baseY: model?.kind === "fire" ? 0.6 : 0.5, orderOffset: 12 });
-    }
-
-    function normalizeOverlayPoint(point) {
-      const bounds = getPlayableBounds();
-      const x = Number(point?.x || 0);
-      const y = Number(point?.y || 0);
-      return {
-        screen_x: clampNumber((x - bounds.x) / bounds.width, 0, 1, 0.5),
-        screen_y: clampNumber((y - bounds.y) / bounds.height, 0, 1, 0.5),
-      };
-    }
-
-    function clampOverlayPoint(point) {
-      const bounds = getPlayableBounds();
-      return {
-        x: Math.max(bounds.x, Math.min(bounds.x + bounds.width, Math.round(Number(point?.x || 0)))),
-        y: Math.max(bounds.y, Math.min(bounds.y + bounds.height, Math.round(Number(point?.y || 0)))),
-      };
-    }
-
-    function offsetPoint(point, dx = 24, dy = 16) {
-      return {
-        x: Math.round(Number(point?.x || 0) + Number(dx || 0)),
-        y: Math.round(Number(point?.y || 0) + Number(dy || 0)),
-      };
-    }
-
-    function cardMoveTargetForModel(model, targetPoint) {
-      const pinMode = cardDisplayMode(model);
-      const basePoint = targetPoint || stagePlacementCandidate || lastStagePoint || null;
-      if (!basePoint) {
-        return null;
-      }
-
-      if (pinMode === "world") {
-        return {
-          pinMode,
-          world_x: Math.round(Number(basePoint.x || 0)),
-          world_y: Math.round(Number(basePoint.y || 0)),
-          screen_x: null,
-          screen_y: null,
-        };
-      }
-
-      const overlayPoint = normalizeOverlayPoint(basePoint);
-      return {
-        pinMode,
-        world_x: null,
-        world_y: null,
-        screen_x: overlayPoint.screen_x,
-        screen_y: overlayPoint.screen_y,
-      };
-    }
-
-    function tokenSnapModeForModel(model) {
-      const data = model?.source?.data || {};
-      const snapMode = String(data.snap_mode || "").trim().toLowerCase();
-      if (snapMode === "grid" || snapMode === "free") {
-        return snapMode;
-      }
-      return currentVenueGridConfig && currentVenueGridConfig.grid_type !== "none" ? "grid" : "free";
-    }
-
-    function tokenLayerForModel(model) {
-      const data = model?.source?.data || {};
-      const tokenLayer = String(data.token_layer || "").trim().toLowerCase();
-      return tokenLayer === "director" ? "director" : "public";
-    }
-
-    function tokenScaleForModel(model) {
-      const data = model?.source?.data || {};
-      const scale = Number(data.scale ?? 100);
-      if (!Number.isFinite(scale) || scale <= 0) return 100;
-      return Math.max(25, Math.min(500, scale));
-    }
-
-    function tokenFootprintForModel(model) {
-      const data = model?.source?.data || {};
-      const width = Number(data.default_grid_width ?? model?.defaultGridWidth ?? 1);
-      const height = Number(data.default_grid_height ?? model?.defaultGridHeight ?? 1);
-      return {
-        width: Math.max(1, Math.round(Number.isFinite(width) ? width : 1)),
-        height: Math.max(1, Math.round(Number.isFinite(height) ? height : 1)),
-      };
-    }
-
-    function tokenPlacementBaseSize(model) {
-      const snapMode = tokenSnapModeForModel(model);
-      const gridConfig = currentVenueGridConfig || defaultGridConfig();
-      const hasGrid = Boolean(gridConfig && gridConfig.grid_type && gridConfig.grid_type !== "none");
-      return hasGrid && snapMode === "grid" ? Number(gridConfig.cell_size || 50) : 64;
-    }
-
-    function tokenDisplaySizeForModel(model) {
-      const footprint = tokenFootprintForModel(model);
-      const base = tokenPlacementBaseSize(model);
-      const scale = tokenScaleForModel(model) / 100;
-      return {
-        width: Math.max(8, Math.round(base * footprint.width * scale)),
-        height: Math.max(8, Math.round(base * footprint.height * scale)),
-      };
-    }
-
-    function tokenPlacementPointForModel(model) {
-      return currentDisplayedPointForModel(model);
-    }
-
-    function tokenPlacementPointForCreate(point, model, forcedSnapMode = "") {
-      const basePoint = point ? { x: Number(point.x || 0), y: Number(point.y || 0) } : null;
-      if (!basePoint) {
-        return null;
-      }
-      const snapMode = forcedSnapMode || tokenSnapModeForModel(model);
-      const bounds = currentVenueMapBounds || getPlayableBounds();
-      if (!window.VictoryPixiGrid?.snapPoint || snapMode !== "grid") {
-        return {
-          x: Number(basePoint.x),
-          y: Number(basePoint.y),
-        };
-      }
-      return window.VictoryPixiGrid.snapPoint(currentVenueGridConfig, bounds, basePoint);
-    }
-
-    function cardDuplicatePlacementForModel(model) {
-      const pinMode = cardDisplayMode(model);
-      const pin = cardPinData(model);
-      const offset = { x: 24, y: 16 };
-
-      if (pinMode === "world") {
-        const baseWorldPoint = Number.isFinite(pin.worldX) && Number.isFinite(pin.worldY)
-          ? { x: pin.worldX, y: pin.worldY }
-          : worldPointForStagePoint(currentDisplayedPointForModel(model));
-        const worldPoint = offsetPoint(baseWorldPoint, offset.x, offset.y);
-        return {
-          pinMode,
-          x: worldPoint.x,
-          y: worldPoint.y,
-          world_x: worldPoint.x,
-          world_y: worldPoint.y,
-          screen_x: null,
-          screen_y: null,
-        };
-      }
-
-      const baseOverlayPoint = currentDisplayedPointForModel(model);
-      const overlayStagePoint = offsetPoint(baseOverlayPoint, offset.x, offset.y);
-      const overlayPoint = normalizeOverlayPoint(overlayStagePoint);
-      return {
-        pinMode,
-        x: overlayStagePoint.x,
-        y: overlayStagePoint.y,
-        world_x: null,
-        world_y: null,
-        screen_x: overlayPoint.screen_x,
-        screen_y: overlayPoint.screen_y,
-      };
-    }
-
-    function tokenMoveTargetForModel(model, targetPoint) {
-      const basePoint = targetPoint || stagePlacementCandidate || lastStagePoint || null;
-      if (!basePoint) {
-        return null;
-      }
-      const snapMode = tokenSnapModeForModel(model);
-      const snapped = snapMode === "grid"
-        ? tokenPlacementPointForCreate(basePoint, model)
-        : { x: Number(basePoint.x || 0), y: Number(basePoint.y || 0) };
-      return {
-        x: snapped.x,
-        y: snapped.y,
-        snapMode,
-      };
-    }
-
-    function tokenDuplicatePlacementForModel(model) {
-      const basePoint = currentDisplayedPointForModel(model);
-      const offset = { x: 24, y: 16 };
-      const duplicatePoint = {
-        x: Number(basePoint.x || 0) + offset.x,
-        y: Number(basePoint.y || 0) + offset.y,
-      };
-      const snapMode = tokenSnapModeForModel(model);
-      const snapped = snapMode === "grid"
-        ? tokenPlacementPointForCreate(duplicatePoint, model, snapMode)
-        : duplicatePoint;
-      return {
-        x: snapped.x,
-        y: snapped.y,
-        snapMode,
-      };
-    }
+    };
+    const cardPinData = firstTheaterGeometryModule?.cardPinData || (() => ({ mode: "overlay", worldX: Number.NaN, worldY: Number.NaN, screenX: Number.NaN, screenY: Number.NaN }));
+    const cardDisplayMode = firstTheaterGeometryModule?.cardDisplayMode || (() => "overlay");
+    const stagePointForWorldPoint = (point) => firstTheaterGeometryModule?.stagePointForWorldPoint?.(point, stageCamera) || { x: Number(point?.x || 0), y: Number(point?.y || 0) };
+    const worldPointForStagePoint = (point) => firstTheaterGeometryModule?.worldPointForStagePoint?.(point, stageCamera) || { x: Number(point?.x || 0), y: Number(point?.y || 0) };
+    const currentDisplayedPointForModel = (model) => firstTheaterGeometryModule?.currentDisplayedPointForModel?.(model, {
+      camera: stageCamera,
+      getPlayableBounds,
+      toStagePoint,
+      stagePointForWorldPoint,
+      worldPointForStagePoint,
+      size: getStageSize(),
+    }) || { x: 0, y: 0 };
+    const normalizeOverlayPoint = (point) => firstTheaterGeometryModule?.normalizeOverlayPoint?.(point, getPlayableBounds()) || { screen_x: 0.5, screen_y: 0.5 };
+    const clampOverlayPoint = (point) => firstTheaterGeometryModule?.clampOverlayPoint?.(point, getPlayableBounds()) || { x: Number(point?.x || 0), y: Number(point?.y || 0) };
+    const offsetPoint = firstTheaterGeometryModule?.offsetPoint || ((point, dx = 24, dy = 16) => ({ x: Math.round(Number(point?.x || 0) + Number(dx || 0)), y: Math.round(Number(point?.y || 0) + Number(dy || 0)) }));
+    const tokenSnapModeForModel = (model) => firstTheaterGeometryModule?.tokenSnapModeForModel?.(model, currentVenueGridConfig) || "free";
+    const tokenLayerForModel = firstTheaterGeometryModule?.tokenLayerForModel || (() => "public");
+    const tokenScaleForModel = firstTheaterGeometryModule?.tokenScaleForModel || (() => 100);
+    const tokenDisplayNameForModel = firstTheaterLogicModule?.tokenDisplayNameForModel || (() => "Token");
+    const tokenStatusPercentForModel = firstTheaterLogicModule?.tokenStatusPercentForModel || (() => null);
+    const tokenFootprintForModel = firstTheaterGeometryModule?.tokenFootprintForModel || (() => ({ width: 1, height: 1 }));
+    const tokenPlacementBaseSize = (model) => firstTheaterGeometryModule?.tokenPlacementBaseSize?.(model, currentVenueGridConfig) || 64;
+    const tokenDisplaySizeForModel = (model) => firstTheaterGeometryModule?.tokenDisplaySizeForModel?.(model, currentVenueGridConfig) || { width: 64, height: 64 };
+    const tokenPlacementPointForModel = (model) => currentDisplayedPointForModel(model);
+    const tokenPlacementPointForCreate = (point, model, forcedSnapMode = "") => firstTheaterGeometryModule?.tokenPlacementPointForCreate?.(point, model, {
+      forcedSnapMode,
+      gridConfig: currentVenueGridConfig,
+      currentVenueMapBounds,
+      getPlayableBounds,
+      snapPoint: firstTheaterGeometryModule?.snapPoint,
+    }) || point;
+    const cardDuplicatePlacementForModel = (model) => firstTheaterGeometryModule?.cardDuplicatePlacementForModel?.(model, {
+      camera: stageCamera,
+      getPlayableBounds,
+      toStagePoint,
+      stagePointForWorldPoint,
+      worldPointForStagePoint,
+      size: getStageSize(),
+      bounds: getPlayableBounds(),
+    }) || null;
+    const tokenMoveTargetForModel = (model, targetPoint) => firstTheaterGeometryModule?.tokenMoveTargetForModel?.(model, targetPoint, {
+      gridConfig: currentVenueGridConfig,
+      currentVenueMapBounds,
+      getPlayableBounds,
+      snapPoint: firstTheaterGeometryModule?.snapPoint,
+      stagePlacementCandidate,
+      lastStagePoint,
+    }) || null;
+    const tokenDuplicatePlacementForModel = (model) => firstTheaterGeometryModule?.tokenDuplicatePlacementForModel?.(model, {
+      camera: stageCamera,
+      getPlayableBounds,
+      toStagePoint,
+      stagePointForWorldPoint,
+      worldPointForStagePoint,
+      size: getStageSize(),
+      gridConfig: currentVenueGridConfig,
+      currentVenueMapBounds,
+      snapPoint: firstTheaterGeometryModule?.snapPoint,
+    }) || null;
 
     function updateLocalCardPinModel(matchModel, updater) {
       return updateLocalObjectModel(matchModel, (model) => {
@@ -1662,166 +1708,32 @@
       return `${value.slice(0, Math.max(1, maxChars - 1)).trimEnd()}…`;
     }
 
-    function canToggleLiveVisibility(model) {
-      return isLiveStageObject(model) && !objectState(model).locked && canActorRevealHideStageObjects();
-    }
-
-    function canToggleNameplate(model) {
-      return isLiveStageObject(model) && !objectState(model).locked && canManageIndexCards(currentRole);
-    }
-
-    function canToggleLock(model) {
-      return isLiveStageObject(model) && canManageIndexCards(currentRole);
-    }
-
-    function canTogglePinState(model) {
-      return isCardObject(model) && model?.live && !objectState(model).locked && canManageIndexCards(currentRole);
-    }
-
-    function cardEditorDraftFromModel(model) {
-      const source = model?.source || {};
-      const data = source?.data || {};
-      return {
-        elementId: String(model?.elementId || source?.element_id || ""),
-        elementSlug: String(model?.elementSlug || source?.slug || ""),
-        label: String(model?.label || source?.name || data.front_text || "Index card"),
-        frontText: String(model?.frontText || data.front_text || source?.name || "").trim(),
-        backText: String(model?.backText || data.back_text || "").trim(),
-        color: String(model?.color || data.color || "#d9c7a6").trim() || "#d9c7a6",
-      };
-    }
-
-    function stageContextMenuModel() {
-      return {
-        key: "stage:canvas",
-        kind: "stage",
-        live: false,
-        elementId: "",
-        elementSlug: "",
-        label: "Stage",
-        position: { x: 0, y: 0, order: 0 },
-      };
-    }
-
-    function resolveStageObjectActions(objectModel) {
-      const kind = objectKind(objectModel);
-      const state = objectState(objectModel);
-      const actions = [];
-
-      const push = (action, label, group, options = {}) => {
-        actions.push({
-          action,
-          label,
-          group,
-          requiresPoint: Boolean(options.requiresPoint),
-          disabled: Boolean(options.disabled),
-        });
-      };
-
-      if (kind === "stage") {
-        push("set-map", "Add / Replace Map", "create", { disabled: !canManageIndexCards(currentRole) });
-        push("configure-grid", "Configure Grid", "create", { disabled: !canManageIndexCards(currentRole) });
-        push("add-token", "Add Token", "create", { disabled: !canManageStageTokens(currentRole) });
-        push("inspect", "Inspect Stage", "info");
-        if (currentSelection) {
-          push("clear", "Clear selection", "clear");
-        }
-        return actions;
-      }
-
-      if (kind === "fire") {
-        push("select", "Select", "info");
-        push("info", "Info", "info");
-        if (canRemoveLiveStageObject(objectModel)) {
-          push("remove", "Remove from Stage", "remove");
-        }
-        if (currentSelection) {
-          push("clear", "Clear selection", "clear");
-        }
-        return actions;
-      }
-
-      if (!objectModel?.live) {
-        push("select", "Select", "info");
-        push("info", "Info", "info");
-        if (currentSelection) {
-          push("clear", "Clear selection", "clear");
-        }
-        return actions;
-      }
-
-      if (state.locked) {
-        if (canToggleLock(objectModel)) {
-          push("unlock", "Unlock", "lock");
-        }
-        push("info", "Info", "info");
-        return actions;
-      }
-
-      push("info", "Info", "info");
-
-      if (kind === "token" && canManageStageTokens(currentRole)) {
-        push("scale", `Scale (${Math.round(tokenScaleForModel(objectModel))}%)`, "edit");
-        push(tokenSnapModeForModel(objectModel) === "grid" ? "free-placement" : "snap-to-grid", tokenSnapModeForModel(objectModel) === "grid" ? "Free Placement" : "Snap to Grid", "pin");
-        push("replace-asset", "Replace Asset", "edit");
-        push(tokenLayerForModel(objectModel) === "director" ? "move-public-layer" : "move-director-layer", tokenLayerForModel(objectModel) === "director" ? "Move to Public Layer" : "Move to Director Layer", "visibility");
-      }
-
-      if (kind === "card" && canEditLiveCard(objectModel)) {
-        push("inspect", "Inspect", "edit");
-        push("edit", "Edit", "edit");
-        push("flip", cardFaceForModel(objectModel) === "back" ? "Show Front" : "Flip", "face");
-      }
-
-      if (kind === "card" && canTogglePinState(objectModel)) {
-        push(cardDisplayMode(objectModel) === "world" ? "unpin" : "pin", cardDisplayMode(objectModel) === "world" ? "Pin to Screen" : "Attach to Map", "pin");
-      }
-
-      if (canMoveLiveStageObject(objectModel)) {
-        push("move-here", "Move here", "move", { requiresPoint: true });
-      }
-
-      if (canToggleLiveVisibility(objectModel)) {
-        push(state.visible ? "hide" : "show", state.visible ? "Hide Audience" : "Show Audience", "visibility");
-      }
-
-      if (kind === "card" && canToggleNameplate(objectModel)) {
-        push(state.nameplateVisible ? "hide-nameplate" : "show-nameplate", state.nameplateVisible ? "Hide Nameplate" : "Show Nameplate", "visibility");
-      }
-
-      if (kind === "token" && canToggleNameplate(objectModel)) {
-        push(state.nameplateVisible ? "hide-nameplate" : "show-nameplate", state.nameplateVisible ? "Hide Nameplate" : "Show Nameplate", "visibility");
-      }
-
-      if (kind === "card" && canDuplicateLiveStageObject(objectModel)) {
-        push("duplicate", "Duplicate Card", "duplicate");
-      }
-
-      if ((kind === "card" || kind === "prop" || kind === "fire" || kind === "token") && canRemoveLiveStageObject(objectModel)) {
-        push("remove", "Remove from Stage", "remove");
-      }
-
-      if (kind === "card" && canDeleteLiveCard(objectModel)) {
-        push("delete-card", "Delete Card", "remove");
-      }
-
-      if ((kind === "card" || kind === "fire" || kind === "token") && canToggleLock(objectModel)) {
-        push("lock", "Lock", "lock");
-      }
-
-      if (kind === "token" && canDuplicateLiveStageObject(objectModel)) {
-        push("duplicate", "Duplicate Token", "duplicate");
-      }
-
-      return actions;
-    }
+    const canToggleLiveVisibility = firstTheaterLogicModule?.canToggleLiveVisibility || (() => false);
+    const canToggleNameplate = firstTheaterLogicModule?.canToggleNameplate || (() => false);
+    const canToggleLock = firstTheaterLogicModule?.canToggleLock || (() => false);
+    const canTogglePinState = firstTheaterLogicModule?.canTogglePinState || (() => false);
+    const cardEditorDraftFromModel = firstTheaterLogicModule?.cardEditorDraftFromModel || (() => ({}));
+    const stageContextMenuModel = firstTheaterLogicModule?.stageContextMenuModel || (() => ({ key: "", kind: "stage" }));
+    const resolveStageObjectActions = firstTheaterLogicModule?.resolveStageObjectActions || (() => []);
 
     function syncSelectedActions() {
       if (!selectedActions) return;
       selectedActions.innerHTML = "";
       if (!currentSelection) return;
 
-      const actions = resolveStageObjectActions(currentSelection);
+      const actions = resolveStageObjectActions(currentSelection, {
+        role: currentRole,
+        canManageIndexCards: canManageIndexCards(currentRole),
+        canManageStageTokens: canManageStageTokens(currentRole),
+        canActorRevealHideStageObjects: canActorRevealHideStageObjects(currentRole, currentSnapshot?.venue?.config || {}),
+        hasSelection: Boolean(currentSelection),
+        gridConfig: currentVenueGridConfig,
+        cardFaceForModel,
+        cardDisplayMode,
+        tokenScaleForModel,
+        tokenSnapModeForModel,
+        tokenLayerForModel,
+      });
       const hasPoint = !!(stagePlacementCandidate || lastStagePoint);
 
       actions.forEach((item, index) => {
@@ -1913,21 +1825,21 @@
 
     function mapEditorDraftFromState() {
       const state = currentVenueMapState || {};
-      const liveDisplayMode = String(mapEditorDisplayMode?.value || "").trim();
-      const liveFit = String(mapEditorFit?.value || "").trim();
-      const liveScale = mapEditorScale?.value;
-      const liveCropX = mapEditorCropX?.value;
-      const liveCropY = mapEditorCropY?.value;
-      const liveSafeMargin = mapEditorSafeMargin?.value;
-      const rawDisplayMode = liveDisplayMode || String(state.display_mode || "theater");
-      return {
+      return firstTheaterMapGridModule?.mapEditorDraftFromState?.(state, currentVenueMapAssetID || "", {
+        displayMode: mapEditorDisplayMode?.value,
+        fit: mapEditorFit?.value,
+        scale: mapEditorScale?.value,
+        cropX: mapEditorCropX?.value,
+        cropY: mapEditorCropY?.value,
+        safeMargin: mapEditorSafeMargin?.value,
+      }) || {
         assetID: String(state.asset_id || currentVenueMapAssetID || ""),
-        displayMode: rawDisplayMode === "fullscreen" ? "fullscreen" : "theater",
-        fit: liveFit || String(state.fit || "cover"),
-        cropX: clampNumber(liveCropX ?? state.crop_x ?? 0.5, 0, 1, 0.5),
-        cropY: clampNumber(liveCropY ?? state.crop_y ?? 0.5, 0, 1, 0.5),
-        scale: clampNumber(liveScale ?? state.scale ?? 1, 0.25, 4, 1),
-        safeMargin: clampNumber(liveSafeMargin ?? state.safe_margin ?? 24, 0, 128, 24),
+        displayMode: String(state.display_mode || "theater"),
+        fit: String(state.fit || "cover"),
+        cropX: Number(state.crop_x ?? 0.5),
+        cropY: Number(state.crop_y ?? 0.5),
+        scale: Number(state.scale ?? 1),
+        safeMargin: Number(state.safe_margin ?? 24),
       };
     }
 
@@ -1938,18 +1850,14 @@
     }
 
     function clampMapEditorPosition(left, top) {
-      const shellRect = stageShell?.getBoundingClientRect?.();
-      const panelRect = mapEditorPanel?.getBoundingClientRect?.();
-      const panelWidth = Number(panelRect?.width || 560);
-      const panelHeight = Number(panelRect?.height || 520);
-      const shellWidth = Number(shellRect?.width || 0);
-      const shellHeight = Number(shellRect?.height || 0);
-      const maxLeft = Math.max(8, shellWidth - panelWidth - 8);
-      const maxTop = Math.max(8, shellHeight - panelHeight - 8);
-      return {
-        left: Math.max(8, Math.min(Math.round(left), maxLeft)),
-        top: Math.max(8, Math.min(Math.round(top), maxTop)),
-      };
+      return firstTheaterMapGridModule?.clampPanelPosition?.(
+        left,
+        top,
+        stageShell?.getBoundingClientRect?.(),
+        mapEditorPanel?.getBoundingClientRect?.(),
+        560,
+        520,
+      ) || { left: Math.round(left), top: Math.round(top) };
     }
 
     function setMapEditorPosition(left, top) {
@@ -1962,18 +1870,14 @@
     }
 
     function clampGridEditorPosition(left, top) {
-      const shellRect = stageShell?.getBoundingClientRect?.();
-      const panelRect = gridEditorPanel?.getBoundingClientRect?.();
-      const panelWidth = Number(panelRect?.width || 420);
-      const panelHeight = Number(panelRect?.height || 480);
-      const shellWidth = Number(shellRect?.width || 0);
-      const shellHeight = Number(shellRect?.height || 0);
-      const maxLeft = Math.max(8, shellWidth - panelWidth - 8);
-      const maxTop = Math.max(8, shellHeight - panelHeight - 8);
-      return {
-        left: Math.max(8, Math.min(Math.round(left), maxLeft)),
-        top: Math.max(8, Math.min(Math.round(top), maxTop)),
-      };
+      return firstTheaterMapGridModule?.clampPanelPosition?.(
+        left,
+        top,
+        stageShell?.getBoundingClientRect?.(),
+        gridEditorPanel?.getBoundingClientRect?.(),
+        420,
+        480,
+      ) || { left: Math.round(left), top: Math.round(top) };
     }
 
     function setGridEditorPosition(left, top) {
@@ -2316,7 +2220,7 @@
     }
 
     function defaultGridConfig() {
-      return {
+      return firstTheaterMapGridModule?.defaultGridConfig?.() || {
         grid_type: "none",
         hex_orientation: "flat-top",
         cell_size: 50,
@@ -2330,20 +2234,25 @@
     }
 
     function gridEditorDraftFromUI() {
-      const state = currentVenueGridConfig || defaultGridConfig();
-      const liveGridType = String(gridEditorType?.value || "");
-      const liveHexOrientation = String(gridEditorHexOrientation?.value || "");
-      const liveLineStyle = String(gridEditorLineStyle?.value || "");
-      return {
-        grid_type: liveGridType === "square" || liveGridType === "hex" ? liveGridType : "none",
-        hex_orientation: liveHexOrientation === "pointy-top" ? "pointy-top" : "flat-top",
-        cell_size: clampNumber(gridEditorCellSize?.value, 8, 500, 50),
-        offset_x: clampNumber(gridEditorOffsetX?.value, -2000, 2000, 0),
-        offset_y: clampNumber(gridEditorOffsetY?.value, -2000, 2000, 0),
-        line_width: clampNumber(gridEditorLineWidth?.value, 0.5, 8, 1),
-        opacity: clampNumber(gridEditorOpacity?.value, 0, 1, 0.45),
-        line_style: liveLineStyle === "light" || liveLineStyle === "dark" ? liveLineStyle : "neutral",
-        visible: state.visible !== false,
+      return firstTheaterMapGridModule?.gridEditorDraftFromUI?.(currentVenueGridConfig || defaultGridConfig(), {
+        gridType: gridEditorType?.value,
+        hexOrientation: gridEditorHexOrientation?.value,
+        cellSize: gridEditorCellSize?.value,
+        offsetX: gridEditorOffsetX?.value,
+        offsetY: gridEditorOffsetY?.value,
+        opacity: gridEditorOpacity?.value,
+        lineWidth: gridEditorLineWidth?.value,
+        lineStyle: gridEditorLineStyle?.value,
+      }) || {
+        grid_type: "none",
+        hex_orientation: "flat-top",
+        cell_size: 50,
+        offset_x: 0,
+        offset_y: 0,
+        line_width: 1,
+        opacity: 0.45,
+        line_style: "neutral",
+        visible: true,
       };
     }
 
@@ -2355,13 +2264,12 @@
 
     function syncGridEditorHexFieldVisibility() {
       if (!gridEditorHexOrientationField) return;
-      gridEditorHexOrientationField.style.display = String(gridEditorType?.value || "") === "hex" ? "" : "none";
+      gridEditorHexOrientationField.style.display = firstTheaterMapGridModule?.gridEditorHexFieldVisible?.(gridEditorType?.value) ? "" : "none";
     }
 
     function syncGridEditorVisibilityButton() {
       if (!gridEditorVisibility) return;
-      const visible = currentVenueGridConfig ? currentVenueGridConfig.visible !== false : true;
-      gridEditorVisibility.textContent = visible ? "Hide Grid" : "Show Grid";
+      gridEditorVisibility.textContent = firstTheaterMapGridModule?.gridEditorVisibilityLabel?.(currentVenueGridConfig) || "Hide Grid";
     }
 
     function syncGridEditorWithState() {
@@ -2532,21 +2440,13 @@
       return venueMapTexturePromise;
     }
 
-    function computeStagePlayableBounds(width, height) {
+    const computeStagePlayableBounds = (width, height) => {
       const displayMode = String(currentVenueMapState?.display_mode || "theater").trim() === "fullscreen" ? "fullscreen" : "theater";
       if (displayMode === "fullscreen") {
         return { x: 0, y: 0, width, height };
       }
-      const prosceniumInset = Math.max(18, Math.round(width * 0.04));
-      const upperDrapeHeight = Math.max(80, Math.round(height * 0.16));
-      const floorBandTop = Math.max(Math.round(height * 0.72), height - 200);
-      return {
-        x: prosceniumInset,
-        y: upperDrapeHeight,
-        width: Math.max(1, width - prosceniumInset * 2),
-        height: Math.max(1, floorBandTop - upperDrapeHeight),
-      };
-    }
+      return firstTheaterGeometryModule?.computeStagePlayableBounds?.(width, height) || { x: 0, y: 0, width, height };
+    };
 
     function renderVenueGridLayer(bounds) {
       if (!gridLayer || !window.PIXI) return;
@@ -2591,12 +2491,13 @@
       mapLayer.addChild(sprite);
 
       const scale = Math.max(0.25, Math.min(4, Number(state.scale ?? 1) || 1));
+      const theaterCropY = Math.max(Number(state.crop_y ?? 0.5), 0.58);
       window.VictoryPixiStage?.fitSpriteToBounds?.(sprite, boundsWidth, boundsHeight, {
         fit: state.fit || "cover",
         x: boundsX,
         y: boundsY,
         cropX: Number(state.crop_x ?? 0.5),
-        cropY: Number(state.crop_y ?? 0.5),
+        cropY: displayMode === "theater" ? theaterCropY : Number(state.crop_y ?? 0.5),
         scale,
       });
 
@@ -2755,15 +2656,12 @@
       return stagePointFromClient(clientPoint.clientX, clientPoint.clientY);
     }
 
-    function stageScreenPointFromClient(clientX, clientY) {
-      const rect = stageHost?.getBoundingClientRect();
-      return {
-        x: rect ? Number(clientX || 0) - rect.left : Number(clientX || 0),
-        y: rect ? Number(clientY || 0) - rect.top : Number(clientY || 0),
-      };
-    }
+    const stageScreenPointFromClient = (clientX, clientY) => firstTheaterGeometryModule?.stageScreenPointFromClient?.(clientX, clientY, stageHost?.getBoundingClientRect?.()) || {
+      x: Number(clientX || 0),
+      y: Number(clientY || 0),
+    };
 
-    function stagePointFromClient(clientX, clientY) {
+    const stagePointFromClient = (clientX, clientY) => {
       const point = stageScreenPointFromClient(clientX, clientY);
       if (stageCamera) {
         const worldPoint = stageCamera.screenToWorld?.(point.x, point.y);
@@ -2779,7 +2677,7 @@
         x: Math.max(0, Math.min(Math.round(size.width), Math.round(point.x))),
         y: Math.max(0, Math.min(Math.round(size.height), Math.round(point.y))),
       };
-    }
+    };
 
     function hitTestContextMenuTarget(screenPoint, worldPoint) {
       for (let index = currentObjects.length - 1; index >= 0; index -= 1) {
@@ -2815,6 +2713,9 @@
     }
 
     function resolveContextMenuTargetFromClient(clientX, clientY) {
+      if (actionRouter?.resolveContextMenuTargetFromClient) {
+        return actionRouter.resolveContextMenuTargetFromClient(clientX, clientY);
+      }
       const screenPoint = stageScreenPointFromClient(clientX, clientY);
       const stagePoint = stagePointFromClient(clientX, clientY);
       const objectModel = hitTestContextMenuTarget(screenPoint, stagePoint) || stageContextMenuModel();
@@ -2876,7 +2777,11 @@
     }
 
     function handleNativeStageContextMenu(event) {
+      if (actionRouter?.handleNativeStageContextMenu) {
+        return actionRouter.handleNativeStageContextMenu(event);
+      }
       if (!event) return;
+      if (wasContextMenuHandled(event)) return;
       const target = event.target;
       const composedPath = typeof event.composedPath === "function" ? event.composedPath() : [];
       if (cameraControls?.contains?.(target)) {
@@ -2898,6 +2803,9 @@
     }
 
     function openResolvedContextMenu(event) {
+      if (actionRouter?.openResolvedContextMenu) {
+        return actionRouter.openResolvedContextMenu(event);
+      }
       if (!event || !contextMenu || !pixiApp) return;
       const clientPoint = eventClientPoint(event);
       const resolved = resolveContextMenuTargetFromClient(clientPoint.clientX, clientPoint.clientY);
@@ -2907,6 +2815,9 @@
     }
 
     function performStageObjectAction(action, objectModel) {
+      if (actionRouter?.performStageObjectAction) {
+        return actionRouter.performStageObjectAction(action, objectModel);
+      }
       if (!objectModel || !action) return;
 
       const kind = objectKind(objectModel);
@@ -3384,6 +3295,9 @@
     }
 
     function openContextMenu(event, objectModel) {
+      if (actionRouter?.openContextMenu) {
+        return actionRouter.openContextMenu(event, objectModel);
+      }
       if (!contextMenu || !objectModel) return;
       contextMenuTarget = objectModel;
       const clientPoint = eventClientPoint(event);
@@ -3397,7 +3311,19 @@
         }
       }
 
-      const items = resolveStageObjectActions(objectModel);
+      const items = resolveStageObjectActions(objectModel, {
+        role: currentRole,
+        canManageIndexCards: canManageIndexCards(currentRole),
+        canManageStageTokens: canManageStageTokens(currentRole),
+        canActorRevealHideStageObjects: canActorRevealHideStageObjects(currentRole, currentSnapshot?.venue?.config || {}),
+        hasSelection: Boolean(currentSelection),
+        gridConfig: currentVenueGridConfig,
+        cardFaceForModel,
+        cardDisplayMode,
+        tokenScaleForModel,
+        tokenSnapModeForModel,
+        tokenLayerForModel,
+      });
       contextMenu.innerHTML = items
         .map((item, index) => {
           let separator = "";
@@ -3421,6 +3347,10 @@
       contextMenu.style.left = `${Math.max(8, Math.min(clientPoint.clientX || 0, maxX))}px`;
       contextMenu.style.top = `${Math.max(8, Math.min(clientPoint.clientY || 0, maxY))}px`;
       contextMenu.dataset.objectKey = objectModel.key;
+      suppressStageContextMenu = true;
+      window.setTimeout(() => {
+        suppressStageContextMenu = false;
+      }, 0);
     }
 
     function getStageSize() {
@@ -3431,28 +3361,10 @@
       return { width: rect.width, height: rect.height };
     }
 
-    function toStagePoint(model, size, options = {}) {
-      const position = model?.position || {};
-      const frame = String(position.frame || position.anchor_frame || position.coordinate_frame || "").trim().toLowerCase();
-      const normX = Number(position.x ?? 0);
-      const normY = Number(position.y ?? 0);
-      const order = Number(position.order ?? 0);
-      const width = Number(size?.width || 960);
-      const height = Number(size?.height || 640);
-      if (frame === "top-left" || frame === "topleft") {
-        return {
-          x: Math.max(0, Math.min(width, Math.round(normX))),
-          y: Math.max(0, Math.min(height, Math.round(normY))),
-        };
-      }
-      const baseY = options.baseY ?? (model?.kind === "fire" ? 0.62 : 0.52);
-      const xScale = width * 0.006;
-      const yScale = height * 0.006;
-      return {
-        x: width * 0.5 + (normX * xScale),
-        y: height * baseY + (normY * yScale) + (options.orderOffset ? order * options.orderOffset : 0),
-      };
-    }
+    const toStagePoint = (model, size, options = {}) => firstTheaterGeometryModule?.toStagePoint?.(model, size, options) || {
+      x: 0,
+      y: 0,
+    };
 
     function describeObject(model) {
       const state = objectState(model);
@@ -3613,423 +3525,12 @@
       return out;
     }
 
-    function clearSceneNodes() {
-      currentNodeMap = new Map();
-      if (pinnedObjectLayer) {
-        pinnedObjectLayer.removeChildren();
-      }
-      if (overlayObjectLayer) {
-        overlayObjectLayer.removeChildren();
-      }
-      if (floatingObjectLayer) {
-        floatingObjectLayer.removeChildren();
-      }
-      if (facadeLayer) {
-        facadeLayer.removeChildren();
-      }
-    }
-
-    function refreshNodeSelection() {
-      for (const [key, node] of currentNodeMap.entries()) {
-        node.updateSelected?.(currentSelection?.key === key);
-      }
-    }
-
-    function makeCardNode(model) {
-      const container = new PIXI.Container();
-      container.sortableChildren = true;
-      const state = objectState(model);
-      const cardKey = String(model.elementId || model.elementSlug || model.key || "");
-      const face = cardFaceForModel(model);
-      const titleText = face === "back"
-        ? truncateCardText(model.backText || "Back", 22) || "Back"
-        : truncateCardText(model.frontText || model.label || "Untitled card", 22) || "Untitled card";
-
-      const shadow = new PIXI.Graphics();
-      shadow.beginFill(0x000000, 0.28);
-      shadow.drawRoundedRect(8, 10, 192, 132, 16);
-      shadow.endFill();
-
-      const body = new PIXI.Graphics();
-      body.beginFill(PIXI.utils.string2hex(model.color || "#d9c7a6"), 1);
-      body.lineStyle(2, 0x5d4327, 0.52);
-      body.drawRoundedRect(0, 0, 192, 132, 16);
-      body.endFill();
-
-      const titleStyle = new PIXI.TextStyle({
-        fontFamily: "Arial",
-        fontSize: 14,
-        fontWeight: "700",
-        fill: 0x2f2112,
-        wordWrap: true,
-        wordWrapWidth: 144,
-      });
-
-      const title = new PIXI.Text(titleText, titleStyle);
-      title.position.set(18, 18);
-      title.alpha = 0.98;
-      title.eventMode = "static";
-      title.cursor = "text";
-
-      const faceButtonBg = new PIXI.Graphics();
-      faceButtonBg.beginFill(0x000000, 0.18);
-      faceButtonBg.drawRoundedRect(0, 0, 26, 26, 13);
-      faceButtonBg.endFill();
-      faceButtonBg.position.set(160, 104);
-      faceButtonBg.alpha = (canEditLiveCard(model) || canToggleLock(model)) && state.visible ? 1 : 0.34;
-
-      const faceButton = new PIXI.Text(face === "back" ? "↻" : "↺", new PIXI.TextStyle({
-        fontFamily: "Arial",
-        fontSize: 15,
-        fontWeight: "700",
-        fill: 0x5d4327,
-      }));
-      faceButton.position.set(168, 108);
-      faceButton.eventMode = "static";
-      faceButton.cursor = "pointer";
-      faceButton.on("pointerdown", (event) => {
-        event.stopPropagation();
-        if (objectState(model).locked) {
-          selectObject(model, `${model.label} is locked.`);
-          return;
-        }
-        if (!canEditLiveCard(model) && !canManageIndexCards(currentRole)) {
-          return;
-        }
-        cardFaceState.set(cardKey, face === "back" ? "front" : "back");
-        renderPixiScene();
-      });
-
-      const statusBadgeTextValue = cardStatusBadgeText(model);
-      const statusBadge = new PIXI.Container();
-      const statusBadgeStyle = new PIXI.TextStyle({
-        fontFamily: "Arial",
-        fontSize: 10,
-        fontWeight: "700",
-        fill: 0xf0d49b,
-      });
-      const statusBadgeLabel = new PIXI.Text(statusBadgeTextValue, statusBadgeStyle);
-      statusBadgeLabel.position.set(10, 3);
-      const statusBadgeBg = new PIXI.Graphics();
-      statusBadgeBg.beginFill(0x1a0f0f, 0.84);
-      statusBadgeBg.lineStyle(1, 0xf0d49b, 0.22);
-      const statusBadgeWidth = Math.max(54, Math.ceil(statusBadgeLabel.width + 20));
-      statusBadgeBg.drawRoundedRect(0, 0, statusBadgeWidth, 18, 9);
-      statusBadgeBg.endFill();
-      statusBadge.addChild(statusBadgeBg, statusBadgeLabel);
-      statusBadge.position.set(Math.max(8, 192 - statusBadgeWidth - 10), 10);
-      statusBadge.visible = Boolean(statusBadgeTextValue);
-
-      const focus = new PIXI.Graphics();
-      focus.lineStyle(0, 0x000000, 0);
-      focus.drawRoundedRect(0, 0, 200, 140, 18);
-
-      container.addChild(shadow, body, title, faceButtonBg, faceButton, statusBadge, focus);
-      container.eventMode = "static";
-      container.cursor = "pointer";
-      container.interactive = true;
-      container.visible = state.visible || viewerCanSeeHiddenCards();
-      title.visible = true;
-      faceButtonBg.visible = true;
-      faceButton.visible = true;
-
-      const node = {
-        model,
-        container,
-        updateSelected(selected) {
-          focus.clear();
-          if (selected) {
-            focus.lineStyle(3, 0xf0d49b, 0.9);
-            focus.drawRoundedRect(0, 0, 200, 140, 18);
-            container.zIndex = 50;
-          } else {
-            focus.lineStyle(0, 0x000000, 0);
-            focus.drawRoundedRect(0, 0, 200, 140, 18);
-            container.zIndex = 10;
-          }
-        },
-      };
-
-      const openCardContextMenu = (event) => {
-        if (wasContextMenuHandled(event)) {
-          return;
-        }
-        cancelContextMenuEvent(event);
-        openResolvedContextMenu(event);
-      };
-
-      container.on("pointerdown", (event) => {
-        if (isSecondaryPointerEvent(event)) {
-          return;
-        }
-        event.stopPropagation();
-        selectObject(model, `${model.label} selected.`);
-
-        if (model.live) {
-          if (objectState(model).locked) {
-            setStageStatus(`${model.label} is locked.`);
-            setMovementReport("Locked objects cannot be dragged.");
-            return;
-          }
-          const clientPoint = eventClientPoint(event);
-          const screenPoint = stageScreenPointFromClient(clientPoint.clientX, clientPoint.clientY);
-          const space = cardDisplayMode(model) === "world" ? "world" : "screen";
-          const renderedPoint = { x: container.x, y: container.y };
-          const floatingPoint = {
-            x: Math.round(Number(screenPoint.x || 0)),
-            y: Math.round(Number(screenPoint.y || 0)),
-          };
-          dragState = {
-            node: container,
-            model,
-            space,
-            originalPinMode: space,
-            originalData: { ...(model.source?.data || {}) },
-            floatingPoint,
-            offsetX: floatingPoint.x - renderedPoint.x,
-            offsetY: floatingPoint.y - renderedPoint.y,
-          };
-          setMovementReport("Dragging live object...");
-          setStageStatus("Release to update the card.");
-        }
-      });
-
-      const inspectFromText = (event) => {
-        event?.stopPropagation?.();
-        event?.stopImmediatePropagation?.();
-        selectObject(model, `${model.label} selected.`);
-        openCardEditor(model);
-      };
-
-      title.on("click", inspectFromText);
-      title.on("contextmenu", openCardContextMenu);
-      faceButton.on("contextmenu", openCardContextMenu);
-      container.on("contextmenu", openCardContextMenu);
-
-      return node;
-    }
-
-    function makeFireNode(model) {
-      const container = new PIXI.Container();
-      const glow = new PIXI.Graphics();
-      glow.beginFill(0xff8b36, 0.14);
-      glow.drawCircle(62, 62, 78);
-      glow.endFill();
-
-      const halo = new PIXI.Graphics();
-      halo.beginFill(0xffc16f, 0.22);
-      halo.drawCircle(62, 62, 40);
-      halo.endFill();
-
-      const sprite = PIXI.Sprite.from("/assets/fire.jpg");
-      sprite.anchor.set(0, 0);
-      sprite.position.set(0, 0);
-      sprite.width = 124;
-      sprite.height = 124;
-
-      const base = new PIXI.Graphics();
-      base.beginFill(0x000000, 0.2);
-      base.drawEllipse(62, 118, 54, 14);
-      base.endFill();
-
-      const labelStyle = new PIXI.TextStyle({
-        fontFamily: "Arial",
-        fontSize: 12,
-        fontWeight: "700",
-        fill: 0xf4dfb4,
-      });
-      const label = new PIXI.Text(model.label || "Fire", labelStyle);
-      label.anchor.set(0, 0);
-      label.position.set(0, 130);
-
-      container.addChild(glow, halo, base, sprite, label);
-      container.eventMode = "static";
-      container.cursor = "pointer";
-      container.interactive = true;
-
-      const focus = new PIXI.Graphics();
-      focus.lineStyle(0, 0x000000, 0);
-      focus.drawRoundedRect(0, 0, 124, 150, 18);
-      container.addChild(focus);
-
-      const node = {
-        model,
-        container,
-        updateSelected(selected) {
-          focus.clear();
-          if (selected) {
-            focus.lineStyle(3, 0xf0d49b, 0.95);
-            focus.drawRoundedRect(0, 0, 124, 150, 18);
-          } else {
-            focus.lineStyle(0, 0x000000, 0);
-            focus.drawRoundedRect(0, 0, 124, 150, 18);
-          }
-        },
-      };
-
-      container.on("pointerdown", (event) => {
-        if (isSecondaryPointerEvent(event)) {
-          return;
-        }
-        event.stopPropagation();
-        selectObject(model, "Fire selected.");
-      });
-
-      container.on("contextmenu", (event) => {
-        if (wasContextMenuHandled(event)) {
-          return;
-        }
-        cancelContextMenuEvent(event);
-        openResolvedContextMenu(event);
-      });
-
-      return node;
-    }
-
-    function makeTokenNode(model) {
-      const container = new PIXI.Container();
-      container.sortableChildren = true;
-      const size = tokenDisplaySizeForModel(model);
-      const applyNameplateVisibility = () => {
-        const show = Boolean(objectState(model).nameplateVisible);
-        const hasBadge = badge.parent === container;
-        const hasLayerTag = layerTag.parent === container;
-        const hasLabel = label.parent === container;
-        if (show) {
-          if (!hasBadge) container.addChild(badge);
-          if (!hasLayerTag) container.addChild(layerTag);
-          if (!hasLabel) container.addChild(label);
-        } else {
-          if (hasBadge) container.removeChild(badge);
-          if (hasLayerTag) container.removeChild(layerTag);
-          if (hasLabel) container.removeChild(label);
-        }
-      };
-      const assetURL = String(model.assetContentURL || model.source?.data?.asset_content_url || "").trim();
-      const thumbnailURL = String(model.assetThumbnailURL || model.source?.data?.asset_thumbnail_url || "").trim();
-      const textureSource = assetURL || thumbnailURL || "/assets/construction.png";
-      const sprite = PIXI.Sprite.from(textureSource);
-      sprite.anchor.set(0.5);
-      sprite.width = size.width;
-      sprite.height = size.height;
-      sprite.eventMode = "static";
-      sprite.cursor = "pointer";
-
-      const outline = new PIXI.Graphics();
-      outline.lineStyle(2, 0x8fb7da, 0.18);
-      outline.drawRoundedRect(-size.width / 2, -size.height / 2, size.width, size.height, Math.max(10, Math.min(size.width, size.height) * 0.18));
-
-      const layerTagStyle = new PIXI.TextStyle({
-        fontFamily: "Arial",
-        fontSize: 10,
-        fontWeight: "700",
-        fill: tokenLayerForModel(model) === "director" ? 0x9dd0ff : 0xe9f5ff,
-      });
-      const layerTag = new PIXI.Text(tokenLayerForModel(model) === "director" ? "DIR" : "TOK", layerTagStyle);
-      layerTag.anchor.set(0.5);
-      layerTag.position.set(size.width / 2 - 12, -size.height / 2 + 12);
-      const labelText = truncateCardText(model.assetName || model.label || "Token", 20) || "Token";
-      const labelStyle = new PIXI.TextStyle({
-        fontFamily: "Arial",
-        fontSize: 11,
-        fontWeight: "700",
-        fill: 0xf4e3c1,
-        align: "center",
-        wordWrap: true,
-        wordWrapWidth: Math.max(80, size.width + 16),
-      });
-      const label = new PIXI.Text(labelText, labelStyle);
-      label.anchor.set(0.5, 0);
-      label.position.set(0, size.height / 2 + 8);
-      const badgeStyle = new PIXI.TextStyle({
-        fontFamily: "Arial",
-        fontSize: 10,
-        fontWeight: "700",
-        fill: 0x8fb7da,
-      });
-      const badge = new PIXI.Text(`${Math.round(tokenScaleForModel(model))}%`, badgeStyle);
-      badge.anchor.set(0.5);
-      badge.position.set(-size.width / 2 + 18, -size.height / 2 + 12);
-
-      const focus = new PIXI.Graphics();
-      focus.lineStyle(0, 0x000000, 0);
-      focus.drawRoundedRect(-size.width / 2 - 8, -size.height / 2 - 8, size.width + 16, size.height + 24, 16);
-
-      container.addChild(outline, sprite, focus);
-      container.eventMode = "static";
-      container.cursor = "pointer";
-      container.interactive = true;
-
-      const node = {
-        model,
-        container,
-        updateSelected(selected) {
-          focus.clear();
-          if (selected) {
-            focus.lineStyle(3, 0x8fb7da, 0.92);
-            focus.drawRoundedRect(-size.width / 2 - 8, -size.height / 2 - 8, size.width + 16, size.height + 24, 16);
-            container.zIndex = 60;
-          } else {
-            focus.lineStyle(0, 0x000000, 0);
-            focus.drawRoundedRect(-size.width / 2 - 8, -size.height / 2 - 8, size.width + 16, size.height + 24, 16);
-            container.zIndex = tokenLayerForModel(model) === "director" ? 35 : 25;
-          }
-          applyNameplateVisibility();
-        },
-      };
-
-      applyNameplateVisibility();
-
-      const openTokenContextMenu = (event) => {
-        if (wasContextMenuHandled(event)) {
-          return;
-        }
-        cancelContextMenuEvent(event);
-        openResolvedContextMenu(event);
-      };
-
-      container.on("pointerdown", (event) => {
-        if (isSecondaryPointerEvent(event)) {
-          return;
-        }
-        event.stopPropagation();
-        selectObject(model, `${model.label} selected.`);
-
-        if (model.live) {
-          if (objectState(model).locked) {
-            setStageStatus(`${model.label} is locked.`);
-            setMovementReport("Locked objects cannot be dragged.");
-            return;
-          }
-          const clientPoint = eventClientPoint(event);
-          const screenPoint = stageScreenPointFromClient(clientPoint.clientX, clientPoint.clientY);
-          dragState = {
-            node: container,
-            model,
-            space: "world",
-            originalPinMode: tokenSnapModeForModel(model),
-            originalData: { ...(model.source?.data || {}) },
-            floatingPoint: { x: Math.round(Number(screenPoint.x || 0)), y: Math.round(Number(screenPoint.y || 0)) },
-            offsetX: Math.round(Number(screenPoint.x || 0)) - container.x,
-            offsetY: Math.round(Number(screenPoint.y || 0)) - container.y,
-          };
-          setMovementReport("Dragging live token...");
-          setStageStatus("Release to move the token.");
-        }
-      });
-
-      container.on("contextmenu", openTokenContextMenu);
-
-      return node;
-    }
-
-    function makePlaceholderNode(model) {
-      if (isTokenObject(model)) {
-        return makeTokenNode(model);
-      }
-      const node = makeCardNode(model);
-      return node;
-    }
+    const clearSceneNodes = () => sceneNodeFactory?.clearSceneNodes?.();
+    const refreshNodeSelection = () => sceneNodeFactory?.refreshNodeSelection?.();
+    const makeCardNode = (model) => sceneNodeFactory?.makeCardNode?.(model) || null;
+    const makeFireNode = (model) => sceneNodeFactory?.makeFireNode?.(model) || null;
+    const makeTokenNode = (model) => sceneNodeFactory?.makeTokenNode?.(model) || null;
+    const makePlaceholderNode = (model) => (isTokenObject(model) ? makeTokenNode(model) : makeCardNode(model));
 
     function createIndexCardFromMenu() {
       if (!canManageIndexCards(currentRole)) {
@@ -4046,7 +3547,8 @@
       stagePlacementCandidate = null;
       stagePlacementScreenCandidate = null;
       const placementLabel = `x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}`;
-      const queued = !!(ws && ws.readyState === WebSocket.CONNECTING && currentSessionId);
+      const socket = socketController?.getWebSocket?.() || ws;
+      const queued = !!(socket && socket.readyState === WebSocket.CONNECTING && currentSessionId);
 
       const sent = sendAction("create/index_card", {
         front_text: "New Index Card",
@@ -4514,6 +4016,20 @@
       renderPixiScene();
     }
 
+    if (tokenUi) {
+      tokenPickerFilteredAssets = (...args) => tokenUi.tokenPickerFilteredAssets(...args);
+      tokenPickerPreviewForAsset = (...args) => tokenUi.tokenPickerPreviewForAsset(...args);
+      renderTokenPickerList = (...args) => tokenUi.renderTokenPickerList(...args);
+      refreshWarehouseTokenAssets = (...args) => tokenUi.refreshWarehouseTokenAssets(...args);
+      openTokenPicker = (...args) => tokenUi.openTokenPicker(...args);
+      closeTokenPicker = (...args) => tokenUi.closeTokenPicker(...args);
+      placeTokenAsset = (...args) => tokenUi.placeTokenAsset(...args);
+      syncTokenEditorWithSelection = (...args) => tokenUi.syncTokenEditorWithSelection(...args);
+      openTokenEditor = (...args) => tokenUi.openTokenEditor(...args);
+      hideTokenEditor = (...args) => tokenUi.hideTokenEditor(...args);
+      saveTokenEditor = (...args) => tokenUi.saveTokenEditor(...args);
+    }
+
     function renderPixiScene() {
       if (!pixiApp || !sceneRoot || !backgroundLayer || !worldLayer || !mapLayer || !overlayObjectLayer) return;
 
@@ -4539,7 +4055,7 @@
 
       const prosceniumInset = Math.max(18, Math.round(width * 0.04));
       const upperDrapeHeight = Math.max(80, Math.round(height * 0.16));
-      const floorBandTop = Math.max(Math.round(height * 0.72), height - 200);
+      const floorBandTop = Math.max(Math.round(height * 0.84), height - 120);
       const footlightY = Math.max(floorBandTop + 10, height - 38);
 
       const stageOpening = new PIXI.Graphics();
@@ -4589,7 +4105,7 @@
 
         const stageFloor = new PIXI.Graphics();
         stageFloor.beginFill(0x0d0a0b, 1);
-        stageFloor.drawRect(0, floorBandTop, width, height - floorBandTop);
+        stageFloor.drawRoundedRect(0, floorBandTop, width, height - floorBandTop, 20);
         stageFloor.endFill();
         facadeLayer.addChild(stageFloor);
 
@@ -4614,7 +4130,7 @@
 
         const stageLip = new PIXI.Graphics();
         stageLip.beginFill(0x120b0b, 0.9);
-        stageLip.drawRect(0, floorBandTop, width, height - floorBandTop);
+        stageLip.drawRoundedRect(0, floorBandTop, width, height - floorBandTop, 18);
         stageLip.endFill();
         facadeLayer.addChild(stageLip);
       }
@@ -4809,8 +4325,8 @@
       stageHost.appendChild(pixiApp.view);
       pixiApp.stage.sortableChildren = true;
 
-      pixiApp.view.addEventListener("contextmenu", handleNativeStageContextMenu, true);
-      stageHost.addEventListener("contextmenu", handleNativeStageContextMenu, true);
+      runtimeLifecycle.listen(pixiApp.view, "contextmenu", handleNativeStageContextMenu, true);
+      runtimeLifecycle.listen(stageHost, "contextmenu", handleNativeStageContextMenu, true);
 
       sceneRoot = new PIXI.Container();
       sceneRoot.sortableChildren = true;
@@ -4849,6 +4365,13 @@
       pixiApp.stage.addChild(sceneRoot);
       worldLayer.addChild(mapLayer, gridLayer, pinnedObjectLayer);
       sceneRoot.addChild(backgroundLayer, worldLayer, facadeLayer, overlayObjectLayer, floatingObjectLayer, uiLayer);
+      runtimeLifecycle.track(() => {
+        try {
+          pixiApp?.destroy?.(true);
+        } catch (error) {
+          console.warn("pixi cleanup failed", error);
+        }
+      });
 
       stageCamera = window.VictoryStageCamera?.mount?.({
         stageElement: stageHost,
@@ -4863,9 +4386,16 @@
           updateCameraControls(view);
         },
       }) || null;
+      runtimeLifecycle.track(() => {
+        try {
+          stageCamera?.destroy?.();
+        } catch (error) {
+          console.warn("stage camera cleanup failed", error);
+        }
+      });
       updateCameraControls(stageCamera?.getView?.());
 
-      stageHost.addEventListener("pointermove", (event) => {
+      runtimeLifecycle.listen(stageHost, "pointermove", (event) => {
         const screenPoint = stageScreenPointFromClient(event.clientX, event.clientY);
         const point = stagePointFromClient(event.clientX, event.clientY);
         const stageX = Math.round(point.x);
@@ -4888,34 +4418,35 @@
         setMovementReport(`Dragging to x ${dropX}, y ${dropY}`);
       });
 
-      window.addEventListener("pointerup", finishDrag, true);
-      window.addEventListener("pointercancel", cancelDrag, true);
+      runtimeLifecycle.listen(window, "pointerup", finishDrag, true);
+      runtimeLifecycle.listen(window, "pointercancel", cancelDrag, true);
       cardEditorHeader?.addEventListener("pointerdown", beginCardEditorDrag);
-      window.addEventListener("pointermove", moveCardEditorDrag, true);
-      window.addEventListener("pointerup", endCardEditorDrag, true);
-      window.addEventListener("pointercancel", endCardEditorDrag, true);
+      runtimeLifecycle.listen(window, "pointermove", moveCardEditorDrag, true);
+      runtimeLifecycle.listen(window, "pointerup", endCardEditorDrag, true);
+      runtimeLifecycle.listen(window, "pointercancel", endCardEditorDrag, true);
       mapEditorHeader?.addEventListener("pointerdown", beginMapEditorDrag);
-      window.addEventListener("pointermove", moveMapEditorDrag, true);
-      window.addEventListener("pointerup", endMapEditorDrag, true);
-      window.addEventListener("pointercancel", endMapEditorDrag, true);
+      runtimeLifecycle.listen(window, "pointermove", moveMapEditorDrag, true);
+      runtimeLifecycle.listen(window, "pointerup", endMapEditorDrag, true);
+      runtimeLifecycle.listen(window, "pointercancel", endMapEditorDrag, true);
       gridEditorHeader?.addEventListener("pointerdown", beginGridEditorDrag);
-      window.addEventListener("pointermove", moveGridEditorDrag, true);
-      window.addEventListener("pointerup", endGridEditorDrag, true);
-      window.addEventListener("pointercancel", endGridEditorDrag, true);
+      runtimeLifecycle.listen(window, "pointermove", moveGridEditorDrag, true);
+      runtimeLifecycle.listen(window, "pointerup", endGridEditorDrag, true);
+      runtimeLifecycle.listen(window, "pointercancel", endGridEditorDrag, true);
       tokenPickerHeader?.addEventListener("pointerdown", beginTokenPickerDrag);
-      window.addEventListener("pointermove", moveTokenPickerDrag, true);
-      window.addEventListener("pointerup", endTokenPickerDrag, true);
-      window.addEventListener("pointercancel", endTokenPickerDrag, true);
+      runtimeLifecycle.listen(window, "pointermove", moveTokenPickerDrag, true);
+      runtimeLifecycle.listen(window, "pointerup", endTokenPickerDrag, true);
+      runtimeLifecycle.listen(window, "pointercancel", endTokenPickerDrag, true);
       tokenEditorHeader?.addEventListener("pointerdown", beginTokenEditorDrag);
-      window.addEventListener("pointermove", moveTokenEditorDrag, true);
-      window.addEventListener("pointerup", endTokenEditorDrag, true);
-      window.addEventListener("pointercancel", endTokenEditorDrag, true);
+      runtimeLifecycle.listen(window, "pointermove", moveTokenEditorDrag, true);
+      runtimeLifecycle.listen(window, "pointerup", endTokenEditorDrag, true);
+      runtimeLifecycle.listen(window, "pointercancel", endTokenEditorDrag, true);
 
       resizeObserver = new ResizeObserver(() => layoutPixiScene());
+      runtimeLifecycle.track(() => resizeObserver?.disconnect());
       resizeObserver.observe(stageShell);
-      window.addEventListener("resize", layoutPixiScene);
+      runtimeLifecycle.listen(window, "resize", layoutPixiScene);
       layoutPixiScene();
-      window.setTimeout(() => {
+      runtimeLifecycle.timeout(() => {
         void refreshVenueMapState();
         void refreshVenueGridConfig();
       }, 0);
@@ -5291,96 +4822,141 @@
     }
 
     function canSendStageAction() {
-      return !!ws && ws.readyState === WebSocket.OPEN;
+      return !!socketController?.canSendStageAction?.();
     }
 
     function scheduleSocketReconnect() {
-      if (socketReconnectTimer) return;
-      socketReconnectTimer = window.setTimeout(() => {
-        socketReconnectTimer = null;
-        socketReconnectDelay = Math.min(socketReconnectDelay * 2, 10000);
-        connectSocket();
-      }, socketReconnectDelay);
+      return socketController?.scheduleSocketReconnect?.();
     }
 
     function queuePendingSocketAction(type, extra = {}) {
-      pendingSocketActions.push({
-        type,
-        extra: { ...extra },
-      });
+      return socketController?.queuePendingSocketAction?.(type, extra);
     }
 
     function flushPendingSocketActions() {
-      if (!canSendStageAction() || pendingSocketActions.length === 0) return;
-
-      const queued = pendingSocketActions;
-      pendingSocketActions = [];
-      for (const item of queued) {
-        ws.send(JSON.stringify({
-          type: item.type,
-          session_id: currentSessionId,
-          ...item.extra,
-        }));
-      }
+      return socketController?.flushPendingSocketActions?.();
     }
 
     function sendAction(type, extra = {}) {
-      if (!canSendStageAction()) {
-        if (ws && ws.readyState === WebSocket.CONNECTING && currentSessionId) {
-          queuePendingSocketAction(type, extra);
-          return true;
-        }
-        return false;
-      }
-
-      ws.send(JSON.stringify({
-        type,
-        session_id: currentSessionId,
-        ...extra,
-      }));
-      return true;
+      return socketController?.sendAction?.(type, extra) || false;
     }
 
     function buildFocusPingPayload() {
-      const view = stageCamera?.getView?.() || {};
-      const size = getStageSize();
-      const centerWorld = stageCamera?.screenToWorld?.(size.width / 2, size.height / 2) || { x: 0, y: 0 };
-      const focusWorld = lastStagePoint || centerWorld;
-      return {
-        venue_slug: "the-cave",
-        focus_x: Math.round(Number(focusWorld.x || 0)),
-        focus_y: Math.round(Number(focusWorld.y || 0)),
-        camera_center_x: Math.round(Number(centerWorld.x || 0)),
-        camera_center_y: Math.round(Number(centerWorld.y || 0)),
-        camera_pan_x: Number(view.panX || 0),
-        camera_pan_y: Number(view.panY || 0),
-        camera_zoom_relative_to_fit: Number(view.zoomRelativeToFit || 1),
-        event_id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      };
+      return socketController?.buildFocusPingPayload?.() || null;
     }
 
     function sendPing() {
-      if (!canSendStageAction() && !(ws && ws.readyState === WebSocket.CONNECTING && currentSessionId)) {
-        return false;
-      }
-      pendingPingStartedAt = performance.now();
-      return sendAction("ping");
+      return socketController?.sendPing?.() || false;
     }
 
     function sendFocusPing() {
-      if (!canSendStageAction() && !(ws && ws.readyState === WebSocket.CONNECTING && currentSessionId)) {
-        return false;
+      return socketController?.sendFocusPing?.() || false;
+    }
+
+    async function handleSocketMessage(msg) {
+      if (!msg) return null;
+
+      if (msg.kind === "snapshot") {
+        applySnapshot(msg.snapshot || msg.message?.data || null);
+        return msg;
       }
-      if (!stageCamera) {
-        setStageStatus("Camera is not ready.");
-        return false;
+
+      if (msg.kind === "focus_ping" && msg.data) {
+        applyVenueFocusPing(msg.data);
+        return msg;
       }
-      const sent = sendAction("venue/focus_ping", buildFocusPingPayload());
-      if (sent) {
-        setStageStatus("Focused venue.");
-        setMovementLine("Focused venue.");
+
+      if (msg.kind === "action" && msg.action) {
+        const actionType = msg.action.type || "";
+        if (actionType === "chat/message") {
+          appendChatActionLine(msg.action);
+          return msg;
+        }
+        if (
+          actionType === "act/place_element" ||
+          actionType === "act/remove_element" ||
+          actionType === "act/set_element_lock" ||
+          actionType === "act/set_nameplate_visibility" ||
+          actionType === "act/reveal_element" ||
+          actionType === "act/hide_element" ||
+          actionType === "create/index_card" ||
+          actionType === "create/token" ||
+          actionType === "update/token" ||
+          actionType === "update/index_card" ||
+          actionType === "delete/index_card"
+        ) {
+          await refreshWorld();
+          if (actionType === "create/index_card") {
+            placeCreatedIndexCard(msg.action);
+          }
+          if (actionType === "create/token") {
+            setMovementLine("create/token accepted by the live action stream.");
+          }
+          if (actionType === "update/token") {
+            setMovementLine("update/token accepted by the live action stream.");
+          }
+          if (actionType === "create/token" || actionType === "update/token") {
+            const targetId = String(msg.action?.target?.element_id || msg.action?.payload?.element_id || "").trim();
+            const targetSlug = String(msg.action?.target?.element_slug || msg.action?.payload?.element_slug || "").trim();
+            const refreshedToken = currentObjects.find((item) =>
+              item &&
+              item.live &&
+              isTokenObject(item) &&
+              (
+                (targetId && item.elementId === targetId) ||
+                (targetSlug && item.elementSlug === targetSlug)
+              )
+            ) || null;
+            if (refreshedToken) {
+              selectObject(refreshedToken, actionType === "create/token" ? "Token created." : "Token updated.");
+            }
+          }
+          if (actionType === "act/place_element") {
+            setMovementLine("act/place_element accepted by the live action stream.");
+          }
+          if (actionType === "act/remove_element") {
+            setMovementLine("act/remove_element accepted by the live action stream.");
+          }
+          if (actionType === "act/set_element_lock") {
+            setMovementLine("act/set_element_lock accepted by the live action stream.");
+          }
+          if (actionType === "act/set_nameplate_visibility") {
+            setMovementLine("act/set_nameplate_visibility accepted by the live action stream.");
+          }
+          if (actionType === "act/hide_element") {
+            setMovementLine("act/hide_element accepted by the live action stream.");
+          }
+          if (actionType === "act/reveal_element") {
+            setMovementLine("act/reveal_element accepted by the live action stream.");
+          }
+          return msg;
+        }
       }
-      return sent;
+
+      if (msg.kind === "showing_update") {
+        await refreshWorld();
+        updateChatPresentation();
+        return msg;
+      }
+
+      if (msg.kind === "error") {
+        const errorText = String(msg.error || "action_denied");
+        setStageStatus(`Action denied: ${errorText}`);
+        setMovementLine(`Denied: ${errorText}`);
+        if (errorText === "showing_closed") {
+          appendSystemChatNotice(chatClosedMessage());
+          if (chatInput) {
+            chatInput.value = "";
+          }
+        } else if (errorText && errorText !== "chat/message") {
+          appendSystemChatNotice(`Action denied: ${errorText}`);
+        }
+        pendingStageCardPlacement = null;
+        stagePlacementCandidate = null;
+        return msg;
+      }
+
+      return msg;
     }
 
     function applyVenueFocusPing(data) {
@@ -5413,6 +4989,7 @@
     }
 
     function applySnapshot(snapshot) {
+      projectedState?.replaceFromSnapshot?.(snapshot, { viewerRole: currentRole });
       currentSnapshot = snapshot || null;
       const elements = Array.isArray(snapshot?.elements) ? snapshot.elements : [];
       const overlay = snapshot?.overlay || null;
@@ -5571,157 +5148,14 @@
     }
 
     function connectSocket() {
-      if (socketReconnectTimer) {
-        window.clearTimeout(socketReconnectTimer);
-        socketReconnectTimer = null;
-      }
-      const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${protocol}//${location.host}/ws/the-cave`);
-
-      ws.addEventListener("open", () => {
-        socketReconnectDelay = 1000;
-        setStageStatus("Connected to the Cave WebSocket.");
-        updateShellMetaPresentation();
-        flushPendingSocketActions();
-      });
-
-      ws.addEventListener("close", () => {
-        setStageStatus("WebSocket closed.");
-        setMovementLine("Socket closed");
-        updateShellMetaPresentation();
-        pendingSocketActions = [];
-        scheduleSocketReconnect();
-      });
-
-      ws.addEventListener("error", () => {
-        setStageStatus("WebSocket error.");
-        updateShellMetaPresentation();
-        scheduleSocketReconnect();
-      });
-
-      ws.addEventListener("message", async (event) => {
-        let msg;
-        try {
-          msg = JSON.parse(event.data);
-        } catch (error) {
-          return;
-        }
-
-        if (msg.type === "snapshot" && msg.data) {
-          applySnapshot(msg.data);
-          return;
-        }
-
-        if (msg.type === "pong") {
-          if (pendingPingStartedAt !== null) {
-            lastPingMs = Math.max(0, Math.round(performance.now() - Number(pendingPingStartedAt)));
-            pendingPingStartedAt = null;
-            updateShellMetaPresentation();
-          }
-          return;
-        }
-
-        if (msg.type === "venue/focus_ping" && msg.data) {
-          applyVenueFocusPing(msg.data);
-          return;
-        }
-
-        if (msg.type === "action" && msg.data) {
-          const actionType = msg.data.type || "";
-          if (actionType === "chat/message") {
-            appendChatActionLine(msg.data);
-            return;
-          }
-          if (
-            actionType === "act/place_element" ||
-            actionType === "act/remove_element" ||
-            actionType === "act/set_element_lock" ||
-            actionType === "act/set_nameplate_visibility" ||
-            actionType === "act/reveal_element" ||
-            actionType === "act/hide_element" ||
-            actionType === "create/index_card" ||
-            actionType === "create/token" ||
-            actionType === "update/token" ||
-            actionType === "update/index_card" ||
-            actionType === "delete/index_card"
-          ) {
-            await refreshWorld();
-            if (actionType === "create/index_card") {
-              placeCreatedIndexCard(msg.data);
-            }
-            if (actionType === "create/token") {
-              setMovementLine("create/token accepted by the live action stream.");
-            }
-            if (actionType === "update/token") {
-              setMovementLine("update/token accepted by the live action stream.");
-            }
-            if (actionType === "create/token" || actionType === "update/token") {
-              const targetId = String(msg.data?.target?.element_id || msg.data?.payload?.element_id || "").trim();
-              const targetSlug = String(msg.data?.target?.element_slug || msg.data?.payload?.element_slug || "").trim();
-              const refreshedToken = currentObjects.find((item) =>
-                item &&
-                item.live &&
-                isTokenObject(item) &&
-                (
-                  (targetId && item.elementId === targetId) ||
-                  (targetSlug && item.elementSlug === targetSlug)
-                )
-              ) || null;
-              if (refreshedToken) {
-                selectObject(refreshedToken, actionType === "create/token" ? "Token created." : "Token updated.");
-              }
-            }
-            if (actionType === "act/place_element") {
-              setMovementLine("act/place_element accepted by the live action stream.");
-            }
-            if (actionType === "act/remove_element") {
-              setMovementLine("act/remove_element accepted by the live action stream.");
-            }
-            if (actionType === "act/set_element_lock") {
-              setMovementLine("act/set_element_lock accepted by the live action stream.");
-            }
-            if (actionType === "act/set_nameplate_visibility") {
-              setMovementLine("act/set_nameplate_visibility accepted by the live action stream.");
-            }
-            if (actionType === "act/hide_element") {
-              setMovementLine("act/hide_element accepted by the live action stream.");
-            }
-            if (actionType === "act/reveal_element") {
-              setMovementLine("act/reveal_element accepted by the live action stream.");
-            }
-            return;
-          }
-        }
-
-        if (msg.type === "showing/update") {
-          await refreshWorld();
-          updateChatPresentation();
-          return;
-        }
-
-        if (msg.type === "error") {
-          const errorText = String(msg.error || "action_denied");
-          setStageStatus(`Action denied: ${errorText}`);
-          setMovementLine(`Denied: ${errorText}`);
-          if (errorText === "showing_closed") {
-            appendSystemChatNotice(chatClosedMessage());
-            if (chatInput) {
-              chatInput.value = "";
-            }
-          } else if (errorText && errorText !== "chat/message") {
-            appendSystemChatNotice(`Action denied: ${errorText}`);
-          }
-          pendingStageCardPlacement = null;
-          stagePlacementCandidate = null;
-        }
-      });
+      return socketController?.connectSocket?.() || null;
     }
 
     async function bootstrapFirstTheater() {
       try {
         initializeShellChrome(null);
         headerHoverOpen = true;
-        chatHoverOpen = true;
+        chatHoverOpen = false;
         drawerHoverOpen = { left: true, right: true };
         if (stageStatus) {
           stageStatus.hidden = false;
@@ -5755,6 +5189,8 @@
       refreshWorld,
       loadPixiLibrary,
     };
+    runtimeLifecycle.listen(window, "beforeunload", () => runtimeLifecycle.dispose());
+    window.VictoryFirstTheaterCleanup = () => runtimeLifecycle.dispose();
 
     async function startFirstTheaterRuntime() {
       try {
@@ -6296,6 +5732,10 @@
     });
 
     document.addEventListener("click", (event) => {
+      if (suppressStageContextMenu) {
+        suppressStageContextMenu = false;
+        return;
+      }
       if (contextMenu && !contextMenu.hidden && !contextMenu.contains(event.target)) {
         closeContextMenu();
       }
@@ -6395,8 +5835,36 @@
       openContextMenu(event, stageContextMenuModel());
     });
 
+    runtimeLifecycle.listen(document, "contextmenu", (event) => {
+      const target = event.target;
+      const composedPath = typeof event.composedPath === "function" ? event.composedPath() : [];
+      const isStageEvent = target === stageHost || target === stageShell || stageShell?.contains?.(target) || stageHost?.contains?.(target) || composedPath.includes(stageHost) || composedPath.includes(stageShell) || composedPath.includes(pixiApp?.view);
+      if (!isStageEvent) return;
+      handleNativeStageContextMenu(event);
+    }, true);
+
+    runtimeLifecycle.listen(document, "pointerdown", (event) => {
+      if (!isSecondaryPointerEvent(event)) return;
+      const target = event.target;
+      const composedPath = typeof event.composedPath === "function" ? event.composedPath() : [];
+      const isStageEvent = target === stageHost || target === stageShell || stageShell?.contains?.(target) || stageHost?.contains?.(target) || composedPath.includes(stageHost) || composedPath.includes(stageShell) || composedPath.includes(pixiApp?.view);
+      if (!isStageEvent) return;
+      handleNativeStageContextMenu(event);
+    }, true);
+
+    runtimeLifecycle.listen(document, "mousedown", (event) => {
+      if (!isSecondaryPointerEvent(event)) return;
+      const target = event.target;
+      const composedPath = typeof event.composedPath === "function" ? event.composedPath() : [];
+      const isStageEvent = target === stageHost || target === stageShell || stageShell?.contains?.(target) || stageHost?.contains?.(target) || composedPath.includes(stageHost) || composedPath.includes(stageShell) || composedPath.includes(pixiApp?.view);
+      if (!isStageEvent) return;
+      handleNativeStageContextMenu(event);
+    }, true);
+
     stageShell?.addEventListener("contextmenu", handleNativeStageContextMenu, true);
+    stageShell?.addEventListener("mousedown", handleNativeStageContextMenu, true);
     stageHost?.addEventListener("contextmenu", handleNativeStageContextMenu, true);
+    stageHost?.addEventListener("mousedown", handleNativeStageContextMenu, true);
 
     smokeToggleGridButton?.addEventListener("click", () => {
       smokeGridEnabled = !smokeGridEnabled;

@@ -1,14 +1,14 @@
 # Victory Current State
 
 ## Purpose
-This document is the current-state canon for Victory as of Kernel 50.
+This document is the current-state canon for Victory as of Kernel 51A.
 
 Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful as history, but this file is the current source of truth when they disagree.
 
 ## Kernel State
-- Current kernel label: **Kernel 50**
-- Current kernel purpose: **Warehouse Token Placement + Grid Snapping v1**
-- Product state: **Kernel 50 is complete**
+- Current kernel label: **Kernel 51A**
+- Current kernel purpose: **Projected State, WebSocket Dispatcher, Cabin Diagnostics, and Capacity Guardrails**
+- Product state: **Kernel 51A is complete; the broader Kernel 51 runtime decomposition remains incomplete**
 - Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
 
 ## Current Stack
@@ -17,6 +17,9 @@ Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful 
 - Shared Pixi helper: `frontend/lib/victory-pixi-stage.js`
 - Shared Pixi grid helper: `frontend/lib/victory-pixi-grid.js`
 - Shared First Theater camera helper: `frontend/lib/victory-stage-camera.js`
+- First Theater runtime modules:
+  - `frontend/venues/first-theater/runtime/state.js`
+  - `frontend/venues/first-theater/runtime/socket.js`
 - Backend: Go `1.25` in `/opt/victory/backend`
 - Reverse proxy/static serving: Caddy. Repo config lives at `/opt/victory/Caddyfile`; the current live shared Caddy container mounts `/opt/bread-exchange/Caddyfile` and serves Victory from `/opt/victory/frontend`.
 - Database: PostgreSQL `16-alpine`
@@ -150,6 +153,7 @@ The First Theater map editor now activates existing map assets directly from the
 Workshop token preparation now lives in The Cave's `mode=workshop` surface, with circle/square/hex/raw previews, token uploads, and installation-wide warehouse storage policy wired to the Producer's Office.
 First Theater now consumes reusable Warehouse token assets through an `Add Token` picker, and placed tokens persist through refresh with grid-aware sizing and snap/free placement.
 Warehouse asset reads still resolve deleted or missing assets to the construction fallback image instead of leaving placements blank.
+First Theater's runtime has been partially decomposed into a projected state module and a single WebSocket dispatcher module, Grant's Cabin now exposes operator-access guidance plus both warehouse policy and filesystem diagnostics, and the installation hard limit now defaults to 8 GB with an 8 GB physical reserve check on uploads.
 Director focus/broadcast and touch controls remain deferred.
 
 WebSocket:

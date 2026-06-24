@@ -128,7 +128,7 @@ func loadDiscordServerBootstrapSummary(ctx context.Context, pool *pgxpool.Pool, 
 		if strings.TrimSpace(row.ApplicationID) != "" {
 			cfg.ApplicationID = row.ApplicationID
 		}
-		if strings.TrimSpace(row.BotToken) != "" {
+		if strings.TrimSpace(cfg.BotToken) == "" && strings.TrimSpace(row.BotToken) != "" {
 			cfg.BotToken = row.BotToken
 		}
 		if strings.TrimSpace(row.RedirectURL) != "" {
@@ -164,7 +164,7 @@ func resolveDiscordServerLinkRuntimeConfig(ctx context.Context, pool *pgxpool.Po
 	if strings.TrimSpace(row.ApplicationID) != "" {
 		cfg.ApplicationID = row.ApplicationID
 	}
-	if strings.TrimSpace(row.BotToken) != "" {
+	if strings.TrimSpace(cfg.BotToken) == "" && strings.TrimSpace(row.BotToken) != "" {
 		cfg.BotToken = row.BotToken
 	}
 	if strings.TrimSpace(row.RedirectURL) != "" {
