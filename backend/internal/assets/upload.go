@@ -521,6 +521,9 @@ func handleWorkshopAssetList(w http.ResponseWriter, r *http.Request, pool *pgxpo
 				item.ContextClass = item.ElementType
 			}
 		}
+		if strings.TrimSpace(item.ThumbnailURL) == "" {
+			item.ThumbnailURL = "/api/assets/" + item.ElementID + "/content?variant=thumbnail"
+		}
 		assets = append(assets, item)
 	}
 	if err := rows.Err(); err != nil {

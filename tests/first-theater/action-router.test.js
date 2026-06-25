@@ -49,6 +49,10 @@ function makeDeps(overrides = {}) {
       calls.push(["send", type, payload]);
       return true;
     },
+    syncCurrentObjectsFromProjectedState: () => {
+      calls.push(["sync-current"]);
+      return true;
+    },
     removeLocalObject: (model) => calls.push(["remove-local", model?.label || null]),
     setPlacementState: () => {},
     getStagePoint: () => ({ x: 100, y: 200 }),
@@ -126,6 +130,37 @@ test("performStageObjectAction routes token move-here and nameplate visibility",
   ]);
   assert.equal(token.state.nameplate_visible, false);
   assert.equal(token.state.nameplateVisible, false);
+
+  calls.length = 0;
+  router.performStageObjectAction("hide", token);
+  assert.deepEqual(calls.find((entry) => entry[0] === "send"), [
+    "send",
+    "act/hide_element",
+    {
+      element_id: "asset-1",
+      element_slug: "goat",
+      layer: "audience",
+    },
+  ]);
+  assert.equal(token.visibility.visible, false);
+});
+
+test("performStageObjectAction routes token scale to the token editor", () => {
+  const { deps, calls } = makeDeps();
+  const router = actionRouterModule.createActionRouter(deps);
+  const token = {
+    kind: "token",
+    live: true,
+    label: "Goat",
+    elementId: "asset-1",
+    elementSlug: "goat",
+    state: {},
+    source: { data: {} },
+  };
+
+  router.performStageObjectAction("scale", token);
+  assert.ok(calls.some((entry) => entry[0] === "token-editor" && entry[1] === token));
+  assert.ok(calls.some((entry) => entry[0] === "close"));
 });
 
 test("performStageObjectAction routes card move-here and remove", () => {
@@ -165,6 +200,8 @@ test("performStageObjectAction routes card move-here and remove", () => {
     },
   ]);
   assert.ok(calls.some((entry) => entry[0] === "remove-local"));
+  assert.ok(calls.some((entry) => entry[0] === "select" && entry[1] === null));
+  assert.ok(calls.some((entry) => entry[0] === "sync-current"));
 });
 
 test("resolveContextMenuTargetFromClient and openContextMenu use injected stage helpers", () => {

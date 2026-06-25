@@ -22,11 +22,16 @@
     const lastStagePoint = deps.lastStagePoint || (() => null);
     const stagePlacementCandidate = deps.stagePlacementCandidate || (() => null);
     const stagePlacementScreenCandidate = deps.stagePlacementScreenCandidate || (() => null);
+    const defaultPlacementPoint = deps.defaultPlacementPoint || (() => null);
     const setPlacementState = deps.setPlacementState;
     const openEditor = deps.openEditor;
     const closeEditor = deps.closeEditor;
     const setEditorStatus = deps.setEditorStatus;
     const getEditorState = deps.getEditorState;
+    const getTokenEditorTargetKey = typeof deps.getTokenEditorTargetKey === "function" ? deps.getTokenEditorTargetKey : () => "";
+    const setTokenEditorTargetKey = typeof deps.setTokenEditorTargetKey === "function" ? deps.setTokenEditorTargetKey : () => {};
+    const getTokenEditorDirty = typeof deps.getTokenEditorDirty === "function" ? deps.getTokenEditorDirty : () => false;
+    const setTokenEditorDirty = typeof deps.setTokenEditorDirty === "function" ? deps.setTokenEditorDirty : () => {};
     const getTokenAssets = deps.getTokenAssets;
     const setTokenAssets = deps.setTokenAssets;
     const getTokenPickerElements = deps.getTokenPickerElements;
@@ -108,15 +113,41 @@
           state.selectedAssetID = assetID;
           state.search = String(elements.search?.value || state.search || "");
           renderTokenPickerList();
-          const target = { ...asset, id: assetID, asset_id: assetID, name: assetName, shape: assetShape, thumbnail_url: thumbURL, content_url: String(asset.content_url || asset.contentURL || "") };
-          if (state.mode === "replace" && state.replaceTargetKey) {
-            placeTokenAsset(target, state.placementPoint, state.replaceTargetKey, true);
-          } else {
-            placeTokenAsset(target, state.placementPoint, "", false);
+          if (state.mode !== "replace") {
+            const assetToPlace = selectedTokenAsset();
+            if (assetToPlace) {
+              placeTokenAsset(assetToPlace, state.placementPoint, "", false);
+            }
+            return;
+          }
+          if (elements.status) {
+            elements.status.textContent = state.mode === "replace"
+              ? `Selected ${assetName}. Click Replace Token to apply.`
+              : `Selected ${assetName}. Click Add Token to place it.`;
           }
         });
         elements.list.appendChild(button);
       });
+    }
+
+    function selectedTokenAsset() {
+      const assets = getTokenAssets();
+      const selectedAssetID = String(state.selectedAssetID || "").trim();
+      if (!selectedAssetID) return null;
+      const asset = assets.find((item) => String(item.id || item.asset_id || "").trim() === selectedAssetID) || null;
+      if (!asset) return null;
+      const assetName = String(asset.name || asset.asset_name || asset.original_filename || selectedAssetID || "Token asset");
+      const assetShape = String(asset.shape || asset.asset_shape || "circle");
+      const thumbURL = String(asset.thumbnail_url || asset.thumbnailURL || asset.content_url || asset.contentURL || "");
+      return {
+        ...asset,
+        id: selectedAssetID,
+        asset_id: selectedAssetID,
+        name: assetName,
+        shape: assetShape,
+        thumbnail_url: thumbURL,
+        content_url: String(asset.content_url || asset.contentURL || ""),
+      };
     }
 
     async function refreshWarehouseTokenAssets() {
@@ -165,7 +196,11 @@
       state.selectedAssetID = "";
       state.filterShape = "all";
       state.search = "";
-      state.placementPoint = stagePlacementCandidate() ? { ...stagePlacementCandidate() } : (lastStagePoint() ? { ...lastStagePoint() } : null);
+      state.placementPoint = stagePlacementCandidate()
+        ? { ...stagePlacementCandidate() }
+        : (lastStagePoint()
+          ? { ...lastStagePoint() }
+          : (defaultPlacementPoint() ? { ...defaultPlacementPoint() } : null));
       state.placementScreenPoint = stagePlacementScreenCandidate() ? { ...stagePlacementScreenCandidate() } : null;
       state.replaceTargetKey = objectModel?.key || "";
       state.replaceTargetElementID = objectModel?.elementId || "";
@@ -180,6 +215,7 @@
       if (elements.search) elements.search.value = "";
       if (elements.shape) elements.shape.value = "all";
       if (elements.status) elements.status.textContent = "Choose an active Warehouse token asset.";
+      if (elements.apply) elements.apply.textContent = state.mode === "replace" ? "Replace Token" : "Add Token";
       void refreshWarehouseTokenAssetsFn();
       elements.search?.focus?.({ preventScroll: true });
     }
@@ -200,13 +236,36 @@
       if (elements.status) elements.status.textContent = "Choose a reusable Warehouse token.";
     }
 
+    function applySelectedTokenAsset() {
+      const asset = selectedTokenAsset();
+      if (!asset) {
+        setStageStatus("Select a token asset first.");
+        const elements = getTokenPickerElements();
+        if (elements.status) {
+          elements.status.textContent = state.mode === "replace"
+            ? "Select a token asset, then click Replace Token."
+            : "Select a token asset, then click Add Token.";
+        }
+        return;
+      }
+      if (state.mode === "replace" && state.replaceTargetKey) {
+        placeTokenAsset(asset, state.placementPoint, state.replaceTargetKey, true);
+        return;
+      }
+      placeTokenAsset(asset, state.placementPoint, "", false);
+    }
+
     function placeTokenAsset(asset, point, replaceTargetKey = "", replacing = false) {
       if (!asset) return;
-      const placementPoint = point || state.placementPoint || lastStagePoint() || null;
+      const livePlacementPoint = stagePlacementCandidate() ? { ...stagePlacementCandidate() } : null;
+      const fallbackPlacementPoint = defaultPlacementPoint() ? { ...defaultPlacementPoint() } : null;
+      const placementPoint = livePlacementPoint || point || state.placementPoint || lastStagePoint() || fallbackPlacementPoint || null;
       if (!placementPoint) {
         setStageStatus("No stage placement point available.");
         return;
       }
+      state.placementPoint = placementPoint;
+      state.placementScreenPoint = stagePlacementScreenCandidate() ? { ...stagePlacementScreenCandidate() } : state.placementScreenPoint;
       const gridConfig = currentGridConfig();
       const snapMode = gridConfig && gridConfig.grid_type !== "none" ? "grid" : "free";
       const snapped = tokenPlacementPointForCreate(placementPoint, { source: { data: { snap_mode: snapMode } } }, snapMode);
@@ -239,12 +298,12 @@
       if (!elements.panel || elements.panel.hidden) return;
       const target = elements.currentSelection && deps.isTokenObject(elements.currentSelection)
         ? elements.currentSelection
-        : deps.currentObjects().find((item) => item.key === elements.tokenEditorTargetKey) || null;
+        : deps.currentObjects().find((item) => item.key === getTokenEditorTargetKey()) || null;
       if (!target || !target.live || !deps.isTokenObject(target)) {
         hideTokenEditor();
         return;
       }
-      if (elements.tokenEditorDirty) return;
+      if (getTokenEditorDirty()) return;
       if (elements.scale) elements.scale.value = String(Math.round(tokenScaleForModel(target)));
       if (elements.scaleValue) elements.scaleValue.value = String(Math.round(tokenScaleForModel(target)));
       if (elements.snap) elements.snap.value = tokenSnapModeForModel(target);
@@ -267,8 +326,8 @@
       closeEditor("grid");
       closeEditor("card");
       closeTokenPicker();
-      elements.tokenEditorTargetKey = target.key;
-      elements.tokenEditorDirty = false;
+      setTokenEditorTargetKey(target.key);
+      setTokenEditorDirty(false);
       if (elements.panel.hidden) {
         elements.setPosition?.(16, 220);
       }
@@ -279,15 +338,15 @@
 
     function hideTokenEditor() {
       const elements = getEditorState();
-      elements.tokenEditorDirty = false;
-      elements.tokenEditorTargetKey = "";
+      setTokenEditorDirty(false);
+      setTokenEditorTargetKey("");
       if (elements.panel) elements.panel.hidden = true;
       if (elements.status) elements.status.textContent = "Adjust the selected token's placement scale.";
     }
 
     function saveTokenEditor() {
       const elements = getEditorState();
-      const target = deps.currentObjects().find((item) => item.key === elements.tokenEditorTargetKey) || elements.currentSelection;
+      const target = deps.currentObjects().find((item) => item.key === getTokenEditorTargetKey()) || elements.currentSelection;
       if (!target || !target.live || !deps.isTokenObject(target)) {
         setStageStatus("Select a live token to save edits.");
         return;
@@ -318,7 +377,7 @@
         model.gridRelative = snapMode === "grid";
         model.tokenLayer = tokenLayer;
       });
-      elements.tokenEditorDirty = false;
+      setTokenEditorDirty(false);
       setStageStatus(`Saved ${target.label}.`);
       if (elements.status) elements.status.textContent = `${target.label} save sent.`;
       setMovementLine(`update/token sent for ${target.label}.`);
@@ -332,6 +391,7 @@
       refreshWarehouseTokenAssets,
       openTokenPicker,
       closeTokenPicker,
+      applySelectedTokenAsset,
       placeTokenAsset,
       syncTokenEditorWithSelection,
       openTokenEditor,

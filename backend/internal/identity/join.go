@@ -147,7 +147,16 @@ func resolveJoiningUser(ctx context.Context, pool *pgxpool.Pool, req JoinRequest
 }
 
 func resolveRoleForUser(ctx context.Context, pool *pgxpool.Pool, userID string) (string, error) {
-	return access.CurrentLocationRole(ctx, pool, userID)
+	role, err := access.CurrentLocationRole(ctx, pool, userID)
+	if err != nil {
+		return "", err
+	}
+	if strings.EqualFold(strings.TrimSpace(role), "audience") {
+		if ok, opErr := access.IsOperatorUser(ctx, pool, userID); opErr == nil && ok {
+			return "producer", nil
+		}
+	}
+	return role, nil
 }
 
 func normalizeHandle(in string) string {

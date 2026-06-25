@@ -5,6 +5,10 @@
   root.VictoryFirstTheaterActionRouter = factory();
 })(typeof globalThis !== "undefined" ? globalThis : window, function () {
   function createActionRouter(deps) {
+    const syncCurrentObjectsFromProjectedState = typeof deps.syncCurrentObjectsFromProjectedState === "function"
+      ? deps.syncCurrentObjectsFromProjectedState
+      : () => false;
+
     function performStageObjectAction(action, objectModel) {
       if (!objectModel || !action) return;
       const state = deps.objectState(objectModel);
@@ -17,7 +21,26 @@
         return;
       }
 
+      if (action === "clear") {
+        deps.selectObject(null, "Selection cleared.");
+        deps.closeContextMenu();
+        return;
+      }
+
+      if (action === "info" || action === "inspect") {
+        if (deps.isTokenObject(objectModel) && typeof deps.openTokenEditor === "function") {
+          deps.openTokenEditor(objectModel);
+        } else if (kind === "card" && typeof deps.openCardEditor === "function") {
+          deps.openCardEditor(objectModel);
+        } else {
+          deps.selectObject(objectModel, `${objectModel.label} selected.`);
+        }
+        deps.closeContextMenu();
+        return;
+      }
+
       if (action === "replace-asset" && deps.isTokenObject(objectModel)) {
+        deps.selectObject(null, "Selection cleared.");
         deps.openTokenPicker("replace", objectModel);
         deps.closeContextMenu();
         return;
@@ -142,6 +165,7 @@
       }
 
       if (action === "add-token") {
+        deps.selectObject(null, "Selection cleared.");
         deps.openTokenPicker("create", null);
         deps.closeContextMenu();
         return;
@@ -149,6 +173,114 @@
 
       if (action === "scale" && deps.isTokenObject(objectModel)) {
         deps.openTokenEditor(objectModel);
+        deps.closeContextMenu();
+        return;
+      }
+
+      if (action === "hide" || action === "show") {
+        const visible = action === "show";
+        const type = visible ? "act/reveal_element" : "act/hide_element";
+        const sent = deps.sendAction(type, {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+          layer: "audience",
+        });
+        if (sent) {
+          deps.updateLocalObjectModel(objectModel, (model) => {
+            model.state = { ...(model.state || {}), visible };
+            model.visibility = { ...(model.visibility || {}), visible };
+          });
+        }
+        deps.setStageStatus(sent ? `${visible ? "Showing" : "Hiding"} ${objectModel.label} for the audience...` : "Socket unavailable.");
+        deps.closeContextMenu();
+        return;
+      }
+
+      if (action === "edit" && kind === "card" && typeof deps.openCardEditor === "function") {
+        deps.openCardEditor(objectModel);
+        deps.closeContextMenu();
+        return;
+      }
+
+      if (action === "flip" && kind === "card") {
+        const nextFace = deps.cardFaceForModel(objectModel) === "back" ? "front" : "back";
+        const sent = deps.sendAction("update/index_card", {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+          front_text: objectModel.frontText || "",
+          back_text: objectModel.backText || "",
+          color: objectModel.color || "#d9c7a6",
+          face: nextFace,
+        });
+        if (sent) {
+          deps.updateLocalObjectModel(objectModel, (model) => {
+            model.cardFace = nextFace;
+            model.source.data = { ...(model.source.data || {}), face: nextFace };
+          });
+        }
+        deps.setStageStatus(sent ? `${objectModel.label} flipped.` : "Socket unavailable.");
+        deps.closeContextMenu();
+        return;
+      }
+
+      if (action === "pin" && kind === "card") {
+        const sent = deps.sendAction("update/index_card", {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+          front_text: objectModel.frontText || "",
+          back_text: objectModel.backText || "",
+          color: objectModel.color || "#d9c7a6",
+          pin_mode: "world",
+          world_x: Number(objectModel.position?.world_x ?? objectModel.position?.x ?? 0),
+          world_y: Number(objectModel.position?.world_y ?? objectModel.position?.y ?? 0),
+          screen_x: Number(objectModel.position?.screen_x ?? 0),
+          screen_y: Number(objectModel.position?.screen_y ?? 0),
+        });
+        if (sent) {
+          deps.updateLocalCardPinModel(objectModel, (model) => {
+            model.source.data = { ...(model.source.data || {}), pin_mode: "world" };
+          });
+        }
+        deps.setStageStatus(sent ? `${objectModel.label} attached to map.` : "Socket unavailable.");
+        deps.closeContextMenu();
+        return;
+      }
+
+      if (action === "unpin" && kind === "card") {
+        const sent = deps.sendAction("update/index_card", {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+          front_text: objectModel.frontText || "",
+          back_text: objectModel.backText || "",
+          color: objectModel.color || "#d9c7a6",
+          pin_mode: "overlay",
+          screen_x: Number(objectModel.position?.screen_x ?? 0),
+          screen_y: Number(objectModel.position?.screen_y ?? 0),
+        });
+        if (sent) {
+          deps.updateLocalCardPinModel(objectModel, (model) => {
+            model.source.data = { ...(model.source.data || {}), pin_mode: "overlay" };
+          });
+        }
+        deps.setStageStatus(sent ? `${objectModel.label} detached from the map.` : "Socket unavailable.");
+        deps.closeContextMenu();
+        return;
+      }
+
+      if (action === "lock" || action === "unlock") {
+        const locked = action === "lock";
+        const sent = deps.sendAction("act/set_element_lock", {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+          locked,
+        });
+        if (sent) {
+          deps.updateLocalObjectModel(objectModel, (model) => {
+            model.state = { ...(model.state || {}), locked };
+            model.visibility = { ...(model.visibility || {}), locked };
+          });
+        }
+        deps.setStageStatus(sent ? `${objectModel.label} ${locked ? "locked" : "unlocked"}.` : "Socket unavailable.");
         deps.closeContextMenu();
         return;
       }
@@ -237,6 +369,13 @@
         });
         if (sent) {
           deps.removeLocalObject(objectModel);
+          deps.selectObject(null, "Selection cleared.");
+          deps.renderPixiScene?.();
+          deps.syncSelectedActions?.();
+          deps.syncTokenEditorWithSelection?.();
+          if (!syncCurrentObjectsFromProjectedState()) {
+            deps.refreshWorld?.();
+          }
         }
         deps.setStageStatus(sent ? `Removing ${objectModel.label} from the stage...` : "Socket unavailable.");
         deps.closeContextMenu();

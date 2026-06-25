@@ -419,6 +419,21 @@
         emit([existing.kind, key, "objects"], { changedKey: key, kind: existing.kind, object: existing, event: options.event || null });
         return existing;
       }
+      if (type === "act/hide_element" || type === "hide_element" || type === "act/reveal_element" || type === "reveal_element") {
+        const existing = key ? state.objectsByKey.get(key) : null;
+        if (!existing || existing.deleted) return null;
+        if (Number(existing.revision || 0) > sequence) return null;
+        const visible = type === "act/reveal_element" || type === "reveal_element";
+        existing.state = mergeState(existing.state, { visible });
+        existing.visibility = mergeVisibility(existing.visibility, { visible });
+        existing.source.state = mergeState(existing.source.state, existing.state);
+        existing.source.visibility = mergeVisibility(existing.source.visibility, existing.visibility);
+        existing.revision = sequence;
+        state.version += 1;
+        state.lastEvent = options.event || null;
+        emit([existing.kind, key, "objects"], { changedKey: key, kind: existing.kind, object: existing, event: options.event || null });
+        return existing;
+      }
       return null;
     }
 

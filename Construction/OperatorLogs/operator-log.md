@@ -11,6 +11,103 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-06-25 — Kernel 51B bootstrap-shell cleanup
+
+### Frontend
+- Reduced the remaining First Theater runtime shell by removing the large runtime-local fallback bodies for context-menu targeting, pointer-event normalization, menu open/resolve flow, and stage-object action execution.
+- Kept those behaviors owned by the extracted modules instead of maintaining a second inline implementation in `frontend/venues/first-theater/runtime.js`:
+  - `frontend/venues/first-theater/runtime/context.js`
+  - `frontend/venues/first-theater/runtime/action-router.js`
+- Kept `runtime.js` focused more narrowly on module binding, dependency construction, shell/bootstrap flow, and listener composition.
+
+### Tests
+- Re-verified syntax:
+  - `node --check frontend/venues/first-theater/runtime.js`
+  - `node --check frontend/venues/first-theater/runtime/action-router.js`
+  - `node --check frontend/venues/first-theater/runtime/context.js`
+- Re-ran focused First Theater regression coverage:
+  - `tests/first-theater/action-router.test.js`
+  - `tests/first-theater/context.test.js`
+  - `tests/first-theater/editors.test.js`
+  - `tests/first-theater/session-sync.test.js`
+  - `tests/first-theater/state.test.js`
+  - `tests/first-theater/token-ui.test.js`
+
+### Notes
+- `frontend/venues/first-theater/runtime.js` is now 4,315 lines.
+- This was intentionally a bounded cleanup pass, not another broad runtime redesign.
+- No new runtime modules were added in 51B.
+- Manual live browser regression is still required for:
+  - map
+  - grid
+  - camera
+  - cards
+  - tokens
+  - context menus
+  - Shift+Ping
+  - chat
+  - House Mic
+  - Discord Audio
+
+## 2026-06-24 — Kernel 51 Session Sync and Stage Placement Cutover
+
+### Frontend
+- Added `frontend/venues/first-theater/runtime/session-sync.js` to own the live join, refresh, snapshot, focus-ping, and staged index-card orchestration.
+- Moved the First Theater staged index-card creation/placement flow onto the session-sync controller instead of keeping it inline in `runtime.js`.
+- Kept `runtime.js` as the composition root while delegating the join/refresh/snapshot wiring through the new controller.
+
+### Tests
+- Added `tests/first-theater/session-sync.test.js`.
+- Re-ran the full First Theater Node suite:
+  - `tests/first-theater/*.test.js`
+- Verified syntax and diff hygiene:
+  - `node --check frontend/venues/first-theater/runtime/session-sync.js`
+  - `node --check frontend/venues/first-theater/runtime.js`
+  - `git diff --check`
+
+### Notes
+- `frontend/venues/first-theater/runtime.js` is now 4,863 lines.
+- The next remaining seam is the final bootstrap-shell cleanup around the start path and listener composition.
+- The runtime decomposition remains incremental, but the live orchestration surface is now slimmer and covered by an additional test file.
+
+## 2026-06-24 — First Theater Boot Fix
+
+### Frontend
+- Fixed the missing `window.VictoryFirstTheaterSessionSync` module binding in `frontend/venues/first-theater/runtime.js`.
+- That binding bug was preventing the First Theater shell, Pixi stage, and DOM fallback from loading at startup.
+
+### Tests
+- Re-ran the First Theater Node suite after the fix:
+  - `tests/first-theater/*.test.js`
+- Rechecked syntax:
+  - `node --check frontend/venues/first-theater/runtime.js`
+  - `node --check frontend/venues/first-theater/runtime/session-sync.js`
+
+### Notes
+- The theater startup blocker is resolved.
+- The remaining bootstrap-shell cleanup is now a refactor tidy-up, not a startup failure.
+
+## 2026-06-24 — Kernel 51 First Theater Editor Cutover Completion
+
+### Frontend
+- Completed the editor-shell extraction for First Theater by moving the remaining map and grid editor helpers into `frontend/venues/first-theater/runtime/editors.js`.
+- Restored the editor helper API so `runtime.js` can keep delegating map draft, payload, grid default, and grid draft logic through the shared editor controller surface.
+- Kept the First Theater bootstrap and runtime wiring intact while the editor seam moved out of the monolith.
+
+### Tests
+- Re-ran the focused editor test:
+  - `tests/first-theater/editors.test.js`
+- Re-ran the full First Theater Node suite:
+  - `tests/first-theater/*.test.js`
+- Verified syntax and diff hygiene:
+  - `node --check frontend/venues/first-theater/runtime/editors.js`
+  - `git diff --check`
+
+### Notes
+- `frontend/venues/first-theater/runtime.js` is now 5,203 lines.
+- The remaining major seams are the placement/action orchestration cluster and the final bootstrap shell cleanup.
+- The First Theater runtime refactor is still incremental, but the editor seam is now stable again and covered by tests.
+
 ## 2026-06-24 — Kernel 51A Finalization, Warehouse Repair, and Discord Link Fixes
 
 ### Frontend
@@ -878,6 +975,52 @@ Implement `perform/speak` using the same action pipeline:
   - `frontend/venues/first-theater/runtime/socket.js`
 - Verified `git diff --check`
 - Verified backend health with `curl -s http://127.0.0.1:8081/health`
+
+## 2026-06-25 — Kernel 51 stabilization closeout
+
+### Frontend
+- Fixed the First Theater grid editor save/close regression so Save persists the new baseline and Close no longer restores stale grid state
+- Fixed the map editor asset-selection path so choosing an existing asset updates the in-tool preview instead of trying to apply/close immediately
+- Fixed token create/remove lag by synchronizing live runtime objects from projected state and subscribing the runtime directly to projected-state object changes for scheduled Pixi re-renders
+- Added a default token placement fallback so create-token can still place when no prior pointer point is cached
+- Fixed token texture late-load behavior by forcing a scene re-render when Pixi finishes loading the token texture
+- Fixed the token editor context-menu path so `Scale` opens the token editor again
+- Restored `Hide Audience` / `Show Audience` handling in the modular action router and projected-state reducer
+
+### Backend
+- Fixed `create/token` and `update/token` live action payloads so websocket broadcasts include the token asset URLs and footprint metadata needed for immediate frontend rendering
+- Rebuilt and restarted the `victory-backend` container so the live site served the patched token payload code instead of the stale binary
+
+### Tests
+- Re-ran focused First Theater regression coverage:
+  - `tests/first-theater/action-router.test.js`
+  - `tests/first-theater/editors.test.js`
+  - `tests/first-theater/session-sync.test.js`
+  - `tests/first-theater/state.test.js`
+  - `tests/first-theater/token-ui.test.js`
+- Re-verified `node --check` for:
+  - `frontend/venues/first-theater/runtime.js`
+  - `frontend/venues/first-theater/runtime/action-router.js`
+  - `frontend/venues/first-theater/runtime/token-ui.js`
+  - `frontend/venues/first-theater/runtime/session-sync.js`
+  - `frontend/venues/first-theater/runtime/state.js`
+  - `frontend/venues/first-theater/runtime/scene-nodes.js`
+- Verified `GOCACHE=/tmp/victory-gocache go test ./internal/actions` from `backend/`
+- Verified backend health inside the rebuilt container with `wget -qO- http://127.0.0.1:8081/health`
+
+### Operational Notes
+- The First Theater refactor is now in a usable state for feature work again
+- The major user-reported regressions from the extraction pass are closed:
+  - map replace flow
+  - grid save/hide behavior
+  - token add/remove/render timing
+  - token real-art live create payloads
+  - token scale editor launch
+- Single-client live verification also confirmed voice and mic behavior working after the runtime cleanup
+- No new review findings were identified in the final closeout pass
+- Remaining uncertainty is limited to multi-client verification:
+  - audience hide/show as seen by another client
+  - Shift+Ping as seen by another client
 
 ### Operational Notes
 - The socket controller owns transport mechanics only; it does not replace projected state or the dispatcher

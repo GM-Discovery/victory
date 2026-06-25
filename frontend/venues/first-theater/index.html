@@ -1795,30 +1795,57 @@
       padding-right: 4px;
     }
 
-    .map-asset-button {
+    .map-asset-button,
+    .map-editor-asset {
       display: grid;
-      gap: 3px;
-      text-align: left;
-      border-radius: 12px;
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border-radius: 14px;
       border: 1px solid rgba(255, 255, 255, 0.12);
       background: rgba(255, 255, 255, 0.04);
-      color: #f5efe4;
-      padding: 10px 12px;
+      color: #f6efe2;
       cursor: pointer;
+      text-align: left;
       font: inherit;
     }
 
-    .map-asset-button strong {
+    .map-asset-button {
+      gap: 3px;
+    }
+
+    .map-asset-button img,
+    .map-editor-asset img {
+      display: block;
+      width: 72px;
+      height: 72px;
+      object-fit: contain;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.22);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .map-asset-button strong,
+    .map-editor-asset strong {
       color: #f4e3c1;
       font-size: 0.92rem;
     }
 
-    .map-asset-button span {
+    .map-asset-button span,
+    .map-editor-asset small {
       color: #cdb892;
       font-size: 0.82rem;
+      line-height: 1.35;
     }
 
-    .map-asset-button.is-selected {
+    .map-editor-asset-meta {
+      display: grid;
+      gap: 3px;
+    }
+
+    .map-asset-button.is-selected,
+    .map-editor-asset.is-selected {
       border-color: rgba(240, 212, 155, 0.48);
       background: rgba(240, 212, 155, 0.1);
     }
@@ -2312,6 +2339,7 @@
                 </div>
               </div>
               <div class="overlay-actions">
+                <button id="token-picker-apply" type="button">Add Token</button>
                 <button id="token-picker-refresh" type="button">Refresh</button>
                 <button id="token-picker-cancel" type="button">Cancel</button>
               </div>
@@ -2567,17 +2595,20 @@
   <script src="/lib/discord-mic.js?v=kernel40-1"></script>
   <script src="/lib/discord-audio.js?v=kernel43-2"></script>
   <script src="/lib/victory-mic-chat.js?v=kernel40-1"></script>
-  <script src="/venues/first-theater/runtime/state.js?v=kernel51-1"></script>
-  <script src="/venues/first-theater/runtime/socket.js?v=kernel51-1"></script>
-  <script src="/venues/first-theater/runtime/logic.js?v=kernel51-1"></script>
-  <script src="/venues/first-theater/runtime/geometry.js?v=kernel51-1"></script>
-  <script src="/venues/first-theater/runtime/stage-controls.js?v=kernel51-2"></script>
-  <script src="/venues/first-theater/runtime/map-grid.js?v=kernel51-3"></script>
-  <script src="/venues/first-theater/runtime/scene-nodes.js?v=kernel51-4"></script>
-  <script src="/venues/first-theater/runtime/token-ui.js?v=kernel51-5"></script>
-  <script src="/venues/first-theater/runtime/action-router.js?v=kernel51-6"></script>
-  <script src="/venues/first-theater/runtime/socket-controller.js?v=kernel51-7"></script>
-  <script src="/venues/first-theater/runtime/lifecycle.js?v=kernel51-1"></script>
+  <script src="/venues/first-theater/runtime/state.js?v=kernel51-2"></script>
+  <script src="/venues/first-theater/runtime/socket.js?v=kernel51-2"></script>
+  <script src="/venues/first-theater/runtime/logic.js?v=kernel51-2"></script>
+  <script src="/venues/first-theater/runtime/geometry.js?v=kernel51-2"></script>
+  <script src="/venues/first-theater/runtime/stage-controls.js?v=kernel51-3"></script>
+  <script src="/venues/first-theater/runtime/map-grid.js?v=kernel51-4"></script>
+  <script src="/venues/first-theater/runtime/scene-nodes.js?v=kernel51-5"></script>
+  <script src="/venues/first-theater/runtime/token-ui.js?v=kernel51-7"></script>
+  <script src="/venues/first-theater/runtime/action-router.js?v=kernel51-10"></script>
+  <script src="/venues/first-theater/runtime/socket-controller.js?v=kernel51-8"></script>
+  <script src="/venues/first-theater/runtime/session-sync.js?v=kernel51-3"></script>
+  <script src="/venues/first-theater/runtime/editors.js?v=kernel51-8"></script>
+  <script src="/venues/first-theater/runtime/lifecycle.js?v=kernel51-2"></script>
+  <script src="/venues/first-theater/runtime/context.js?v=kernel51-2"></script>
   <script>
     window.VictoryDiscordAudio?.mount({
       venueSlug: "first-theater",
@@ -2590,7 +2621,7 @@
       window.__firstTheaterBootWiring = true;
 
       const script = document.createElement("script");
-      script.src = "/venues/first-theater/runtime.js?v=boot-31";
+      script.src = "/venues/first-theater/runtime.js?v=boot-36";
       script.dataset.victoryRuntime = "first-theater";
       script.addEventListener("load", () => {
         window.VictoryFirstTheater?.start?.();

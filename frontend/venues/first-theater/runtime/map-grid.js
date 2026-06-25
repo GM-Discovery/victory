@@ -23,6 +23,42 @@
     };
   }
 
+  function cameraControlsState(view = {}, displayMode = "theater", defaults = {}) {
+    const zoom = clampNumber(view.zoomRelativeToFit, defaults.minZoom || 0.25, defaults.maxZoom || 4, 1);
+    const minZoom = Number(defaults.minZoom || 0.25);
+    const maxZoom = Number(defaults.maxZoom || 4);
+    return {
+      label: `${Math.round(zoom * 100)}%`,
+      zoomOutDisabled: zoom <= minZoom,
+      zoomInDisabled: zoom >= maxZoom,
+      interactionLocked: String(displayMode || "theater") === "fullscreen",
+    };
+  }
+
+  function getPlayableBounds(stageSize = { width: 0, height: 0 }) {
+    const width = Math.max(320, Number(stageSize?.width || 0));
+    const height = Math.max(320, Number(stageSize?.height || 0));
+    const insetX = Math.max(18, Math.round(width * 0.04));
+    const upperDrapeHeight = Math.max(80, Math.round(height * 0.16));
+    return {
+      x: insetX,
+      y: upperDrapeHeight,
+      width: Math.max(1, width - (insetX * 2)),
+      height: Math.max(1, height - upperDrapeHeight),
+    };
+  }
+
+  function resetCameraToFit(stageCamera, activeMapId, currentView = null, currentMapState = null, currentMapAssetID = "") {
+    if (!stageCamera) return;
+    const nextActiveMapId = String(activeMapId || currentMapState?.asset_id || currentMapAssetID || "");
+    stageCamera.setActiveMapId?.(nextActiveMapId, { reset: true });
+    stageCamera.fit?.(nextActiveMapId);
+    const displayMode = String(currentMapState?.display_mode || "theater").trim() === "fullscreen" ? "fullscreen" : "theater";
+    const state = cameraControlsState(currentView || stageCamera.getView?.(), displayMode, { minZoom: 0.25, maxZoom: 4 });
+    stageCamera.setInteractionLocked?.(state.interactionLocked);
+    return state;
+  }
+
   function mapEditorDraftFromState(state = {}, currentAssetID = "", controls = {}) {
     const liveDisplayMode = String(controls.displayMode ?? "").trim();
     const liveFit = String(controls.fit ?? "").trim();
@@ -94,6 +130,9 @@
 
   return {
     clampPanelPosition,
+    cameraControlsState,
+    getPlayableBounds,
+    resetCameraToFit,
     mapEditorDraftFromState,
     mapEditorPayloadFromUI,
     defaultGridConfig,

@@ -14,6 +14,45 @@ test("panel clamping keeps editor windows inside the shell", () => {
   });
 });
 
+test("camera controls and playable bounds derive from the current stage", () => {
+  assert.deepEqual(mapGrid.cameraControlsState({ zoomRelativeToFit: 0.2 }, "theater", { minZoom: 0.25, maxZoom: 4 }), {
+    label: "25%",
+    zoomOutDisabled: true,
+    zoomInDisabled: false,
+    interactionLocked: false,
+  });
+
+  assert.deepEqual(mapGrid.getPlayableBounds({ width: 1000, height: 700 }), {
+    x: 40,
+    y: 112,
+    width: 920,
+    height: 588,
+  });
+
+  const calls = [];
+  const stageCamera = {
+    setActiveMapId(id, options) {
+      calls.push(["active", id, options]);
+    },
+    fit(id) {
+      calls.push(["fit", id]);
+    },
+    getView() {
+      return { zoomRelativeToFit: 1 };
+    },
+    setInteractionLocked(value) {
+      calls.push(["lock", value]);
+    },
+  };
+  const state = mapGrid.resetCameraToFit(stageCamera, "map-1", null, { display_mode: "fullscreen" }, "");
+  assert.equal(state.interactionLocked, true);
+  assert.deepEqual(calls, [
+    ["active", "map-1", { reset: true }],
+    ["fit", "map-1"],
+    ["lock", true],
+  ]);
+});
+
 test("map and grid drafts preserve the live selections and saved defaults", () => {
   assert.deepEqual(mapGrid.mapEditorDraftFromState(
     { asset_id: "map-1", display_mode: "fullscreen", fit: "contain", crop_x: 0.2, crop_y: 0.8, scale: 1.5, safe_margin: 32 },

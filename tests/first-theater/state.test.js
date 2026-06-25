@@ -92,3 +92,12 @@ test("subscriptions fire only for relevant changes", () => {
   assert.equal(snapshotHits >= 1, true);
   assert.equal(tokenHits >= 1, true);
 });
+
+test("hide and reveal element actions update projected visibility", () => {
+  const state = createProjectedState({ viewerRole: "director" });
+  state.replaceFromSnapshot(tokenSnapshot());
+  state.applyEvent({ type: "act/hide_element", target: { element_id: "token-1" }, sequence: 2 });
+  assert.equal(state.getState().objects[0].visibility.visible, false);
+  state.applyEvent({ type: "act/reveal_element", target: { element_id: "token-1" }, sequence: 3 });
+  assert.equal(state.getState().objects[0].visibility.visible, true);
+});

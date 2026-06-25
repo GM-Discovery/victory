@@ -192,7 +192,13 @@
       const assetURL = String(model.assetContentURL || model.source?.data?.asset_content_url || "").trim();
       const thumbnailURL = String(model.assetThumbnailURL || model.source?.data?.asset_thumbnail_url || "").trim();
       const textureSource = assetURL || thumbnailURL || "/assets/construction.png";
-      const sprite = PIXI.Sprite.from(textureSource);
+      const texture = PIXI.Texture.from(textureSource);
+      if (texture?.baseTexture && !texture.baseTexture.valid) {
+        const rerender = () => renderPixiScene?.();
+        texture.baseTexture.once?.("loaded", rerender);
+        texture.baseTexture.once?.("error", rerender);
+      }
+      const sprite = new PIXI.Sprite(texture);
       sprite.anchor.set(0.5);
       sprite.width = size.width;
       sprite.height = size.height;

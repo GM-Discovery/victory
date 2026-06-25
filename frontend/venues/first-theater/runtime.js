@@ -85,6 +85,7 @@
     const tokenPickerSearch = document.getElementById("token-picker-search");
     const tokenPickerShape = document.getElementById("token-picker-shape");
     const tokenPickerList = document.getElementById("token-picker-list");
+    const tokenPickerApply = document.getElementById("token-picker-apply");
     const tokenPickerRefresh = document.getElementById("token-picker-refresh");
     const tokenPickerCancel = document.getElementById("token-picker-cancel");
     const tokenEditorPanel = document.getElementById("token-editor");
@@ -116,6 +117,8 @@
     let currentSessionId = "";
     let currentActorId = "";
     let currentRole = "audience";
+    const smokeMode = new URLSearchParams(location.search).has("smoke");
+    let smokeGridEnabled = smokeMode;
     const firstTheaterStateModule = window.VictoryFirstTheaterState || null;
     const firstTheaterSocketModule = window.VictoryFirstTheaterSocket || null;
     const firstTheaterLogicModule = window.VictoryFirstTheaterLogic || null;
@@ -126,7 +129,10 @@
     const firstTheaterTokenUiModule = window.VictoryFirstTheaterTokenUI || null;
     const firstTheaterActionRouterModule = window.VictoryFirstTheaterActionRouter || null;
     const firstTheaterSocketControllerModule = window.VictoryFirstTheaterSocketController || null;
+    const firstTheaterSessionSyncModule = window.VictoryFirstTheaterSessionSync || null;
     const firstTheaterLifecycleModule = window.VictoryFirstTheaterLifecycle || null;
+    const firstTheaterContextModule = window.VictoryFirstTheaterContext || null;
+    const firstTheaterEditorsModule = window.VictoryFirstTheaterEditors || null;
     const projectedState = firstTheaterStateModule?.createProjectedState?.({
       viewerRole: currentRole,
     }) || null;
@@ -147,6 +153,44 @@
       animationFrame: (callback) => window.requestAnimationFrame(callback),
       dispose: () => {},
     };
+    const contextHelpers = firstTheaterContextModule?.createContextInteractionHelpers?.({
+      smokeMode,
+      getCurrentObjects: () => currentObjects,
+      getCurrentNodeMap: () => currentNodeMap,
+      getStageShell: () => stageShell,
+      getStageHost: () => stageHost,
+      getPixiApp: () => pixiApp,
+      getLastStagePoint: () => lastStagePoint,
+      setLastStagePoint: (point) => {
+        if (point) {
+          lastStagePoint = {
+            x: Math.round(Number(point.x || 0)),
+            y: Math.round(Number(point.y || 0)),
+          };
+        }
+      },
+      setPointerLine: (...args) => setPointerLine(...args),
+      setSmokeLine: (...args) => setSmokeLine(...args),
+      currentSelectionSummary: () => currentSelectionSummary(),
+      stageContextMenuModel: () => stageContextMenuModel(),
+      objectKind: (...args) => objectKind(...args),
+      setStagePlacementCandidate: (point, screenPoint) => {
+        stagePlacementCandidate = point || null;
+        stagePlacementScreenCandidate = screenPoint || null;
+      },
+      setContextMenuTarget: (model) => {
+        contextMenuTarget = model;
+      },
+      closeContextMenuUI: () => {
+        if (contextMenu) {
+          contextMenu.hidden = true;
+          contextMenu.innerHTML = "";
+        }
+        contextMenuTarget = null;
+        stagePlacementCandidate = null;
+        stagePlacementScreenCandidate = null;
+      },
+    }) || null;
     let joinPromise = null;
     let currentSnapshot = null;
     let currentObjects = [];
@@ -157,6 +201,7 @@
     let lastStagePoint = null;
     let contextMenuTarget = null;
     let suppressStageContextMenu = false;
+    let suppressEditorAutoClose = false;
     let stagePlacementCandidate = null;
     let stagePlacementScreenCandidate = null;
     let pendingStageCardPlacement = null;
@@ -203,8 +248,6 @@
     let socketReconnectTimer = null;
     let socketReconnectDelay = 1000;
     let worldRefreshSerial = 0;
-    const smokeMode = new URLSearchParams(location.search).has("smoke");
-    let smokeGridEnabled = smokeMode;
     let pixiApp = null;
     let sceneRoot = null;
     let backgroundLayer = null;
@@ -266,6 +309,8 @@
     };
     let sceneNodeFactory = null;
     let tokenUi = null;
+    let editors = null;
+    let sessionSync = null;
     let actionRouter = null;
     let socketController = null;
     const shellDefaults = {
@@ -368,7 +413,7 @@
 
     function normalizeRole(role) {
       const value = String(role || "audience").trim().toLowerCase();
-      if (["producer", "director", "cast", "crew", "audience", "actor"].includes(value)) {
+      if (["producer", "director", "operator", "cast", "crew", "audience", "actor"].includes(value)) {
         return value;
       }
       return "audience";
@@ -380,6 +425,8 @@
           return "Producer";
         case "director":
           return "Director";
+        case "operator":
+          return "Operator";
         case "cast":
         case "actor":
           return "Cast";
@@ -392,7 +439,7 @@
 
     function canManageIndexCards(role) {
       const normalized = normalizeRole(role);
-      return normalized === "producer" || normalized === "director";
+      return normalized === "producer" || normalized === "director" || normalized === "operator";
     }
 
     function canManageStageTokens(role) {
@@ -435,7 +482,7 @@
 
     function updateCameraControls(view = null) {
       const mapDisplayMode = String(currentVenueMapState?.display_mode || "theater").trim() === "fullscreen" ? "fullscreen" : "theater";
-      const cameraState = firstTheaterStageControlsModule?.cameraControlsState?.(view || stageCamera?.getView?.(), mapDisplayMode, cameraDefaults) || {
+      const cameraState = firstTheaterMapGridModule?.cameraControlsState?.(view || stageCamera?.getView?.(), mapDisplayMode, cameraDefaults) || firstTheaterStageControlsModule?.cameraControlsState?.(view || stageCamera?.getView?.(), mapDisplayMode, cameraDefaults) || {
         label: "100%",
         zoomOutDisabled: false,
         zoomInDisabled: false,
@@ -453,7 +500,7 @@
 
     function getPlayableBounds() {
       const size = getStageSize();
-      return computeStagePlayableBounds(size.width, size.height);
+      return firstTheaterMapGridModule?.getPlayableBounds?.(size) || computeStagePlayableBounds(size.width, size.height);
     }
 
     function currentCameraView() {
@@ -466,8 +513,7 @@
     }
 
     function resetCameraToFit(activeMapId = currentVenueMapState?.asset_id || currentVenueMapAssetID || "") {
-      stageCamera?.setActiveMapId?.(activeMapId, { reset: true });
-      stageCamera?.fit?.(activeMapId);
+      firstTheaterMapGridModule?.resetCameraToFit?.(stageCamera, activeMapId, stageCamera?.getView?.(), currentVenueMapState, currentVenueMapAssetID);
       updateCameraControls();
     }
 
@@ -1339,6 +1385,47 @@
       return updated;
     }
 
+    function syncCurrentObjectsFromProjectedState() {
+      const projected = projectedState?.getState?.() || null;
+      if (!projected) return false;
+      currentObjects = Array.isArray(projected.objects) ? projected.objects : [];
+      if (currentSelection) {
+        const refreshedSelection = currentObjects.find((item) => updateObjectMatches(item, currentSelection)) || null;
+        currentSelection = refreshedSelection;
+      }
+      updateStatusSummary();
+      updateShellTargetPresentation();
+      syncSelectedActions();
+      syncCardEditorWithSelection();
+      syncTokenEditorWithSelection();
+      return true;
+    }
+
+    let projectedStateRenderQueued = false;
+    function scheduleProjectedStateRender() {
+      if (projectedStateRenderQueued) return;
+      projectedStateRenderQueued = true;
+      runtimeLifecycle.animationFrame(() => {
+        projectedStateRenderQueued = false;
+        if (syncCurrentObjectsFromProjectedState()) {
+          renderPixiScene();
+        }
+      });
+    }
+
+    if (projectedState?.subscribe) {
+      const unsubscribeProjectedObjects = projectedState.subscribe("objects", () => {
+        scheduleProjectedStateRender();
+      });
+      runtimeLifecycle.track(() => {
+        try {
+          unsubscribeProjectedObjects?.();
+        } catch (error) {
+          console.warn("projected state unsubscribe failed", error);
+        }
+      });
+    }
+
     const canActorRevealHideStageObjects = firstTheaterLogicModule?.canActorRevealHideStageObjects || (() => false);
     const isCardObject = firstTheaterLogicModule?.isCardObject || (() => false);
     const isTokenObject = firstTheaterLogicModule?.isTokenObject || (() => false);
@@ -1370,10 +1457,10 @@
       setMovementReport: (...args) => setMovementReport(...args),
       openCardEditor: (...args) => openCardEditor(...args),
       wasContextMenuHandled: (...args) => wasContextMenuHandled(...args),
-      cancelContextMenuEvent: (...args) => cancelContextMenuEvent(...args),
-      openResolvedContextMenu: (...args) => openResolvedContextMenu(...args),
-      eventClientPoint: (...args) => eventClientPoint(...args),
-      stageScreenPointFromClient: (...args) => stageScreenPointFromClient(...args),
+      cancelContextMenuEvent: (...args) => contextHelpers?.cancelContextMenuEvent?.(...args) || cancelContextMenuEvent(...args),
+      openResolvedContextMenu: (...args) => contextHelpers?.openResolvedContextMenu?.(...args) || openResolvedContextMenu(...args),
+      eventClientPoint: (...args) => contextHelpers?.eventClientPoint?.(...args) || eventClientPoint(...args),
+      stageScreenPointFromClient: (...args) => contextHelpers?.stageScreenPointFromClient?.(...args) || stageScreenPointFromClient(...args),
       cardDisplayMode: (...args) => cardDisplayMode(...args),
       tokenSnapModeForModel: (...args) => tokenSnapModeForModel(...args),
       renderPixiScene: () => renderPixiScene(),
@@ -1402,6 +1489,21 @@
       lastStagePoint: () => lastStagePoint,
       stagePlacementCandidate: () => stagePlacementCandidate,
       stagePlacementScreenCandidate: () => stagePlacementScreenCandidate,
+      defaultPlacementPoint: () => {
+        const size = getStageSize();
+        const worldPoint = stageCamera?.screenToWorld?.(Math.round(size.width / 2), Math.round(size.height / 2)) || null;
+        if (worldPoint) {
+          return {
+            x: Math.round(Number(worldPoint.x || 0)),
+            y: Math.round(Number(worldPoint.y || 0)),
+          };
+        }
+        const bounds = getPlayableBounds();
+        return {
+          x: Math.round(Number(bounds.x || 0) + (Number(bounds.width || 0) / 2)),
+          y: Math.round(Number(bounds.y || 0) + (Number(bounds.height || 0) / 2)),
+        };
+      },
       setPlacementState: (next) => {
         if (next?.point !== undefined) stagePlacementCandidate = next.point;
         if (next?.screenPoint !== undefined) stagePlacementScreenCandidate = next.screenPoint;
@@ -1426,8 +1528,6 @@
       getEditorState: () => ({
         panel: tokenEditorPanel,
         currentSelection,
-        tokenEditorTargetKey,
-        tokenEditorDirty,
         scale: tokenEditorScale,
         scaleValue: tokenEditorScaleValue,
         snap: tokenEditorSnap,
@@ -1435,6 +1535,10 @@
         status: tokenEditorStatus,
         setPosition: setTokenEditorPosition,
       }),
+      getTokenEditorTargetKey: () => tokenEditorTargetKey,
+      setTokenEditorTargetKey: (value) => { tokenEditorTargetKey = String(value || ""); },
+      getTokenEditorDirty: () => tokenEditorDirty,
+      setTokenEditorDirty: (value) => { tokenEditorDirty = Boolean(value); },
       getTokenAssets: () => warehouseTokenAssets,
       setTokenAssets: (assets) => {
         warehouseTokenAssets = Array.isArray(assets) ? assets : [];
@@ -1447,6 +1551,7 @@
         search: tokenPickerSearch,
         shape: tokenPickerShape,
         list: tokenPickerList,
+        apply: tokenPickerApply,
         setPosition: setTokenPickerPosition,
       }),
       refreshWarehouseTokenAssets: () => refreshWarehouseTokenAssets(),
@@ -1455,6 +1560,236 @@
       isTokenObject: (...args) => isTokenObject(...args),
       currentObjects: () => currentObjects,
       updateTokenLocalModel: (...args) => updateTokenLocalModel(...args),
+    }) || null;
+
+    sessionSync = firstTheaterSessionSyncModule?.createSessionSync?.({
+      fetch: (...args) => fetch(...args),
+      getCurrentIdentity: () => currentIdentity,
+      setCurrentIdentity: (value) => { currentIdentity = value; },
+      getCurrentRole: () => currentRole,
+      setCurrentRole: (value) => { currentRole = value; },
+      getCurrentSessionId: () => currentSessionId,
+      setCurrentSessionId: (value) => { currentSessionId = String(value || ""); },
+      getCurrentActorId: () => currentActorId,
+      setCurrentActorId: (value) => { currentActorId = String(value || ""); },
+      getCurrentSnapshot: () => currentSnapshot,
+      getCurrentObjects: () => currentObjects,
+      setCurrentObjects: (value) => { currentObjects = Array.isArray(value) ? value : []; },
+      getCurrentSelection: () => currentSelection,
+      setCurrentSelection: (value) => { currentSelection = value; },
+      replaceProjectedState: (...args) => projectedState?.replaceFromSnapshot?.(...args),
+      buildObjects: (...args) => buildObjects(...args),
+      applyVenueFocusPing: (...args) => applyVenueFocusPing(...args),
+      updateStatusSummary: (...args) => updateStatusSummary(...args),
+      setStageStatus: (...args) => setStageStatus(...args),
+      setMovementLine: (...args) => setMovementLine(...args),
+      setSnapshotSummary: (...args) => setSnapshotSummary(...args),
+      setLiveFeedLine: (...args) => setLiveFeedLine(...args),
+      setSelectionLine: (...args) => setSelectionLine(...args),
+      updateChatPresentation: (...args) => updateChatPresentation(...args),
+      syncCurrentObjectsFromProjectedState: () => syncCurrentObjectsFromProjectedState(),
+      canManageIndexCards: (...args) => canManageIndexCards(...args),
+      canManageStageTokens: (...args) => canManageStageTokens(...args),
+      canActorRevealHideStageObjects: (...args) => canActorRevealHideStageObjects(...args),
+      cardFaceForModel: (...args) => cardFaceForModel(...args),
+      cardDisplayMode: (...args) => cardDisplayMode(...args),
+      tokenScaleForModel: (...args) => tokenScaleForModel(...args),
+      tokenSnapModeForModel: (...args) => tokenSnapModeForModel(...args),
+      tokenLayerForModel: (...args) => tokenLayerForModel(...args),
+      closeContextMenu: () => closeContextMenu(),
+      selectObject: (...args) => selectObject(...args),
+      syncSelectedActions: () => syncSelectedActions(),
+      syncCardEditorWithSelection: () => syncCardEditorWithSelection(),
+      syncTokenEditorWithSelection: () => syncTokenEditorWithSelection(),
+      refreshVenueGridConfig: (...args) => refreshVenueGridConfig(...args),
+      refreshVenueMapState: (...args) => refreshVenueMapState(...args),
+      refreshVenueMapAssets: (...args) => refreshVenueMapAssets(...args),
+      loadPixiLibrary: () => loadPixiLibrary(),
+      initializePixi: () => initializePixi(),
+      initializeShellChrome: (...args) => initializeShellChrome(...args),
+      updateShellMetaPresentation: () => updateShellMetaPresentation(),
+      updateShellTargetPresentation: () => updateShellTargetPresentation(),
+      updateHeaderPresentation: () => updateHeaderPresentation(),
+      setRendererFallback: (...args) => setRendererFallback(...args),
+      appendSystemChatNotice: (...args) => appendSystemChatNotice(...args),
+      appendChatActionLine: (...args) => appendChatActionLine(...args),
+      chatClosedMessage: () => chatClosedMessage(),
+      getCurrentVenueMapState: () => currentVenueMapState,
+      getCurrentVenueMapAssetID: () => currentVenueMapAssetID,
+      getCurrentVenueGridConfig: () => currentVenueGridConfig,
+      roleLabel: (...args) => roleLabel(...args),
+      getStageStatus: () => stageStatus?.textContent || "",
+      getStagePlacementCandidate: () => stagePlacementCandidate,
+      setStagePlacementCandidate: (value) => { stagePlacementCandidate = value; },
+      getStagePlacementScreenCandidate: () => stagePlacementScreenCandidate,
+      setStagePlacementScreenCandidate: (value) => { stagePlacementScreenCandidate = value; },
+      getPendingStageCardPlacement: () => pendingStageCardPlacement,
+      setPendingStageCardPlacement: (value) => { pendingStageCardPlacement = value; },
+      setSmokeLine: (...args) => setSmokeLine(...args),
+      normalizeOverlayPoint: (...args) => normalizeOverlayPoint(...args),
+      setRecentPlacementMarker: (...args) => setRecentPlacementMarker(...args),
+      smokeMode,
+      setLocalPositionOverrideForModel: (...args) => setLocalPositionOverrideForModel(...args),
+      sendAction: (...args) => sendAction(...args),
+      placeCreatedIndexCard: (action) => sessionSync?.placeCreatedIndexCard?.(action),
+      setStageStatus: (...args) => setStageStatus(...args),
+    }) || null;
+
+    editors = firstTheaterEditorsModule?.createEditorControllers?.({
+      getStageShell: () => stageShell,
+      getCurrentRole: () => currentRole,
+      getCurrentSelection: () => currentSelection,
+      getCurrentObjects: () => currentObjects,
+      getCurrentVenueMapState: () => currentVenueMapState,
+      getCurrentVenueMapAssetID: () => currentVenueMapAssetID,
+      getCurrentVenueMapAssets: () => currentVenueMapAssets,
+      setCurrentVenueMapState: (value) => {
+        currentVenueMapState = value;
+      },
+      setCurrentVenueMapAssetID: (value) => {
+        currentVenueMapAssetID = String(value || "");
+      },
+      setCurrentVenueMapAssets: (value) => {
+        currentVenueMapAssets = Array.isArray(value) ? value : [];
+      },
+      getCurrentVenueGridConfig: () => currentVenueGridConfig,
+      setCurrentVenueGridConfig: (value) => {
+        currentVenueGridConfig = value;
+      },
+      getPlayableBounds: () => getPlayableBounds(),
+      getMapEditorElements: () => ({
+        panel: mapEditorPanel,
+        file: mapEditorFile,
+        displayMode: mapEditorDisplayMode,
+        fit: mapEditorFit,
+        scale: mapEditorScale,
+        cropX: mapEditorCropX,
+        cropY: mapEditorCropY,
+        safeMargin: mapEditorSafeMargin,
+        preview: mapEditorPreview,
+        previewMode: mapEditorPreviewMode,
+        previewFocus: mapEditorPreviewFocus,
+        previewSafe: mapEditorPreviewSafe,
+        assets: mapEditorAssets,
+        remove: mapEditorRemove,
+      }),
+      getGridEditorElements: () => ({
+        panel: gridEditorPanel,
+        type: gridEditorType,
+        hexOrientation: gridEditorHexOrientation,
+        hexOrientationField: gridEditorHexOrientationField,
+        cellSize: gridEditorCellSize,
+        offsetX: gridEditorOffsetX,
+        offsetY: gridEditorOffsetY,
+        opacity: gridEditorOpacity,
+        lineWidth: gridEditorLineWidth,
+        lineStyle: gridEditorLineStyle,
+        visibility: gridEditorVisibility,
+      }),
+      getMapEditorPreviewURL: () => mapEditorPreviewURL,
+      setMapEditorPreviewURL: (value) => { mapEditorPreviewURL = String(value || ""); },
+      getCurrentSnapshot: () => currentSnapshot,
+      setCurrentSnapshot: (value) => { currentSnapshot = value; },
+      canManageIndexCards: (...args) => canManageIndexCards(...args),
+      canManageStageTokens: (...args) => canManageStageTokens(...args),
+      isCardObject: (...args) => isCardObject(...args),
+      isTokenObject: (...args) => isTokenObject(...args),
+      objectState: (...args) => objectState(...args),
+      selectObject: (...args) => selectObject(...args),
+      setStageStatus: (...args) => setStageStatus(...args),
+      setMovementLine: (...args) => setMovementLine(...args),
+      renderPixiScene: () => renderPixiScene(),
+      renderVenueGridLayer: (...args) => renderVenueGridLayer(...args),
+      sendAction: (...args) => sendAction(...args),
+      updateLocalObjectModel: (...args) => updateLocalObjectModel(...args),
+      updateLocalCardPinModel: (...args) => updateLocalCardPinModel(...args),
+      updateTokenLocalModel: (...args) => updateTokenLocalModel(...args),
+      setLocalPositionOverrideForModel: (...args) => setLocalPositionOverrideForModel(...args),
+      currentDisplayedPointForModel: (...args) => currentDisplayedPointForModel(...args),
+      tokenScaleForModel: (...args) => tokenScaleForModel(...args),
+      tokenSnapModeForModel: (...args) => tokenSnapModeForModel(...args),
+      tokenLayerForModel: (...args) => tokenLayerForModel(...args),
+      tokenPlacementPointForCreate: (...args) => tokenPlacementPointForCreate(...args),
+      tokenDuplicatePlacementForModel: (...args) => tokenDuplicatePlacementForModel(...args),
+      cardDuplicatePlacementForModel: (...args) => cardDuplicatePlacementForModel(...args),
+      tokenMoveTargetForModel: (...args) => tokenMoveTargetForModel(...args),
+      cardMoveTargetForModel: (...args) => cardMoveTargetForModel(...args),
+      refreshVenueMapAssets: (...args) => refreshVenueMapAssets(...args),
+      refreshVenueMapState: (...args) => refreshVenueMapState(...args),
+      refreshVenueGridConfig: (...args) => refreshVenueGridConfig(...args),
+      uploadMapAsset: (...args) => uploadMapAsset(...args),
+      saveVenueMap: (...args) => saveVenueMap(...args),
+      removeVenueMap: (...args) => removeVenueMap(...args),
+      saveGridConfig: (...args) => saveGridConfig(...args),
+      renderVenueGridLayer: (...args) => renderVenueGridLayer(...args),
+      setMapEditorStatus: (...args) => setMapEditorStatus(...args),
+      setGridEditorStatus: (...args) => setGridEditorStatus(...args),
+      setMapEditorPosition: (left, top) => setMapEditorPosition(left, top),
+      setGridEditorPosition: (left, top) => setGridEditorPosition(left, top),
+      clampMapEditorPosition: (...args) => clampMapEditorPosition(...args),
+      clampGridEditorPosition: (...args) => clampGridEditorPosition(...args),
+      clampCardEditorPosition: (...args) => clampCardEditorPosition(...args),
+      getCardEditorTarget: () => getCardEditorTarget(),
+      setCardEditorPosition: (...args) => setCardEditorPosition(...args),
+      hideMapEditor: () => hideMapEditor(),
+      hideGridEditor: () => hideGridEditor(),
+      hideCardEditor: () => hideCardEditor(),
+      hideTokenEditor: () => hideTokenEditor(),
+      closeTokenPicker: () => closeTokenPicker(),
+      openTokenPicker: (...args) => openTokenPicker(...args),
+      canActorRevealHideStageObjects: (...args) => canActorRevealHideStageObjects(...args),
+      setCurrentSelection: (value) => { currentSelection = value; },
+      syncSelectedActions: () => syncSelectedActions(),
+      syncTokenEditorWithSelection: () => syncTokenEditorWithSelection(),
+      setCardEditorTargetKey: (value) => { cardEditorTargetKey = value; },
+      setCardEditorDirty: (value) => { cardEditorDirty = Boolean(value); },
+      getMapEditorOriginalState: () => mapEditorOriginalState,
+      setMapEditorOriginalState: (value) => { mapEditorOriginalState = value; },
+      setMapEditorDirty: (value) => { mapEditorDirty = Boolean(value); },
+      getGridEditorOriginalState: () => gridEditorOriginalState,
+      setGridEditorOriginalState: (value) => { gridEditorOriginalState = value; },
+      setGridEditorDirty: (value) => { gridEditorDirty = Boolean(value); },
+      cardEditorPanel,
+      cardEditorFront,
+      cardEditorBack,
+      cardEditorColor,
+      cardEditorStatus,
+      cardEditorDirty: () => cardEditorDirty,
+      mapEditorPanel,
+      mapEditorFile,
+      mapEditorDisplayMode,
+      mapEditorFit,
+      mapEditorScale,
+      mapEditorCropX,
+      mapEditorCropY,
+      mapEditorSafeMargin,
+      mapEditorPreview,
+      mapEditorPreviewMode,
+      mapEditorPreviewFocus,
+      mapEditorPreviewSafe,
+      mapEditorAssets: mapEditorAssets,
+      gridEditorPanel,
+      gridEditorType,
+      gridEditorHexOrientation,
+      gridEditorCellSize,
+      gridEditorOffsetX,
+      gridEditorOffsetY,
+      gridEditorOpacity,
+      gridEditorLineWidth,
+      gridEditorLineStyle,
+      gridEditorVisibility,
+      gridEditorHexOrientationField,
+      defaultGridConfig: () => defaultGridConfig(),
+      mapEditorDraftFromState: () => mapEditorDraftFromState(),
+      mapEditorPayloadFromUI: (assetID) => mapEditorPayloadFromUI(assetID),
+      gridEditorDraftFromUI: () => gridEditorDraftFromUI(),
+      syncMapEditorHexFieldVisibility: () => syncGridEditorHexFieldVisibility(),
+      syncGridEditorVisibilityButton: () => syncGridEditorVisibilityButton(),
+      syncGridEditorWithState: () => syncGridEditorWithState(),
+      livePreviewMapOnStage: () => livePreviewMapOnStage(),
+      syncMapAssetList: () => syncMapAssetList(),
+      createIndexCardFromMenu: () => createIndexCardFromMenu(),
+      placeCreatedIndexCard: (action) => placeCreatedIndexCard(action),
     }) || null;
 
     actionRouter = firstTheaterActionRouterModule?.createActionRouter?.({
@@ -1468,6 +1803,7 @@
       closeContextMenu: () => closeContextMenu(),
       openTokenPicker: (...args) => openTokenPicker(...args),
       openTokenEditor: (...args) => openTokenEditor(...args),
+      openCardEditor: (...args) => openCardEditor(...args),
       openMapEditor: (...args) => openMapEditor(...args),
       openGridEditor: (...args) => openGridEditor(...args),
       updateLocalObjectModel: (...args) => updateLocalObjectModel(...args),
@@ -1483,6 +1819,8 @@
       tokenDuplicatePlacementForModel: (...args) => tokenDuplicatePlacementForModel(...args),
       cardDuplicatePlacementForModel: (...args) => cardDuplicatePlacementForModel(...args),
       sendAction: (...args) => sendAction(...args),
+      refreshWorld: () => refreshWorld(),
+      syncCurrentObjectsFromProjectedState: () => syncCurrentObjectsFromProjectedState(),
       removeLocalObject: (objectModel) => {
         currentObjects = currentObjects.filter((item) => !updateObjectMatches(item, objectModel));
       },
@@ -1514,13 +1852,9 @@
       contextMenu: () => contextMenu,
       pixiApp: () => pixiApp,
       cameraControlsContains: (target) => cameraControls?.contains?.(target),
-      isStageEvent: (event) => {
-        const target = event?.target;
-        const composedPath = typeof event?.composedPath === "function" ? event.composedPath() : [];
-        return target === stageHost || target === stageShell || stageShell?.contains?.(target) || stageHost?.contains?.(target) || composedPath.includes(stageHost) || composedPath.includes(stageShell) || composedPath.includes(pixiApp?.view);
-      },
-      isSecondaryPointerEvent: (...args) => isSecondaryPointerEvent(...args),
-      markContextMenuHandled: (...args) => markContextMenuHandled(...args),
+      isStageEvent: (event) => contextHelpers?.isStageEvent?.(event) || false,
+      isSecondaryPointerEvent: (...args) => contextHelpers?.isSecondaryPointerEvent?.(...args) || isSecondaryPointerEvent(...args),
+      markContextMenuHandled: (...args) => contextHelpers?.markContextMenuHandled?.(...args) || markContextMenuHandled(...args),
       openMapEditor: (...args) => openMapEditor(...args),
       openGridEditor: (...args) => openGridEditor(...args),
       renderContextMenu: (items) => {
@@ -1762,643 +2096,46 @@
       });
     }
 
-    function showCardEditorFor(model) {
-      if (!cardEditorPanel || !cardEditorFront || !cardEditorBack || !cardEditorColor) return;
-      if (!model || !model.live || !isCardObject(model) || objectState(model).locked) {
-        cardEditorTargetKey = "";
-        cardEditorDirty = false;
-        cardEditorPanel.hidden = true;
-        if (cardEditorStatus) {
-          cardEditorStatus.textContent = "Select a live index card.";
-        }
-        return;
-      }
+    function showCardEditorFor(model) { return editors?.showCardEditorFor?.(model); }
 
-      const draft = cardEditorDraftFromModel(model);
-      cardEditorTargetKey = model.key;
-      cardEditorDirty = false;
-      if (cardEditorPanel.hidden) {
-        setCardEditorPosition(24, 24);
-      }
-      cardEditorPanel.hidden = false;
-      cardEditorFront.value = draft.frontText;
-      cardEditorBack.value = draft.backText;
-      cardEditorColor.value = draft.color || "#d9c7a6";
-      if (cardEditorStatus) {
-        cardEditorStatus.textContent = `${draft.label} ready to inspect.`;
-      }
-    }
+    function hideCardEditor() { return editors?.hideCardEditor?.(); }
 
-    function hideCardEditor() {
-      cardEditorTargetKey = "";
-      cardEditorDirty = false;
-      if (cardEditorPanel) {
-        cardEditorPanel.hidden = true;
-      }
-      if (cardEditorStatus) {
-        cardEditorStatus.textContent = "Select a live index card.";
-      }
-    }
+    function syncCardEditorWithSelection() { return editors?.syncCardEditorWithSelection?.(); }
 
-    function syncCardEditorWithSelection() {
-      if (!cardEditorPanel || cardEditorPanel.hidden) {
-        return;
-      }
-
-      const target = getCardEditorTarget();
-      if (!target || !target.live || !isCardObject(target) || objectState(target).locked) {
-        hideCardEditor();
-        return;
-      }
-
-      if (currentSelection && currentSelection.key !== target.key) {
-        hideCardEditor();
-        return;
-      }
-
-      if (cardEditorDirty) {
-        return;
-      }
-
-      showCardEditorFor(target);
-    }
-
-    function mapEditorDraftFromState() {
-      const state = currentVenueMapState || {};
-      return firstTheaterMapGridModule?.mapEditorDraftFromState?.(state, currentVenueMapAssetID || "", {
-        displayMode: mapEditorDisplayMode?.value,
-        fit: mapEditorFit?.value,
-        scale: mapEditorScale?.value,
-        cropX: mapEditorCropX?.value,
-        cropY: mapEditorCropY?.value,
-        safeMargin: mapEditorSafeMargin?.value,
-      }) || {
-        assetID: String(state.asset_id || currentVenueMapAssetID || ""),
-        displayMode: String(state.display_mode || "theater"),
-        fit: String(state.fit || "cover"),
-        cropX: Number(state.crop_x ?? 0.5),
-        cropY: Number(state.crop_y ?? 0.5),
-        scale: Number(state.scale ?? 1),
-        safeMargin: Number(state.safe_margin ?? 24),
-      };
-    }
-
-    function setMapEditorStatus(text) {
-      if (mapEditorStatus) {
-        mapEditorStatus.textContent = text || "";
-      }
-    }
-
-    function clampMapEditorPosition(left, top) {
-      return firstTheaterMapGridModule?.clampPanelPosition?.(
-        left,
-        top,
-        stageShell?.getBoundingClientRect?.(),
-        mapEditorPanel?.getBoundingClientRect?.(),
-        560,
-        520,
-      ) || { left: Math.round(left), top: Math.round(top) };
-    }
-
-    function setMapEditorPosition(left, top) {
-      if (!mapEditorPanel) return;
-      const position = clampMapEditorPosition(left, top);
-      mapEditorPanel.style.left = `${position.left}px`;
-      mapEditorPanel.style.top = `${position.top}px`;
-      mapEditorPanel.style.right = "auto";
-      mapEditorPanel.style.bottom = "auto";
-    }
-
-    function clampGridEditorPosition(left, top) {
-      return firstTheaterMapGridModule?.clampPanelPosition?.(
-        left,
-        top,
-        stageShell?.getBoundingClientRect?.(),
-        gridEditorPanel?.getBoundingClientRect?.(),
-        420,
-        480,
-      ) || { left: Math.round(left), top: Math.round(top) };
-    }
-
-    function setGridEditorPosition(left, top) {
-      if (!gridEditorPanel) return;
-      const position = clampGridEditorPosition(left, top);
-      gridEditorPanel.style.left = `${position.left}px`;
-      gridEditorPanel.style.top = `${position.top}px`;
-      gridEditorPanel.style.right = "auto";
-      gridEditorPanel.style.bottom = "auto";
-    }
-
-    function syncMapEditorPreview(url) {
-      if (!mapEditorPreview) return;
-      if (mapEditorPreviewURL && mapEditorPreviewURL !== url && mapEditorPreviewURL.startsWith("blob:")) {
-        try {
-          URL.revokeObjectURL(mapEditorPreviewURL);
-        } catch (error) {
-          console.warn("map preview revoke failed", error);
-        }
-      }
-      mapEditorPreviewURL = url || "";
-      mapEditorPreview.src = mapEditorPreviewURL || currentVenueMapState?.asset?.content_url || "";
-      const draft = mapEditorDraftFromState();
-      const fitMode = draft.fit === "contain" ? "contain" : "cover";
-      mapEditorPreview.style.objectFit = fitMode;
-      mapEditorPreview.style.objectPosition = `${Math.round(draft.cropX * 100)}% ${Math.round(draft.cropY * 100)}%`;
-      mapEditorPreview.style.transform = `scale(${draft.scale})`;
-      if (mapEditorPreviewMode) {
-        mapEditorPreviewMode.textContent = fitMode;
-      }
-      if (mapEditorPreviewFocus) {
-        mapEditorPreviewFocus.style.setProperty("--map-crop-x", `${Math.round(draft.cropX * 100)}%`);
-        mapEditorPreviewFocus.style.setProperty("--map-crop-y", `${Math.round(draft.cropY * 100)}%`);
-      }
-      if (mapEditorPreviewSafe) {
-        mapEditorPreviewSafe.style.setProperty("--map-safe-margin", `${draft.safeMargin}px`);
-      }
-    }
-
-    function syncMapAssetList() {
-      if (!mapEditorAssets || !mapEditorPanel || mapEditorPanel.hidden) return;
-      mapEditorAssets.innerHTML = "";
-      const draft = mapEditorDraftFromState();
-      const selectedAssetID = String(currentVenueMapAssetID || draft.assetID || "");
-      if (currentVenueMapAssets.length === 0) {
-        const empty = document.createElement("div");
-        empty.className = "editor-status";
-        empty.textContent = "No uploaded map assets yet.";
-        mapEditorAssets.appendChild(empty);
-        return;
-      }
-
-      currentVenueMapAssets.forEach((asset) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "map-asset-button";
-        if (asset.asset_id === selectedAssetID) {
-          button.classList.add("is-selected");
-        }
-        button.innerHTML = `
-          <strong>${escapeHtml(asset.original_filename || asset.asset_id || "Map asset")}</strong>
-          <span>${escapeHtml(asset.asset_type || "map")} · ${escapeHtml(String(asset.width || 0))}x${escapeHtml(String(asset.height || 0))}</span>
-        `;
-        button.addEventListener("click", () => {
-          if (mapEditorFile) {
-            mapEditorFile.value = "";
-          }
-          currentVenueMapAssetID = asset.asset_id;
-          mapEditorDirty = true;
-          currentVenueMapState = {
-            ...(currentVenueMapState || {}),
-            asset_id: asset.asset_id,
-            asset: asset,
-          };
-          syncMapEditorPreview(asset.content_url);
-          syncMapAssetList();
-          if (mapEditorStatus) {
-            mapEditorStatus.textContent = `Selected ${asset.original_filename || asset.asset_id}. Saving to activate it...`;
-          }
-          void saveVenueMap().catch((error) => {
-            console.warn("map asset selection save failed", error);
-            setMapEditorStatus(error.message || String(error));
-            setStageStatus(error.message || String(error));
-          });
-        });
-        mapEditorAssets.appendChild(button);
-      });
-    }
-
-    function syncMapEditorWithState() {
-      if (!mapEditorPanel || mapEditorPanel.hidden) {
-        return;
-      }
-      const state = currentVenueMapState || {};
-      if (mapEditorFile) {
-        mapEditorFile.value = "";
-      }
-      // Read selects directly from state — mapEditorDraftFromState() reads the
-      // live select value first, which is always the HTML default ("theater", "cover")
-      // on a fresh page load, masking the saved state value.
-      if (mapEditorDisplayMode) mapEditorDisplayMode.value = String(state.display_mode || "theater");
-      if (mapEditorFit) mapEditorFit.value = String(state.fit || "cover");
-      if (mapEditorScale) mapEditorScale.value = String(state.scale ?? 1);
-      if (mapEditorCropX) mapEditorCropX.value = String(state.crop_x ?? 0.5);
-      if (mapEditorCropY) mapEditorCropY.value = String(state.crop_y ?? 0.5);
-      if (mapEditorSafeMargin) mapEditorSafeMargin.value = String(state.safe_margin ?? 24);
-      currentVenueMapAssetID = String(state.asset_id || "");
-      syncMapAssetList();
-      syncMapEditorPreview(state.asset?.content_url || "");
-      if (mapEditorRemove) mapEditorRemove.disabled = !currentVenueMapAssetID;
-    }
-
-    function livePreviewMapOnStage() {
-      if (!venueMapTexture || !pixiApp) return;
-      const draft = mapEditorDraftFromState();
-      currentVenueMapState = {
-        ...(currentVenueMapState || {}),
-        display_mode: draft.displayMode,
-        fit: draft.fit,
-        scale: draft.scale,
-        crop_x: draft.cropX,
-        crop_y: draft.cropY,
-        safe_margin: draft.safeMargin,
-      };
-      const size = getStageSize();
-      renderVenueMapLayer(Math.max(320, size.width), Math.max(320, size.height));
-    }
-
-    function openMapEditor() {
-      if (!mapEditorPanel) return;
-      if (!canManageIndexCards(currentRole)) {
-        setStageStatus("Only producers and directors can add or replace the First Theater map.");
-        return;
-      }
-      hideCardEditor();
-      hideGridEditor();
-      mapEditorOriginalState = currentVenueMapState ? { ...currentVenueMapState } : null;
-      if (mapEditorPanel.hidden) {
-        setMapEditorPosition(24, 24);
-      }
-      mapEditorPanel.hidden = false;
-      mapEditorDirty = false;
-      setMapEditorStatus("Choose a map asset for the First Theater stage.");
-      void refreshVenueMapAssets();
-      syncMapEditorWithState();
-      mapEditorFile?.focus?.({ preventScroll: true });
-    }
-
-    function hideMapEditor() {
-      mapEditorDirty = false;
-      mapEditorOriginalState = null;
-      if (mapEditorPanel) {
-        mapEditorPanel.hidden = true;
-      }
-      if (mapEditorPreviewURL) {
-        if (mapEditorPreviewURL.startsWith("blob:")) {
-          try {
-            URL.revokeObjectURL(mapEditorPreviewURL);
-          } catch (error) {
-            console.warn("map preview revoke failed", error);
-          }
-        }
-        mapEditorPreviewURL = "";
-      }
-      setMapEditorStatus("Choose a map asset for the First Theater stage.");
-    }
-
-    function cancelMapEditor() {
-      if (mapEditorOriginalState) {
-        currentVenueMapState = mapEditorOriginalState;
-        if (mapEditorDisplayMode) mapEditorDisplayMode.value = String(currentVenueMapState.display_mode || "theater");
-        if (mapEditorFit) mapEditorFit.value = String(currentVenueMapState.fit || "cover");
-        if (mapEditorScale) mapEditorScale.value = String(currentVenueMapState.scale ?? 1);
-        if (mapEditorCropX) mapEditorCropX.value = String(currentVenueMapState.crop_x ?? 0.5);
-        if (mapEditorCropY) mapEditorCropY.value = String(currentVenueMapState.crop_y ?? 0.5);
-        if (mapEditorSafeMargin) mapEditorSafeMargin.value = String(currentVenueMapState.safe_margin ?? 24);
-        renderPixiScene();
-      }
-      hideMapEditor();
-    }
-
-    function mapEditorPayloadFromUI(assetID) {
-      const draft = mapEditorDraftFromState();
-      return {
-        asset_id: String(assetID || currentVenueMapAssetID || currentVenueMapState?.asset_id || "").trim(),
-        display_mode: draft.displayMode,
-        fit: String(mapEditorFit?.value || currentVenueMapState?.fit || "cover"),
-        crop_x: clampNumber(mapEditorCropX?.value ?? currentVenueMapState?.crop_x ?? 0.5, 0, 1, 0.5),
-        crop_y: clampNumber(mapEditorCropY?.value ?? currentVenueMapState?.crop_y ?? 0.5, 0, 1, 0.5),
-        scale: clampNumber(mapEditorScale?.value ?? currentVenueMapState?.scale ?? 1, 0.25, 4, 1),
-        safe_margin: Math.round(clampNumber(mapEditorSafeMargin?.value ?? currentVenueMapState?.safe_margin ?? 24, 0, 128, 24)),
-      };
-    }
-
-    async function refreshVenueMapAssets() {
-      try {
-        const response = await fetch("/api/workshop/assets?asset_type=map", {
-          credentials: "include",
-          cache: "no-store",
-        });
-        const payload = await response.json().catch(() => null);
-        if (!response.ok || !payload?.ok) {
-          throw new Error(payload?.error || `HTTP ${response.status}`);
-        }
-        currentVenueMapAssets = Array.isArray(payload.data) ? payload.data : [];
-        syncMapAssetList();
-      } catch (error) {
-        console.warn("refreshVenueMapAssets failed", error);
-        currentVenueMapAssets = [];
-        syncMapAssetList();
-      }
-    }
-
-    async function refreshVenueMapState() {
-      try {
-        const previousAssetID = String(currentVenueMapState?.asset_id || currentVenueMapAssetID || "");
-        const response = await fetch("/api/venues/first-theater/map", {
-          credentials: "include",
-          cache: "no-store",
-        });
-        const payload = await response.json().catch(() => null);
-        if (!response.ok || !payload?.ok) {
-          throw new Error(payload?.error || `HTTP ${response.status}`);
-        }
-        currentVenueMapState = payload.data || null;
-        currentVenueMapAssetID = String(currentVenueMapState?.asset_id || "");
-        if (stageCamera && previousAssetID !== currentVenueMapAssetID) {
-          resetCameraToFit(currentVenueMapAssetID);
-        }
-        if (currentVenueMapState?.asset?.content_url) {
-          syncMapEditorPreview(currentVenueMapState.asset.content_url);
-        }
-        syncMapEditorWithState();
-        renderPixiScene();
-        void ensureVenueMapTexture().then(() => {
-          renderPixiScene();
-        });
-      } catch (error) {
-        console.warn("refreshVenueMapState failed", error);
-        currentVenueMapState = null;
-        currentVenueMapAssetID = "";
-        resetCameraToFit("");
-        renderPixiScene();
-      }
-    }
-
-    async function uploadMapAsset(file) {
-      if (!file) return null;
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("asset_type", "map");
-      formData.append("tags", "map");
-      const response = await fetch("/api/workshop/assets", {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload?.ok) {
-        throw new Error(payload?.error || `HTTP ${response.status}`);
-      }
-      return payload.data || null;
-    }
-
-    async function saveVenueMap() {
-      if (!canManageIndexCards(currentRole)) {
-        setStageStatus("Only producers and directors can add or replace the First Theater map.");
-        return;
-      }
-
-      const selectedFile = mapEditorFile?.files?.[0] || null;
-      let assetID = String(currentVenueMapAssetID || currentVenueMapState?.asset_id || "").trim();
-      if (selectedFile) {
-        setMapEditorStatus(`Uploading ${selectedFile.name}...`);
-        const uploadResult = await uploadMapAsset(selectedFile);
-        assetID = String(uploadResult?.asset_id || "").trim();
-        if (!assetID) {
-          throw new Error("upload_failed");
-        }
-        currentVenueMapAssetID = assetID;
-        await refreshVenueMapAssets();
-      }
-
-      if (!assetID) {
-        throw new Error("asset_id_required");
-      }
-
-      const payload = mapEditorPayloadFromUI(assetID);
-      setMapEditorStatus("Saving map placement...");
-      const response = await fetch("/api/venues/first-theater/map", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json().catch(() => null);
-      if (!response.ok || !result?.ok) {
-        throw new Error(result?.error || `HTTP ${response.status}`);
-      }
-      const previousAssetID = String(currentVenueMapState?.asset_id || "");
-      currentVenueMapState = result.data || null;
-      currentVenueMapAssetID = String(currentVenueMapState?.asset_id || assetID);
-      mapEditorOriginalState = currentVenueMapState ? { ...currentVenueMapState } : null;
-      if (previousAssetID !== currentVenueMapAssetID) {
-        resetCameraToFit(currentVenueMapAssetID);
-      }
-      renderPixiScene();
-      setStageStatus("First Theater map updated.");
-      hideMapEditor();
-      void ensureVenueMapTexture().then(() => {
-        renderPixiScene();
-      });
-    }
-
-    async function removeVenueMap() {
-      if (!canManageIndexCards(currentRole)) {
-        setStageStatus("Only producers and directors can add or replace the First Theater map.");
-        return;
-      }
-
-      setMapEditorStatus("Removing map...");
-      const response = await fetch("/api/venues/first-theater/map", {
-        method: "DELETE",
-        credentials: "include",
-      });
-      const result = await response.json().catch(() => null);
-      if (!response.ok || !result?.ok) {
-        throw new Error(result?.error || `HTTP ${response.status}`);
-      }
-      currentVenueMapState = null;
-      currentVenueMapAssetID = "";
-      mapEditorOriginalState = null;
-      resetCameraToFit("");
-      void ensureVenueMapTexture();
-      renderPixiScene();
-      setStageStatus("First Theater map removed.");
-      hideMapEditor();
-    }
-
-    function defaultGridConfig() {
-      return firstTheaterMapGridModule?.defaultGridConfig?.() || {
-        grid_type: "none",
-        hex_orientation: "flat-top",
-        cell_size: 50,
-        offset_x: 0,
-        offset_y: 0,
-        line_width: 1,
-        opacity: 0.45,
-        line_style: "neutral",
-        visible: true,
-      };
-    }
-
-    function gridEditorDraftFromUI() {
-      return firstTheaterMapGridModule?.gridEditorDraftFromUI?.(currentVenueGridConfig || defaultGridConfig(), {
-        gridType: gridEditorType?.value,
-        hexOrientation: gridEditorHexOrientation?.value,
-        cellSize: gridEditorCellSize?.value,
-        offsetX: gridEditorOffsetX?.value,
-        offsetY: gridEditorOffsetY?.value,
-        opacity: gridEditorOpacity?.value,
-        lineWidth: gridEditorLineWidth?.value,
-        lineStyle: gridEditorLineStyle?.value,
-      }) || {
-        grid_type: "none",
-        hex_orientation: "flat-top",
-        cell_size: 50,
-        offset_x: 0,
-        offset_y: 0,
-        line_width: 1,
-        opacity: 0.45,
-        line_style: "neutral",
-        visible: true,
-      };
-    }
-
-    function setGridEditorStatus(text) {
-      if (gridEditorStatus) {
-        gridEditorStatus.textContent = text || "";
-      }
-    }
-
-    function syncGridEditorHexFieldVisibility() {
-      if (!gridEditorHexOrientationField) return;
-      gridEditorHexOrientationField.style.display = firstTheaterMapGridModule?.gridEditorHexFieldVisible?.(gridEditorType?.value) ? "" : "none";
-    }
-
-    function syncGridEditorVisibilityButton() {
-      if (!gridEditorVisibility) return;
-      gridEditorVisibility.textContent = firstTheaterMapGridModule?.gridEditorVisibilityLabel?.(currentVenueGridConfig) || "Hide Grid";
-    }
-
-    function syncGridEditorWithState() {
-      if (!gridEditorPanel || gridEditorPanel.hidden) return;
-      const state = currentVenueGridConfig || defaultGridConfig();
-      if (gridEditorType) gridEditorType.value = String(state.grid_type || "none");
-      if (gridEditorHexOrientation) gridEditorHexOrientation.value = String(state.hex_orientation || "flat-top");
-      if (gridEditorCellSize) gridEditorCellSize.value = String(state.cell_size ?? 50);
-      if (gridEditorOffsetX) gridEditorOffsetX.value = String(state.offset_x ?? 0);
-      if (gridEditorOffsetY) gridEditorOffsetY.value = String(state.offset_y ?? 0);
-      if (gridEditorOpacity) gridEditorOpacity.value = String(state.opacity ?? 0.45);
-      if (gridEditorLineWidth) gridEditorLineWidth.value = String(state.line_width ?? 1);
-      if (gridEditorLineStyle) gridEditorLineStyle.value = String(state.line_style || "neutral");
-      syncGridEditorHexFieldVisibility();
-      syncGridEditorVisibilityButton();
-    }
-
-    function liveSyncGrid() {
-      currentVenueGridConfig = gridEditorDraftFromUI();
-      syncGridEditorHexFieldVisibility();
-      renderVenueGridLayer(currentVenueMapBounds || getPlayableBounds());
-    }
-
-    function nudgeGridNumberField(inputEl, delta, min, max) {
-      if (!inputEl) return;
-      const current = Number(inputEl.value) || 0;
-      const next = Math.max(min, Math.min(max, current + delta));
-      inputEl.value = String(next);
-      gridEditorDirty = true;
-      liveSyncGrid();
-    }
-
-    function openGridEditor() {
-      if (!gridEditorPanel) return;
-      if (!canManageIndexCards(currentRole)) {
-        setStageStatus("Only producers and directors can configure the First Theater grid.");
-        return;
-      }
-      hideCardEditor();
-      hideMapEditor();
-      gridEditorOriginalState = currentVenueGridConfig ? { ...currentVenueGridConfig } : defaultGridConfig();
-      if (gridEditorPanel.hidden) {
-        setGridEditorPosition(24, 24);
-      }
-      gridEditorPanel.hidden = false;
-      gridEditorDirty = false;
-      setGridEditorStatus("Choose a grid style for the First Theater stage.");
-      syncGridEditorWithState();
-    }
-
-    function hideGridEditor() {
-      gridEditorDirty = false;
-      gridEditorOriginalState = null;
-      if (gridEditorPanel) {
-        gridEditorPanel.hidden = true;
-      }
-      setGridEditorStatus("Choose a grid style for the First Theater stage.");
-    }
-
-    function cancelGridEditor() {
-      if (gridEditorOriginalState) {
-        currentVenueGridConfig = gridEditorOriginalState;
-        renderVenueGridLayer(currentVenueMapBounds || getPlayableBounds());
-      }
-      hideGridEditor();
-    }
-
-    function resetGridEditorDraft() {
-      if (!window.confirm("Reset grid fields to default values? Click Save Grid to persist.")) return;
-      currentVenueGridConfig = defaultGridConfig();
-      gridEditorDirty = true;
-      syncGridEditorWithState();
-      renderVenueGridLayer(currentVenueMapBounds || getPlayableBounds());
-      setGridEditorStatus("Grid reset to defaults. Save to persist.");
-    }
-
-    function toggleGridVisibilityDraft() {
-      const draft = gridEditorDraftFromUI();
-      draft.visible = !(currentVenueGridConfig ? currentVenueGridConfig.visible !== false : true);
-      currentVenueGridConfig = draft;
-      gridEditorDirty = true;
-      syncGridEditorVisibilityButton();
-      renderVenueGridLayer(currentVenueMapBounds || getPlayableBounds());
-      setGridEditorStatus(draft.visible ? "Grid will be shown after save." : "Grid will be hidden after save.");
-    }
-
-    async function saveGridConfig() {
-      if (!canManageIndexCards(currentRole)) {
-        setStageStatus("Only producers and directors can configure the First Theater grid.");
-        return;
-      }
-      const payload = gridEditorDraftFromUI();
-      setGridEditorStatus("Saving grid configuration...");
-      const response = await fetch("/api/venues/first-theater/grid", {
-        method: "PUT",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json().catch(() => null);
-      if (!response.ok || !result?.ok) {
-        throw new Error(result?.error || `HTTP ${response.status}`);
-      }
-      currentVenueGridConfig = result.data || defaultGridConfig();
-      gridEditorOriginalState = { ...currentVenueGridConfig };
-      renderPixiScene();
-      setStageStatus("First Theater grid updated.");
-      hideGridEditor();
-    }
-
-    async function refreshVenueGridConfig() {
-      try {
-        const response = await fetch("/api/venues/first-theater/grid", {
-          credentials: "include",
-          cache: "no-store",
-        });
-        const payload = await response.json().catch(() => null);
-        if (!response.ok || !payload?.ok) {
-          throw new Error(payload?.error || `HTTP ${response.status}`);
-        }
-        currentVenueGridConfig = payload.data || defaultGridConfig();
-        renderPixiScene();
-      } catch (error) {
-        console.warn("refreshVenueGridConfig failed", error);
-        currentVenueGridConfig = defaultGridConfig();
-      }
-    }
+    function mapEditorDraftFromState() { return editors?.mapEditorDraftFromState?.(); }
+    function setMapEditorStatus(text) { if (mapEditorStatus) mapEditorStatus.textContent = text || ""; }
+    function clampMapEditorPosition(left, top) { return firstTheaterMapGridModule?.clampPanelPosition?.(left, top, stageShell?.getBoundingClientRect?.(), mapEditorPanel?.getBoundingClientRect?.(), 560, 520) || { left: Math.round(left), top: Math.round(top) }; }
+    function setMapEditorPosition(left, top) { if (!mapEditorPanel) return; const position = clampMapEditorPosition(left, top); mapEditorPanel.style.left = `${position.left}px`; mapEditorPanel.style.top = `${position.top}px`; mapEditorPanel.style.right = "auto"; mapEditorPanel.style.bottom = "auto"; }
+    function clampGridEditorPosition(left, top) { return firstTheaterMapGridModule?.clampPanelPosition?.(left, top, stageShell?.getBoundingClientRect?.(), gridEditorPanel?.getBoundingClientRect?.(), 420, 480) || { left: Math.round(left), top: Math.round(top) }; }
+    function setGridEditorPosition(left, top) { if (!gridEditorPanel) return; const position = clampGridEditorPosition(left, top); gridEditorPanel.style.left = `${position.left}px`; gridEditorPanel.style.top = `${position.top}px`; gridEditorPanel.style.right = "auto"; gridEditorPanel.style.bottom = "auto"; }
+    function syncMapEditorPreview(url) { return editors?.syncMapEditorPreview?.(url); }
+    function syncMapAssetList() { return editors?.syncMapAssetList?.(); }
+    function syncMapEditorWithState() { return editors?.syncMapEditorWithState?.(); }
+    function livePreviewMapOnStage() { return editors?.livePreviewMapOnStage?.(); }
+    function openMapEditor() { return editors?.openMapEditor?.(); }
+    function hideMapEditor() { return editors?.hideMapEditor?.(); }
+    function cancelMapEditor() { return editors?.cancelMapEditor?.(); }
+    function mapEditorPayloadFromUI(assetID) { return editors?.mapEditorPayloadFromUI?.(assetID); }
+    async function refreshVenueMapAssets() { return editors?.refreshVenueMapAssets?.(); }
+    async function refreshVenueMapState() { return editors?.refreshVenueMapState?.(); }
+    async function uploadMapAsset(file) { return editors?.uploadMapAsset?.(file); }
+    async function saveVenueMap() { return editors?.saveVenueMap?.(); }
+    async function removeVenueMap() { return editors?.removeVenueMap?.(); }
+    function defaultGridConfig() { return editors?.defaultGridConfig?.() || firstTheaterMapGridModule?.defaultGridConfig?.() || { grid_type: "none", hex_orientation: "flat-top", cell_size: 50, offset_x: 0, offset_y: 0, line_width: 1, opacity: 0.45, line_style: "neutral", visible: true }; }
+    function gridEditorDraftFromUI() { return editors?.gridEditorDraftFromUI?.(); }
+    function setGridEditorStatus(text) { if (gridEditorStatus) gridEditorStatus.textContent = text || ""; }
+    function syncGridEditorHexFieldVisibility() { return editors?.syncGridEditorHexFieldVisibility?.(); }
+    function syncGridEditorVisibilityButton() { return editors?.syncGridEditorVisibilityButton?.(); }
+    function syncGridEditorWithState() { return editors?.syncGridEditorWithState?.(); }
+    function liveSyncGrid() { return editors?.liveSyncGrid?.(); }
+    function nudgeGridNumberField(inputEl, delta, min, max) { return editors?.nudgeGridNumberField?.(inputEl, delta, min, max); }
+    function openGridEditor() { return editors?.openGridEditor?.(); }
+    function hideGridEditor() { return editors?.hideGridEditor?.(); }
+    function cancelGridEditor() { return editors?.cancelGridEditor?.(); }
+    function resetGridEditorDraft() { return editors?.resetGridEditorDraft?.(); }
+    function toggleGridVisibilityDraft() { return editors?.toggleGridVisibilityDraft?.(); }
+    async function saveGridConfig() { return editors?.saveGridConfig?.(); }
+    async function refreshVenueGridConfig() { return editors?.refreshVenueGridConfig?.(); }
 
     async function ensureVenueMapTexture() {
       const assetURL = String(currentVenueMapState?.asset?.content_url || "").trim();
@@ -2448,10 +2185,10 @@
       return firstTheaterGeometryModule?.computeStagePlayableBounds?.(width, height) || { x: 0, y: 0, width, height };
     };
 
-    function renderVenueGridLayer(bounds) {
+    function renderVenueGridLayer(bounds, config = null) {
       if (!gridLayer || !window.PIXI) return;
       const resolvedBounds = bounds || getPlayableBounds();
-      window.VictoryPixiGrid?.render?.(gridLayer, currentVenueGridConfig, resolvedBounds);
+      window.VictoryPixiGrid?.render?.(gridLayer, config || currentVenueGridConfig, resolvedBounds);
     }
 
     function renderVenueMapLayer(width, height) {
@@ -2634,12 +2371,15 @@
     }
 
     function isSecondaryPointerEvent(event) {
-      const button = Number(event?.button ?? event?.data?.button ?? -1);
-      const buttons = Number(event?.buttons ?? event?.data?.buttons ?? 0);
-      return button === 2 || (buttons & 2) === 2;
+      return contextHelpers?.isSecondaryPointerEvent?.(event)
+        || (Number(event?.button ?? event?.data?.button ?? -1) === 2 || (Number(event?.buttons ?? event?.data?.buttons ?? 0) & 2) === 2);
     }
 
     function markContextMenuHandled(event) {
+      if (contextHelpers?.markContextMenuHandled) {
+        contextHelpers.markContextMenuHandled(event);
+        return;
+      }
       if (!event) return;
       event.__firstTheaterContextMenuHandled = true;
       if (event.data?.originalEvent) {
@@ -2648,6 +2388,9 @@
     }
 
     function wasContextMenuHandled(event) {
+      if (contextHelpers?.wasContextMenuHandled) {
+        return contextHelpers.wasContextMenuHandled(event);
+      }
       return !!(event?.__firstTheaterContextMenuHandled || event?.data?.originalEvent?.__firstTheaterContextMenuHandled);
     }
 
@@ -2680,41 +2423,15 @@
     };
 
     function hitTestContextMenuTarget(screenPoint, worldPoint) {
-      for (let index = currentObjects.length - 1; index >= 0; index -= 1) {
-        const model = currentObjects[index];
-        const node = currentNodeMap.get(model.key);
-        const bounds = node?.container?.getBounds?.();
-        const point = screenPoint;
-        if (bounds?.contains?.(point.x, point.y)) {
-          return model;
-        }
-
-        const localPoint = node?.container?.toLocal && window.PIXI
-          ? node.container.toLocal(new PIXI.Point(point.x, point.y))
-          : null;
-        if (!localPoint) {
-          continue;
-        }
-
-        const kind = objectKind(model);
-        const width = kind === "fire" ? 124 : 200;
-        const height = kind === "fire" ? 150 : 140;
-        const hitSlop = 8;
-        if (
-          localPoint.x >= -hitSlop &&
-          localPoint.x <= width + hitSlop &&
-          localPoint.y >= -hitSlop &&
-          localPoint.y <= height + hitSlop
-        ) {
-          return model;
-        }
+      if (contextHelpers?.hitTestContextMenuTarget) {
+        return contextHelpers.hitTestContextMenuTarget(screenPoint, worldPoint);
       }
       return null;
     }
 
     function resolveContextMenuTargetFromClient(clientX, clientY) {
-      if (actionRouter?.resolveContextMenuTargetFromClient) {
-        return actionRouter.resolveContextMenuTargetFromClient(clientX, clientY);
+      if (contextHelpers?.resolveContextMenuTargetFromClient) {
+        return contextHelpers.resolveContextMenuTargetFromClient(clientX, clientY);
       }
       const screenPoint = stageScreenPointFromClient(clientX, clientY);
       const stagePoint = stagePointFromClient(clientX, clientY);
@@ -2723,629 +2440,34 @@
     }
 
     function eventClientPoint(event) {
-      if (!event) {
-        return { clientX: 0, clientY: 0 };
-      }
-
-      const originalClientX = Number(event.data?.originalEvent?.clientX ?? event.originalEvent?.clientX ?? Number.NaN);
-      const originalClientY = Number(event.data?.originalEvent?.clientY ?? event.originalEvent?.clientY ?? Number.NaN);
-      if (Number.isFinite(originalClientX) && Number.isFinite(originalClientY)) {
-        return { clientX: originalClientX, clientY: originalClientY };
-      }
-
-      const clientX = Number(event.clientX ?? event.x ?? 0);
-      const clientY = Number(event.clientY ?? event.y ?? 0);
-      if (Number.isFinite(clientX) && Number.isFinite(clientY) && (clientX !== 0 || clientY !== 0)) {
-        return { clientX, clientY };
-      }
-
-      const stagePoint = event.data?.global || event.global || null;
-      if (stagePoint && pixiApp?.renderer) {
-        const rect = stageHost?.getBoundingClientRect();
-        const screenWidth = Number(pixiApp.renderer.screen?.width || rect?.width || 1);
-        const screenHeight = Number(pixiApp.renderer.screen?.height || rect?.height || 1);
-        const domX = rect ? rect.left + (Number(stagePoint.x || 0) * (rect.width / screenWidth)) : Number(stagePoint.x || 0);
-        const domY = rect ? rect.top + (Number(stagePoint.y || 0) * (rect.height / screenHeight)) : Number(stagePoint.y || 0);
-        return { clientX: domX, clientY: domY };
-      }
-
-      return { clientX: 0, clientY: 0 };
+      return contextHelpers?.eventClientPoint?.(event) || { clientX: 0, clientY: 0 };
     }
 
     function updatePointerReadout(screenX, screenY, stagePoint, note = "") {
-      if (stagePoint) {
-        setLastStagePoint(stagePoint);
-      }
-      const resolved = stagePoint || lastStagePoint || { x: 0, y: 0 };
-      const screenLabel = `Screen ${Math.round(screenX || 0)}, ${Math.round(screenY || 0)}`;
-      const stageLabel = `Stage ${resolved.x}, ${resolved.y}`;
-      const text = `${screenLabel} | ${stageLabel}`;
-      setPointerLine(text);
-      if (smokeMode) {
-        const prefix = note ? `${note} · ` : "";
-        setSmokeLine(`${prefix}${stageLabel} · selection ${currentSelectionSummary()}`);
-      }
+      return contextHelpers?.updatePointerReadout?.(screenX, screenY, stagePoint, note);
     }
 
     function cancelContextMenuEvent(event) {
-      event?.stopPropagation?.();
-      event?.preventDefault?.();
-      event?.stopImmediatePropagation?.();
-      event?.data?.originalEvent?.preventDefault?.();
-      event?.data?.originalEvent?.stopPropagation?.();
-      event?.data?.originalEvent?.stopImmediatePropagation?.();
+      return contextHelpers?.cancelContextMenuEvent?.(event);
     }
 
     function handleNativeStageContextMenu(event) {
-      if (actionRouter?.handleNativeStageContextMenu) {
-        return actionRouter.handleNativeStageContextMenu(event);
-      }
-      if (!event) return;
-      if (wasContextMenuHandled(event)) return;
-      const target = event.target;
-      const composedPath = typeof event.composedPath === "function" ? event.composedPath() : [];
-      if (cameraControls?.contains?.(target)) {
-        return;
-      }
-      const isStageEvent = target === stageHost || target === stageShell || stageShell?.contains?.(target) || stageHost?.contains?.(target) || composedPath.includes(stageHost) || composedPath.includes(stageShell) || composedPath.includes(pixiApp?.view);
-      if (!isStageEvent) return;
-      if (event.type !== "contextmenu" && !isSecondaryPointerEvent(event)) {
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation?.();
-      const clientPoint = eventClientPoint(event);
-      const resolved = resolveContextMenuTargetFromClient(clientPoint.clientX, clientPoint.clientY);
-      const nativeEvent = event?.originalEvent || event?.data?.originalEvent || event;
-      markContextMenuHandled(nativeEvent);
-      openContextMenu(nativeEvent, resolved.objectModel);
+      return actionRouter?.handleNativeStageContextMenu?.(event);
     }
 
     function openResolvedContextMenu(event) {
-      if (actionRouter?.openResolvedContextMenu) {
-        return actionRouter.openResolvedContextMenu(event);
-      }
-      if (!event || !contextMenu || !pixiApp) return;
-      const clientPoint = eventClientPoint(event);
-      const resolved = resolveContextMenuTargetFromClient(clientPoint.clientX, clientPoint.clientY);
-      const nativeEvent = event?.data?.originalEvent || event?.originalEvent || event;
-      markContextMenuHandled(nativeEvent);
-      openContextMenu(nativeEvent, resolved.objectModel);
+      return actionRouter?.openResolvedContextMenu?.(event);
     }
 
     function performStageObjectAction(action, objectModel) {
-      if (actionRouter?.performStageObjectAction) {
-        return actionRouter.performStageObjectAction(action, objectModel);
-      }
-      if (!objectModel || !action) return;
-
-      const kind = objectKind(objectModel);
-      const state = objectState(objectModel);
-      const targetPoint = stagePlacementCandidate || lastStagePoint || null;
-      const point = targetPoint ? { x: Math.round(targetPoint.x), y: Math.round(targetPoint.y) } : null;
-
-      if (action === "select") {
-        selectObject(objectModel, `${objectModel.label} selected.`);
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "info" || action === "inspect") {
-        selectObject(objectModel, describeObject(objectModel));
-        if (action === "inspect" && kind === "card" && objectModel.live) {
-          showCardEditorFor(objectModel);
-        }
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "edit") {
-        openCardEditor(objectModel);
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "flip") {
-        if (state.locked) {
-          setStageStatus(`${objectModel.label} is locked.`);
-          closeContextMenu();
-          return;
-        }
-        const key = String(objectModel.elementId || objectModel.elementSlug || objectModel.key || "");
-        const nextFace = cardFaceForModel(objectModel) === "back" ? "front" : "back";
-        if (key) {
-          cardFaceState.set(key, nextFace);
-          renderPixiScene();
-        }
-        setStageStatus(`${objectModel.label} flipped to ${nextFace}.`);
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "pin" || action === "unpin") {
-        if (state.locked) {
-          setStageStatus(`${objectModel.label} is locked.`);
-          closeContextMenu();
-          return;
-        }
-        const currentPoint = currentDisplayedPointForModel(objectModel);
-        const pinMode = action === "pin" ? "world" : "overlay";
-        const worldPoint = pinMode === "world"
-          ? worldPointForStagePoint(currentPoint)
-          : null;
-        const overlayPoint = pinMode === "overlay" ? normalizeOverlayPoint(currentPoint) : null;
-        const payload = {
-          element_id: objectModel.elementId || "",
-          element_slug: objectModel.elementSlug || "",
-          front_text: objectModel.frontText || "",
-          back_text: objectModel.backText || "",
-          color: objectModel.color || "#d9c7a6",
-          pin_mode: pinMode,
-        };
-        if (pinMode === "world") {
-          payload.world_x = worldPoint.x;
-          payload.world_y = worldPoint.y;
-          payload.screen_x = null;
-          payload.screen_y = null;
-        } else {
-          payload.world_x = null;
-          payload.world_y = null;
-          payload.screen_x = overlayPoint.screen_x;
-          payload.screen_y = overlayPoint.screen_y;
-        }
-        const sent = sendAction("update/index_card", payload);
-        const placementSent = sendAction("act/place_element", {
-          element_id: objectModel.elementId || "",
-          element_slug: objectModel.elementSlug || "",
-          venue_slug: "the-cave",
-          layer: "stage",
-          x: currentPoint.x,
-          y: currentPoint.y,
-          order: Number(objectModel.position?.order ?? 0),
-        });
-        if (sent) {
-          updateLocalCardPinModel(objectModel, (model) => {
-            model.source.data = {
-              ...(model.source.data || {}),
-              pin_mode: pinMode,
-              world_x: pinMode === "world" ? worldPoint.x : null,
-              world_y: pinMode === "world" ? worldPoint.y : null,
-              screen_x: pinMode === "overlay" ? overlayPoint.screen_x : null,
-              screen_y: pinMode === "overlay" ? overlayPoint.screen_y : null,
-            };
-            model.position = setLocalPositionOverrideForModel(model, currentPoint) || model.position;
-          });
-        }
-        setStageStatus(sent && placementSent ? `${action === "pin" ? "Attached" : "Pinned"} ${objectModel.label}.` : "Socket unavailable.");
-        setMovementReport(sent && placementSent ? `${action === "pin" ? "Attached" : "Pinned"} ${objectModel.label}.` : "Socket unavailable.");
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "create-card") {
-        createIndexCardFromMenu();
-        return;
-      }
-
-      if (action === "set-map") {
-        openMapEditor();
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "configure-grid") {
-        openGridEditor();
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "add-token") {
-        openTokenPicker("create", null);
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "clear") {
-        selectObject(null, "Selection cleared.");
-        hideCardEditor();
-        hideMapEditor();
-        hideGridEditor();
-        hideTokenEditor();
-        closeTokenPicker();
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "unlock" || action === "lock") {
-        const locked = action === "lock";
-        const sent = sendAction("act/set_element_lock", {
-          element_id: objectModel.elementId || "",
-          element_slug: objectModel.elementSlug || "",
-          locked,
-        });
-        if (sent) {
-          updateLocalObjectModel(objectModel, (model) => {
-            model.state = { ...(model.state || {}), locked };
-            model.visibility = { ...(model.visibility || {}), locked };
-          });
-        }
-        setStageStatus(sent ? `${locked ? "Locking" : "Unlocking"} ${objectModel.label}...` : "Socket unavailable.");
-        if (!sent && cardEditorStatus) {
-          cardEditorStatus.textContent = "Socket unavailable.";
-        }
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "scale" && isTokenObject(objectModel)) {
-        openTokenEditor(objectModel);
-        closeContextMenu();
-        return;
-      }
-
-      if ((action === "snap-to-grid" || action === "free-placement") && isTokenObject(objectModel)) {
-        const snapMode = action === "snap-to-grid" ? "grid" : "free";
-        const snappedPoint = snapMode === "grid"
-          ? tokenPlacementPointForCreate(currentDisplayedPointForModel(objectModel), objectModel, snapMode)
-          : currentDisplayedPointForModel(objectModel);
-        const sent = sendAction("update/token", {
-          element_id: objectModel.elementId || "",
-          element_slug: objectModel.elementSlug || "",
-          venue_slug: "the-cave",
-          layer: "stage",
-          x: Number(snappedPoint?.x ?? objectModel.position?.x ?? 0),
-          y: Number(snappedPoint?.y ?? objectModel.position?.y ?? 0),
-          order: Number(objectModel.position?.order ?? 0),
-          snap_mode: snapMode,
-        });
-        if (sent) {
-          updateTokenLocalModel(objectModel, (model) => {
-            model.snapMode = snapMode;
-            model.gridRelative = snapMode === "grid";
-            if (snapMode === "grid" && snappedPoint) {
-              model.position = {
-                ...(model.position || {}),
-                x: Math.round(Number(snappedPoint.x || 0)),
-                y: Math.round(Number(snappedPoint.y || 0)),
-                order: Number(model.position?.order ?? 0),
-                frame: "center",
-              };
-            }
-          });
-        }
-        setStageStatus(sent ? `${objectModel.label} set to ${snapMode === "grid" ? "Snap to Grid" : "Free Placement"}.` : "Socket unavailable.");
-        closeContextMenu();
-        return;
-      }
-
-      if ((action === "move-director-layer" || action === "move-public-layer") && isTokenObject(objectModel)) {
-        const tokenLayer = action === "move-director-layer" ? "director" : "public";
-        const sent = sendAction("update/token", {
-          element_id: objectModel.elementId || "",
-          element_slug: objectModel.elementSlug || "",
-          venue_slug: "the-cave",
-          layer: "stage",
-          x: Number(objectModel.position?.x ?? 0),
-          y: Number(objectModel.position?.y ?? 0),
-          order: Number(objectModel.position?.order ?? 0),
-          token_layer: tokenLayer,
-        });
-        if (sent) {
-          updateTokenLocalModel(objectModel, (model) => {
-            model.tokenLayer = tokenLayer;
-          });
-        }
-        setStageStatus(sent ? `${objectModel.label} moved to the ${tokenLayer === "director" ? "Director" : "Public"} layer.` : "Socket unavailable.");
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "replace-asset" && isTokenObject(objectModel)) {
-        openTokenPicker("replace", objectModel);
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "hide-nameplate" || action === "show-nameplate") {
-        const visible = action === "show-nameplate";
-        const sent = sendAction("act/set_nameplate_visibility", {
-          element_id: objectModel.elementId || "",
-          element_slug: objectModel.elementSlug || "",
-          layer: "audience",
-          visible,
-        });
-        if (sent) {
-          updateLocalObjectModel(objectModel, (model) => {
-            model.state = { ...(model.state || {}), nameplate_visible: visible, nameplateVisible: visible };
-            model.visibility = { ...(model.visibility || {}), nameplate_visible: visible };
-          });
-        }
-        setStageStatus(sent ? `${visible ? "Showing" : "Hiding"} nameplate for ${objectModel.label}...` : "Socket unavailable.");
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "hide" || action === "show") {
-        const type = action === "show" ? "act/reveal_element" : "act/hide_element";
-        const sent = sendAction(type, {
-          element_id: objectModel.elementId || "",
-          element_slug: objectModel.elementSlug || "",
-          layer: "audience",
-        });
-        if (sent) {
-          updateLocalObjectModel(objectModel, (model) => {
-            model.state = { ...(model.state || {}), visible: action === "show" };
-            model.visibility = { ...(model.visibility || {}), visible: action === "show" };
-          });
-        }
-        setStageStatus(sent ? `${action === "show" ? "Showing" : "Hiding"} ${objectModel.label} for the audience...` : "Socket unavailable.");
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "move-here") {
-        if (!point) {
-          setStageStatus("Move here needs a stage point.");
-          return;
-        }
-        const moveTarget = isTokenObject(objectModel)
-          ? tokenMoveTargetForModel(objectModel, point)
-          : cardMoveTargetForModel(objectModel, point);
-        if (!moveTarget) {
-          setStageStatus("Move here needs a stage point.");
-          closeContextMenu();
-          return;
-        }
-        const sent = isTokenObject(objectModel)
-          ? sendAction("update/token", {
-              element_id: objectModel.elementId || "",
-              element_slug: objectModel.elementSlug || "",
-              venue_slug: "the-cave",
-              layer: "stage",
-              x: point.x,
-              y: point.y,
-              order: Number(objectModel.position?.order ?? 0),
-              snap_mode: moveTarget.snapMode,
-              token_layer: tokenLayerForModel(objectModel),
-              scale: tokenScaleForModel(objectModel),
-            })
-          : sendAction("update/index_card", {
-              element_id: objectModel.elementId || "",
-              element_slug: objectModel.elementSlug || "",
-              front_text: objectModel.frontText || "",
-              back_text: objectModel.backText || "",
-              color: objectModel.color || "#d9c7a6",
-              pin_mode: moveTarget.pinMode,
-              world_x: moveTarget.world_x,
-              world_y: moveTarget.world_y,
-              screen_x: moveTarget.screen_x,
-              screen_y: moveTarget.screen_y,
-            });
-        const placementSent = isTokenObject(objectModel)
-          ? true
-          : sendAction("act/place_element", {
-              element_id: objectModel.elementId || "",
-              element_slug: objectModel.elementSlug || "",
-              venue_slug: "the-cave",
-              layer: "stage",
-              x: point.x,
-              y: point.y,
-              order: Number(objectModel.position?.order ?? 0),
-            });
-        if (sent) {
-          updateLocalCardPinModel(objectModel, (model) => {
-            if (isTokenObject(model)) {
-              model.source.data = {
-                ...(model.source.data || {}),
-                snap_mode: moveTarget.snapMode,
-                token_layer: tokenLayerForModel(model),
-                scale: tokenScaleForModel(model),
-              };
-              model.position = {
-                ...(model.position || {}),
-                x: point.x,
-                y: point.y,
-                order: Number(model.position?.order ?? 0),
-                frame: "center",
-              };
-            } else {
-              model.source.data = {
-                ...(model.source.data || {}),
-                pin_mode: moveTarget.pinMode,
-                world_x: moveTarget.world_x,
-                world_y: moveTarget.world_y,
-                screen_x: moveTarget.screen_x,
-                screen_y: moveTarget.screen_y,
-              };
-              model.position = setLocalPositionOverrideForModel(model, point) || model.position;
-            }
-          });
-        }
-        const moveLabel = isTokenObject(objectModel)
-          ? `${moveTarget.snapMode === "grid" ? "grid" : "free"} x ${point.x}, y ${point.y}`
-          : moveTarget.pinMode === "world"
-            ? `world x ${moveTarget.world_x}, y ${moveTarget.world_y}`
-            : `overlay x ${moveTarget.screen_x}, y ${moveTarget.screen_y}`;
-        const moveOk = isTokenObject(objectModel) ? sent : (sent && placementSent);
-        setMovementLine(moveOk ? `Move sent for ${objectModel.label} to ${moveLabel}.` : "Socket unavailable.");
-        setStageStatus(moveOk ? `Moving ${objectModel.label} to ${moveLabel}.` : "Socket unavailable.");
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "duplicate") {
-        const duplicatePlacement = isTokenObject(objectModel)
-          ? tokenDuplicatePlacementForModel(objectModel)
-          : cardDuplicatePlacementForModel(objectModel);
-        const duplicatePinMode = isTokenObject(objectModel)
-          ? (tokenSnapModeForModel(objectModel) === "grid" ? "world" : "overlay")
-          : duplicatePlacement.pinMode;
-        const sent = sendAction("act/duplicate_element", {
-          element_id: objectModel.elementId || "",
-          element_slug: objectModel.elementSlug || "",
-          venue_slug: "the-cave",
-          layer: "stage",
-          x: duplicatePlacement.x,
-          y: duplicatePlacement.y,
-          order: Number(objectModel.position?.order ?? 0),
-          pin_mode: duplicatePinMode,
-          world_x: duplicatePlacement.world_x,
-          world_y: duplicatePlacement.world_y,
-          screen_x: duplicatePlacement.screen_x,
-          screen_y: duplicatePlacement.screen_y,
-        });
-        const duplicateLabel = isTokenObject(objectModel)
-          ? `x ${duplicatePlacement.x}, y ${duplicatePlacement.y}`
-          : duplicatePlacement.pinMode === "world"
-            ? `world x ${duplicatePlacement.world_x}, y ${duplicatePlacement.world_y}`
-            : `overlay x ${duplicatePlacement.screen_x}, y ${duplicatePlacement.screen_y}`;
-        setMovementLine(sent ? `Duplicate sent for ${objectModel.label} to ${duplicateLabel}.` : "Socket unavailable.");
-        setStageStatus(sent ? `Duplicating ${objectModel.label} to ${duplicateLabel}.` : "Socket unavailable.");
-        if (sent) {
-          if (isTokenObject(objectModel)) {
-            updateTokenLocalModel(objectModel, (model) => {
-              model.position = {
-                ...(model.position || {}),
-                x: duplicatePlacement.x,
-                y: duplicatePlacement.y,
-                order: Number(model.position?.order ?? 0),
-                frame: "center",
-              };
-            });
-          } else {
-            setLocalPositionOverrideForModel(objectModel, { x: duplicatePlacement.x, y: duplicatePlacement.y });
-          }
-        }
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "remove") {
-        const sent = sendAction("act/remove_element", {
-          element_id: objectModel.elementId || "",
-          element_slug: objectModel.elementSlug || "",
-          venue_slug: "the-cave",
-          layer: "stage",
-        });
-        if (sent) {
-          currentObjects = currentObjects.filter((item) => !updateObjectMatches(item, objectModel));
-          if (currentSelection && updateObjectMatches(currentSelection, objectModel)) {
-            currentSelection = null;
-          }
-          if (tokenEditorTargetKey && updateObjectMatches({ key: tokenEditorTargetKey }, objectModel)) {
-            hideTokenEditor();
-          }
-          if (cardEditorTargetKey && updateObjectMatches({ key: cardEditorTargetKey }, objectModel)) {
-            cardEditorTargetKey = "";
-          }
-          updateStatusSummary();
-          updateShellTargetPresentation();
-          renderPixiScene();
-          syncSelectedActions();
-          syncCardEditorWithSelection();
-          syncTokenEditorWithSelection();
-        }
-        setMovementReport(sent ? `Remove sent for ${objectModel.label}.` : "Socket unavailable.");
-        setStageStatus(sent ? `Removing ${objectModel.label} from the stage...` : "Socket unavailable.");
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "delete-card") {
-        const sent = sendAction("delete/index_card", {
-          element_id: objectModel.elementId || "",
-          element_slug: objectModel.elementSlug || "",
-        });
-        if (sent) {
-          currentObjects = currentObjects.filter((item) => !updateObjectMatches(item, objectModel));
-          if (currentSelection && updateObjectMatches(currentSelection, objectModel)) {
-            currentSelection = null;
-          }
-          if (cardEditorTargetKey && updateObjectMatches({ key: cardEditorTargetKey }, objectModel)) {
-            cardEditorTargetKey = "";
-          }
-          updateStatusSummary();
-          updateShellTargetPresentation();
-          renderPixiScene();
-          syncSelectedActions();
-          syncCardEditorWithSelection();
-        }
-        setMovementReport(sent ? `Delete sent for ${objectModel.label}.` : "Socket unavailable.");
-        setStageStatus(sent ? `Deleting ${objectModel.label}...` : "Socket unavailable.");
-        closeContextMenu();
-        return;
-      }
-
-      if (action === "place") {
-        if (kind === "card" && objectModel.live && point) {
-          const sent = sendAction("act/place_element", {
-            element_id: objectModel.elementId || "",
-            element_slug: objectModel.elementSlug || "",
-            venue_slug: "the-cave",
-            layer: "stage",
-            x: point.x,
-            y: point.y,
-            order: Number(objectModel.position?.order ?? 0),
-          });
-          setMovementLine(sent ? `Placement sent to x ${point.x}, y ${point.y}.` : "Socket unavailable.");
-        }
-        closeContextMenu();
-      }
+      return actionRouter?.performStageObjectAction?.(action, objectModel);
     }
 
     function openContextMenu(event, objectModel) {
-      if (actionRouter?.openContextMenu) {
-        return actionRouter.openContextMenu(event, objectModel);
+      actionRouter?.openContextMenu?.(event, objectModel);
+      if (!objectModel) {
+        return;
       }
-      if (!contextMenu || !objectModel) return;
-      contextMenuTarget = objectModel;
-      const clientPoint = eventClientPoint(event);
-      const stagePoint = stagePlacementFromEvent(event);
-      const screenPoint = stageScreenPointFromClient(clientPoint.clientX, clientPoint.clientY);
-      if (objectModel.kind === "stage" || objectModel.kind === "fire" || (objectModel.live && isLiveStageObject(objectModel))) {
-        stagePlacementCandidate = stagePoint;
-        stagePlacementScreenCandidate = screenPoint;
-        if (stagePlacementCandidate) {
-          updatePointerReadout(clientPoint.clientX || 0, clientPoint.clientY || 0, stagePlacementCandidate, `${objectModel.kind === "fire" ? "Fire" : "Stage"} menu`);
-        }
-      }
-
-      const items = resolveStageObjectActions(objectModel, {
-        role: currentRole,
-        canManageIndexCards: canManageIndexCards(currentRole),
-        canManageStageTokens: canManageStageTokens(currentRole),
-        canActorRevealHideStageObjects: canActorRevealHideStageObjects(currentRole, currentSnapshot?.venue?.config || {}),
-        hasSelection: Boolean(currentSelection),
-        gridConfig: currentVenueGridConfig,
-        cardFaceForModel,
-        cardDisplayMode,
-        tokenScaleForModel,
-        tokenSnapModeForModel,
-        tokenLayerForModel,
-      });
-      contextMenu.innerHTML = items
-        .map((item, index) => {
-          let separator = "";
-          if (index > 0 && items[index - 1].group !== item.group) {
-            separator = '<div class="menu-separator"></div>';
-          }
-          const disabled = item.disabled ? " disabled" : "";
-          return `${separator}<button type="button" data-menu-action="${escapeHtml(item.action)}"${disabled}>${escapeHtml(item.label)}</button>`;
-        })
-        .join("") +
-        `<div class="menu-separator"></div>
-        <button type="button" data-menu-action="copy" disabled>Copy</button>
-        <button type="button" data-menu-action="paste" disabled>Paste</button>`;
-
-      contextMenu.hidden = false;
-      contextMenu.style.left = "0px";
-      contextMenu.style.top = "0px";
-      const rect = contextMenu.getBoundingClientRect();
-      const maxX = Math.max(8, window.innerWidth - rect.width - 8);
-      const maxY = Math.max(8, window.innerHeight - rect.height - 8);
-      contextMenu.style.left = `${Math.max(8, Math.min(clientPoint.clientX || 0, maxX))}px`;
-      contextMenu.style.top = `${Math.max(8, Math.min(clientPoint.clientY || 0, maxY))}px`;
       contextMenu.dataset.objectKey = objectModel.key;
       suppressStageContextMenu = true;
       window.setTimeout(() => {
@@ -3532,143 +2654,9 @@
     const makeTokenNode = (model) => sceneNodeFactory?.makeTokenNode?.(model) || null;
     const makePlaceholderNode = (model) => (isTokenObject(model) ? makeTokenNode(model) : makeCardNode(model));
 
-    function createIndexCardFromMenu() {
-      if (!canManageIndexCards(currentRole)) {
-        setStageStatus("Only producers and directors can create cards.");
-        return;
-      }
+    function createIndexCardFromMenu() { return sessionSync?.createIndexCardFromMenu?.(); }
 
-      if (!stagePlacementCandidate) {
-        setStageStatus("No stage placement point available.");
-        return;
-      }
-
-      pendingStageCardPlacement = stagePlacementScreenCandidate || null;
-      stagePlacementCandidate = null;
-      stagePlacementScreenCandidate = null;
-      const placementLabel = `x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}`;
-      const socket = socketController?.getWebSocket?.() || ws;
-      const queued = !!(socket && socket.readyState === WebSocket.CONNECTING && currentSessionId);
-
-      const sent = sendAction("create/index_card", {
-        front_text: "New Index Card",
-        back_text: "",
-        color: "#d9c7a6",
-      });
-      if (!sent) {
-        pendingStageCardPlacement = null;
-        setStageStatus("Socket unavailable.");
-        closeContextMenu();
-        return;
-      }
-
-      setStageStatus(queued ? `Index card queued. Attaching to screen at ${placementLabel} when the connection opens...` : `Index card created. Attaching to screen at ${placementLabel}...`);
-      setMovementReport(queued ? `Queued placement at ${placementLabel}.` : `Awaiting placement at ${placementLabel}.`);
-      if (smokeMode) {
-        setSmokeLine(queued ? `Create queued for ${placementLabel}.` : `Create sent for ${placementLabel}.`);
-      }
-      closeContextMenu();
-    }
-
-    function placeCreatedIndexCard(action) {
-      if (!pendingStageCardPlacement) return;
-
-      const targetId = String(action?.target?.element_id || "");
-      const targetSlug = String(action?.target?.element_slug || "");
-      const snapshotElements = Array.isArray(currentSnapshot?.elements) ? currentSnapshot.elements : [];
-      const createdCard = snapshotElements.find((el) =>
-        el &&
-        String(el.element_type || "").toLowerCase() === "index_card" &&
-        (
-          (targetId && String(el.element_id || "") === targetId) ||
-          (targetSlug && String(el.slug || "") === targetSlug)
-        )
-      );
-
-      const elementId = targetId || createdCard?.element_id || "";
-      const elementSlug = targetSlug || createdCard?.slug || "";
-
-      if (!elementId && !elementSlug) {
-        return;
-      }
-
-      selectObject({
-        key: `live:${elementId || elementSlug}`,
-        kind: "card",
-        live: true,
-        elementId,
-        elementSlug,
-        label: createdCard?.name || createdCard?.data?.front_text || "Index card",
-        frontText: String(createdCard?.data?.front_text || createdCard?.name || "").trim(),
-        backText: String(createdCard?.data?.back_text || "").trim(),
-        color: String(createdCard?.data?.color || "#d9c7a6").trim() || "#d9c7a6",
-        position: {
-          ...(createdCard?.position || createdCard?.data?.position || {}),
-          x: pendingStageCardPlacement.x,
-          y: pendingStageCardPlacement.y,
-          frame: "top-left",
-        },
-      }, `Index card created at x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}.`);
-      const createdCardModel = {
-        elementId,
-        elementSlug,
-        key: `live:${elementId || elementSlug}`,
-      };
-      createdCardModel.position = setLocalPositionOverrideForModel(createdCardModel, pendingStageCardPlacement) || createdCardModel.position;
-      if (smokeMode) {
-        setRecentPlacementMarker(pendingStageCardPlacement, createdCard?.name || createdCard?.data?.front_text || "Index card");
-      } else {
-        setRecentPlacementMarker(null);
-      }
-
-      const normalizedPlacement = normalizeOverlayPoint(pendingStageCardPlacement);
-      const updated = sendAction("update/index_card", {
-        element_id: elementId,
-        element_slug: elementSlug,
-        front_text: createdCard?.data?.front_text || createdCard?.name || "New Index Card",
-        back_text: String(createdCard?.data?.back_text || ""),
-        color: String(createdCard?.data?.color || "#d9c7a6"),
-        pin_mode: "overlay",
-        screen_x: normalizedPlacement.screen_x,
-        screen_y: normalizedPlacement.screen_y,
-        world_x: null,
-        world_y: null,
-      });
-
-      if (!updated) {
-        setStageStatus(`Card created but the screen attachment could not be sent from x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}.`);
-        pendingStageCardPlacement = null;
-        closeContextMenu();
-        return;
-      }
-
-      const ok = sendAction("act/place_element", {
-        element_id: elementId,
-        element_slug: elementSlug,
-        venue_slug: "the-cave",
-        layer: "stage",
-        x: pendingStageCardPlacement.x,
-        y: pendingStageCardPlacement.y,
-        order: Number(createdCard?.position?.order ?? 0),
-      });
-
-      if (!ok) {
-        setStageStatus(`Card created but the stage placement could not be sent from x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}.`);
-        if (smokeMode) {
-          setSmokeLine(`Create succeeded, placement failed at ${pendingStageCardPlacement.x}, ${pendingStageCardPlacement.y}.`);
-        }
-        pendingStageCardPlacement = null;
-        closeContextMenu();
-        return;
-      }
-
-      setStageStatus(`Index card placed at x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}.`);
-      setMovementReport(`Index card placed at x ${pendingStageCardPlacement.x}, y ${pendingStageCardPlacement.y}.`);
-      if (smokeMode) {
-        setSmokeLine(`Placed smoke card at ${pendingStageCardPlacement.x}, ${pendingStageCardPlacement.y}.`);
-      }
-      pendingStageCardPlacement = null;
-    }
+    function placeCreatedIndexCard(action) { return sessionSync?.placeCreatedIndexCard?.(action); }
 
     function tokenPickerFilteredAssets() {
       const search = String(tokenPickerState.search || "").trim().toLowerCase();
@@ -3713,308 +2701,15 @@
       }
     }
 
-    function renderTokenPickerList() {
-      if (!tokenPickerList) return;
-      const assets = tokenPickerFilteredAssets();
-      tokenPickerList.innerHTML = "";
-      if (!assets.length) {
-        const empty = document.createElement("div");
-        empty.className = "token-picker-status";
-        empty.textContent = "No matching active token assets.";
-        tokenPickerList.appendChild(empty);
-        tokenPickerPreviewForAsset(null);
-        return;
-      }
-
-      if (!tokenPickerState.selectedAssetID || !assets.some((asset) => asset.id === tokenPickerState.selectedAssetID)) {
-        tokenPickerState.selectedAssetID = String(assets[0].id || assets[0].asset_id || "");
-      }
-
-      const selected = assets.find((asset) => asset.id === tokenPickerState.selectedAssetID) || assets[0] || null;
-      if (selected) {
-        tokenPickerPreviewForAsset(selected);
-      }
-
-      assets.forEach((asset) => {
-        const assetID = String(asset.id || asset.asset_id || "").trim();
-        const assetName = String(asset.name || asset.asset_name || asset.original_filename || assetID || "Token asset");
-        const assetShape = String(asset.shape || asset.asset_shape || "circle");
-        const sourceMime = String(asset.source_mime || asset.sourceMime || asset.sniffed_mime || asset.sniffedMime || "");
-        const thumbURL = String(asset.thumbnail_url || asset.thumbnailURL || asset.content_url || asset.contentURL || "");
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "token-picker-card";
-        if (assetID === tokenPickerState.selectedAssetID) {
-          button.classList.add("is-selected");
-        }
-        const bytes = formatByteSize(asset.stored_bytes || asset.byte_size || 0);
-        const dims = `${asset.default_grid_width || asset.defaultGridWidth || 1} x ${asset.default_grid_height || asset.defaultGridHeight || 1}`;
-        button.innerHTML = `
-          <img src="${escapeHtml(thumbURL)}" alt="${escapeHtml(assetName)}" />
-          <div class="token-picker-meta">
-            <strong>${escapeHtml(assetName)}</strong>
-            <small>${escapeHtml(assetShape)} · ${escapeHtml(dims)} · ${escapeHtml(bytes)}</small>
-            <small>${escapeHtml(sourceMime)}</small>
-          </div>
-        `;
-        button.addEventListener("click", () => {
-          tokenPickerState.selectedAssetID = assetID;
-          tokenPickerState.search = String(tokenPickerSearch?.value || tokenPickerState.search || "");
-          renderTokenPickerList();
-          const target = {
-            ...asset,
-            id: assetID,
-            asset_id: assetID,
-            name: assetName,
-            shape: assetShape,
-            thumbnail_url: thumbURL,
-            content_url: String(asset.content_url || asset.contentURL || ""),
-          };
-          if (tokenPickerState.mode === "replace" && tokenPickerState.replaceTargetKey) {
-            placeTokenAsset(target, tokenPickerState.placementPoint, tokenPickerState.replaceTargetKey, true);
-          } else {
-            placeTokenAsset(target, tokenPickerState.placementPoint, "", false);
-          }
-        });
-        tokenPickerList.appendChild(button);
-      });
-    }
-
-    async function refreshWarehouseTokenAssets() {
-      if (!canManageStageTokens(currentRole)) {
-        warehouseTokenAssets = [];
-        renderTokenPickerList();
-        return;
-      }
-      try {
-        if (tokenPickerStatus) {
-          tokenPickerStatus.textContent = "Loading active token assets...";
-        }
-        const params = new URLSearchParams({
-          asset_type: "token",
-          status: "active",
-          search: String(tokenPickerSearch?.value || "").trim(),
-        });
-        const response = await fetch(`/api/warehouse/assets?${params.toString()}`, {
-          credentials: "include",
-          cache: "no-store",
-        });
-        const payload = await response.json().catch(() => null);
-        if (!response.ok || !payload?.ok) {
-          throw new Error(payload?.error || `HTTP ${response.status}`);
-        }
-        warehouseTokenAssets = Array.isArray(payload.data) ? payload.data : [];
-        if (tokenPickerStatus) {
-          tokenPickerStatus.textContent = warehouseTokenAssets.length
-            ? `${warehouseTokenAssets.length} token asset${warehouseTokenAssets.length === 1 ? "" : "s"} loaded.`
-            : "No active token assets found.";
-        }
-        renderTokenPickerList();
-      } catch (error) {
-        console.warn("refreshWarehouseTokenAssets failed", error);
-        warehouseTokenAssets = [];
-        if (tokenPickerStatus) {
-          tokenPickerStatus.textContent = error.message || String(error);
-        }
-        renderTokenPickerList();
-      }
-    }
-
-    function openTokenPicker(mode = "create", objectModel = null) {
-      if (!tokenPickerPanel) return;
-      if (!canManageStageTokens(currentRole)) {
-        setStageStatus("Only producers and directors can place First Theater tokens.");
-        return;
-      }
-      hideCardEditor();
-      hideMapEditor();
-      hideGridEditor();
-      hideTokenEditor();
-        tokenPickerState = {
-        open: true,
-        mode: mode === "replace" ? "replace" : "create",
-        selectedAssetID: "",
-        filterShape: "all",
-        search: "",
-        placementPoint: stagePlacementCandidate ? { ...stagePlacementCandidate } : (lastStagePoint ? { ...lastStagePoint } : null),
-        placementScreenPoint: stagePlacementScreenCandidate ? { ...stagePlacementScreenCandidate } : null,
-        replaceTargetKey: objectModel?.key || "",
-        replaceTargetElementID: objectModel?.elementId || "",
-        replaceTargetElementSlug: objectModel?.elementSlug || "",
-        replaceTargetScale: objectModel ? tokenScaleForModel(objectModel) : 100,
-        replaceTargetSnapMode: objectModel ? tokenSnapModeForModel(objectModel) : (currentVenueGridConfig && currentVenueGridConfig.grid_type !== "none" ? "grid" : "free"),
-        replaceTargetTokenLayer: objectModel ? tokenLayerForModel(objectModel) : "public",
-      };
-      if (tokenPickerPanel.hidden) {
-        setTokenPickerPosition(16, 220);
-      }
-      tokenPickerPanel.hidden = false;
-      if (tokenPickerSearch) tokenPickerSearch.value = "";
-      if (tokenPickerShape) tokenPickerShape.value = "all";
-      if (tokenPickerStatus) {
-        tokenPickerStatus.textContent = "Choose an active Warehouse token asset.";
-      }
-      void refreshWarehouseTokenAssets();
-      tokenPickerSearch?.focus?.({ preventScroll: true });
-    }
-
-    function closeTokenPicker() {
-      tokenPickerState.open = false;
-      tokenPickerState.replaceTargetKey = "";
-      tokenPickerState.replaceTargetElementID = "";
-      tokenPickerState.replaceTargetElementSlug = "";
-      tokenPickerState.replaceTargetScale = 100;
-      tokenPickerState.replaceTargetSnapMode = "grid";
-      tokenPickerState.replaceTargetTokenLayer = "public";
-      tokenPickerState.placementPoint = null;
-      tokenPickerState.placementScreenPoint = null;
-      if (tokenPickerPanel) {
-        tokenPickerPanel.hidden = true;
-      }
-      if (warehouseTokenAssetPreviewURL) {
-        warehouseTokenAssetPreviewURL = "";
-      }
-      if (tokenPickerStatus) {
-        tokenPickerStatus.textContent = "Choose a reusable Warehouse token.";
-      }
-    }
-
-    function placeTokenAsset(asset, point, replaceTargetKey = "", replacing = false) {
-      if (!asset) return;
-      const placementPoint = point || tokenPickerState.placementPoint || lastStagePoint || null;
-      if (!placementPoint) {
-        setStageStatus("No stage placement point available.");
-        return;
-      }
-      const snapMode = currentVenueGridConfig && currentVenueGridConfig.grid_type !== "none" ? "grid" : "free";
-      const snapped = tokenPlacementPointForCreate(placementPoint, { source: { data: { snap_mode: snapMode } } }, snapMode);
-      const targetPayload = {
-        asset_id: String(asset.id || "").trim(),
-        venue_slug: "the-cave",
-        layer: "stage",
-        x: snapped.x,
-        y: snapped.y,
-        order: 0,
-        snap_mode: replacing ? (tokenPickerState.replaceTargetSnapMode || snapMode) : snapMode,
-        token_layer: replacing ? (tokenPickerState.replaceTargetTokenLayer || "public") : "public",
-        scale: replacing ? (tokenPickerState.replaceTargetScale || 100) : 100,
-      };
-      const actionType = replacing ? "update/token" : "create/token";
-      const sent = sendAction(actionType, replacing && replaceTargetKey ? {
-        element_id: tokenPickerState.replaceTargetElementID || replaceTargetKey || "",
-        element_slug: tokenPickerState.replaceTargetElementSlug || "",
-        ...targetPayload,
-      } : targetPayload);
-      if (sent) {
-        if (tokenPickerStatus) {
-          tokenPickerStatus.textContent = replacing ? `Replacing token asset with ${asset.name || asset.id}.` : `Placing ${asset.name || asset.id}.`;
-        }
-        setStageStatus(replacing ? `Replacing token with ${asset.name || asset.id}.` : `Placing token ${asset.name || asset.id}.`);
-        setMovementLine(replacing ? `Replace sent for ${asset.name || asset.id}.` : `Create sent for ${asset.name || asset.id}.`);
-      } else {
-        setStageStatus("Socket unavailable.");
-      }
-      closeTokenPicker();
-    }
-
-    function syncTokenEditorWithSelection() {
-      if (!tokenEditorPanel || tokenEditorPanel.hidden) return;
-      const target = currentSelection && isTokenObject(currentSelection)
-        ? currentSelection
-        : currentObjects.find((item) => item.key === tokenEditorTargetKey) || null;
-      if (!target || !target.live || !isTokenObject(target)) {
-        hideTokenEditor();
-        return;
-      }
-      if (tokenEditorDirty) {
-        return;
-      }
-      if (tokenEditorScale) tokenEditorScale.value = String(Math.round(tokenScaleForModel(target)));
-      if (tokenEditorScaleValue) tokenEditorScaleValue.value = String(Math.round(tokenScaleForModel(target)));
-      if (tokenEditorSnap) tokenEditorSnap.value = tokenSnapModeForModel(target);
-      if (tokenEditorLayer) tokenEditorLayer.value = tokenLayerForModel(target);
-      if (tokenEditorStatus) {
-        tokenEditorStatus.textContent = `${target.label} ready to edit.`;
-      }
-    }
-
-    function openTokenEditor(model = null) {
-      const target = model || currentSelection;
-      if (!target || !target.live || !isTokenObject(target)) {
-        setStageStatus("Select a live token to edit it.");
-        return;
-      }
-      if (objectState(target).locked) {
-        setStageStatus("This token is locked.");
-        return;
-      }
-      hideMapEditor();
-      hideGridEditor();
-      hideCardEditor();
-      closeTokenPicker();
-      tokenEditorTargetKey = target.key;
-      tokenEditorDirty = false;
-      if (tokenEditorPanel.hidden) {
-        setTokenEditorPosition(16, 220);
-      }
-      tokenEditorPanel.hidden = false;
-      syncTokenEditorWithSelection();
-      tokenEditorScale?.focus?.({ preventScroll: true });
-    }
-
-    function hideTokenEditor() {
-      tokenEditorDirty = false;
-      tokenEditorTargetKey = "";
-      if (tokenEditorPanel) {
-        tokenEditorPanel.hidden = true;
-      }
-      if (tokenEditorStatus) {
-        tokenEditorStatus.textContent = "Adjust the selected token's placement scale.";
-      }
-    }
-
-    function saveTokenEditor() {
-      const target = currentObjects.find((item) => item.key === tokenEditorTargetKey) || currentSelection;
-      if (!target || !target.live || !isTokenObject(target)) {
-        setStageStatus("Select a live token to save edits.");
-        return;
-      }
-      const scale = clampNumber(tokenEditorScaleValue?.value ?? tokenEditorScale?.value ?? 100, 25, 500, 100);
-      const snapMode = String(tokenEditorSnap?.value || tokenSnapModeForModel(target)).trim().toLowerCase() === "free" ? "free" : "grid";
-      const tokenLayer = String(tokenEditorLayer?.value || tokenLayerForModel(target)).trim().toLowerCase() === "director" ? "director" : "public";
-      const sent = sendAction("update/token", {
-        element_id: target.elementId || "",
-        element_slug: target.elementSlug || "",
-        venue_slug: "the-cave",
-        layer: "stage",
-        x: Number(target.position?.x ?? 0),
-        y: Number(target.position?.y ?? 0),
-        order: Number(target.position?.order ?? 0),
-        scale,
-        snap_mode: snapMode,
-        token_layer: tokenLayer,
-      });
-      if (!sent) {
-        setStageStatus("Socket unavailable.");
-        if (tokenEditorStatus) {
-          tokenEditorStatus.textContent = "Save failed: socket unavailable.";
-        }
-        return;
-      }
-      updateTokenLocalModel(target, (model) => {
-        model.scale = scale;
-        model.snapMode = snapMode;
-        model.gridRelative = snapMode === "grid";
-        model.tokenLayer = tokenLayer;
-      });
-      tokenEditorDirty = false;
-      setStageStatus(`Saved ${target.label}.`);
-      if (tokenEditorStatus) {
-        tokenEditorStatus.textContent = `${target.label} save sent.`;
-      }
-      setMovementLine(`update/token sent for ${target.label}.`);
-      renderPixiScene();
-    }
+    function renderTokenPickerList() { return tokenUi?.renderTokenPickerList?.(); }
+    async function refreshWarehouseTokenAssets() { return tokenUi?.refreshWarehouseTokenAssets?.(); }
+    function openTokenPicker(mode = "create", objectModel = null) { return tokenUi?.openTokenPicker?.(mode, objectModel); }
+    function closeTokenPicker() { return tokenUi?.closeTokenPicker?.(); }
+    function placeTokenAsset(asset, point, replaceTargetKey = "", replacing = false) { return tokenUi?.placeTokenAsset?.(asset, point, replaceTargetKey, replacing); }
+    function syncTokenEditorWithSelection() { return tokenUi?.syncTokenEditorWithSelection?.(); }
+    function openTokenEditor(model = null) { return tokenUi?.openTokenEditor?.(model); }
+    function hideTokenEditor() { return tokenUi?.hideTokenEditor?.(); }
+    function saveTokenEditor() { return tokenUi?.saveTokenEditor?.(); }
 
     if (tokenUi) {
       tokenPickerFilteredAssets = (...args) => tokenUi.tokenPickerFilteredAssets(...args);
@@ -4853,299 +3548,19 @@
       return socketController?.sendFocusPing?.() || false;
     }
 
-    async function handleSocketMessage(msg) {
-      if (!msg) return null;
+    function handleSocketMessage(msg) { return sessionSync?.handleSocketMessage?.(msg); }
 
-      if (msg.kind === "snapshot") {
-        applySnapshot(msg.snapshot || msg.message?.data || null);
-        return msg;
-      }
+    function applyVenueFocusPing(data) { return sessionSync?.applyVenueFocusPing?.(data); }
 
-      if (msg.kind === "focus_ping" && msg.data) {
-        applyVenueFocusPing(msg.data);
-        return msg;
-      }
+    function applySnapshot(snapshot) { return sessionSync?.applySnapshot?.(snapshot); }
 
-      if (msg.kind === "action" && msg.action) {
-        const actionType = msg.action.type || "";
-        if (actionType === "chat/message") {
-          appendChatActionLine(msg.action);
-          return msg;
-        }
-        if (
-          actionType === "act/place_element" ||
-          actionType === "act/remove_element" ||
-          actionType === "act/set_element_lock" ||
-          actionType === "act/set_nameplate_visibility" ||
-          actionType === "act/reveal_element" ||
-          actionType === "act/hide_element" ||
-          actionType === "create/index_card" ||
-          actionType === "create/token" ||
-          actionType === "update/token" ||
-          actionType === "update/index_card" ||
-          actionType === "delete/index_card"
-        ) {
-          await refreshWorld();
-          if (actionType === "create/index_card") {
-            placeCreatedIndexCard(msg.action);
-          }
-          if (actionType === "create/token") {
-            setMovementLine("create/token accepted by the live action stream.");
-          }
-          if (actionType === "update/token") {
-            setMovementLine("update/token accepted by the live action stream.");
-          }
-          if (actionType === "create/token" || actionType === "update/token") {
-            const targetId = String(msg.action?.target?.element_id || msg.action?.payload?.element_id || "").trim();
-            const targetSlug = String(msg.action?.target?.element_slug || msg.action?.payload?.element_slug || "").trim();
-            const refreshedToken = currentObjects.find((item) =>
-              item &&
-              item.live &&
-              isTokenObject(item) &&
-              (
-                (targetId && item.elementId === targetId) ||
-                (targetSlug && item.elementSlug === targetSlug)
-              )
-            ) || null;
-            if (refreshedToken) {
-              selectObject(refreshedToken, actionType === "create/token" ? "Token created." : "Token updated.");
-            }
-          }
-          if (actionType === "act/place_element") {
-            setMovementLine("act/place_element accepted by the live action stream.");
-          }
-          if (actionType === "act/remove_element") {
-            setMovementLine("act/remove_element accepted by the live action stream.");
-          }
-          if (actionType === "act/set_element_lock") {
-            setMovementLine("act/set_element_lock accepted by the live action stream.");
-          }
-          if (actionType === "act/set_nameplate_visibility") {
-            setMovementLine("act/set_nameplate_visibility accepted by the live action stream.");
-          }
-          if (actionType === "act/hide_element") {
-            setMovementLine("act/hide_element accepted by the live action stream.");
-          }
-          if (actionType === "act/reveal_element") {
-            setMovementLine("act/reveal_element accepted by the live action stream.");
-          }
-          return msg;
-        }
-      }
+    async function refreshWorld() { return sessionSync?.refreshWorld?.(); }
 
-      if (msg.kind === "showing_update") {
-        await refreshWorld();
-        updateChatPresentation();
-        return msg;
-      }
+    async function joinCave() { return sessionSync?.joinCave?.(); }
 
-      if (msg.kind === "error") {
-        const errorText = String(msg.error || "action_denied");
-        setStageStatus(`Action denied: ${errorText}`);
-        setMovementLine(`Denied: ${errorText}`);
-        if (errorText === "showing_closed") {
-          appendSystemChatNotice(chatClosedMessage());
-          if (chatInput) {
-            chatInput.value = "";
-          }
-        } else if (errorText && errorText !== "chat/message") {
-          appendSystemChatNotice(`Action denied: ${errorText}`);
-        }
-        pendingStageCardPlacement = null;
-        stagePlacementCandidate = null;
-        return msg;
-      }
+    async function ensureJoinedCave() { return sessionSync?.ensureJoinedCave?.(); }
 
-      return msg;
-    }
-
-    function applyVenueFocusPing(data) {
-      if (!data) return;
-      const stamp = Number(Date.parse(String(data.ts || "")) || Date.now());
-      if (stamp < latestFocusEventStamp) {
-        return;
-      }
-      latestFocusEventStamp = stamp;
-
-      const targetPanX = Number.isFinite(Number(data.camera_pan_x)) ? Number(data.camera_pan_x) : Number(data.camera_center_x || 0);
-      const targetPanY = Number.isFinite(Number(data.camera_pan_y)) ? Number(data.camera_pan_y) : Number(data.camera_center_y || 0);
-      const targetZoom = Number.isFinite(Number(data.camera_zoom_relative_to_fit))
-        ? Number(data.camera_zoom_relative_to_fit)
-        : 1;
-      stageCamera?.animateToView?.({
-        panX: targetPanX,
-        panY: targetPanY,
-        zoomRelativeToFit: targetZoom,
-      }, { duration: 250 });
-
-      setRecentFocusMarker({
-        x: Number(data.focus_x || 0),
-        y: Number(data.focus_y || 0),
-      }, "Director focus");
-      const isSelf = String(data.sender_user_id || "") === String(currentActorId || "");
-      setStageStatus(isSelf ? "Focused venue." : "Director focus.");
-      setMovementLine(isSelf ? "Focused venue." : "Director focus.");
-      renderPixiScene();
-    }
-
-    function applySnapshot(snapshot) {
-      projectedState?.replaceFromSnapshot?.(snapshot, { viewerRole: currentRole });
-      currentSnapshot = snapshot || null;
-      const elements = Array.isArray(snapshot?.elements) ? snapshot.elements : [];
-      const overlay = snapshot?.overlay || null;
-      const showing = snapshot?.showing || null;
-      const latestFire = elements.find((element) => element?.slug === "first-fire") || null;
-      const stageCards = elements.filter((element) =>
-        String(element?.element_type || "").toLowerCase() === "index_card" &&
-        String(element?.surface || element?.data?.surface || "tray").toLowerCase() === "stage"
-      );
-      const stageTokens = elements.filter((element) =>
-        String(element?.element_type || "").toLowerCase() === "token" &&
-        String(element?.surface || element?.data?.surface || "stage").toLowerCase() === "stage"
-      );
-
-      const nextObjects = buildObjects(snapshot);
-      if (localPositionOverrides.size > 0) {
-        for (const obj of nextObjects) {
-          const key = String(obj.elementId || obj.elementSlug || obj.key || "");
-          const override = key ? localPositionOverrides.get(key) : null;
-          if (override) {
-            obj.position = override;
-          }
-        }
-      }
-      if (nextObjects.length > 0 || currentObjects.length === 0) {
-        currentObjects = nextObjects;
-      }
-      updateStatusSummary();
-      setStageStatus(`Snapshot loaded. ${currentObjects.length} rendered object${currentObjects.length === 1 ? "" : "s"}.`);
-      setMovementLine("Idle");
-
-      const showingState = showing && String(showing.status || "").toLowerCase() !== "closed"
-        ? "active"
-        : "closed";
-      const overlayState = overlay ? `${overlay.overlay_type || "text"} overlay active` : "no overlay";
-      setSnapshotSummary(`Showing is ${showingState}; ${overlayState}; fire ${latestFire ? "is present" : "not present"}; staged cards ${stageCards.length}; staged tokens ${stageTokens.length}.`);
-
-      if (!pixiApp) {
-        return;
-      }
-
-      if (currentSelection && !currentObjects.find((object) => object.key === currentSelection.key)) {
-        currentSelection = null;
-      }
-      if (currentSelection) {
-        const refreshedSelection = currentObjects.find((object) => object.key === currentSelection.key);
-        if (refreshedSelection) {
-          currentSelection = refreshedSelection;
-        }
-      }
-
-      if (!currentSelection) {
-        setSelectionLine("None");
-        setLiveFeedLine("No live object selected.");
-      }
-
-      if (nextObjects.length > 0 || currentObjects.length === 0) {
-        renderPixiScene();
-      }
-      syncSelectedActions();
-      syncCardEditorWithSelection();
-      syncTokenEditorWithSelection();
-    }
-
-    async function refreshWorld() {
-      const refreshSerial = ++worldRefreshSerial;
-      try {
-        if (!currentSessionId) {
-          await ensureJoinedCave();
-        }
-        const response = await fetch("/api/world/the-cave", {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-        });
-        const payload = await response.json().catch(() => null);
-        if (!response.ok || !payload?.ok || !payload?.data) {
-          throw new Error(payload?.error || `HTTP ${response.status}`);
-        }
-        if (refreshSerial !== worldRefreshSerial) {
-          return;
-        }
-        applySnapshot(payload.data);
-      } catch (error) {
-        if (refreshSerial !== worldRefreshSerial) {
-          return;
-        }
-        console.error("refreshWorld failed", error);
-        setStageStatus(`Snapshot refresh failed: ${error.message || String(error)}`);
-      }
-    }
-
-    async function joinCave() {
-      if (joinPromise) {
-        return joinPromise;
-      }
-
-      joinPromise = joinCaveOnce().finally(() => {
-        joinPromise = null;
-      });
-      return joinPromise;
-    }
-
-    async function ensureJoinedCave() {
-      if (currentSessionId && currentActorId) return;
-      await joinCave();
-    }
-
-    async function joinCaveOnce() {
-      setStageStatus("Joining the live Cave session...");
-
-      let sessionHandle = String(currentIdentity?.handle || "web").trim() || "web";
-      let sessionDisplayName = String(currentIdentity?.display_name || "Friend").trim() || "Friend";
-      if (!currentIdentity) {
-        try {
-          const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
-          const sessionPayload = await sessionResponse.json().catch(() => null);
-          const session = sessionPayload?.data || {};
-          currentIdentity = session;
-          sessionHandle = String(session.handle || sessionHandle).trim() || sessionHandle;
-          sessionDisplayName = String(session.display_name || sessionDisplayName).trim() || sessionDisplayName;
-        } catch (err) {
-          console.warn("session identity lookup failed", err);
-        }
-      }
-
-      const response = await fetch("/api/session/the-cave/join", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          handle: sessionHandle,
-          display_name: sessionDisplayName,
-        }),
-      });
-
-      const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload?.ok) {
-        throw new Error(payload?.error || `Join failed (HTTP ${response.status})`);
-      }
-
-      const data = payload.data || {};
-      currentRole = data.role || data.participant?.role || "audience";
-      currentSessionId = data.session_id || data.session?.id || data.sessionId || "";
-      currentActorId = data.actor_id || data.participant?.actor_id || data.participant?.user_id || data.user_id || "";
-
-      if (!currentSessionId || !currentActorId) {
-        throw new Error("Join succeeded but did not return session_id and actor_id.");
-      }
-
-      updateStatusSummary();
-      updateShellMetaPresentation();
-      setStageStatus(`Joined as ${roleLabel(currentRole)}.`);
-    }
+    async function joinCaveOnce() { return sessionSync?.joinCaveOnce?.(); }
 
     function connectSocket() {
       return socketController?.connectSocket?.() || null;
@@ -5513,6 +3928,10 @@
       void refreshWarehouseTokenAssets();
     });
 
+    tokenPickerApply?.addEventListener("click", () => {
+      tokenUi?.applySelectedTokenAsset?.();
+    });
+
     tokenPickerCancel?.addEventListener("click", () => {
       closeTokenPicker();
     });
@@ -5582,42 +4001,32 @@
 
     mapEditorDisplayMode?.addEventListener("change", () => {
       mapEditorDirty = true;
-      const draft = mapEditorDraftFromState();
-      currentVenueMapState = {
-        ...(currentVenueMapState || {}),
-        display_mode: draft.displayMode,
-      };
-      renderPixiScene();
+      syncMapEditorPreview(mapEditorPreviewURL || currentVenueMapState?.asset?.content_url || "");
     });
 
     mapEditorFit?.addEventListener("change", () => {
       mapEditorDirty = true;
       syncMapEditorPreview(mapEditorPreviewURL || currentVenueMapState?.asset?.content_url || "");
-      livePreviewMapOnStage();
       setMapEditorStatus("Map fit updated.");
     });
 
     mapEditorScale?.addEventListener("input", () => {
       mapEditorDirty = true;
       syncMapEditorPreview(mapEditorPreviewURL || currentVenueMapState?.asset?.content_url || "");
-      livePreviewMapOnStage();
     });
 
     mapEditorCropX?.addEventListener("input", () => {
       mapEditorDirty = true;
       syncMapEditorPreview(mapEditorPreviewURL || currentVenueMapState?.asset?.content_url || "");
-      livePreviewMapOnStage();
     });
 
     mapEditorCropY?.addEventListener("input", () => {
       mapEditorDirty = true;
       syncMapEditorPreview(mapEditorPreviewURL || currentVenueMapState?.asset?.content_url || "");
-      livePreviewMapOnStage();
     });
 
     mapEditorSafeMargin?.addEventListener("input", () => {
       mapEditorDirty = true;
-      livePreviewMapOnStage();
     });
 
     mapEditorSave?.addEventListener("click", async () => {
@@ -5732,8 +4141,9 @@
     });
 
     document.addEventListener("click", (event) => {
-      if (suppressStageContextMenu) {
+      if (suppressStageContextMenu || suppressEditorAutoClose) {
         suppressStageContextMenu = false;
+        suppressEditorAutoClose = false;
         return;
       }
       if (contextMenu && !contextMenu.hidden && !contextMenu.contains(event.target)) {
@@ -5813,6 +4223,10 @@
       if (!button) return;
       const action = button.getAttribute("data-menu-action");
       if (button.disabled) return;
+      suppressEditorAutoClose = true;
+      window.setTimeout(() => {
+        suppressEditorAutoClose = false;
+      }, 0);
       const objectKey = contextMenu.dataset.objectKey || "";
       const objectModel = contextMenuTarget || currentObjects.find((item) => item.key === objectKey) || null;
       if (!objectModel) {

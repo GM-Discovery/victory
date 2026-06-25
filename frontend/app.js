@@ -43,6 +43,13 @@ async function loadVenues() {
   const statusEl = document.getElementById("status");
   const mapLayerEl = document.querySelector(".map-layer");
   const venueIconsEl = document.getElementById("venue-icons");
+  const assetVersion = "map-icons-1";
+
+  const assetURL = (url) => {
+    if (!url || typeof url !== "string") return url;
+    if (!url.startsWith("/assets/")) return url;
+    return `${url}${url.includes("?") ? "&" : "?"}v=${assetVersion}`;
+  };
 
   initInfoBoothModal();
   statusEl.textContent = "Loading venues...";
@@ -132,7 +139,7 @@ async function loadVenues() {
         catharsis: "/assets/catharsis.png",
       };
 
-      icon.src = venue.icon_url || venueIcons[venue.slug] || "/assets/default.png";
+      icon.src = assetURL(venue.icon_url || venueIcons[venue.slug] || "/assets/default.png");
       icon.alt = "";
 
       const label = document.createElement("span");
