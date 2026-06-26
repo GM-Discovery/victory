@@ -11,6 +11,32 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-06-25 — Kernel 52 Canonical Dice Actions v1
+
+### Backend
+- Added a canonical dice parser/roller using `crypto/rand` with deterministic test injection support and server-side limits for expression length, dice count, sides, modifier size, and explosion safety.
+- Added a new append-only `roll/dice` action path with canonical payload storage and authority checks for Director, Producer, and Operator roll authority.
+- Wired the websocket dispatcher so `/roll` requests are validated, rolled, persisted, and broadcast from the backend instead of being generated in the browser.
+
+### Frontend
+- Added a First Theater Dice tray module that accepts `/roll` expressions, submits canonical roll requests, and renders the authoritative session action stream as a readable history.
+- Wired the dice tray into the First Theater shell and chat command flow so `/roll ...` goes through the same canonical action path.
+
+### Tests
+- Added backend coverage for the dice parser, authority gate, websocket dispatch, and canonical roll persistence path.
+- Added First Theater dice tray coverage for expression building, request/response correlation, validation failures, timeouts, and remount behavior.
+- Re-ran the full First Theater Node suite:
+  - `tests/first-theater/*.test.js`
+- Re-ran backend coverage for the new dice path:
+  - `cd backend && GOCACHE=/tmp/victory-gocache go test ./internal/dice ./internal/actions ./internal/network`
+- Verified diff hygiene:
+  - `git diff --check`
+
+### Notes
+- The browser does not generate canonical die results.
+- The tray is textual only; there is no visual dice renderer in this kernel.
+- Controlled-character roll authority remains deferred behind the `canActDiceRoll` policy seam.
+
 ## 2026-06-25 — Kernel 51B bootstrap-shell cleanup
 
 ### Frontend

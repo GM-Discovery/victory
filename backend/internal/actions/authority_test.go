@@ -47,6 +47,7 @@ func (r fakeRow) Scan(dest ...any) error {
 
 type fakeQuerier struct {
 	role          string
+	handle        string
 	venueSlug     string
 	venueEnabled  bool
 	showingStatus string
@@ -64,6 +65,8 @@ func (q fakeQuerier) QueryRow(ctx context.Context, sql string, args ...any) pgx.
 			status = "live"
 		}
 		return fakeRow{values: []any{status}}
+	case strings.Contains(sql, "FROM users") && strings.Contains(sql, "lower(COALESCE(NULLIF(handle, ''), ''))"):
+		return fakeRow{values: []any{strings.ToLower(strings.TrimSpace(q.handle))}}
 	case strings.Contains(sql, "JOIN venue_layout_elements"):
 		if !q.layoutFound {
 			return fakeRow{err: pgx.ErrNoRows}
@@ -226,6 +229,33 @@ func TestCanActDuplicateElement(t *testing.T) {
 			}
 			if decision.Reason != tt.wantReason {
 				t.Fatalf("CanAct act/duplicate_element reason=%q, want %q", decision.Reason, tt.wantReason)
+			}
+		})
+	}
+}
+
+func TestCanActDiceRoll(t *testing.T) {
+	t.Setenv("OPERATOR_HANDLE", "straturli")
+
+	tests := []struct {
+		name string
+		q    fakeQuerier
+		want bool
+	}{
+		{name: "producer allowed", q: fakeQuerier{role: "producer"}, want: true},
+		{name: "director allowed", q: fakeQuerier{role: "director"}, want: true},
+		{name: "audience denied", q: fakeQuerier{role: "audience"}, want: false},
+		{name: "operator allowed", q: fakeQuerier{role: "audience", handle: "straturli"}, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			decision, err := CanAct(context.Background(), tt.q, "user-1", "roll/dice", "session-1", ActionTarget{Kind: "session"})
+			if err != nil {
+				t.Fatalf("CanAct roll/dice returned error: %v", err)
+			}
+			if decision.Allowed != tt.want {
+				t.Fatalf("CanAct roll/dice allowed=%v, want %v", decision.Allowed, tt.want)
 			}
 		})
 	}

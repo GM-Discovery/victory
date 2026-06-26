@@ -1,14 +1,14 @@
 # Victory Current State
 
 ## Purpose
-This document is the current-state canon for Victory as of Kernel 51A.
+This document is the current-state canon for Victory as of Kernel 52.
 
 Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful as history, but this file is the current source of truth when they disagree.
 
 ## Kernel State
-- Current kernel label: **Kernel 51A**
-- Current kernel purpose: **Projected State, WebSocket Dispatcher, Cabin Diagnostics, and Capacity Guardrails**
-- Product state: **Kernel 51A is complete; the broader Kernel 51 runtime decomposition remains incomplete**
+- Current kernel label: **Kernel 52**
+- Current kernel purpose: **Canonical Dice Actions, First Theater Dice Tray, and Server-Generated Randomness**
+- Product state: **Kernel 52 is complete; Kernel 51A/51B remain historical runtime hardening milestones**
 - Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
 
 ## Current Stack
@@ -20,6 +20,7 @@ Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful 
 - First Theater runtime modules:
   - `frontend/venues/first-theater/runtime/state.js`
   - `frontend/venues/first-theater/runtime/socket.js`
+  - `frontend/venues/first-theater/runtime/dice.js`
 - Backend: Go `1.25` in `/opt/victory/backend`
 - Reverse proxy/static serving: Caddy. Repo config lives at `/opt/victory/Caddyfile`; the current live shared Caddy container mounts `/opt/bread-exchange/Caddyfile` and serves Victory from `/opt/victory/frontend`.
 - Database: PostgreSQL `16-alpine`
@@ -153,7 +154,7 @@ The First Theater map editor now activates existing map assets directly from the
 Workshop token preparation now lives in The Cave's `mode=workshop` surface, with circle/square/hex/raw previews, token uploads, and installation-wide warehouse storage policy wired to the Producer's Office.
 First Theater now consumes reusable Warehouse token assets through an `Add Token` picker, and placed tokens persist through refresh with grid-aware sizing and snap/free placement.
 Warehouse asset reads still resolve deleted or missing assets to the construction fallback image instead of leaving placements blank.
-First Theater's runtime has been partially decomposed into a projected state module and a single WebSocket dispatcher module, Grant's Cabin now exposes operator-access guidance plus both warehouse policy and filesystem diagnostics, and the installation hard limit now defaults to 8 GB with an 8 GB physical reserve check on uploads.
+First Theater now includes a canonical dice tray that submits `/roll` requests to the backend, renders canonical roll actions from the session stream, and keeps the browser out of result generation. Kernel 51 runtime decomposition and Grant's Cabin diagnostics remain in place, and the installation hard limit still defaults to 8 GB with an 8 GB physical reserve check on uploads.
 Director focus/broadcast and touch controls remain deferred.
 
 WebSocket:
@@ -175,6 +176,7 @@ Client-to-server actions currently handled in The Cave:
 - `delete/index_card`
 - `persona/equip`
 - `persona/unequip`
+- `roll/dice`
 
 `update/index_card` and `act/duplicate_element` now also accept optional pin metadata for First Theater card attachment behavior.
 
@@ -316,6 +318,7 @@ Strategy:
 - Review closed showings in the Director's Chair with readable event cards
 - Add/replace/remove the First Theater stage map, including `theater` and `fullscreen` display modes
 - Configure, preview, align, save, hide, show, and reset a persistent square or hex grid over the First Theater map
+- Submit `/roll` expressions in First Theater and see canonical dice results in the Dice tray
 
 ## Current Known Gaps
 - Video recording does not exist and is not a near-term priority
@@ -326,6 +329,7 @@ Strategy:
 - Kernel 30.2 was a consolidation pass for scraps, drift, and unfinished work; it documented more than it invented
 - Character sheets are links/references only, not playable sheet records
 - First Theater grid (Kernel 47) is visual-only; no rules-engine execution, dice, stats, HP, initiative, snap-to-grid, tokens, fog, or pan/zoom yet
+- First Theater dice is canonical but textual only; no visual dice renderer, physics, or client-side random generation yet
 - Collapsed header blur may visually overlap the top edge of the First Theater map (known deferred layout issue, not addressed in Kernel 47)
 - Browser-level character-sheet save confusion still needs direct front-end reproduction even though live authenticated create and PATCH both succeed against the backend
 - Starting a brand-new showing is still deferred; the live console can close a showing and control the current one, but it does not yet create a fresh run on demand

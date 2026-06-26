@@ -37,6 +37,7 @@ var storeReactionFunc = actions.StoreReaction
 var storeChatMessageFunc = actions.StoreChatMessage
 var storeSpeakFunc = actions.StoreSpeak
 var storeRevealFunc = actions.StoreReveal
+var storeDiceRollFunc = actions.StoreDiceRoll
 var storeOverlayShowFunc = actions.StoreOverlayShow
 var storeOverlayHideFunc = actions.StoreOverlayHide
 var storeIndexCardCreateFunc = actions.StoreIndexCardCreate
@@ -409,6 +410,60 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 			})
 			hub.Broadcast(msgOut)
 			go mirrorVictoryChatToDiscord(context.Background(), pool, discordBridgeConfig, storedAction)
+		}
+
+	case "roll/dice":
+		{
+			sessionID, _ := payload["session_id"].(string)
+			actorID := c.UserID
+			requestID, _ := payload["request_id"].(string)
+			expression, _ := payload["expression"].(string)
+			visibility, _ := payload["visibility"].(string)
+			label, _ := payload["label"].(string)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			storedAction, err := storeDiceRollFunc(ctx, pool, actions.DiceRollRequest{
+				SessionID:  sessionID,
+				ActorID:    actorID,
+				RequestID:  requestID,
+				Expression: expression,
+				Visibility: visibility,
+				Label:      label,
+			})
+			cancel()
+
+			if err != nil {
+				var denied *actions.ActionDeniedError
+				if errors.As(err, &denied) {
+					errorPayload := map[string]any{
+						"type":  "error",
+						"error": denied.Reason,
+					}
+					if strings.TrimSpace(requestID) != "" {
+						errorPayload["request_id"] = requestID
+					}
+					_ = c.Conn.WriteJSON(errorPayload)
+					log.Printf("dice denied: user=%s session=%s action=%s reason=%s", actorID, sessionID, payload["type"], denied.Reason)
+					return
+				}
+
+				errorPayload := map[string]any{
+					"type":  "error",
+					"error": err.Error(),
+				}
+				if strings.TrimSpace(requestID) != "" {
+					errorPayload["request_id"] = requestID
+				}
+				_ = c.Conn.WriteJSON(errorPayload)
+				log.Printf("dice store failed: user=%s session=%s action=%s err=%v", actorID, sessionID, payload["type"], err)
+				return
+			}
+
+			msgOut, _ := json.Marshal(map[string]any{
+				"type": "action",
+				"data": storedAction,
+			})
+			hub.Broadcast(msgOut)
 		}
 
 	case "perform/speak":

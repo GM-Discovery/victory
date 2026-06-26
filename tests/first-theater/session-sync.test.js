@@ -50,6 +50,24 @@ test("session sync handles join, refresh, and staged index-card placement", asyn
                   surface: "stage",
                 },
               ],
+              actions: [
+                {
+                  id: "roll-1",
+                  moment_id: 7,
+                  type: "roll/dice",
+                  actor_id: "actor-1",
+                  payload: {
+                    request_id: "req-1",
+                    expression: "d20",
+                    dice: [{ index: 0, chain: [20], subtotal: 20 }],
+                    total: 20,
+                    modifier: 0,
+                    explosion_count: 0,
+                    roll_version: 1,
+                    visibility_mode: "public",
+                  },
+                },
+              ],
               overlay: null,
               showing: { status: "open" },
             },
@@ -132,6 +150,10 @@ test("session sync handles join, refresh, and staged index-card placement", asyn
     setRecentPlacementMarker: (point, label) => calls.push(["marker", point, label]),
     smokeMode: true,
     setLocalPositionOverrideForModel: () => null,
+    syncDiceTrayFromSnapshot: (snapshot) => calls.push(["dice-snapshot", snapshot?.actions?.length || 0]),
+    handleDiceTrayAction: (action) => calls.push(["dice-action", action?.type || ""]),
+    handleDiceTrayError: (errorText) => calls.push(["dice-error", errorText]),
+    rejectPendingDiceTrayRolls: (reason) => calls.push(["dice-reject", reason]),
     sendAction: (type, payload) => {
       calls.push(["send", type, payload]);
       return true;
@@ -158,9 +180,20 @@ test("session sync handles join, refresh, and staged index-card placement", asyn
   await sessionSync.refreshWorld();
   assert.equal(currentObjects.length, 2);
   assert.equal(currentSnapshot.elements.length, 2);
+  assert.ok(calls.some((entry) => entry[0] === "dice-snapshot" && entry[1] === 1));
   assert.ok(renderCount > 0);
 
   const rendersAfterRefresh = renderCount;
+  await sessionSync.handleSocketMessage({
+    kind: "action",
+    action: {
+      id: "roll-2",
+      type: "roll/dice",
+      payload: { request_id: "req-2", expression: "d20", total: 7 },
+    },
+  });
+  assert.ok(calls.some((entry) => entry[0] === "dice-action" && entry[1] === "roll/dice"));
+
   await sessionSync.handleSocketMessage({
     kind: "action",
     action: {

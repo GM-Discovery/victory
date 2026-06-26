@@ -29,6 +29,7 @@
     const cameraZoomInButton = document.getElementById("camera-zoom-in");
     const cameraFitButton = document.getElementById("camera-fit");
     const pingButton = document.getElementById("ping-button");
+    const diceTrayRoot = document.getElementById("first-theater-dice-tray");
     const cardEditorPanel = document.getElementById("card-editor");
     const cardEditorHeader = document.getElementById("card-editor-header");
     const cardEditorStatus = document.getElementById("card-editor-status");
@@ -127,6 +128,7 @@
     const firstTheaterMapGridModule = window.VictoryFirstTheaterMapGrid || null;
     const firstTheaterSceneNodesModule = window.VictoryFirstTheaterSceneNodes || null;
     const firstTheaterTokenUiModule = window.VictoryFirstTheaterTokenUI || null;
+    const firstTheaterDiceModule = window.VictoryFirstTheaterDice || null;
     const firstTheaterActionRouterModule = window.VictoryFirstTheaterActionRouter || null;
     const firstTheaterSocketControllerModule = window.VictoryFirstTheaterSocketController || null;
     const firstTheaterSessionSyncModule = window.VictoryFirstTheaterSessionSync || null;
@@ -238,6 +240,7 @@
     let currentVenueMapAssetID = "";
     let currentVenueMapBounds = null;
     let mapEditorDirty = false;
+    let diceTray = null;
     let mapEditorDragState = null;
     let mapEditorPreviewURL = "";
     let venueMapTexture = null;
@@ -482,7 +485,7 @@
 
     function updateCameraControls(view = null) {
       const mapDisplayMode = String(currentVenueMapState?.display_mode || "theater").trim() === "fullscreen" ? "fullscreen" : "theater";
-      const cameraState = firstTheaterMapGridModule?.cameraControlsState?.(view || stageCamera?.getView?.(), mapDisplayMode, cameraDefaults) || firstTheaterStageControlsModule?.cameraControlsState?.(view || stageCamera?.getView?.(), mapDisplayMode, cameraDefaults) || {
+      const cameraState = firstTheaterStageControlsModule?.cameraControlsState?.(view || stageCamera?.getView?.(), mapDisplayMode, cameraDefaults) || firstTheaterMapGridModule?.cameraControlsState?.(view || stageCamera?.getView?.(), mapDisplayMode, cameraDefaults) || {
         label: "100%",
         zoomOutDisabled: false,
         zoomInDisabled: false,
@@ -1103,6 +1106,32 @@
       const text = chatInput.value.trim();
       if (!text) return;
 
+      const rollMatch = text.match(/^\/roll(?:\s+(.+))?$/i);
+      if (rollMatch) {
+        const expression = String(rollMatch[1] || "").trim();
+        if (!expression) {
+          appendSystemChatNotice("Usage: /roll XdY");
+          chatInput.value = "";
+          return;
+        }
+        if (!diceTray?.roll) {
+          appendSystemChatNotice("Dice tray unavailable.");
+          chatInput.value = "";
+          return;
+        }
+        try {
+          const result = await diceTray.roll({
+            expression,
+            visibility: "public",
+          });
+          appendSystemChatNotice(diceTray?.formatRollSummary?.(result) || `Rolled ${expression}.`);
+        } catch (error) {
+          appendSystemChatNotice(String(error?.message || error || "Roll failed"));
+        }
+        chatInput.value = "";
+        return;
+      }
+
       try {
         const sessionResult = await window.VictoryMicChat?.sendSessionCommand?.("first-theater", text);
         if (sessionResult?.handled) {
@@ -1562,6 +1591,24 @@
       updateTokenLocalModel: (...args) => updateTokenLocalModel(...args),
     }) || null;
 
+    diceTray = firstTheaterDiceModule?.createDiceTrayController?.({
+      document,
+      window,
+      mountRoot: diceTrayRoot,
+      sendAction: (...args) => sendAction(...args),
+      canSendAction: () => canSendStageAction(),
+      getCurrentSnapshot: () => currentSnapshot,
+      refreshWorld: () => refreshWorld(),
+      setStageStatus: (...args) => setStageStatus(...args),
+      setMovementLine: (...args) => setMovementLine(...args),
+      appendSystemChatNotice: (...args) => appendSystemChatNotice(...args),
+      onAction: () => updateChatPresentation(),
+      onPendingChange: () => updateShellMetaPresentation(),
+      onHistoryChange: () => updateShellMetaPresentation(),
+      historyLimit: 2,
+      timeoutMs: 15000,
+    }) || null;
+
     sessionSync = firstTheaterSessionSyncModule?.createSessionSync?.({
       fetch: (...args) => fetch(...args),
       getCurrentIdentity: () => currentIdentity,
@@ -1587,6 +1634,10 @@
       setLiveFeedLine: (...args) => setLiveFeedLine(...args),
       setSelectionLine: (...args) => setSelectionLine(...args),
       updateChatPresentation: (...args) => updateChatPresentation(...args),
+      syncDiceTrayFromSnapshot: (snapshot) => diceTray?.handleSnapshot?.(snapshot),
+      handleDiceTrayAction: (action) => diceTray?.handleAction?.(action),
+      handleDiceTrayError: (errorText, message) => diceTray?.handleError?.(errorText, message),
+      rejectPendingDiceTrayRolls: (reason) => diceTray?.rejectPendingRolls?.(reason),
       syncCurrentObjectsFromProjectedState: () => syncCurrentObjectsFromProjectedState(),
       canManageIndexCards: (...args) => canManageIndexCards(...args),
       canManageStageTokens: (...args) => canManageStageTokens(...args),
@@ -1915,6 +1966,17 @@
           void handleSocketMessage(msg);
         }
         return msg;
+      },
+      onConnect: () => {
+        diceTray?.setActionAvailability?.(canSendStageAction());
+      },
+      onClose: () => {
+        diceTray?.setActionAvailability?.(canSendStageAction());
+        diceTray?.rejectPendingRolls?.("Socket closed.");
+      },
+      onError: () => {
+        diceTray?.setActionAvailability?.(canSendStageAction());
+        diceTray?.rejectPendingRolls?.("Socket error.");
       },
       onPong: (value) => {
         if (Number.isFinite(Number(value))) {

@@ -1,11 +1,11 @@
 # Victory Roadmap
 
 ## Purpose
-This roadmap reflects current priorities after Kernel 51A.
+This roadmap reflects current priorities after Kernel 52.
 
 Kernel numbers are labels, but from here they should remain stable once assigned so planning, reportbacks, and future agents all refer to the same landmarks.
 
-## Near Roadmap: Kernels 26–47
+## Near Roadmap: Kernels 26–52
 - `27 — Showing Review v1`
   - review chat, stage speech, reactions, reveal/hide, overlays, cards, and persona changes
 - `28 — Director Console v1`
@@ -60,6 +60,8 @@ Kernel numbers are labels, but from here they should remain stable once assigned
   - token moves survive refresh and nameplate visibility now persists through reloads and hover interactions
 - `51A — First Theater Runtime Decomposition + Capacity Guardrails v1`
   - Kernel 51A hardens the projected First Theater runtime and Grant's Cabin diagnostics path, while the broader runtime decomposition and operator-console work remain intentionally deferred
+- `52 — Canonical Dice Actions v1`
+  - Victory now owns canonical server-generated dice rolls, persists `roll/dice` as an append-only action, and exposes a simple First Theater Dice tray that submits `/roll` requests without client-side random generation
 
 Ordering note:
 - Showing Review comes before polish-only work
@@ -77,6 +79,7 @@ Ordering note:
 - Kernel 48.1 tightens the card attachment model and adds the one-time venue focus ping without turning the camera into a shared persistent state
 - Kernel 49 extends the existing asset system into a Warehouse model for reusable token and map assets, while Kernel 50 adds First Theater token placement and grid snapping on top of that warehouse model
 - Kernel 51A hardens the First Theater projected runtime, adds cabin-facing warehouse policy plus filesystem diagnostics, and lowers the warehouse cap to 8 GB with an 8 GB physical reserve check instead of adding another major VTT feature
+- Kernel 52 adds the canonical dice path, server-side randomness, and a tray presentation for readable roll results without introducing a visual dice renderer
 
 ## Medium Roadmap: Kernels 38–62
 - strengthen showing/review surfaces and auditability

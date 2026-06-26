@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -58,7 +59,7 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 		return Decision{Allowed: false, Reason: "not_session_participant"}, nil
 	}
 	if actionType != "act/reveal_element" && actionType != "act/hide_element" {
-		if actionType != "create/index_card" && actionType != "update/index_card" && actionType != "delete/index_card" && actionType != "create/token" && actionType != "update/token" && actionType != "act/place_element" && actionType != "act/duplicate_element" && actionType != "act/remove_element" && actionType != "act/show_overlay" && actionType != "act/hide_overlay" && actionType != "act/set_element_lock" && actionType != "act/set_nameplate_visibility" && actionType != "chat/message" && actionType != "persona/equip" && actionType != "persona/unequip" {
+		if actionType != "create/index_card" && actionType != "update/index_card" && actionType != "delete/index_card" && actionType != "create/token" && actionType != "update/token" && actionType != "act/place_element" && actionType != "act/duplicate_element" && actionType != "act/remove_element" && actionType != "act/show_overlay" && actionType != "act/hide_overlay" && actionType != "act/set_element_lock" && actionType != "act/set_nameplate_visibility" && actionType != "chat/message" && actionType != "persona/equip" && actionType != "persona/unequip" && actionType != "roll/dice" {
 			return Decision{Allowed: false, Reason: "unknown_action"}, nil
 		}
 	}
@@ -117,6 +118,10 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 
 	if actionType == "chat/message" {
 		return canActChatMessage(ctx, q, userID, sessionID)
+	}
+
+	if actionType == "roll/dice" {
+		return canActDiceRoll(ctx, q, userID, sessionID)
 	}
 
 	if actionType == "persona/equip" || actionType == "persona/unequip" {
@@ -720,4 +725,68 @@ func isVenueLayoutElementLocked(ctx context.Context, q actionQuerier, sessionID,
 
 func normalizeActionRole(role string) string {
 	return strings.ToLower(strings.TrimSpace(role))
+}
+
+func canActDiceRoll(ctx context.Context, q actionQuerier, userID, sessionID string) (Decision, error) {
+	// Future controlled-character roll authority should extend this boundary.
+	if ok, err := isOperatorDiceRoller(ctx, q, userID); err != nil {
+		return Decision{}, err
+	} else if ok {
+		return Decision{Allowed: true, Reason: "allowed"}, nil
+	}
+
+	var participantRole string
+	err := q.QueryRow(ctx, `
+		SELECT sp.role::text
+		FROM session_participants sp
+		WHERE sp.session_id = $1::uuid
+		  AND sp.user_id = $2
+		LIMIT 1
+	`, sessionID, userID).Scan(&participantRole)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Decision{Allowed: false, Reason: "not_session_participant"}, nil
+		}
+		return Decision{}, err
+	}
+
+	switch normalizeActionRole(participantRole) {
+	case "director", "producer":
+		return Decision{Allowed: true, Reason: "allowed"}, nil
+	default:
+		return Decision{Allowed: false, Reason: "insufficient_role"}, nil
+	}
+}
+
+func isOperatorDiceRoller(ctx context.Context, q actionQuerier, userID string) (bool, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return false, nil
+	}
+
+	operatorUserID := strings.TrimSpace(os.Getenv("OPERATOR_USER_ID"))
+	if operatorUserID != "" && operatorUserID == userID {
+		return true, nil
+	}
+
+	operatorHandle := strings.ToLower(strings.TrimSpace(os.Getenv("OPERATOR_HANDLE")))
+	if operatorHandle == "" {
+		return false, nil
+	}
+
+	var handle string
+	err := q.QueryRow(ctx, `
+		SELECT lower(COALESCE(NULLIF(handle, ''), ''))
+		FROM users
+		WHERE id = $1
+		LIMIT 1
+	`, userID).Scan(&handle)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return handle == operatorHandle, nil
 }

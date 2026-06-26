@@ -31,6 +31,10 @@
     const setSelectionLine = typeof deps.setSelectionLine === "function" ? deps.setSelectionLine : () => {};
     const updateChatPresentation = typeof deps.updateChatPresentation === "function" ? deps.updateChatPresentation : () => {};
     const renderPixiScene = typeof deps.renderPixiScene === "function" ? deps.renderPixiScene : () => {};
+    const syncDiceTrayFromSnapshot = typeof deps.syncDiceTrayFromSnapshot === "function" ? deps.syncDiceTrayFromSnapshot : () => {};
+    const handleDiceTrayAction = typeof deps.handleDiceTrayAction === "function" ? deps.handleDiceTrayAction : () => {};
+    const handleDiceTrayError = typeof deps.handleDiceTrayError === "function" ? deps.handleDiceTrayError : () => {};
+    const rejectPendingDiceTrayRolls = typeof deps.rejectPendingDiceTrayRolls === "function" ? deps.rejectPendingDiceTrayRolls : () => {};
     const syncCurrentObjectsFromProjectedState = typeof deps.syncCurrentObjectsFromProjectedState === "function" ? deps.syncCurrentObjectsFromProjectedState : () => false;
     const canManageIndexCards = typeof deps.canManageIndexCards === "function" ? deps.canManageIndexCards : () => false;
     const canManageStageTokens = typeof deps.canManageStageTokens === "function" ? deps.canManageStageTokens : () => false;
@@ -136,6 +140,7 @@
       syncSelectedActions();
       syncCardEditorWithSelection();
       syncTokenEditorWithSelection();
+      syncDiceTrayFromSnapshot(snapshot);
       renderPixiScene();
     }
 
@@ -385,6 +390,10 @@
 
       if (msg.kind === "action" && msg.action) {
         const actionType = msg.action.type || "";
+        if (actionType === "roll/dice") {
+          handleDiceTrayAction(msg.action);
+          return msg;
+        }
         if (actionType === "chat/message") {
           deps.appendChatActionLine?.(msg.action);
           return msg;
@@ -464,6 +473,7 @@
 
       if (msg.kind === "error") {
         const errorText = String(msg.error || "action_denied");
+        handleDiceTrayError(errorText, msg);
         setStageStatus(`Action denied: ${errorText}`);
         setMovementLine(`Denied: ${errorText}`);
         if (errorText === "showing_closed") {
@@ -487,6 +497,10 @@
       createIndexCardFromMenu,
       placeCreatedIndexCard,
       handleSocketMessage,
+      syncDiceTrayFromSnapshot,
+      handleDiceTrayAction,
+      handleDiceTrayError,
+      rejectPendingDiceTrayRolls,
       getCurrentSnapshot: () => getCurrentSnapshot() || currentSnapshot,
       getCurrentObjects: () => getCurrentObjects() || currentObjects,
       getCurrentRole: () => getCurrentRole() || currentRole,

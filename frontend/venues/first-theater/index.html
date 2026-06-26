@@ -1082,6 +1082,160 @@
       line-height: 1.4;
     }
 
+    .dice-tray {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+      max-height: min(72vh, 640px);
+      overflow: hidden;
+    }
+
+    .dice-tray > * {
+      min-width: 0;
+    }
+
+    .dice-tray__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .dice-tray__status {
+      color: #b5c5de;
+      font-size: 0.78rem;
+      line-height: 1.35;
+      text-align: right;
+    }
+
+    .dice-tray__quick {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .dice-tray__quick button,
+    .dice-tray__actions button {
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04);
+      color: #f6efe2;
+      padding: 7px 10px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .dice-tray__quick button:hover,
+    .dice-tray__actions button:hover {
+      background: rgba(240, 201, 107, 0.14);
+      border-color: rgba(240, 201, 107, 0.28);
+    }
+
+    .dice-tray__controls {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .dice-tray__controls label,
+    .dice-tray > label {
+      display: grid;
+      gap: 6px;
+      color: #b5c5de;
+      font-size: 0.8rem;
+    }
+
+    .dice-tray__controls input,
+    .dice-tray > label input {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(8, 7, 6, 0.78);
+      color: #f7efe5;
+      padding: 9px 10px;
+      font: inherit;
+    }
+
+    .dice-tray__toggle {
+      grid-column: 1 / -1;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dice-tray__preview {
+      border-radius: 14px;
+      border: 1px solid rgba(240, 208, 155, 0.14);
+      background: rgba(0, 0, 0, 0.18);
+      color: #f0c96b;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      letter-spacing: 0.02em;
+    }
+
+    .dice-tray__actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .dice-tray__actions button {
+      min-width: 92px;
+      background: rgba(240, 201, 107, 0.14);
+      border-color: rgba(240, 201, 107, 0.28);
+    }
+
+    .dice-tray__history {
+      display: grid;
+      gap: 8px;
+      max-height: 190px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .dice-roll-entry,
+    .dice-roll-empty {
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 10px;
+    }
+
+    .dice-roll-entry {
+      display: grid;
+      gap: 4px;
+    }
+
+    .dice-roll-entry strong {
+      color: #f4e3c1;
+      font-size: 0.9rem;
+    }
+
+    .dice-roll__row {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
+      color: #d6e1f1;
+      font-size: 0.8rem;
+      line-height: 1.35;
+    }
+
+    .dice-roll__label {
+      color: #b5c5de;
+      white-space: nowrap;
+    }
+
+    .dice-roll__value {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .dice-roll-empty {
+      color: #b5c5de;
+      font-size: 0.84rem;
+    }
+
     .presence-preview {
       display: flex;
       flex-wrap: wrap;
@@ -2553,6 +2707,7 @@
                     <div class="drawer-settings-helper">Right drawer settings are stored locally per user and kept intentionally small for now.</div>
                   </div>
                   <div class="drawer-body">
+                    <div id="first-theater-dice-tray" class="drawer-item"></div>
                     <div class="drawer-item">
                       <strong>Character</strong>
                       <span id="right-character-value">No Character</span>
@@ -2603,9 +2758,10 @@
   <script src="/venues/first-theater/runtime/map-grid.js?v=kernel51-4"></script>
   <script src="/venues/first-theater/runtime/scene-nodes.js?v=kernel51-5"></script>
   <script src="/venues/first-theater/runtime/token-ui.js?v=kernel51-7"></script>
+  <script src="/venues/first-theater/runtime/dice.js?v=kernel52-1"></script>
   <script src="/venues/first-theater/runtime/action-router.js?v=kernel51-10"></script>
   <script src="/venues/first-theater/runtime/socket-controller.js?v=kernel51-8"></script>
-  <script src="/venues/first-theater/runtime/session-sync.js?v=kernel51-3"></script>
+  <script src="/venues/first-theater/runtime/session-sync.js?v=kernel52-1"></script>
   <script src="/venues/first-theater/runtime/editors.js?v=kernel51-8"></script>
   <script src="/venues/first-theater/runtime/lifecycle.js?v=kernel51-2"></script>
   <script src="/venues/first-theater/runtime/context.js?v=kernel51-2"></script>
@@ -2621,7 +2777,7 @@
       window.__firstTheaterBootWiring = true;
 
       const script = document.createElement("script");
-      script.src = "/venues/first-theater/runtime.js?v=boot-36";
+      script.src = "/venues/first-theater/runtime.js?v=boot-37";
       script.dataset.victoryRuntime = "first-theater";
       script.addEventListener("load", () => {
         window.VictoryFirstTheater?.start?.();
