@@ -4,99 +4,2217 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Catharsis</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />
   <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
   <style>
     :root {
       color-scheme: dark;
-      --panel: rgba(18, 18, 24, 0.94);
-      --line: rgba(255, 255, 255, 0.1);
-      --text: #f5f0ff;
-      --muted: #c8c0d7;
-      --accent: #bd9df0;
+      --bg: #090807;
+      --panel: rgba(11, 14, 19, 0.82);
+      --panel-soft: rgba(11, 14, 19, 0.68);
+      --line: rgba(240, 208, 155, 0.12);
+      --line-strong: rgba(240, 208, 155, 0.2);
+      --text: #f5ead7;
+      --muted: #cbbba5;
+      --accent: #e1c38c;
+      --accent-strong: #f3d79f;
+      --utility: #8fb7da;
+      --stage-top: #531017;
+      --stage-bottom: #050403;
     }
 
     body {
       margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
+      min-height: 100vh;
+      font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
       background:
-        radial-gradient(circle at 25% 0%, rgba(120, 90, 175, 0.24), transparent 28%),
-        radial-gradient(circle at 80% 0%, rgba(74, 145, 200, 0.12), transparent 24%),
-        linear-gradient(180deg, #12101a 0%, #0a0910 100%);
+        radial-gradient(circle at 50% 0%, rgba(228, 185, 108, 0.08), transparent 26%),
+        radial-gradient(circle at 50% 14%, rgba(168, 62, 78, 0.2), transparent 32%),
+        radial-gradient(circle at 15% 12%, rgba(95, 140, 186, 0.08), transparent 24%),
+        linear-gradient(180deg, #201014 0%, #11090a 32%, #070606 100%);
       color: var(--text);
     }
 
     .shell {
       min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 24px;
+      padding: 0;
       box-sizing: border-box;
     }
 
-    .card {
-      width: min(100%, 960px);
+    .page {
+      width: 100%;
+      margin: 0;
+      display: grid;
+      gap: 0;
+    }
+
+    .panel {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 18px;
-      padding: 22px;
+      box-shadow: 0 20px 64px rgba(0, 0, 0, 0.3);
       box-sizing: border-box;
-      box-shadow: 0 20px 64px rgba(0, 0, 0, 0.34);
     }
 
     .hero {
-      display: grid;
-      gap: 18px;
-      grid-template-columns: minmax(280px, 380px) 1fr;
-      align-items: start;
+      display: none;
     }
 
-    .hero img {
+    .hero-visual {
       width: 100%;
-      border-radius: 16px;
       display: block;
-      border: 1px solid rgba(255,255,255,0.1);
-      background: #1b1526;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: #221b17;
     }
 
-    h1 {
-      margin: 0 0 10px;
+    .hero-copy {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .hero-copy h1 {
+      margin: 0;
       font-size: clamp(2rem, 4vw, 3rem);
+      line-height: 1.05;
     }
 
-    p {
-      margin: 0 0 12px;
+    .hero-copy p {
+      margin: 0;
       line-height: 1.55;
       color: var(--muted);
-    }
-
-    .note {
-      margin-top: 18px;
-      padding: 14px 16px;
-      border-radius: 14px;
-      border: 1px solid rgba(189, 157, 240, 0.22);
-      background: rgba(61, 44, 100, 0.18);
-      color: #efe6ff;
-    }
-
-    .button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 11px 16px;
-      border-radius: 999px;
-      color: #fff5dd;
-      text-decoration: none;
-      background: linear-gradient(180deg, #5c4a86 0%, #42355f 100%);
-      margin-top: 14px;
     }
 
     .hidden {
       display: none;
     }
 
-    @media (max-width: 760px) {
-      .hero {
+    .corner-controls {
+      position: fixed;
+      top: auto;
+      bottom: 16px;
+      left: 16px;
+      z-index: 40;
+      display: flex;
+      gap: 8px;
+      opacity: 0.55;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .corner-controls:hover,
+    .corner-controls:focus-within {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
+
+    .corner-control {
+      width: 2.5rem;
+      height: 2.5rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(12, 10, 8, 0.35);
+      color: #f7efe5;
+      text-decoration: none;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+      transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+    }
+
+    .corner-control:hover,
+    .corner-control:focus-visible {
+      background: rgba(20, 16, 12, 0.72);
+      border-color: rgba(255, 255, 255, 0.28);
+      transform: scale(1.04);
+      outline: none;
+    }
+
+    .stage-section {
+      padding: 0;
+    }
+
+    .stage-shell {
+      position: relative;
+      min-height: 100vh;
+      overflow: hidden;
+      border-radius: 0;
+      border: 0;
+      background:
+        radial-gradient(circle at 50% 36%, rgba(255, 236, 196, 0.12), transparent 20%),
+        linear-gradient(180deg, #6a1520 0%, #3d0d14 18%, #140708 42%, #090606 100%);
+      box-shadow: none;
+      isolation: isolate;
+    }
+
+    .shell-chrome {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      pointer-events: none;
+      --left-drawer-width: 42px;
+      --right-drawer-width: 42px;
+      --chat-rail-height: 44px;
+    }
+
+    .stage-summary,
+    .overlay-panel {
+      display: none !important;
+    }
+
+    .stage-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      max-width: min(340px, calc(100vw - 64px));
+      border-radius: 999px;
+      background: rgba(12, 14, 19, 0.72);
+      border: 1px solid rgba(240, 208, 155, 0.14);
+      color: #f8eedf;
+      line-height: 1.35;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+      font-size: 0.84rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .stage-empty-state {
+      position: absolute;
+      left: 50%;
+      top: 52%;
+      transform: translate(-50%, -50%);
+      z-index: 7;
+      display: grid;
+      gap: 8px;
+      justify-items: center;
+      pointer-events: auto;
+      text-align: center;
+      width: min(340px, calc(100vw - 48px));
+      padding: 8px 10px;
+    }
+
+    .stage-empty-state[hidden] {
+      display: none;
+    }
+
+    .stage-empty-card {
+      display: grid;
+      gap: 6px;
+      width: min(100%, 320px);
+      padding: 12px 14px 11px;
+      border-radius: 999px;
+      background: rgba(12, 14, 19, 0.7);
+      border: 1px solid rgba(240, 208, 155, 0.16);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.24);
+      backdrop-filter: blur(8px);
+    }
+
+    .stage-empty-card strong {
+      font-size: 0.94rem;
+      color: var(--accent-strong);
+      letter-spacing: 0.03em;
+    }
+
+    .stage-empty-card span {
+      color: #d2c3ae;
+      line-height: 1.45;
+      font-size: 0.86rem;
+    }
+
+    .stage-empty-card em {
+      display: inline-block;
+      font-style: normal;
+      color: #f1e0bf;
+      background: rgba(240, 208, 155, 0.08);
+      border: 1px solid rgba(240, 208, 155, 0.12);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      justify-self: center;
+    }
+
+    .stage-empty-card button {
+      justify-self: center;
+      padding: 9px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(240, 208, 155, 0.2);
+      background: rgba(240, 208, 155, 0.12);
+      color: #f8eedf;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .stage-empty-card button:hover {
+      background: rgba(240, 208, 155, 0.18);
+    }
+
+    .stage-summary {
+      position: absolute;
+      right: 16px;
+      top: 16px;
+      z-index: 8;
+      width: min(360px, calc(100vw - 64px));
+      display: grid;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .stage-summary-card {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(18, 14, 11, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #f8eedf;
+      line-height: 1.45;
+      backdrop-filter: blur(6px);
+    }
+
+    .stage-summary-card strong {
+      display: block;
+      color: var(--accent-strong);
+      margin-bottom: 4px;
+    }
+
+    .stage-summary-line {
+      color: #d8c9b0;
+      font-size: 0.94rem;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .renderer-fallback {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      z-index: 9;
+      width: min(380px, calc(100vw - 32px));
+      border-radius: 16px;
+      padding: 14px 16px;
+      background: rgba(18, 14, 11, 0.86);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+      backdrop-filter: blur(6px);
+    }
+
+    .renderer-fallback[hidden] {
+      display: none;
+    }
+
+    .renderer-fallback strong {
+      display: block;
+      color: var(--accent-strong);
+      margin-bottom: 4px;
+    }
+
+    .renderer-fallback p {
+      margin: 0;
+      color: #d8c9b0;
+      line-height: 1.45;
+      font-size: 0.94rem;
+    }
+
+    .camera-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 999px;
+      background: rgba(13, 12, 14, 0.78);
+      border: 1px solid rgba(240, 208, 155, 0.16);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(10px);
+      pointer-events: auto;
+    }
+
+    .camera-button {
+      min-width: 2.2rem;
+      height: 2.2rem;
+      padding: 0 0.7rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .camera-button:hover,
+    .camera-button:focus-visible {
+      background: rgba(240, 208, 155, 0.14);
+      border-color: rgba(240, 208, 155, 0.34);
+      outline: none;
+    }
+
+    .camera-zoom {
+      min-width: 4rem;
+      text-align: center;
+      color: var(--accent-strong);
+      font-size: 0.88rem;
+      letter-spacing: 0.04em;
+    }
+
+    .pixi-stage-host {
+      position: absolute;
+      inset: 0;
+      touch-action: none;
+      z-index: 1;
+    }
+
+    .pixi-stage-host canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .stage-dom-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    .overlay-anchor {
+      position: fixed;
+      left: 16px;
+      top: 16px;
+      z-index: 10000;
+      pointer-events: none;
+      display: grid;
+      gap: 8px;
+      justify-items: start;
+    }
+
+    .overlay-anchor[hidden] {
+      display: none;
+    }
+
+    .overlay-anchor__badge {
+      pointer-events: auto;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: linear-gradient(180deg, rgba(240, 201, 107, 0.98), rgba(140, 199, 255, 0.96));
+      color: #122033;
+      font-weight: 800;
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      font-size: 0.86rem;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    }
+
+    .overlay-panel {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      width: min(380px, calc(100vw - 32px));
+      border-radius: 18px;
+      padding: 16px;
+      background: rgba(16, 12, 10, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+      pointer-events: auto;
+      backdrop-filter: blur(6px);
+      display: grid;
+      gap: 12px;
+    }
+
+    .overlay-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      color: #d8c9b0;
+      font-size: 0.94rem;
+      line-height: 1.45;
+    }
+
+    .overlay-row strong {
+      color: #f4e3c1;
+      font-size: 0.92rem;
+      flex: 0 0 auto;
+    }
+
+    .overlay-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .overlay-actions button {
+      padding: 8px 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.06);
+      color: #f6efe2;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .overlay-actions button:hover {
+      background: rgba(255, 255, 255, 0.11);
+    }
+
+    .overlay-actions button.overlay-action-danger {
+      border-color: rgba(214, 84, 84, 0.35);
+      background: rgba(214, 84, 84, 0.12);
+      color: #f0b9b9;
+      margin-right: auto;
+    }
+
+    .overlay-actions button.overlay-action-danger:hover {
+      background: rgba(214, 84, 84, 0.22);
+    }
+
+    .overlay-actions button.overlay-action-danger:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .overlay-note {
+      margin-top: 10px;
+      color: #c7bba5;
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .top-bar,
+    .drawer,
+    .chat-panel {
+      border: 1px solid rgba(240, 208, 155, 0.12);
+      background: linear-gradient(180deg, rgba(15, 18, 25, 0.86), rgba(8, 10, 15, 0.82));
+      border-radius: 18px;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(12px);
+      pointer-events: auto;
+    }
+
+    .top-bar {
+      position: fixed;
+      top: 0;
+      left: 14px;
+      right: 14px;
+      z-index: 88;
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(220px, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 8px 14px;
+      min-height: 54px;
+      overflow: visible;
+      transition: padding 180ms ease, transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+      --header-surface-opacity: 0.95;
+      background: linear-gradient(180deg, rgba(15, 18, 25, var(--header-surface-opacity)), rgba(8, 10, 15, calc(var(--header-surface-opacity) - 0.06)));
+    }
+
+    .top-bar[data-open="false"] {
+      min-height: 12px;
+      padding: 0 14px;
+      border-radius: 0 0 18px 18px;
+      background: linear-gradient(180deg, rgba(15, 18, 25, 0.06), rgba(8, 10, 15, 0.03));
+      border-color: transparent;
+      box-shadow: none;
+      backdrop-filter: blur(2px);
+      overflow: hidden;
+    }
+
+    .top-bar[data-open="true"] {
+      padding: 10px 14px;
+      min-height: 58px;
+      transform: translateY(0);
+    }
+
+    .top-bar[data-open="false"] .header-left,
+    .top-bar[data-open="false"] .header-center,
+    .top-bar[data-open="false"] .header-right,
+    .top-bar[data-open="false"] .camera-controls,
+    .top-bar[data-open="false"] .header-settings-panel {
+      opacity: 0;
+      transform: translateY(-8px);
+      pointer-events: none;
+      visibility: hidden;
+      display: none;
+    }
+
+    .brand {
+      display: grid;
+      gap: 4px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.12rem;
+      letter-spacing: 0.03em;
+    }
+
+    .brand p,
+    .status-strip,
+    .header-center {
+      transition: opacity 160ms ease, transform 160ms ease;
+    }
+
+    .brand p {
+      margin: 0;
+      color: #b5c5de;
+      font-size: 0.84rem;
+    }
+
+    .status-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .header-center {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .top-bar .brand p {
+      opacity: 0;
+      transform: translateY(-4px);
+      pointer-events: none;
+      display: none;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.03);
+      color: #eef4ff;
+      font-size: 0.84rem;
+    }
+
+    .chip strong {
+      color: #f0c96b;
+      font-weight: 700;
+    }
+
+    .chip-action {
+      border: 0;
+      background: transparent;
+      color: #8cc7ff;
+      cursor: help;
+      padding: 0;
+      line-height: 1;
+      font-size: 1rem;
+    }
+
+    .chip--target {
+      min-width: min(100%, 300px);
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .chip-stack {
+      display: grid;
+      gap: 2px;
+    }
+
+    .chip-stack span {
+      display: block;
+      line-height: 1.15;
+    }
+
+    .header-right {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      position: relative;
+    }
+
+    .header-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+
+    .header-pill {
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: #f0c96b;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      text-decoration: none;
+      line-height: 1;
+    }
+
+    .header-pill:hover {
+      background: rgba(240, 201, 107, 0.14);
+    }
+
+    .header-pill.is-active {
+      background: rgba(140, 199, 255, 0.16);
+      border-color: rgba(140, 199, 255, 0.36);
+      color: #8cc7ff;
+    }
+
+    .header-pill--back {
+      font-size: 0.95rem;
+    }
+
+    .account-menu-wrap {
+      position: relative;
+    }
+
+    .account-chip {
+      min-width: 52px;
+      padding-inline: 8px;
+      justify-content: space-between;
+    }
+
+    .account-chip #account-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .account-avatar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, rgba(240, 201, 107, 0.22), rgba(140, 199, 255, 0.16));
+      color: #f0c96b;
+      font-weight: 700;
+      font-size: 0.82rem;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .account-menu {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 10px);
+      min-width: 180px;
+      border: 1px solid rgba(186, 208, 239, 0.14);
+      border-radius: 16px;
+      background: rgba(11, 18, 29, 0.98);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+      padding: 8px;
+      display: grid;
+      gap: 6px;
+      z-index: 9;
+    }
+
+    .account-menu[hidden] {
+      display: none;
+    }
+
+    .account-menu a,
+    .account-menu button,
+    .drawer-settings-button,
+    .overlay-actions button,
+    .chat-row button,
+    .context-menu button {
+      font: inherit;
+    }
+
+    .account-menu a,
+    .account-menu button {
+      border: 0;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      color: #eef4ff;
+      text-decoration: none;
+      text-align: left;
+      padding: 10px 12px;
+      cursor: pointer;
+    }
+
+    .account-menu a:hover,
+    .account-menu button:hover {
+      background: rgba(240, 201, 107, 0.14);
+    }
+
+    .drawer {
+      min-height: 0;
+      position: fixed;
+      top: 66px;
+      bottom: 60px;
+      width: var(--left-drawer-width, 20px);
+      overflow: visible;
+      transition: width 180ms ease, transform 180ms ease, background 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+      --drawer-surface-opacity: 0.9;
+      background: linear-gradient(180deg, rgba(15, 18, 25, var(--drawer-surface-opacity)), rgba(8, 10, 15, calc(var(--drawer-surface-opacity) - 0.06)));
+    }
+
+    .drawer-inner {
+      min-height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      width: 100%;
+    }
+
+    .drawer-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      user-select: none;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .drawer-head__copy {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+      transition: opacity 140ms ease, transform 180ms ease;
+    }
+
+    .drawer-head strong {
+      font-size: 0.95rem;
+      letter-spacing: 0.02em;
+      color: #f0c96b;
+    }
+
+    .drawer-head span {
+      color: #b5c5de;
+      font-size: 0.82rem;
+    }
+
+    .drawer-head__actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .drawer-settings-button {
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: #f0c96b;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .drawer-settings-button:hover {
+      background: rgba(240, 201, 107, 0.14);
+    }
+
+    .drawer[data-open="false"] .drawer-head__copy {
+      opacity: 0;
+      transform: translateX(-4px);
+      pointer-events: none;
+      width: 0;
+      overflow: hidden;
+    }
+
+    .drawer[data-open="false"] .drawer-head__actions {
+      opacity: 0;
+      transform: translateX(4px);
+      pointer-events: none;
+      width: 0;
+      overflow: hidden;
+    }
+
+    .drawer[data-open="false"]::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) rotate(180deg);
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      color: #f6e6c7;
+      letter-spacing: 0.08em;
+      font-size: 0.66rem;
+      text-transform: uppercase;
+      opacity: 0.08;
+      pointer-events: none;
+    }
+
+    .drawer[data-open="false"] .drawer-body {
+      display: none;
+    }
+
+    .drawer[data-open="true"] .drawer-item,
+    .drawer[data-open="true"] .drawer-body {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .drawer-item {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .drawer[data-open="false"] {
+      border-color: transparent;
+      box-shadow: none;
+      background: linear-gradient(180deg, rgba(15, 18, 25, 0.06), rgba(8, 10, 15, 0.03));
+      backdrop-filter: blur(2px);
+      overflow: hidden;
+      opacity: 0.34;
+    }
+
+    .drawer-edge-trigger {
+      position: fixed;
+      top: 66px;
+      bottom: 60px;
+      width: 22px;
+      z-index: 85;
+      pointer-events: auto;
+      background: transparent;
+    }
+
+    .drawer-edge-trigger--left {
+      left: 0;
+      cursor: w-resize;
+    }
+
+    .drawer-edge-trigger--right {
+      right: 0;
+      cursor: e-resize;
+    }
+
+    .drawer[data-open="false"] .drawer-head {
+      padding: 0;
+      justify-content: center;
+      min-height: 100%;
+      border-bottom: 0;
+    }
+
+    .drawer-settings-panel {
+      position: absolute;
+      top: 56px;
+      z-index: 6;
+      border-radius: 14px;
+      border: 1px solid rgba(186, 208, 239, 0.14);
+      background: rgba(11, 18, 29, 0.98);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+      padding: 12px;
+      display: grid;
+      gap: 12px;
+    }
+
+    #left-drawer .drawer-settings-panel {
+      left: calc(100% + 10px);
+      right: auto;
+      width: min(340px, calc(100vw - 32px));
+    }
+
+    #right-drawer .drawer-settings-panel {
+      right: calc(100% + 10px);
+      left: auto;
+      width: min(340px, calc(100vw - 32px));
+    }
+
+    .drawer-settings-panel[hidden] {
+      display: none;
+    }
+
+    .drawer-settings-panel h3,
+    .header-settings-panel h3 {
+      margin: 0;
+      font-size: 0.92rem;
+      letter-spacing: 0.02em;
+      color: #eef4ff;
+    }
+
+    .drawer-settings-group,
+    .header-settings-group {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .drawer-settings-group label,
+    .header-settings-group label {
+      display: grid;
+      gap: 4px;
+      font-size: 0.82rem;
+      color: #b5c5de;
+    }
+
+    .drawer-settings-group select,
+    .drawer-settings-group input[type="range"],
+    .header-settings-group input[type="range"] {
+      width: 100%;
+    }
+
+    .drawer-settings-group select {
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(8, 13, 20, 0.86);
+      color: #eef4ff;
+      padding: 9px 10px;
+    }
+
+    .drawer-settings-helper,
+    .header-settings-helper {
+      color: #b5c5de;
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+
+    .drawer-settings-value,
+    .header-settings-value {
+      color: #eef4ff;
+      font-size: 0.84rem;
+    }
+
+    .header-settings-button {
+      justify-self: start;
+      border: 1px solid rgba(240, 208, 155, 0.24);
+      background: rgba(240, 208, 155, 0.08);
+      color: #f7e4be;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .header-settings-button:hover,
+    .header-settings-button:focus-visible {
+      background: rgba(240, 208, 155, 0.16);
+      border-color: rgba(240, 208, 155, 0.44);
+      outline: none;
+    }
+
+    .drawer-body {
+      padding: 14px 12px 16px;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+      opacity: 1;
+      transition: opacity 180ms ease;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .drawer--collapsed {
+      width: 12px;
+    }
+
+    .drawer--expanded {
+      width: auto;
+      min-width: 0;
+    }
+
+    #left-drawer.drawer--expanded,
+    #right-drawer.drawer--expanded {
+      width: min(24vw, 420px) !important;
+    }
+
+    #left-drawer {
+      left: 16px;
+      width: var(--left-drawer-width, 12px);
+      z-index: 86;
+    }
+
+    #right-drawer {
+      right: 16px;
+      width: var(--right-drawer-width, 12px);
+      z-index: 86;
+    }
+
+    .drawer[data-open-mode="always-open"] {
+      width: auto;
+      min-width: 0;
+    }
+
+    .drawer[data-open-mode="hover"]:not(:hover):not(:focus-within) {
+      width: 12px;
+    }
+
+    .drawer-item {
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 12px;
+      display: grid;
+      gap: 4px;
+    }
+
+    .drawer-item strong {
+      color: #f0c96b;
+      font-size: 0.92rem;
+    }
+
+    .drawer-item span {
+      margin: 0;
+      color: #b5c5de;
+      font-size: 0.86rem;
+      line-height: 1.4;
+    }
+
+    .dice-tray {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+      max-height: min(72vh, 640px);
+      overflow: hidden;
+    }
+
+    .dice-tray > * {
+      min-width: 0;
+    }
+
+    .dice-tray__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .dice-tray__status {
+      color: #b5c5de;
+      font-size: 0.78rem;
+      line-height: 1.35;
+      text-align: right;
+    }
+
+    .dice-tray__quick {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .dice-tray__quick button,
+    .dice-tray__actions button {
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04);
+      color: #f6efe2;
+      padding: 7px 10px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .dice-tray__quick button:hover,
+    .dice-tray__actions button:hover {
+      background: rgba(240, 201, 107, 0.14);
+      border-color: rgba(240, 201, 107, 0.28);
+    }
+
+    .dice-tray__controls {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .dice-tray__controls label,
+    .dice-tray > label {
+      display: grid;
+      gap: 6px;
+      color: #b5c5de;
+      font-size: 0.8rem;
+    }
+
+    .dice-tray__controls input,
+    .dice-tray > label input {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(8, 7, 6, 0.78);
+      color: #f7efe5;
+      padding: 9px 10px;
+      font: inherit;
+    }
+
+    .dice-tray__toggle {
+      grid-column: 1 / -1;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dice-tray__preview {
+      border-radius: 14px;
+      border: 1px solid rgba(240, 208, 155, 0.14);
+      background: rgba(0, 0, 0, 0.18);
+      color: #f0c96b;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      letter-spacing: 0.02em;
+    }
+
+    .dice-tray__actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .dice-tray__actions button {
+      min-width: 92px;
+      background: rgba(240, 201, 107, 0.14);
+      border-color: rgba(240, 201, 107, 0.28);
+    }
+
+    .dice-tray__history {
+      display: grid;
+      gap: 8px;
+      max-height: 190px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .dice-roll-entry,
+    .dice-roll-empty {
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 10px;
+    }
+
+    .dice-roll-entry {
+      display: grid;
+      gap: 4px;
+    }
+
+    .dice-roll-entry strong {
+      color: #f4e3c1;
+      font-size: 0.9rem;
+    }
+
+    .dice-roll__row {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
+      color: #d6e1f1;
+      font-size: 0.8rem;
+      line-height: 1.35;
+    }
+
+    .dice-roll__label {
+      color: #b5c5de;
+      white-space: nowrap;
+    }
+
+    .dice-roll__value {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .dice-roll-empty {
+      color: #b5c5de;
+      font-size: 0.84rem;
+    }
+
+    .presence-preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .presence-avatar {
+      width: var(--portrait-size, 36px);
+      height: var(--portrait-size, 36px);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: linear-gradient(180deg, rgba(240, 201, 107, 0.16), rgba(140, 199, 255, 0.1));
+      color: #eef4ff;
+      font-size: 0.78rem;
+      font-weight: 700;
+      flex: 0 0 auto;
+      overflow: hidden;
+    }
+
+    .presence-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .presence-avatar--fallback {
+      background: linear-gradient(180deg, rgba(25, 40, 62, 0.96), rgba(14, 22, 35, 0.96));
+    }
+
+    .drawer-portrait-note {
+      color: #b5c5de;
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
+
+    .chat-panel {
+      position: fixed;
+      left: 50%;
+      bottom: -4px;
+      z-index: 82;
+      overflow: hidden;
+      transition: opacity 180ms ease, transform 180ms ease, box-shadow 180ms ease, background 180ms ease, border-color 180ms ease;
+      transform: translateX(-50%) translateY(calc(100% - var(--chat-rail-height, 24px)));
+      border-radius: 18px;
+      box-shadow: 0 16px 42px rgba(0, 0, 0, 0.34);
+      width: var(--chat-panel-width, min(32vw, 420px));
+      max-width: calc(100vw - 32px);
+      --chat-surface-opacity: 0.88;
+      --chat-rail-height: 24px;
+      opacity: 0.05;
+      background: linear-gradient(180deg, rgba(15, 18, 25, var(--chat-surface-opacity)), rgba(8, 10, 15, calc(var(--chat-surface-opacity) - 0.06)));
+    }
+
+    .chat-panel.is-open {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .chat-panel[data-open="false"] {
+      border-color: transparent;
+      box-shadow: none;
+      background: linear-gradient(180deg, rgba(15, 18, 25, 0.05), rgba(8, 10, 15, 0.02));
+      backdrop-filter: blur(2px);
+    }
+
+    .chat-panel[data-open="true"] {
+      --chat-panel-width: min(32vw, 420px);
+      opacity: 1;
+    }
+
+    .chat-panel:hover,
+    .chat-panel:focus-within {
+      opacity: 1;
+    }
+
+    .chat-head {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 24px;
+      padding: 4px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+      cursor: pointer;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .chat-head__label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+      flex: 1;
+      font-weight: 700;
+      color: #f0c96b;
+      letter-spacing: 0.02em;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(140, 199, 255, 0.18);
+      color: #eef4ff;
+      font-size: 0.78rem;
+      border: 1px solid rgba(140, 199, 255, 0.24);
+    }
+
+    .chat-body {
+      padding: 6px 8px 7px;
+      display: none;
+      gap: 12px;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      opacity: 1;
+      transition: opacity 180ms ease;
+      background: rgba(8, 10, 15, 0.96);
+      height: min(13vh, 128px);
+      min-height: 0;
+      overflow: hidden;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .chat-state-note {
+      padding: 8px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(240, 201, 107, 0.22);
+      background: rgba(240, 201, 107, 0.08);
+      color: #f0c96b;
+      font-size: 0.84rem;
+      line-height: 1.35;
+    }
+
+    .chat-state-note[hidden] {
+      display: none;
+    }
+
+    .chat-panel.is-chat-open .chat-state-note {
+      border-color: rgba(133, 201, 121, 0.24);
+      background: rgba(133, 201, 121, 0.08);
+      color: #c9f2c1;
+    }
+
+    .chat-panel.is-closed .chat-log {
+      opacity: 0.78;
+    }
+
+    .chat-panel.is-closed .chat-row input,
+    .chat-panel.is-closed .chat-row button {
+      opacity: 0.74;
+    }
+
+    .chat-panel[data-open="true"] .chat-body {
+      display: grid;
+    }
+
+    .chat-log {
+      min-height: 0;
+      height: 100%;
+      padding: 8px 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: #b5c5de;
+      overflow: auto;
+      line-height: 1.35;
+    }
+
+    .chat-entry {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0 6px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: #b5c5de;
+    }
+
+    .chat-entry strong {
+      color: #f0c96b;
+      font-size: 0.85rem;
+    }
+
+    .chat-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .chat-row input {
+      min-width: 0;
+      box-sizing: border-box;
+      width: 100%;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(9, 12, 18, 0.8);
+      color: #eef4ff;
+      padding: 10px 14px;
+    }
+
+    .chat-row button {
+      white-space: nowrap;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: #eef4ff;
+      padding: 10px 14px;
+    }
+
+    .header-settings-panel {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 18px;
+      width: min(360px, calc(100vw - 36px));
+      z-index: 20;
+      border-radius: 16px;
+      border: 1px solid rgba(186, 208, 239, 0.14);
+      background: rgba(11, 18, 29, 0.98);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+      padding: 12px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .header-settings-panel[hidden] {
+      display: none;
+    }
+
+    .top-bar[data-open="false"] .header-settings-panel {
+      display: none !important;
+    }
+
+    .selected-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .selected-actions button {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.06);
+      color: #f6efe2;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+
+    .selected-actions button:hover {
+      background: rgba(255, 255, 255, 0.11);
+    }
+
+    .selected-actions button[disabled] {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .selected-actions .action-separator {
+      flex: 0 0 100%;
+      height: 0;
+      margin: 0;
+    }
+
+    .card-editor {
+      position: absolute;
+      left: 16px;
+      top: 220px;
+      z-index: 18;
+      width: min(420px, calc(100vw - 32px));
+      border-radius: 18px;
+      padding: 16px;
+      background: rgba(16, 12, 10, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+      pointer-events: auto;
+      backdrop-filter: blur(8px);
+      display: grid;
+      gap: 10px;
+      touch-action: none;
+    }
+
+    .card-editor-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: move;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .card-editor-header strong {
+      color: #f4e3c1;
+      font-size: 0.96rem;
+    }
+
+    .card-editor-grip {
+      color: #cdb892;
+      font-size: 0.88rem;
+      letter-spacing: 0.1em;
+    }
+
+    .editor-field {
+      display: grid;
+      gap: 6px;
+      color: #dac8af;
+      font-size: 0.88rem;
+    }
+
+    .editor-field span {
+      color: #f4e3c1;
+      font-weight: 700;
+    }
+
+    .editor-field textarea,
+    .editor-field input {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(8, 7, 6, 0.78);
+      color: #f7efe5;
+      font: inherit;
+      padding: 10px 12px;
+      resize: vertical;
+      min-height: 44px;
+    }
+
+    .editor-field textarea {
+      min-height: 92px;
+    }
+
+    .editor-status {
+      color: #cdb892;
+      font-size: 0.86rem;
+      line-height: 1.45;
+    }
+
+    .map-editor {
+      position: absolute;
+      right: 16px;
+      top: 220px;
+      z-index: 18;
+      width: min(560px, calc(100vw - 32px));
+      border-radius: 18px;
+      padding: 16px;
+      background: rgba(12, 14, 19, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+      pointer-events: auto;
+      backdrop-filter: blur(8px);
+      display: grid;
+      gap: 10px;
+      touch-action: none;
+    }
+
+    .map-editor-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: move;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .map-editor-header strong {
+      color: #f4e3c1;
+      font-size: 0.96rem;
+    }
+
+    .map-editor-grip {
+      color: #cdb892;
+      font-size: 0.88rem;
+      letter-spacing: 0.1em;
+    }
+
+    .map-editor-body {
+      display: grid;
+      grid-template-columns: minmax(180px, 0.9fr) minmax(0, 1.1fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .map-editor-preview-shell {
+      position: relative;
+      min-height: 220px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background:
+        radial-gradient(circle at 50% 50%, rgba(240, 212, 155, 0.15), rgba(0, 0, 0, 0.55)),
+        rgba(4, 5, 8, 0.9);
+    }
+
+    .map-editor-preview-shell img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 50% 50%;
+      opacity: 0.95;
+    }
+
+    .map-editor-preview-mode {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 2;
+      border-radius: 999px;
+      background: rgba(10, 12, 16, 0.76);
+      border: 1px solid rgba(240, 212, 155, 0.28);
+      color: #f4e3c1;
+      padding: 5px 10px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .map-editor-preview-focus {
+      position: absolute;
+      left: var(--map-crop-x, 50%);
+      top: var(--map-crop-y, 50%);
+      z-index: 2;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid rgba(240, 212, 155, 0.95);
+      background: rgba(240, 212, 155, 0.18);
+      box-shadow: 0 0 0 5px rgba(240, 212, 155, 0.08);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    .map-editor-preview-safe {
+      position: absolute;
+      inset: var(--map-safe-margin, 24px);
+      border-radius: 12px;
+      border: 1px dashed rgba(240, 212, 155, 0.62);
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    .map-editor-fields {
+      display: grid;
+      gap: 10px;
+    }
+
+    .map-editor-fields .editor-field select,
+    .map-editor-fields .editor-field input[type="number"] {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(8, 7, 6, 0.78);
+      color: #f7efe5;
+      font: inherit;
+      padding: 10px 12px;
+    }
+
+    .map-editor-fields .editor-field input[type="range"] {
+      width: 100%;
+    }
+
+    .grid-editor-fields {
+      display: grid;
+      gap: 10px;
+    }
+
+    .grid-editor-fields .editor-field select,
+    .grid-editor-fields .editor-field input[type="number"] {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(8, 7, 6, 0.78);
+      color: #f7efe5;
+      font: inherit;
+      padding: 10px 12px;
+    }
+
+    .grid-editor-fields .editor-field input[type="range"] {
+      width: 100%;
+    }
+
+    .grid-editor-nudge-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .token-editor,
+    .token-picker {
+      position: absolute;
+      right: 16px;
+      top: 220px;
+      z-index: 18;
+      width: min(640px, calc(100vw - 32px));
+      border-radius: 18px;
+      padding: 16px;
+      background: rgba(10, 13, 18, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+      pointer-events: auto;
+      backdrop-filter: blur(8px);
+      display: grid;
+      gap: 10px;
+      touch-action: none;
+    }
+
+    .token-editor-header,
+    .token-picker-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: move;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .token-editor-header strong,
+    .token-picker-header strong {
+      color: #f4e3c1;
+      font-size: 0.96rem;
+    }
+
+    .token-editor-grip,
+    .token-picker-grip {
+      color: #cdb892;
+      font-size: 0.88rem;
+      letter-spacing: 0.1em;
+    }
+
+    .token-picker-body {
+      display: grid;
+      grid-template-columns: minmax(180px, 0.84fr) minmax(0, 1.16fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .token-picker-preview {
+      position: relative;
+      min-height: 220px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background:
+        radial-gradient(circle at 50% 50%, rgba(123, 194, 255, 0.18), rgba(0, 0, 0, 0.58)),
+        rgba(4, 5, 8, 0.9);
+    }
+
+    .token-picker-preview img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: 50% 50%;
+      opacity: 0.96;
+    }
+
+    .token-picker-preview-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 2;
+      border-radius: 999px;
+      background: rgba(10, 12, 16, 0.76);
+      border: 1px solid rgba(123, 194, 255, 0.28);
+      color: #d4ecff;
+      padding: 5px 10px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .token-picker-preview-outline {
+      position: absolute;
+      inset: 18px;
+      border-radius: 18px;
+      border: 1px dashed rgba(123, 194, 255, 0.45);
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    .token-picker-fields,
+    .token-editor-fields {
+      display: grid;
+      gap: 10px;
+    }
+
+    .token-picker-fields .editor-field select,
+    .token-picker-fields .editor-field input[type="text"],
+    .token-editor-fields .editor-field select,
+    .token-editor-fields .editor-field input[type="number"],
+    .token-editor-fields .editor-field input[type="range"] {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(8, 7, 6, 0.78);
+      color: #f7efe5;
+      font: inherit;
+      padding: 10px 12px;
+    }
+
+    .token-picker-fields .editor-field input[type="text"] {
+      min-height: 44px;
+    }
+
+    .token-picker-list {
+      display: grid;
+      gap: 8px;
+      max-height: 290px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .token-picker-card {
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: #f6efe2;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .token-picker-card:hover,
+    .token-picker-card.is-selected {
+      background: rgba(123, 194, 255, 0.12);
+      border-color: rgba(123, 194, 255, 0.36);
+    }
+
+    .token-picker-card img {
+      display: block;
+      width: 72px;
+      height: 72px;
+      object-fit: contain;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.22);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .token-picker-meta {
+      display: grid;
+      gap: 3px;
+    }
+
+    .token-picker-meta strong {
+      color: #f4e3c1;
+    }
+
+    .token-picker-meta small {
+      color: #cdb892;
+      line-height: 1.35;
+    }
+
+    .token-picker-status {
+      color: #cdb892;
+      font-size: 0.86rem;
+      line-height: 1.45;
+    }
+
+    .grid-nudge-button {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.06);
+      color: #f6efe2;
+      cursor: pointer;
+      font: inherit;
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .grid-nudge-button:hover {
+      background: rgba(255, 255, 255, 0.11);
+    }
+
+    .map-asset-list {
+      display: grid;
+      gap: 8px;
+      max-height: 180px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .map-asset-button,
+    .map-editor-asset {
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: #f6efe2;
+      cursor: pointer;
+      text-align: left;
+      font: inherit;
+    }
+
+    .map-asset-button {
+      gap: 3px;
+    }
+
+    .map-asset-button img,
+    .map-editor-asset img {
+      display: block;
+      width: 72px;
+      height: 72px;
+      object-fit: contain;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.22);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .map-asset-button strong,
+    .map-editor-asset strong {
+      color: #f4e3c1;
+      font-size: 0.92rem;
+    }
+
+    .map-asset-button span,
+    .map-editor-asset small {
+      color: #cdb892;
+      font-size: 0.82rem;
+      line-height: 1.35;
+    }
+
+    .map-editor-asset-meta {
+      display: grid;
+      gap: 3px;
+    }
+
+    .map-asset-button.is-selected,
+    .map-editor-asset.is-selected {
+      border-color: rgba(240, 212, 155, 0.48);
+      background: rgba(240, 212, 155, 0.1);
+    }
+
+    .smoke-tools {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.12);
+      display: grid;
+      gap: 10px;
+    }
+
+    .smoke-tools code {
+      color: #f5ead7;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 1px 5px;
+      border-radius: 999px;
+    }
+
+    .context-menu {
+      position: fixed;
+      z-index: 220;
+      min-width: 240px;
+      border-radius: 16px;
+      background: rgba(18, 14, 11, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.36);
+      padding: 8px;
+      pointer-events: auto;
+    }
+
+    .context-menu[hidden] {
+      display: none;
+    }
+
+    .context-menu button {
+      width: 100%;
+      display: block;
+      text-align: left;
+      padding: 10px 12px;
+      margin: 0;
+      border: 0;
+      background: transparent;
+      color: #f5efe4;
+      border-radius: 10px;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .context-menu button:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .context-menu button:disabled {
+      color: rgba(245, 239, 228, 0.42);
+      cursor: not-allowed;
+    }
+
+    .context-menu button:disabled:hover {
+      background: transparent;
+    }
+
+    .context-menu .menu-separator {
+      height: 1px;
+      margin: 6px 4px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .report-grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+    }
+
+    .report-card {
+      padding: 18px 20px;
+      border-radius: 18px;
+    }
+
+    .report-card h2 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+      color: #ead7b2;
+    }
+
+    .report-card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .report-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .report-line {
+      color: #d8c9b0;
+      line-height: 1.5;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .report-figure {
+      margin: 0;
+      display: grid;
+      gap: 12px;
+    }
+
+    .report-figure img {
+      width: 100%;
+      display: block;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: #1f1814;
+    }
+
+    @media (max-width: 980px) {
+      .hero,
+      .report-grid {
         grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .shell {
+        padding: 0;
+      }
+
+      .top-bar {
+        left: 12px;
+        right: 12px;
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 10px 12px;
+      }
+
+      .header-right {
+        justify-content: space-between;
+      }
+
+      .header-center {
+        justify-content: flex-start;
+      }
+
+      .status-strip {
+        justify-content: flex-start;
+      }
+
+      .report-card {
+        padding: 14px;
+      }
+
+      .stage-shell {
+        min-height: 100vh;
+      }
+
+      .stage-summary {
+        right: 12px;
+        left: 12px;
+        width: auto;
+      }
+
+      .overlay-panel {
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        width: auto;
+      }
+
+      .map-editor {
+        left: 12px;
+        right: 12px;
+        top: auto;
+        bottom: 12px;
+        width: auto;
+      }
+
+      .map-editor-body {
+        grid-template-columns: 1fr;
+      }
+
+      .drawer {
+        top: 80px;
+        bottom: 72px;
+        width: 34px;
+      }
+
+      .drawer-edge-trigger {
+        top: 80px;
+        bottom: 72px;
+        width: 24px;
+      }
+
+      #left-drawer {
+        left: 10px;
+        width: 34px;
+      }
+
+      #right-drawer {
+        right: 10px;
+        width: 34px;
+      }
+
+      .chat-panel {
+        left: 50%;
+        bottom: -2px;
+        width: calc(100vw - 16px);
+      }
+
+      #left-drawer .drawer-settings-panel,
+      #right-drawer .drawer-settings-panel {
+        left: 0;
+        right: auto;
+        width: min(340px, calc(100vw - 24px));
       }
     }
   </style>
@@ -107,69 +2225,566 @@
       <img src="/assets/redirect.png" alt="Security redirect" />
       <h1>Error: Forbidden Access Entry</h1>
       <p>Security redirects you to the pathway.</p>
-      <a href="/" class="back-map-button">← Back to Map</a>
+      <a href="/" class="back-map-button">Back to Map</a>
     </div>
   </div>
 
   <div class="shell">
-    <div class="card">
-      <div class="hero">
-        <img src="/assets/catharsis.png" alt="Catharsis" />
-        <div>
-          <h1>Catharsis</h1>
-          <p>
-            Catharsis is the future home of Socio. It will eventually carry the same stage-facing spirit as the Cave, but we are not duplicating that system yet.
-          </p>
-          <p>
-            For now it is an invitation-bound audience venue where ticketing and access policy will be layered in before it opens broadly.
-          </p>
-          <p id="access-line">Checking access...</p>
-          <div id="access-note" class="note hidden">
-            This venue is not open to your account yet.
+    <div class="page">
+      <section class="stage-section panel">
+        <div class="stage-shell" id="stage-shell">
+          <div id="stage-empty-state" class="stage-empty-state" hidden>
+            <div class="stage-empty-card">
+              <em>Catharsis</em>
+              <strong>Live tools are paused.</strong>
+              <span>Right-click the stage or load the shell tools when you want the full stage.</span>
+              <button id="stage-load-tools" type="button">Load live tools</button>
+            </div>
           </div>
-          <a href="/" class="button">← Back to Map</a>
-        </div>
-      </div>
+          <div class="stage-summary">
+            <div class="stage-summary-card">
+              <strong>Live Feed</strong>
+              <div id="live-feed-line" class="stage-summary-line">No live data yet.</div>
+            </div>
+            <div class="stage-summary-card">
+              <strong>Snapshot</strong>
+              <div id="snapshot-summary" class="stage-summary-line">No snapshot summary yet.</div>
+            </div>
+            <div class="stage-summary-card">
+              <strong>Selected</strong>
+              <div id="selection-line" class="stage-summary-line">None</div>
+              <div id="selected-actions" class="selected-actions"></div>
+            </div>
+            <div class="stage-summary-card">
+              <strong>Pointer</strong>
+              <div id="pointer-line" class="stage-summary-line">Screen n/a | Stage n/a</div>
+            </div>
+            <div class="stage-summary-card">
+              <strong>Movement</strong>
+              <div id="movement-line" class="stage-summary-line">Idle</div>
+            </div>
+          </div>
+              <div id="pixi-stage-host" class="pixi-stage-host" aria-label="Catharsis stage"></div>
+              <div id="renderer-fallback" class="renderer-fallback" hidden>
+                <strong>Renderer fallback</strong>
+                <p id="renderer-fallback-line">PixiJS has not loaded yet.</p>
+                <p>The stage remains usable in DOM mode while the latest snapshot and controls stay available.</p>
+              </div>
+          <div id="overlay-root" class="stage-dom-overlay">
+            <div id="overlay-anchor" class="overlay-anchor" aria-label="Smoke overlay proof marker" hidden>
+              <div id="overlay-badge" class="overlay-anchor__badge">Smoke overlay</div>
+            </div>
+            <div class="overlay-panel">
+              <div class="overlay-row">
+                <strong>Session</strong>
+                <span id="session-line">Not joined</span>
+              </div>
+              <div class="overlay-row">
+                <strong>Role</strong>
+                <span id="role-line">Unknown</span>
+              </div>
+              <div class="overlay-row">
+                <strong>Objects</strong>
+                <span id="object-count-line">0</span>
+              </div>
+              <div class="overlay-actions">
+                <button id="refresh-world" type="button" title="Reload the latest world snapshot from the server and re-render the stage.">Reload snapshot</button>
+                <button id="stage-map" type="button" title="Open the Catharsis map editor.">Map</button>
+                <button id="clear-selection" type="button">Clear</button>
+              </div>
+              <div class="overlay-note">
+                Map is a first-class stage action. Use the Map button or right-click the stage to add / replace the active map. Right-click a live Pixi object for its menu;
+                dragging a live object still uses the existing <code>act/place_element</code> path.
+                Reload snapshot fetches the latest world state from the server and re-renders the stage.
+                Smoke mode adds <code>g</code> for grid and <code>d</code> for drop test card.
+              </div>
+              <div id="smoke-panel" class="smoke-tools" hidden>
+                <div class="overlay-row">
+                  <strong>Smoke</strong>
+                  <span id="smoke-line">Open this page with <code>?smoke=1</code>.</span>
+                </div>
+                <div class="overlay-actions">
+                  <button id="smoke-toggle-grid" type="button">Grid: Off</button>
+                  <button id="smoke-drop-card" type="button">Drop Test Card</button>
+                </div>
+              </div>
+            </div>
+            <div id="card-editor" class="card-editor" hidden>
+              <div id="card-editor-header" class="card-editor-header">
+                <strong>Inspect Card</strong>
+                <span class="card-editor-grip">drag</span>
+              </div>
+              <div id="card-editor-status" class="editor-status">Select a live index card.</div>
+              <label class="editor-field" for="card-editor-front">
+                <span>Front Text</span>
+                <textarea id="card-editor-front" rows="4"></textarea>
+              </label>
+              <label class="editor-field" for="card-editor-back">
+                <span>Back Text</span>
+                <textarea id="card-editor-back" rows="3"></textarea>
+              </label>
+              <label class="editor-field" for="card-editor-color">
+                <span>Color</span>
+                <input id="card-editor-color" type="color" />
+              </label>
+              <div class="overlay-actions">
+                <button id="card-editor-save" type="button">Save</button>
+                <button id="card-editor-cancel" type="button">Close</button>
+              </div>
+            </div>
+            <div id="map-editor" class="map-editor" hidden>
+              <div id="map-editor-header" class="map-editor-header">
+                <strong>Add / Replace Map</strong>
+                <span class="map-editor-grip">drag</span>
+              </div>
+              <div id="map-editor-status" class="editor-status">Choose a map asset for the Catharsis stage.</div>
+              <div class="map-editor-body">
+                <div class="map-editor-preview-shell">
+                  <div id="map-editor-preview-mode" class="map-editor-preview-mode">Cover</div>
+                  <img id="map-editor-preview" alt="Selected map preview" />
+                  <div id="map-editor-preview-focus" class="map-editor-preview-focus" aria-hidden="true"></div>
+                  <div id="map-editor-preview-safe" class="map-editor-preview-safe" aria-hidden="true"></div>
+                </div>
+                <div class="map-editor-fields">
+                  <label class="editor-field" for="map-editor-file">
+                    <span>Upload Map</span>
+                    <input id="map-editor-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+                  </label>
+                  <label class="editor-field" for="map-editor-display-mode">
+                    <span>Display</span>
+                    <select id="map-editor-display-mode">
+                      <option value="theater">Theater Stage</option>
+                      <option value="fullscreen">Full Canvas</option>
+                    </select>
+                  </label>
+                  <label class="editor-field" for="map-editor-fit">
+                    <span>Fit</span>
+                    <select id="map-editor-fit">
+                      <option value="cover">Cover</option>
+                      <option value="contain">Contain</option>
+                    </select>
+                  </label>
+                  <label class="editor-field" for="map-editor-scale">
+                    <span>Scale</span>
+                    <input id="map-editor-scale" type="range" min="0.25" max="4" step="0.01" value="1" />
+                  </label>
+                  <label class="editor-field" for="map-editor-crop-x">
+                    <span>Focal X</span>
+                    <input id="map-editor-crop-x" type="range" min="0" max="1" step="0.01" value="0.5" />
+                  </label>
+                  <label class="editor-field" for="map-editor-crop-y">
+                    <span>Focal Y</span>
+                    <input id="map-editor-crop-y" type="range" min="0" max="1" step="0.01" value="0.5" />
+                  </label>
+                  <div class="editor-status">Focal X/Y move the point the map uses when it is scaled or cropped.</div>
+                  <label class="editor-field">
+                    <span>Existing Map Assets</span>
+                    <div id="map-editor-assets" class="map-asset-list"></div>
+                  </label>
+                </div>
+              </div>
+              <div class="overlay-actions">
+                <button id="map-editor-remove" type="button" class="overlay-action-danger">Remove Map</button>
+                <button id="map-editor-save" type="button">Save Map</button>
+                <button id="map-editor-cancel" type="button">Close</button>
+              </div>
+            </div>
+            <div id="grid-editor" class="map-editor grid-editor" hidden>
+              <div id="grid-editor-header" class="map-editor-header">
+                <strong>Configure Grid</strong>
+                <span class="map-editor-grip">drag</span>
+              </div>
+              <div id="grid-editor-status" class="editor-status">Choose a grid style for the Catharsis stage.</div>
+              <div class="grid-editor-fields">
+                <label class="editor-field" for="grid-editor-type">
+                  <span>Grid</span>
+                  <select id="grid-editor-type">
+                    <option value="none">Off</option>
+                    <option value="square">Square</option>
+                    <option value="hex">Hex</option>
+                  </select>
+                </label>
+                <label class="editor-field" for="grid-editor-hex-orientation" id="grid-editor-hex-orientation-field">
+                  <span>Hex Orientation</span>
+                  <select id="grid-editor-hex-orientation">
+                    <option value="flat-top">Flat-top</option>
+                    <option value="pointy-top">Pointy-top</option>
+                  </select>
+                </label>
+                <label class="editor-field" for="grid-editor-cell-size">
+                  <span>Cell Size</span>
+                  <div class="grid-editor-nudge-row">
+                    <button id="grid-editor-cell-size-down" type="button" class="grid-nudge-button">&minus;</button>
+                    <input id="grid-editor-cell-size" type="number" min="8" max="500" step="1" value="50" />
+                    <button id="grid-editor-cell-size-up" type="button" class="grid-nudge-button">&plus;</button>
+                  </div>
+                </label>
+                <label class="editor-field" for="grid-editor-offset-x">
+                  <span>Offset X</span>
+                  <div class="grid-editor-nudge-row">
+                    <button id="grid-editor-offset-x-down" type="button" class="grid-nudge-button">&#8592;</button>
+                    <input id="grid-editor-offset-x" type="number" step="1" value="0" />
+                    <button id="grid-editor-offset-x-up" type="button" class="grid-nudge-button">&#8594;</button>
+                  </div>
+                </label>
+                <label class="editor-field" for="grid-editor-offset-y">
+                  <span>Offset Y</span>
+                  <div class="grid-editor-nudge-row">
+                    <button id="grid-editor-offset-y-down" type="button" class="grid-nudge-button">&#8593;</button>
+                    <input id="grid-editor-offset-y" type="number" step="1" value="0" />
+                    <button id="grid-editor-offset-y-up" type="button" class="grid-nudge-button">&#8595;</button>
+                  </div>
+                </label>
+                <label class="editor-field" for="grid-editor-opacity">
+                  <span>Opacity</span>
+                  <input id="grid-editor-opacity" type="range" min="0" max="1" step="0.01" value="0.45" />
+                </label>
+                <label class="editor-field" for="grid-editor-line-width">
+                  <span>Line Width</span>
+                  <input id="grid-editor-line-width" type="range" min="0.5" max="8" step="0.5" value="1" />
+                </label>
+                <label class="editor-field" for="grid-editor-line-style">
+                  <span>Line Style</span>
+                  <select id="grid-editor-line-style">
+                    <option value="light">Light</option>
+                    <option value="neutral">Neutral</option>
+                    <option value="dark">Dark</option>
+                  </select>
+                </label>
+                <div class="editor-status">Use the +/- and arrow buttons to nudge values. Hold Shift and click for a larger step.</div>
+              </div>
+              <div class="overlay-actions">
+                <button id="grid-editor-reset" type="button" class="overlay-action-danger">Reset Grid</button>
+                <button id="grid-editor-visibility" type="button">Hide Grid</button>
+                <button id="grid-editor-save" type="button">Save Grid</button>
+                <button id="grid-editor-cancel" type="button">Close</button>
+              </div>
+            </div>
+            <div id="token-picker" class="token-picker" hidden>
+              <div id="token-picker-header" class="token-picker-header">
+                <strong>Add Token</strong>
+                <span class="token-picker-grip">drag</span>
+              </div>
+              <div id="token-picker-status" class="token-picker-status">Choose a reusable Warehouse token.</div>
+              <div class="token-picker-body">
+                <div class="token-picker-preview">
+                  <div id="token-picker-preview-badge" class="token-picker-preview-badge">No token selected</div>
+                  <img id="token-picker-preview" alt="Selected token preview" />
+                  <div class="token-picker-preview-outline" aria-hidden="true"></div>
+                </div>
+                <div class="token-picker-fields">
+                  <label class="editor-field" for="token-picker-search">
+                    <span>Search</span>
+                    <input id="token-picker-search" type="text" placeholder="Search token assets" />
+                  </label>
+                  <label class="editor-field" for="token-picker-shape">
+                    <span>Shape</span>
+                    <select id="token-picker-shape">
+                      <option value="all">All shapes</option>
+                      <option value="circle">Circle</option>
+                      <option value="square">Square</option>
+                      <option value="hex">Hex</option>
+                      <option value="raw">Raw</option>
+                    </select>
+                  </label>
+                  <label class="editor-field">
+                    <span>Active Warehouse Tokens</span>
+                    <div id="token-picker-list" class="token-picker-list"></div>
+                  </label>
+                </div>
+              </div>
+              <div class="overlay-actions">
+                <button id="token-picker-apply" type="button">Add Token</button>
+                <button id="token-picker-refresh" type="button">Refresh</button>
+                <button id="token-picker-cancel" type="button">Cancel</button>
+              </div>
+            </div>
+            <div id="token-editor" class="token-editor" hidden>
+              <div id="token-editor-header" class="token-editor-header">
+                <strong>Scale Token</strong>
+                <span class="token-editor-grip">drag</span>
+              </div>
+              <div id="token-editor-status" class="editor-status">Adjust the selected token's placement scale.</div>
+              <div class="token-editor-fields">
+                <label class="editor-field" for="token-editor-scale">
+                  <span>Scale</span>
+                  <input id="token-editor-scale" type="range" min="25" max="500" step="1" value="100" />
+                </label>
+                <label class="editor-field" for="token-editor-scale-value">
+                  <span>Scale Value</span>
+                  <input id="token-editor-scale-value" type="number" min="25" max="500" step="1" value="100" />
+                </label>
+                <label class="editor-field" for="token-editor-snap">
+                  <span>Placement Mode</span>
+                  <select id="token-editor-snap">
+                    <option value="grid">Snap to Grid</option>
+                    <option value="free">Free Placement</option>
+                  </select>
+                </label>
+                <label class="editor-field" for="token-editor-layer">
+                  <span>Layer</span>
+                  <select id="token-editor-layer">
+                    <option value="public">Public Token Layer</option>
+                    <option value="director">Director Layer</option>
+                  </select>
+                </label>
+              </div>
+              <div class="overlay-actions">
+                <button id="token-editor-reset" type="button">Reset</button>
+                <button id="token-editor-save" type="button">Save</button>
+                <button id="token-editor-cancel" type="button">Close</button>
+              </div>
+            </div>
+            <div id="pixi-context-menu" class="context-menu" hidden></div>
+          </div>
+          <div id="shell-root" class="shell-chrome">
+              <header id="top-bar" class="top-bar" data-open="false" data-pinned="false">
+                <div class="header-left">
+                  <div class="brand">
+                    <h1>Catharsis</h1>
+                  </div>
+                <div class="status-strip">
+                  <span class="chip">Role <strong id="role-value">Audience</strong></span>
+                  <span class="chip">Connection <strong id="connection-value">Waiting</strong></span>
+                  <span class="chip">Session <strong id="session-status">Idle</strong></span>
+                  <div id="stage-status" class="stage-status" hidden>Stage ready.</div>
+                  <div id="discord-mic-status" class="chip" data-venue-slug="catharsis">House Mic: Loading</div>
+                </div>
+              </div>
+                <div class="header-center">
+                  <div id="camera-controls" class="camera-controls" aria-label="Camera controls">
+                    <button id="camera-zoom-out" class="camera-button" type="button" aria-label="Zoom out">−</button>
+                    <div id="camera-zoom-value" class="camera-zoom">100%</div>
+                    <button id="camera-zoom-in" class="camera-button" type="button" aria-label="Zoom in">+</button>
+                    <button id="camera-fit" class="camera-button" type="button">Fit</button>
+                  </div>
+                  <button id="target-info" class="chip chip--target" type="button" aria-label="Selected target information" title="No target selected">
+                    <span class="chip-stack">
+                      <span><strong id="target-value">No Target</strong></span>
+                      <span id="target-class-value">Unknown Class</span>
+                      <span id="pointer-value">Screen n/a | Stage n/a</span>
+                    </span>
+                    <span class="chip-action" aria-hidden="true">ⓘ</span>
+                  </button>
+                </div>
+                <div class="header-right">
+                  <div class="header-controls">
+                    <button id="header-pin-button" class="header-pill" type="button" aria-label="Pin header open" aria-pressed="false" title="Pin header open">📌</button>
+                    <button id="header-settings-button" class="header-pill" type="button" aria-label="Header settings" aria-expanded="false" title="Header settings">⚙</button>
+                    <button id="boot-live-tools" class="header-pill" type="button" aria-label="Load live stage tools" title="Load live stage tools">▶</button>
+                    <a class="header-pill header-pill--back" href="/" aria-label="Back to map" title="Back to map">←</a>
+                  </div>
+                  <div class="account-menu-wrap">
+                    <button id="account-menu-toggle" class="chip account-chip" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Open account menu">
+                      <span class="account-avatar" aria-hidden="true">CS</span>
+                      <span id="account-label">Account</span>
+                    </button>
+                    <div id="account-menu" class="account-menu" hidden>
+                      <button id="account-logout-button" type="button">Log Out</button>
+                    </div>
+                  </div>
+                </div>
+                <div id="header-settings-panel" class="header-settings-panel" hidden>
+                  <h3>Shell windows</h3>
+                  <div class="header-settings-group">
+                    <label for="header-opacity">Header body opacity
+                      <input id="header-opacity" type="range" min="0" max="100" step="5" value="100" />
+                      <span id="header-opacity-value" class="header-settings-value">100%</span>
+                    </label>
+                    <label for="chat-opacity">Chat body opacity
+                      <input id="chat-opacity" type="range" min="0" max="100" step="5" value="96" />
+                      <span id="chat-opacity-value" class="header-settings-value">96%</span>
+                    </label>
+                  </div>
+                  <div class="header-settings-group">
+                    <label>Identity
+                      <span id="identity-value" class="header-settings-value">Unknown User</span>
+                    </label>
+                    <label>Character
+                      <span id="character-value" class="header-settings-value">No Character</span>
+                    </label>
+                    <label>Viewing As
+                      <span id="view-value" class="header-settings-value">Self</span>
+                    </label>
+                    <button id="ping-button" class="header-settings-button" type="button">Ping</button>
+                    <label>Ping RTT
+                      <span id="ping-value" class="header-settings-value">—</span>
+                    </label>
+                  </div>
+                  <div class="overlay-actions">
+                    <button id="reset-shell-prefs" type="button">Reset shell prefs</button>
+                  </div>
+                  <div class="header-settings-helper">The rails stay reachable even when the body fades down. Pin the header when you want rehearsal mode to stay open.</div>
+                </div>
+              </header>
+
+              <aside id="left-drawer" class="drawer drawer--collapsed" data-open-mode="hover" data-open="false" data-rail-label="Presence / Tools">
+                <div class="drawer-inner">
+                  <div class="drawer-head">
+                    <div class="drawer-head__copy">
+                      <strong>Presence / Tools</strong>
+                    </div>
+                    <div class="drawer-head__actions">
+                      <button id="left-settings-button" class="drawer-settings-button" type="button" aria-label="Left drawer settings" aria-expanded="false">⚙</button>
+                    </div>
+                  </div>
+                  <div id="left-settings-panel" class="drawer-settings-panel" hidden>
+                    <h3>Left drawer settings</h3>
+                    <div class="drawer-settings-group">
+                      <label for="left-open-mode">Open mode
+                        <select id="left-open-mode">
+                          <option value="hover">Hover open</option>
+                          <option value="always-open">Always open</option>
+                          <option value="always-closed">Always closed</option>
+                        </select>
+                      </label>
+                      <label for="left-opacity">Window opacity
+                        <input id="left-opacity" type="range" min="0" max="100" step="5" value="96" />
+                        <span id="left-opacity-value" class="drawer-settings-value">96%</span>
+                      </label>
+                      <label for="left-portrait-size">Portrait size
+                        <select id="left-portrait-size">
+                          <option value="small">Small</option>
+                          <option value="medium">Medium</option>
+                          <option value="large">Large</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div class="drawer-settings-helper">Settings are stored locally for this user on this device.</div>
+                  </div>
+                  <div class="drawer-body">
+                    <div class="drawer-item">
+                      <strong>Network</strong>
+                      <span id="network-state">Idle. Audio hooks reserved.</span>
+                    </div>
+                    <div id="catharsis-audio-tray" class="drawer-item"></div>
+                    <div class="drawer-item">
+                      <strong>Presence</strong>
+                      <div id="presence-preview" class="presence-preview" aria-label="Current room presence preview">
+                        <span class="presence-avatar presence-avatar--fallback">?</span>
+                        <span class="presence-avatar presence-avatar--fallback">?</span>
+                        <span class="presence-avatar presence-avatar--fallback">?</span>
+                      </div>
+                    </div>
+                    <div class="drawer-item">
+                      <strong>Stage Controls</strong>
+                      <div class="overlay-actions">
+                        <button id="shell-refresh-world" type="button">Reload snapshot</button>
+                        <button id="shell-clear-selection" type="button">Clear</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+
+              <div id="left-drawer-edge-trigger" class="drawer-edge-trigger drawer-edge-trigger--left" aria-hidden="true"></div>
+              <div id="right-drawer-edge-trigger" class="drawer-edge-trigger drawer-edge-trigger--right" aria-hidden="true"></div>
+
+              <aside id="right-drawer" class="drawer drawer--collapsed" data-open-mode="hover" data-open="false" data-rail-label="Character / Notes">
+                <div class="drawer-inner">
+                  <div class="drawer-head">
+                    <div class="drawer-head__copy">
+                      <strong>Character / Notes</strong>
+                    </div>
+                    <div class="drawer-head__actions">
+                      <button id="right-settings-button" class="drawer-settings-button" type="button" aria-label="Right drawer settings" aria-expanded="false">⚙</button>
+                    </div>
+                  </div>
+                  <div id="right-settings-panel" class="drawer-settings-panel" hidden>
+                    <h3>Right drawer settings</h3>
+                    <div class="drawer-settings-group">
+                      <label for="right-open-mode">Open mode
+                        <select id="right-open-mode">
+                          <option value="hover">Hover open</option>
+                          <option value="always-open">Always open</option>
+                          <option value="always-closed">Always closed</option>
+                        </select>
+                      </label>
+                      <label for="right-opacity">Window opacity
+                        <input id="right-opacity" type="range" min="0" max="100" step="5" value="96" />
+                        <span id="right-opacity-value" class="drawer-settings-value">96%</span>
+                      </label>
+                    </div>
+                    <div class="drawer-settings-helper">Right drawer settings are stored locally per user and kept intentionally small for now.</div>
+                  </div>
+                  <div class="drawer-body">
+                    <div id="catharsis-dice-tray" class="drawer-item"></div>
+                    <div class="drawer-item">
+                      <strong>Character</strong>
+                      <span id="right-character-value">No Character</span>
+                    </div>
+                    <div class="drawer-item">
+                      <strong>Selection</strong>
+                      <div class="overlay-actions">
+                        <button id="right-card-editor-button" type="button">Card editor</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+
+              <section id="chat-panel" class="chat-panel" data-open="false">
+                <div id="chat-head" class="chat-head" role="button" tabindex="0" aria-label="Toggle chat open">
+                  <div class="chat-head__label">Chat <span id="chat-badge" class="badge" hidden>0</span></div>
+                </div>
+                <div class="chat-body">
+                  <div class="chat-log" id="chat-log">
+                  </div>
+                  <div class="chat-row">
+                    <input id="chat-input" type="text" placeholder="Start typing here..." />
+                    <button id="chat-send" type="button">Send</button>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+      </section>
     </div>
   </div>
 
   <script src="/lib/forbidden.js"></script>
+  <script src="/lib/pixi.min.js"></script>
+  <script src="/lib/victory-pixi-stage.js"></script>
+  <script src="/lib/victory-pixi-grid.js"></script>
+  <script src="/lib/victory-stage-camera.js"></script>
+  <script src="/venues/shared/venue-shell.js"></script>
+  <script src="/lib/discord-mic.js?v=kernel40-1"></script>
+  <script src="/lib/discord-audio.js?v=kernel43-2"></script>
+  <script src="/lib/victory-mic-chat.js?v=kernel40-1"></script>
+  <script src="/venues/catharsis/runtime/state.js?v=kernel51-2"></script>
+  <script src="/venues/catharsis/runtime/socket.js?v=kernel51-2"></script>
+  <script src="/venues/catharsis/runtime/logic.js?v=kernel51-2"></script>
+  <script src="/venues/catharsis/runtime/geometry.js?v=kernel51-2"></script>
+  <script src="/venues/catharsis/runtime/stage-controls.js?v=kernel51-3"></script>
+  <script src="/venues/catharsis/runtime/map-grid.js?v=kernel51-4"></script>
+  <script src="/venues/catharsis/runtime/scene-nodes.js?v=kernel51-5"></script>
+  <script src="/venues/catharsis/runtime/token-ui.js?v=kernel51-7"></script>
+  <script src="/venues/catharsis/runtime/dice.js?v=kernel52-1"></script>
+  <script src="/venues/catharsis/runtime/action-router.js?v=kernel51-10"></script>
+  <script src="/venues/catharsis/runtime/socket-controller.js?v=kernel51-8"></script>
+  <script src="/venues/catharsis/runtime/session-sync.js?v=kernel52-1"></script>
+  <script src="/venues/catharsis/runtime/editors.js?v=kernel51-8"></script>
+  <script src="/venues/catharsis/runtime/lifecycle.js?v=kernel51-2"></script>
+  <script src="/venues/catharsis/runtime/context.js?v=kernel51-2"></script>
   <script>
-    const accessLine = document.getElementById("access-line");
-    const accessNote = document.getElementById("access-note");
+    window.VictoryDiscordAudio?.mount({
+      venueSlug: "catharsis",
+      mount: "#catharsis-audio-tray",
+    });
+  </script>
+  <script>
+    (function () {
+      if (window.__catharsisBootWiring) return;
+      window.__catharsisBootWiring = true;
 
-    async function bootstrapCatharsis() {
-      try {
-        const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
-        const sessionPayload = await sessionResponse.json().catch(() => null);
-
-        if (!sessionPayload?.signed_in) {
-          showForbiddenScreen();
-          return;
-        }
-
-        const visibilityResponse = await fetch("/api/map/visibility", { credentials: "include" });
-        const visibilityPayload = await visibilityResponse.json().catch(() => null);
-        const visible = Array.isArray(visibilityPayload?.data)
-          ? visibilityPayload.data.some((venue) => venue?.slug === "catharsis")
-          : false;
-
-        if (visible) {
-          accessLine.textContent = "Access granted";
-          accessLine.style.color = "#e9dcff";
-          accessNote.classList.add("hidden");
-        } else {
-          accessLine.textContent = "Audience venue pending ticketing";
-          accessLine.style.color = "#c8c0d7";
-          accessNote.classList.remove("hidden");
-        }
-      } catch (error) {
-        console.error("catharsis bootstrap failed", error);
-        showForbiddenScreen();
-      }
-    }
-
-    bootstrapCatharsis();
+      const script = document.createElement("script");
+      script.src = "/venues/catharsis/runtime.js?v=boot-37";
+      script.dataset.victoryRuntime = "catharsis";
+      script.addEventListener("load", () => {
+        window.VictoryCatharsis?.start?.();
+      }, { once: true });
+      document.head.appendChild(script);
+    })();
   </script>
 </body>
 </html>

@@ -22,6 +22,7 @@ const discordChatBridgeMaxContentRunes = 2000
 var discordChatBridgeEligibleVenues = map[string]string{
 	"the-cave":            "The Cave",
 	"first-theater":       "First Theater",
+	"catharsis":           "Catharsis",
 	"middle-school-stage": "Middle School Stage",
 }
 

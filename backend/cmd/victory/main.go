@@ -351,6 +351,10 @@ func main() {
 	mux.HandleFunc("POST /api/venues/first-theater/map", venues.HandleVenueMap(pool))
 	mux.HandleFunc("GET /api/venues/first-theater/grid", venues.HandleVenueGrid(pool))
 	mux.HandleFunc("PUT /api/venues/first-theater/grid", venues.HandleVenueGrid(pool))
+	mux.HandleFunc("GET /api/venues/catharsis/map", venues.HandleVenueMap(pool))
+	mux.HandleFunc("POST /api/venues/catharsis/map", venues.HandleVenueMap(pool))
+	mux.HandleFunc("GET /api/venues/catharsis/grid", venues.HandleVenueGrid(pool))
+	mux.HandleFunc("PUT /api/venues/catharsis/grid", venues.HandleVenueGrid(pool))
 	mux.HandleFunc("/api/venues/", venues.HandleVenueMap(pool))
 
 	mux.HandleFunc("/api/session/the-cave/join", func(w http.ResponseWriter, r *http.Request) {

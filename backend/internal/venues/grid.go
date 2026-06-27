@@ -54,7 +54,7 @@ func defaultVenueGridConfig() venueGridConfig {
 func HandleVenueGrid(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		venueSlug := resolveVenueGridSlug(r)
-		if venueSlug != firstTheaterSlug {
+		if !isSupportedTheaterVenueSlug(venueSlug) {
 			writeJSON(w, http.StatusNotFound, map[string]any{
 				"ok":    false,
 				"error": "venue_grid_not_supported",

@@ -341,6 +341,7 @@ func TestNormalizeMicVenueSlug(t *testing.T) {
 	cases := map[string]string{
 		"first-theater":       "first-theater",
 		" First-Theater ":     "first-theater",
+		"catharsis":           "catharsis",
 		"MIDDLE-SCHOOL-STAGE": "middle-school-stage",
 		"the-cave":            "the-cave",
 	}

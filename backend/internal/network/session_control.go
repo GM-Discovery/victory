@@ -175,7 +175,7 @@ func HandleSessionControl(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 
 func normalizeSessionControlVenueSlug(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "the-cave", "first-theater", "middle-school-stage":
+	case "the-cave", "first-theater", "catharsis", "middle-school-stage":
 		return strings.ToLower(strings.TrimSpace(raw))
 	default:
 		return ""

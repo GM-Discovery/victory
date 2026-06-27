@@ -8,6 +8,7 @@ func TestNormalizeSessionControlVenueSlug(t *testing.T) {
 	cases := map[string]string{
 		"the-cave":            "the-cave",
 		"first-theater":       "first-theater",
+		"catharsis":           "catharsis",
 		"middle-school-stage": "middle-school-stage",
 		"unknown":             "",
 	}

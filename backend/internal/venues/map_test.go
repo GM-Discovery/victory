@@ -10,4 +10,9 @@ func TestResolveVenueMapSlug(t *testing.T) {
 	if got := resolveVenueMapSlug(req); got != firstTheaterSlug {
 		t.Fatalf("resolveVenueMapSlug() = %q, want %q", got, firstTheaterSlug)
 	}
+
+	req = httptest.NewRequest("POST", "/api/venues/catharsis/map", nil)
+	if got := resolveVenueMapSlug(req); got != catharsisSlug {
+		t.Fatalf("resolveVenueMapSlug() = %q, want %q", got, catharsisSlug)
+	}
 }

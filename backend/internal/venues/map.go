@@ -15,7 +15,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const firstTheaterSlug = "first-theater"
+const (
+	firstTheaterSlug = "first-theater"
+	catharsisSlug    = "catharsis"
+)
+
+func isSupportedTheaterVenueSlug(slug string) bool {
+	switch strings.ToLower(strings.TrimSpace(slug)) {
+	case firstTheaterSlug, catharsisSlug:
+		return true
+	default:
+		return false
+	}
+}
 
 type venueMapState struct {
 	AssetID         string         `json:"asset_id"`
@@ -56,7 +68,7 @@ type venueMapRequest struct {
 func HandleVenueMap(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		venueSlug := resolveVenueMapSlug(r)
-		if venueSlug != firstTheaterSlug {
+		if !isSupportedTheaterVenueSlug(venueSlug) {
 			writeJSON(w, http.StatusNotFound, map[string]any{
 				"ok":    false,
 				"error": "venue_map_not_supported",

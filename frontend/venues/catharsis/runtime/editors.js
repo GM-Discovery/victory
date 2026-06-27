@@ -2,7 +2,7 @@
   if (typeof module === "object" && module.exports) {
     module.exports = factory();
   }
-  root.VictoryFirstTheaterEditors = factory();
+  root.VictoryCatharsisEditors = factory();
 })(typeof globalThis !== "undefined" ? globalThis : window, function () {
   function createEditorControllers(deps = {}) {
     const getStageShell = typeof deps.getStageShell === "function" ? deps.getStageShell : () => null;
@@ -223,7 +223,7 @@
       const panel = elements.panel;
       if (panel) panel.hidden = true;
       if (elements.file) elements.file.value = "";
-      setMapEditorStatus("Choose a map asset for the First Theater stage.");
+      setMapEditorStatus("Choose a map asset for the Catharsis stage.");
       deps.setMapEditorPreviewURL?.("");
     }
 
@@ -237,7 +237,7 @@
       setGridEditorOriginalState(null);
       const panel = deps.getGridEditorElements?.().panel;
       if (panel) panel.hidden = true;
-      setGridEditorStatus("Choose a grid style for the First Theater stage.");
+      setGridEditorStatus("Choose a grid style for the Catharsis stage.");
     }
 
     function syncMapEditorPreview(url) {
@@ -393,7 +393,7 @@
 
     async function refreshVenueMapStateController() {
       try {
-        const response = await fetchFn("/api/venues/first-theater/map", {
+        const response = await fetchFn("/api/venues/catharsis/map", {
           credentials: "include",
           cache: "no-store",
         });
@@ -415,7 +415,7 @@
 
     async function refreshVenueGridConfigController() {
       try {
-        const response = await fetchFn("/api/venues/first-theater/grid", {
+        const response = await fetchFn("/api/venues/catharsis/grid", {
           credentials: "include",
           cache: "no-store",
         });
@@ -472,7 +472,7 @@
         ...draft,
         asset_id: assetID,
       };
-      const response = await fetchFn("/api/venues/first-theater/map", {
+      const response = await fetchFn("/api/venues/catharsis/map", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -496,7 +496,7 @@
     }
 
     async function removeVenueMapController() {
-      const response = await fetchFn("/api/venues/first-theater/map", {
+      const response = await fetchFn("/api/venues/catharsis/map", {
         method: "DELETE",
         credentials: "include",
       });
@@ -507,8 +507,7 @@
       setCurrentVenueMapState(null);
       setCurrentVenueMapAssetID("");
       setMapEditorDirty(false);
-      const elements = deps.getMapEditorElements?.() || {};
-      if (elements.file) elements.file.value = "";
+      if (deps.getMapEditorElements?.().file) deps.getMapEditorElements().file.value = "";
       deps.setMapEditorPreviewURL?.("");
       syncMapEditorWithState();
       livePreviewMapOnStage();
@@ -517,7 +516,7 @@
 
     async function saveGridConfigController() {
       const draft = deps.gridEditorDraftFromUI?.() || defaultGridConfig();
-      const response = await fetchFn("/api/venues/first-theater/grid", {
+      const response = await fetchFn("/api/venues/catharsis/grid", {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -542,7 +541,7 @@
       const panel = deps.getMapEditorElements?.().panel;
       if (!panel) return;
       if (!canManageIndexCards(getCurrentRole())) {
-        setStageStatus("Only producers and directors can add or replace the First Theater map.");
+        setStageStatus("Only producers and directors can add or replace the Catharsis map.");
         return;
       }
       hideCardEditor();
@@ -553,7 +552,7 @@
       panel.hidden = false;
       deps.setMapEditorDirty?.(false);
       if (deps.getMapEditorElements?.().file) deps.getMapEditorElements().file.value = "";
-      setMapEditorStatus("Choose a map asset for the First Theater stage.");
+      setMapEditorStatus("Choose a map asset for the Catharsis stage.");
       void refreshVenueMapAssetsController();
       syncMapEditorWithState();
       deps.getMapEditorElements?.().file?.focus?.({ preventScroll: true });
@@ -564,7 +563,7 @@
       deps.setMapEditorOriginalState?.(null);
       const panel = deps.getMapEditorElements?.().panel;
       if (panel) panel.hidden = true;
-      setMapEditorStatus("Choose a map asset for the First Theater stage.");
+      setMapEditorStatus("Choose a map asset for the Catharsis stage.");
       deps.setMapEditorPreviewURL?.("");
     }
 
@@ -584,7 +583,7 @@
       const panel = deps.getGridEditorElements?.().panel;
       if (!panel) return;
       if (!canManageIndexCards(getCurrentRole())) {
-        setStageStatus("Only producers and directors can configure the First Theater grid.");
+        setStageStatus("Only producers and directors can configure the Catharsis grid.");
         return;
       }
       hideCardEditor();
@@ -593,7 +592,7 @@
       if (panel.hidden) setGridEditorPosition(24, 24);
       panel.hidden = false;
       setGridEditorDirty(false);
-      setGridEditorStatus("Choose a grid style for the First Theater stage.");
+      setGridEditorStatus("Choose a grid style for the Catharsis stage.");
       syncGridEditorWithState();
     }
 

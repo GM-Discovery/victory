@@ -30,7 +30,7 @@
     const cameraZoomInButton = document.getElementById("camera-zoom-in");
     const cameraFitButton = document.getElementById("camera-fit");
     const pingButton = document.getElementById("ping-button");
-    const diceTrayRoot = document.getElementById("first-theater-dice-tray");
+    const diceTrayRoot = document.getElementById("catharsis-dice-tray");
     const cardEditorPanel = document.getElementById("card-editor");
     const cardEditorHeader = document.getElementById("card-editor-header");
     const cardEditorStatus = document.getElementById("card-editor-status");
@@ -101,17 +101,17 @@
     const tokenEditorSave = document.getElementById("token-editor-save");
     const tokenEditorCancel = document.getElementById("token-editor-cancel");
     let pixiLoadPromise = null;
-    let firstTheaterRuntimeStarted = false;
+    let catharsisRuntimeStarted = false;
     window.VictoryVenueShell?.mount?.({
       root: stageShell,
-      venueSlug: "first-theater",
-      venueName: "First Theater",
+      venueSlug: "catharsis",
+      venueName: "Catharsis",
       slots: {
         header: stageStatus,
         leftTray: document.getElementById("overlay-root"),
         rightTray: document.getElementById("snapshot-summary"),
         chatRail: document.getElementById("renderer-fallback"),
-        audioTray: document.getElementById("first-theater-audio-tray"),
+        audioTray: document.getElementById("catharsis-audio-tray"),
       },
     });
 
@@ -121,31 +121,31 @@
     let currentRole = "audience";
     const smokeMode = new URLSearchParams(location.search).has("smoke");
     let smokeGridEnabled = smokeMode;
-    const firstTheaterStateModule = window.VictoryFirstTheaterState || null;
-    const firstTheaterSocketModule = window.VictoryFirstTheaterSocket || null;
-    const firstTheaterLogicModule = window.VictoryFirstTheaterLogic || null;
-    const firstTheaterGeometryModule = window.VictoryFirstTheaterGeometry || null;
-    const firstTheaterStageControlsModule = window.VictoryFirstTheaterStageControls || null;
-    const firstTheaterMapGridModule = window.VictoryFirstTheaterMapGrid || null;
-    const firstTheaterSceneNodesModule = window.VictoryFirstTheaterSceneNodes || null;
-    const firstTheaterTokenUiModule = window.VictoryFirstTheaterTokenUI || null;
-    const firstTheaterDiceModule = window.VictoryFirstTheaterDice || null;
-    const firstTheaterActionRouterModule = window.VictoryFirstTheaterActionRouter || null;
-    const firstTheaterSocketControllerModule = window.VictoryFirstTheaterSocketController || null;
-    const firstTheaterSessionSyncModule = window.VictoryFirstTheaterSessionSync || null;
-    const firstTheaterLifecycleModule = window.VictoryFirstTheaterLifecycle || null;
-    const firstTheaterContextModule = window.VictoryFirstTheaterContext || null;
-    const firstTheaterEditorsModule = window.VictoryFirstTheaterEditors || null;
-    const projectedState = firstTheaterStateModule?.createProjectedState?.({
+    const catharsisStateModule = window.VictoryCatharsisState || null;
+    const catharsisSocketModule = window.VictoryCatharsisSocket || null;
+    const catharsisLogicModule = window.VictoryCatharsisLogic || null;
+    const catharsisGeometryModule = window.VictoryCatharsisGeometry || null;
+    const catharsisStageControlsModule = window.VictoryCatharsisStageControls || null;
+    const catharsisMapGridModule = window.VictoryCatharsisMapGrid || null;
+    const catharsisSceneNodesModule = window.VictoryCatharsisSceneNodes || null;
+    const catharsisTokenUiModule = window.VictoryCatharsisTokenUI || null;
+    const catharsisDiceModule = window.VictoryCatharsisDice || null;
+    const catharsisActionRouterModule = window.VictoryCatharsisActionRouter || null;
+    const catharsisSocketControllerModule = window.VictoryCatharsisSocketController || null;
+    const catharsisSessionSyncModule = window.VictoryCatharsisSessionSync || null;
+    const catharsisLifecycleModule = window.VictoryCatharsisLifecycle || null;
+    const catharsisContextModule = window.VictoryCatharsisContext || null;
+    const catharsisEditorsModule = window.VictoryCatharsisEditors || null;
+    const projectedState = catharsisStateModule?.createProjectedState?.({
       viewerRole: currentRole,
     }) || null;
-    const firstTheaterDispatcher = firstTheaterSocketModule?.createDispatcher?.({
+    const catharsisDispatcher = catharsisSocketModule?.createDispatcher?.({
       state: projectedState,
       parseMessage(raw) {
         return JSON.parse(raw);
       },
     }) || null;
-    const runtimeLifecycle = firstTheaterLifecycleModule?.createLifecycleBag?.() || {
+    const runtimeLifecycle = catharsisLifecycleModule?.createLifecycleBag?.() || {
       track: (dispose) => dispose,
       listen: (target, type, handler, options) => {
         target?.addEventListener?.(type, handler, options);
@@ -156,7 +156,7 @@
       animationFrame: (callback) => window.requestAnimationFrame(callback),
       dispose: () => {},
     };
-    const contextHelpers = firstTheaterContextModule?.createContextInteractionHelpers?.({
+    const contextHelpers = catharsisContextModule?.createContextInteractionHelpers?.({
       smokeMode,
       getCurrentObjects: () => currentObjects,
       getCurrentNodeMap: () => currentNodeMap,
@@ -459,7 +459,7 @@
       }
 
       pixiLoadPromise = new Promise((resolve) => {
-        const existing = document.querySelector('script[data-victory-pixi-loader="first-theater"]');
+        const existing = document.querySelector('script[data-victory-pixi-loader="catharsis"]');
         if (existing) {
           if (window.PIXI) {
             resolve(window.PIXI);
@@ -472,7 +472,7 @@
         }
 
         const script = document.createElement("script");
-        script.dataset.victoryPixiLoader = "first-theater";
+        script.dataset.victoryPixiLoader = "catharsis";
         script.src = "/lib/pixi.min.js";
         script.async = true;
         script.onload = () => resolve(window.PIXI || null);
@@ -486,7 +486,7 @@
 
     function updateCameraControls(view = null) {
       const mapDisplayMode = String(currentVenueMapState?.display_mode || "theater").trim() === "fullscreen" ? "fullscreen" : "theater";
-      const cameraState = firstTheaterStageControlsModule?.cameraControlsState?.(view || stageCamera?.getView?.(), mapDisplayMode, cameraDefaults) || firstTheaterMapGridModule?.cameraControlsState?.(view || stageCamera?.getView?.(), mapDisplayMode, cameraDefaults) || {
+      const cameraState = catharsisStageControlsModule?.cameraControlsState?.(view || stageCamera?.getView?.(), mapDisplayMode, cameraDefaults) || catharsisMapGridModule?.cameraControlsState?.(view || stageCamera?.getView?.(), mapDisplayMode, cameraDefaults) || {
         label: "100%",
         zoomOutDisabled: false,
         zoomInDisabled: false,
@@ -504,7 +504,7 @@
 
     function getPlayableBounds() {
       const size = getStageSize();
-      return firstTheaterMapGridModule?.getPlayableBounds?.(size) || computeStagePlayableBounds(size.width, size.height);
+      return catharsisMapGridModule?.getPlayableBounds?.(size) || computeStagePlayableBounds(size.width, size.height);
     }
 
     function currentCameraView() {
@@ -517,7 +517,7 @@
     }
 
     function resetCameraToFit(activeMapId = currentVenueMapState?.asset_id || currentVenueMapAssetID || "") {
-      firstTheaterMapGridModule?.resetCameraToFit?.(stageCamera, activeMapId, stageCamera?.getView?.(), currentVenueMapState, currentVenueMapAssetID);
+      catharsisMapGridModule?.resetCameraToFit?.(stageCamera, activeMapId, stageCamera?.getView?.(), currentVenueMapState, currentVenueMapAssetID);
       updateCameraControls();
     }
 
@@ -691,7 +691,7 @@
       try {
         localStorage.removeItem(storageKey);
       } catch (error) {
-        console.warn("failed to clear first theater shell prefs", error);
+        console.warn("failed to clear catharsis shell prefs", error);
       }
       initializeShellChrome(currentIdentity);
     }
@@ -754,8 +754,8 @@
       stageMapButton.disabled = !canEditMap;
       stageMapButton.textContent = hasMap ? "Edit Map" : "Add Map";
       stageMapButton.title = canEditMap
-        ? (hasMap ? "Open the First Theater map editor." : "Add a new map to First Theater.")
-        : "Only producers and directors can manage the First Theater map.";
+        ? (hasMap ? "Open the Catharsis map editor." : "Add a new map to Catharsis.")
+        : "Only producers and directors can manage the Catharsis map.";
     }
 
     function isHeaderPinned() {
@@ -1147,7 +1147,7 @@
       }
 
       try {
-        const sessionResult = await window.VictoryMicChat?.sendSessionCommand?.("first-theater", text);
+        const sessionResult = await window.VictoryMicChat?.sendSessionCommand?.("catharsis", text);
         if (sessionResult?.handled) {
           const message = String(sessionResult.message || "").replace(/\n+/g, " · ").trim();
           if (message) {
@@ -1169,7 +1169,7 @@
       }
 
       try {
-        const micResult = await window.VictoryMicChat?.sendMicCommand?.("first-theater", text);
+        const micResult = await window.VictoryMicChat?.sendMicCommand?.("catharsis", text);
         if (micResult?.handled) {
           const message = String(micResult.message || "").replace(/\n+/g, " · ").trim();
           if (message) {
@@ -1271,7 +1271,7 @@
         }
         currentPresenceUsers = presence;
       } catch (error) {
-        console.warn("failed to refresh first theater presence", error);
+        console.warn("failed to refresh catharsis presence", error);
       }
     }
 
@@ -1362,14 +1362,14 @@
       };
     }
 
-    const venueConfigFlag = firstTheaterLogicModule?.venueConfigFlag || ((config, key, fallback = false) => fallback);
-    const objectKind = firstTheaterLogicModule?.objectKind || (() => "");
+    const venueConfigFlag = catharsisLogicModule?.venueConfigFlag || ((config, key, fallback = false) => fallback);
+    const objectKind = catharsisLogicModule?.objectKind || (() => "");
     function objectState(model) {
-      return firstTheaterLogicModule?.objectState?.(model) || { locked: false, nameplateVisible: true, visible: true };
+      return catharsisLogicModule?.objectState?.(model) || { locked: false, nameplateVisible: true, visible: true };
     }
-    const updateObjectMatches = firstTheaterLogicModule?.updateObjectMatches || (() => false);
-    const viewerCanSeeHiddenCards = firstTheaterLogicModule?.viewerCanSeeHiddenCards || (() => true);
-    const cardStatusBadgeText = firstTheaterLogicModule?.cardStatusBadgeText || (() => "");
+    const updateObjectMatches = catharsisLogicModule?.updateObjectMatches || (() => false);
+    const viewerCanSeeHiddenCards = catharsisLogicModule?.viewerCanSeeHiddenCards || (() => true);
+    const cardStatusBadgeText = catharsisLogicModule?.cardStatusBadgeText || (() => "");
 
     function updateLocalObjectModel(matchModel, mutator) {
       if (!matchModel || typeof mutator !== "function") return null;
@@ -1469,17 +1469,17 @@
       });
     }
 
-    const canActorRevealHideStageObjects = firstTheaterLogicModule?.canActorRevealHideStageObjects || (() => false);
-    const isCardObject = firstTheaterLogicModule?.isCardObject || (() => false);
-    const isTokenObject = firstTheaterLogicModule?.isTokenObject || (() => false);
-    const isLiveStageObject = firstTheaterLogicModule?.isLiveStageObject || (() => false);
-    const canEditLiveCard = firstTheaterLogicModule?.canEditLiveCard || (() => false);
-    const canMoveLiveStageObject = firstTheaterLogicModule?.canMoveLiveStageObject || (() => false);
-    const canDuplicateLiveStageObject = firstTheaterLogicModule?.canDuplicateLiveStageObject || (() => false);
-    const canRemoveLiveStageObject = firstTheaterLogicModule?.canRemoveLiveStageObject || (() => false);
-    const canDeleteLiveCard = firstTheaterLogicModule?.canDeleteLiveCard || (() => false);
+    const canActorRevealHideStageObjects = catharsisLogicModule?.canActorRevealHideStageObjects || (() => false);
+    const isCardObject = catharsisLogicModule?.isCardObject || (() => false);
+    const isTokenObject = catharsisLogicModule?.isTokenObject || (() => false);
+    const isLiveStageObject = catharsisLogicModule?.isLiveStageObject || (() => false);
+    const canEditLiveCard = catharsisLogicModule?.canEditLiveCard || (() => false);
+    const canMoveLiveStageObject = catharsisLogicModule?.canMoveLiveStageObject || (() => false);
+    const canDuplicateLiveStageObject = catharsisLogicModule?.canDuplicateLiveStageObject || (() => false);
+    const canRemoveLiveStageObject = catharsisLogicModule?.canRemoveLiveStageObject || (() => false);
+    const canDeleteLiveCard = catharsisLogicModule?.canDeleteLiveCard || (() => false);
 
-    sceneNodeFactory = firstTheaterSceneNodesModule?.createSceneNodeFactory?.({
+    sceneNodeFactory = catharsisSceneNodesModule?.createSceneNodeFactory?.({
       PIXI: window.PIXI,
       objectState: (...args) => objectState(...args),
       canEditLiveCard: (...args) => canEditLiveCard(...args),
@@ -1514,7 +1514,7 @@
       },
     }) || null;
 
-    tokenUi = firstTheaterTokenUiModule?.createTokenUi?.({
+    tokenUi = catharsisTokenUiModule?.createTokenUi?.({
       state: tokenPickerState,
       canManageStageTokens: () => canManageStageTokens(currentRole),
       tokenPlacementPointForCreate: (...args) => tokenPlacementPointForCreate(...args),
@@ -1605,7 +1605,7 @@
       updateTokenLocalModel: (...args) => updateTokenLocalModel(...args),
     }) || null;
 
-    diceTray = firstTheaterDiceModule?.createDiceTrayController?.({
+    diceTray = catharsisDiceModule?.createDiceTrayController?.({
       document,
       window,
       mountRoot: diceTrayRoot,
@@ -1623,7 +1623,7 @@
       timeoutMs: 15000,
     }) || null;
 
-    sessionSync = firstTheaterSessionSyncModule?.createSessionSync?.({
+    sessionSync = catharsisSessionSyncModule?.createSessionSync?.({
       fetch: (...args) => fetch(...args),
       getCurrentIdentity: () => currentIdentity,
       setCurrentIdentity: (value) => { currentIdentity = value; },
@@ -1700,7 +1700,7 @@
       setStageStatus: (...args) => setStageStatus(...args),
     }) || null;
 
-    editors = firstTheaterEditorsModule?.createEditorControllers?.({
+    editors = catharsisEditorsModule?.createEditorControllers?.({
       getStageShell: () => stageShell,
       getCurrentRole: () => currentRole,
       getCurrentSelection: () => currentSelection,
@@ -1859,7 +1859,7 @@
       placeCreatedIndexCard: (action) => placeCreatedIndexCard(action),
     }) || null;
 
-    actionRouter = firstTheaterActionRouterModule?.createActionRouter?.({
+    actionRouter = catharsisActionRouterModule?.createActionRouter?.({
       objectState: (...args) => objectState(...args),
       objectKind: (...args) => objectKind(...args),
       isTokenObject: (...args) => isTokenObject(...args),
@@ -1964,7 +1964,7 @@
       },
     }) || null;
 
-    socketController = firstTheaterSocketControllerModule?.createSocketController?.({
+    socketController = catharsisSocketControllerModule?.createSocketController?.({
       getSessionId: () => currentSessionId,
       getStageCamera: () => stageCamera,
       getLastStagePoint: () => lastStagePoint,
@@ -1977,7 +1977,7 @@
       updateShellMetaPresentation: () => updateShellMetaPresentation(),
       refreshWorld: () => refreshWorld(),
       onMessage: (raw) => {
-        const msg = firstTheaterDispatcher?.dispatch?.(raw) || null;
+        const msg = catharsisDispatcher?.dispatch?.(raw) || null;
         if (msg) {
           void handleSocketMessage(msg);
         }
@@ -2007,11 +2007,11 @@
       const cardKey = String(model?.elementId || model?.elementSlug || model?.key || "");
       return String(cardFaceState.get(cardKey) || "front").toLowerCase() === "back" ? "back" : "front";
     };
-    const cardPinData = firstTheaterGeometryModule?.cardPinData || (() => ({ mode: "overlay", worldX: Number.NaN, worldY: Number.NaN, screenX: Number.NaN, screenY: Number.NaN }));
-    const cardDisplayMode = firstTheaterGeometryModule?.cardDisplayMode || (() => "overlay");
-    const stagePointForWorldPoint = (point) => firstTheaterGeometryModule?.stagePointForWorldPoint?.(point, stageCamera) || { x: Number(point?.x || 0), y: Number(point?.y || 0) };
-    const worldPointForStagePoint = (point) => firstTheaterGeometryModule?.worldPointForStagePoint?.(point, stageCamera) || { x: Number(point?.x || 0), y: Number(point?.y || 0) };
-    const currentDisplayedPointForModel = (model) => firstTheaterGeometryModule?.currentDisplayedPointForModel?.(model, {
+    const cardPinData = catharsisGeometryModule?.cardPinData || (() => ({ mode: "overlay", worldX: Number.NaN, worldY: Number.NaN, screenX: Number.NaN, screenY: Number.NaN }));
+    const cardDisplayMode = catharsisGeometryModule?.cardDisplayMode || (() => "overlay");
+    const stagePointForWorldPoint = (point) => catharsisGeometryModule?.stagePointForWorldPoint?.(point, stageCamera) || { x: Number(point?.x || 0), y: Number(point?.y || 0) };
+    const worldPointForStagePoint = (point) => catharsisGeometryModule?.worldPointForStagePoint?.(point, stageCamera) || { x: Number(point?.x || 0), y: Number(point?.y || 0) };
+    const currentDisplayedPointForModel = (model) => catharsisGeometryModule?.currentDisplayedPointForModel?.(model, {
       camera: stageCamera,
       getPlayableBounds,
       toStagePoint,
@@ -2019,26 +2019,26 @@
       worldPointForStagePoint,
       size: getStageSize(),
     }) || { x: 0, y: 0 };
-    const normalizeOverlayPoint = (point) => firstTheaterGeometryModule?.normalizeOverlayPoint?.(point, getPlayableBounds()) || { screen_x: 0.5, screen_y: 0.5 };
-    const clampOverlayPoint = (point) => firstTheaterGeometryModule?.clampOverlayPoint?.(point, getPlayableBounds()) || { x: Number(point?.x || 0), y: Number(point?.y || 0) };
-    const offsetPoint = firstTheaterGeometryModule?.offsetPoint || ((point, dx = 24, dy = 16) => ({ x: Math.round(Number(point?.x || 0) + Number(dx || 0)), y: Math.round(Number(point?.y || 0) + Number(dy || 0)) }));
-    const tokenSnapModeForModel = (model) => firstTheaterGeometryModule?.tokenSnapModeForModel?.(model, currentVenueGridConfig) || "free";
-    const tokenLayerForModel = firstTheaterGeometryModule?.tokenLayerForModel || (() => "public");
-    const tokenScaleForModel = firstTheaterGeometryModule?.tokenScaleForModel || (() => 100);
-    const tokenDisplayNameForModel = firstTheaterLogicModule?.tokenDisplayNameForModel || (() => "Token");
-    const tokenStatusPercentForModel = firstTheaterLogicModule?.tokenStatusPercentForModel || (() => null);
-    const tokenFootprintForModel = firstTheaterGeometryModule?.tokenFootprintForModel || (() => ({ width: 1, height: 1 }));
-    const tokenPlacementBaseSize = (model) => firstTheaterGeometryModule?.tokenPlacementBaseSize?.(model, currentVenueGridConfig) || 64;
-    const tokenDisplaySizeForModel = (model) => firstTheaterGeometryModule?.tokenDisplaySizeForModel?.(model, currentVenueGridConfig) || { width: 64, height: 64 };
+    const normalizeOverlayPoint = (point) => catharsisGeometryModule?.normalizeOverlayPoint?.(point, getPlayableBounds()) || { screen_x: 0.5, screen_y: 0.5 };
+    const clampOverlayPoint = (point) => catharsisGeometryModule?.clampOverlayPoint?.(point, getPlayableBounds()) || { x: Number(point?.x || 0), y: Number(point?.y || 0) };
+    const offsetPoint = catharsisGeometryModule?.offsetPoint || ((point, dx = 24, dy = 16) => ({ x: Math.round(Number(point?.x || 0) + Number(dx || 0)), y: Math.round(Number(point?.y || 0) + Number(dy || 0)) }));
+    const tokenSnapModeForModel = (model) => catharsisGeometryModule?.tokenSnapModeForModel?.(model, currentVenueGridConfig) || "free";
+    const tokenLayerForModel = catharsisGeometryModule?.tokenLayerForModel || (() => "public");
+    const tokenScaleForModel = catharsisGeometryModule?.tokenScaleForModel || (() => 100);
+    const tokenDisplayNameForModel = catharsisLogicModule?.tokenDisplayNameForModel || (() => "Token");
+    const tokenStatusPercentForModel = catharsisLogicModule?.tokenStatusPercentForModel || (() => null);
+    const tokenFootprintForModel = catharsisGeometryModule?.tokenFootprintForModel || (() => ({ width: 1, height: 1 }));
+    const tokenPlacementBaseSize = (model) => catharsisGeometryModule?.tokenPlacementBaseSize?.(model, currentVenueGridConfig) || 64;
+    const tokenDisplaySizeForModel = (model) => catharsisGeometryModule?.tokenDisplaySizeForModel?.(model, currentVenueGridConfig) || { width: 64, height: 64 };
     const tokenPlacementPointForModel = (model) => currentDisplayedPointForModel(model);
-    const tokenPlacementPointForCreate = (point, model, forcedSnapMode = "") => firstTheaterGeometryModule?.tokenPlacementPointForCreate?.(point, model, {
+    const tokenPlacementPointForCreate = (point, model, forcedSnapMode = "") => catharsisGeometryModule?.tokenPlacementPointForCreate?.(point, model, {
       forcedSnapMode,
       gridConfig: currentVenueGridConfig,
       currentVenueMapBounds,
       getPlayableBounds,
-      snapPoint: firstTheaterGeometryModule?.snapPoint,
+      snapPoint: catharsisGeometryModule?.snapPoint,
     }) || point;
-    const cardDuplicatePlacementForModel = (model) => firstTheaterGeometryModule?.cardDuplicatePlacementForModel?.(model, {
+    const cardDuplicatePlacementForModel = (model) => catharsisGeometryModule?.cardDuplicatePlacementForModel?.(model, {
       camera: stageCamera,
       getPlayableBounds,
       toStagePoint,
@@ -2047,15 +2047,15 @@
       size: getStageSize(),
       bounds: getPlayableBounds(),
     }) || null;
-    const tokenMoveTargetForModel = (model, targetPoint) => firstTheaterGeometryModule?.tokenMoveTargetForModel?.(model, targetPoint, {
+    const tokenMoveTargetForModel = (model, targetPoint) => catharsisGeometryModule?.tokenMoveTargetForModel?.(model, targetPoint, {
       gridConfig: currentVenueGridConfig,
       currentVenueMapBounds,
       getPlayableBounds,
-      snapPoint: firstTheaterGeometryModule?.snapPoint,
+      snapPoint: catharsisGeometryModule?.snapPoint,
       stagePlacementCandidate,
       lastStagePoint,
     }) || null;
-    const tokenDuplicatePlacementForModel = (model) => firstTheaterGeometryModule?.tokenDuplicatePlacementForModel?.(model, {
+    const tokenDuplicatePlacementForModel = (model) => catharsisGeometryModule?.tokenDuplicatePlacementForModel?.(model, {
       camera: stageCamera,
       getPlayableBounds,
       toStagePoint,
@@ -2064,7 +2064,7 @@
       size: getStageSize(),
       gridConfig: currentVenueGridConfig,
       currentVenueMapBounds,
-      snapPoint: firstTheaterGeometryModule?.snapPoint,
+      snapPoint: catharsisGeometryModule?.snapPoint,
     }) || null;
 
     function updateLocalCardPinModel(matchModel, updater) {
@@ -2120,13 +2120,13 @@
       return `${value.slice(0, Math.max(1, maxChars - 1)).trimEnd()}…`;
     }
 
-    const canToggleLiveVisibility = firstTheaterLogicModule?.canToggleLiveVisibility || (() => false);
-    const canToggleNameplate = firstTheaterLogicModule?.canToggleNameplate || (() => false);
-    const canToggleLock = firstTheaterLogicModule?.canToggleLock || (() => false);
-    const canTogglePinState = firstTheaterLogicModule?.canTogglePinState || (() => false);
-    const cardEditorDraftFromModel = firstTheaterLogicModule?.cardEditorDraftFromModel || (() => ({}));
-    const stageContextMenuModel = firstTheaterLogicModule?.stageContextMenuModel || (() => ({ key: "", kind: "stage" }));
-    const resolveStageObjectActions = firstTheaterLogicModule?.resolveStageObjectActions || (() => []);
+    const canToggleLiveVisibility = catharsisLogicModule?.canToggleLiveVisibility || (() => false);
+    const canToggleNameplate = catharsisLogicModule?.canToggleNameplate || (() => false);
+    const canToggleLock = catharsisLogicModule?.canToggleLock || (() => false);
+    const canTogglePinState = catharsisLogicModule?.canTogglePinState || (() => false);
+    const cardEditorDraftFromModel = catharsisLogicModule?.cardEditorDraftFromModel || (() => ({}));
+    const stageContextMenuModel = catharsisLogicModule?.stageContextMenuModel || (() => ({ key: "", kind: "stage" }));
+    const resolveStageObjectActions = catharsisLogicModule?.resolveStageObjectActions || (() => []);
 
     function syncSelectedActions() {
       if (!selectedActions) return;
@@ -2182,9 +2182,9 @@
 
     function mapEditorDraftFromState() { return editors?.mapEditorDraftFromState?.(); }
     function setMapEditorStatus(text) { if (mapEditorStatus) mapEditorStatus.textContent = text || ""; }
-    function clampMapEditorPosition(left, top) { return firstTheaterMapGridModule?.clampPanelPosition?.(left, top, stageShell?.getBoundingClientRect?.(), mapEditorPanel?.getBoundingClientRect?.(), 560, 520) || { left: Math.round(left), top: Math.round(top) }; }
+    function clampMapEditorPosition(left, top) { return catharsisMapGridModule?.clampPanelPosition?.(left, top, stageShell?.getBoundingClientRect?.(), mapEditorPanel?.getBoundingClientRect?.(), 560, 520) || { left: Math.round(left), top: Math.round(top) }; }
     function setMapEditorPosition(left, top) { if (!mapEditorPanel) return; const position = clampMapEditorPosition(left, top); mapEditorPanel.style.left = `${position.left}px`; mapEditorPanel.style.top = `${position.top}px`; mapEditorPanel.style.right = "auto"; mapEditorPanel.style.bottom = "auto"; }
-    function clampGridEditorPosition(left, top) { return firstTheaterMapGridModule?.clampPanelPosition?.(left, top, stageShell?.getBoundingClientRect?.(), gridEditorPanel?.getBoundingClientRect?.(), 420, 480) || { left: Math.round(left), top: Math.round(top) }; }
+    function clampGridEditorPosition(left, top) { return catharsisMapGridModule?.clampPanelPosition?.(left, top, stageShell?.getBoundingClientRect?.(), gridEditorPanel?.getBoundingClientRect?.(), 420, 480) || { left: Math.round(left), top: Math.round(top) }; }
     function setGridEditorPosition(left, top) { if (!gridEditorPanel) return; const position = clampGridEditorPosition(left, top); gridEditorPanel.style.left = `${position.left}px`; gridEditorPanel.style.top = `${position.top}px`; gridEditorPanel.style.right = "auto"; gridEditorPanel.style.bottom = "auto"; }
     function syncMapEditorPreview(url) { return editors?.syncMapEditorPreview?.(url); }
     function syncMapAssetList() { return editors?.syncMapAssetList?.(); }
@@ -2199,7 +2199,7 @@
     async function uploadMapAsset(file) { return editors?.uploadMapAsset?.(file); }
     async function saveVenueMap() { return editors?.saveVenueMap?.(); }
     async function removeVenueMap() { return editors?.removeVenueMap?.(); }
-    function defaultGridConfig() { return editors?.defaultGridConfig?.() || firstTheaterMapGridModule?.defaultGridConfig?.() || { grid_type: "none", hex_orientation: "flat-top", cell_size: 50, offset_x: 0, offset_y: 0, line_width: 1, opacity: 0.45, line_style: "neutral", visible: true }; }
+    function defaultGridConfig() { return editors?.defaultGridConfig?.() || catharsisMapGridModule?.defaultGridConfig?.() || { grid_type: "none", hex_orientation: "flat-top", cell_size: 50, offset_x: 0, offset_y: 0, line_width: 1, opacity: 0.45, line_style: "neutral", visible: true }; }
     function gridEditorDraftFromUI() { return editors?.gridEditorDraftFromUI?.(); }
     function setGridEditorStatus(text) { if (gridEditorStatus) gridEditorStatus.textContent = text || ""; }
     function syncGridEditorHexFieldVisibility() { return editors?.syncGridEditorHexFieldVisibility?.(); }
@@ -2260,7 +2260,7 @@
       if (displayMode === "fullscreen") {
         return { x: 0, y: 0, width, height };
       }
-      return firstTheaterGeometryModule?.computeStagePlayableBounds?.(width, height) || { x: 0, y: 0, width, height };
+      return catharsisGeometryModule?.computeStagePlayableBounds?.(width, height) || { x: 0, y: 0, width, height };
     };
 
     function renderVenueGridLayer(bounds, config = null) {
@@ -2459,9 +2459,9 @@
         return;
       }
       if (!event) return;
-      event.__firstTheaterContextMenuHandled = true;
+      event.__catharsisContextMenuHandled = true;
       if (event.data?.originalEvent) {
-        event.data.originalEvent.__firstTheaterContextMenuHandled = true;
+        event.data.originalEvent.__catharsisContextMenuHandled = true;
       }
     }
 
@@ -2469,7 +2469,7 @@
       if (contextHelpers?.wasContextMenuHandled) {
         return contextHelpers.wasContextMenuHandled(event);
       }
-      return !!(event?.__firstTheaterContextMenuHandled || event?.data?.originalEvent?.__firstTheaterContextMenuHandled);
+      return !!(event?.__catharsisContextMenuHandled || event?.data?.originalEvent?.__catharsisContextMenuHandled);
     }
 
     function stagePlacementFromEvent(event) {
@@ -2477,7 +2477,7 @@
       return stagePointFromClient(clientPoint.clientX, clientPoint.clientY);
     }
 
-    const stageScreenPointFromClient = (clientX, clientY) => firstTheaterGeometryModule?.stageScreenPointFromClient?.(clientX, clientY, stageHost?.getBoundingClientRect?.()) || {
+    const stageScreenPointFromClient = (clientX, clientY) => catharsisGeometryModule?.stageScreenPointFromClient?.(clientX, clientY, stageHost?.getBoundingClientRect?.()) || {
       x: Number(clientX || 0),
       y: Number(clientY || 0),
     };
@@ -2561,7 +2561,7 @@
       return { width: rect.width, height: rect.height };
     }
 
-    const toStagePoint = (model, size, options = {}) => firstTheaterGeometryModule?.toStagePoint?.(model, size, options) || {
+    const toStagePoint = (model, size, options = {}) => catharsisGeometryModule?.toStagePoint?.(model, size, options) || {
       x: 0,
       y: 0,
     };
@@ -3058,7 +3058,7 @@
       const renderedFire = currentObjects.some((object) => object.kind === "fire");
       const renderedCards = currentObjects.filter((object) => object.kind === "card").length;
       const renderedTokens = currentObjects.filter((object) => object.kind === "token").length;
-      setSnapshotSummary(`${renderedFire ? "Fire" : "No fire"} and ${renderedCards} card object${renderedCards === 1 ? "" : "s"} plus ${renderedTokens} token object${renderedTokens === 1 ? "" : "s"} are rendered from the live Cave snapshot.`);
+      setSnapshotSummary(`${renderedFire ? "Fire" : "No fire"} and ${renderedCards} card object${renderedCards === 1 ? "" : "s"} plus ${renderedTokens} token object${renderedTokens === 1 ? "" : "s"} are rendered from the live Catharsis snapshot.`);
       updateStatusSummary();
       refreshNodeSelection();
       updateStageEmptyState();
@@ -3149,7 +3149,7 @@
       stageCamera = window.VictoryStageCamera?.mount?.({
         stageElement: stageHost,
         worldLayer,
-        venueSlug: "first-theater",
+        venueSlug: "catharsis",
         userScope: String(currentIdentity?.user_id || currentIdentity?.handle || currentIdentity?.display_name || "browser"),
         minZoom: cameraDefaults.minZoom,
         maxZoom: cameraDefaults.maxZoom,
@@ -3325,7 +3325,7 @@
         : sendAction("act/place_element", {
             element_id: model.elementId || "",
             element_slug: model.elementSlug || "",
-            venue_slug: "first-theater",
+            venue_slug: "catharsis",
             layer: "stage",
             x: stagePoint.x,
             y: stagePoint.y,
@@ -3644,7 +3644,7 @@
       return socketController?.connectSocket?.() || null;
     }
 
-    async function bootstrapFirstTheater() {
+    async function bootstrapCatharsis() {
       try {
         initializeShellChrome(null);
         headerHoverOpen = true;
@@ -3659,10 +3659,10 @@
         updateShellTargetPresentation();
         updateHeaderPresentation();
         updateChatPresentation();
-        setStageStatus("First Theater shell ready. Load live tools when you want the full stage.");
-        window.__firstTheaterRuntimeBootstrapped = true;
+        setStageStatus("Catharsis shell ready. Load live tools when you want the full stage.");
+        window.__catharsisRuntimeBootstrapped = true;
       } catch (error) {
-        console.error("first theater bootstrap failed", error);
+        console.error("catharsis bootstrap failed", error);
         setStageStatus(error.message || String(error));
         if (forbiddenScreen) {
           forbiddenScreen.hidden = true;
@@ -3671,21 +3671,21 @@
       }
     }
 
-    window.VictoryFirstTheater = {
+    window.VictoryCatharsis = {
       start() {
-        if (firstTheaterRuntimeStarted) {
+        if (catharsisRuntimeStarted) {
           return;
         }
-        firstTheaterRuntimeStarted = true;
-        void startFirstTheaterRuntime();
+        catharsisRuntimeStarted = true;
+        void startCatharsisRuntime();
       },
       refreshWorld,
       loadPixiLibrary,
     };
     runtimeLifecycle.listen(window, "beforeunload", () => runtimeLifecycle.dispose());
-    window.VictoryFirstTheaterCleanup = () => runtimeLifecycle.dispose();
+    window.VictoryCatharsisCleanup = () => runtimeLifecycle.dispose();
 
-    async function startFirstTheaterRuntime() {
+    async function startCatharsisRuntime() {
       try {
         const pingStartedAt = performance.now();
         const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
@@ -3694,34 +3694,34 @@
         currentIdentity = sessionPayload?.data || null;
 
         if (!sessionPayload?.signed_in) {
-          setStageStatus("Shell only. Sign in to load the live First Theater tools.");
+          setStageStatus("Shell only. Sign in to load the live Catharsis tools.");
           setMovementLine("Unavailable");
           setSnapshotSummary("The shell stays open, but the live Pixi stage needs a signed-in session.");
-          setRendererFallback(true, "Sign in to load the live First Theater tools.");
+          setRendererFallback(true, "Sign in to load the live Catharsis tools.");
           if (stageEmptyState) {
             stageEmptyState.hidden = false;
           }
-          window.__firstTheaterRuntimeLoaded = false;
-          window.__firstTheaterRuntimeLoading = false;
+          window.__catharsisRuntimeLoaded = false;
+          window.__catharsisRuntimeLoading = false;
           return;
         }
 
         const visibilityResponse = await fetch("/api/map/visibility", { credentials: "include" });
         const visibilityPayload = await visibilityResponse.json().catch(() => null);
         const visible = Array.isArray(visibilityPayload?.data)
-          ? visibilityPayload.data.some((venue) => venue?.slug === "first-theater")
+          ? visibilityPayload.data.some((venue) => venue?.slug === "catharsis")
           : false;
 
         if (!visible) {
           setStageStatus("Shell only. This venue is not visible yet, but the overlay remains available.");
           setMovementLine("Unavailable");
-          setSnapshotSummary("The First Theater Pixi stage is hidden until this venue becomes visible.");
+          setSnapshotSummary("The Catharsis Pixi stage is hidden until this venue becomes visible.");
           setRendererFallback(true, "The live Pixi stage is hidden until this venue becomes visible.");
           if (stageEmptyState) {
             stageEmptyState.hidden = false;
           }
-          window.__firstTheaterRuntimeLoaded = false;
-          window.__firstTheaterRuntimeLoading = false;
+          window.__catharsisRuntimeLoaded = false;
+          window.__catharsisRuntimeLoading = false;
           return;
         }
 
@@ -3734,7 +3734,7 @@
         updateShellMetaPresentation();
 
         connectSocket();
-        setStageStatus("Opening the live Cave socket...");
+        setStageStatus("Opening the live Catharsis socket...");
 
         await refreshWorld();
         setStageStatus("Loading Pixi stage tools...");
@@ -3744,17 +3744,17 @@
         if (stageEmptyState) {
           stageEmptyState.hidden = true;
         }
-        window.__firstTheaterRuntimeLoaded = true;
-        window.__firstTheaterRuntimeLoading = false;
+        window.__catharsisRuntimeLoaded = true;
+        window.__catharsisRuntimeLoading = false;
       } catch (error) {
-        console.error("first theater runtime failed", error);
+        console.error("catharsis runtime failed", error);
         setStageStatus(error.message || String(error));
         setRendererFallback(true, "PixiJS failed to load. The stage stays readable in DOM-only mode.");
         if (forbiddenScreen) {
           forbiddenScreen.hidden = true;
         }
-        window.__firstTheaterRuntimeLoaded = false;
-        window.__firstTheaterRuntimeLoading = false;
+        window.__catharsisRuntimeLoaded = false;
+        window.__catharsisRuntimeLoading = false;
       }
     }
 
@@ -4122,7 +4122,7 @@
     });
 
     mapEditorRemove?.addEventListener("click", async () => {
-      if (!window.confirm("Remove the active map from the First Theater stage?")) return;
+      if (!window.confirm("Remove the active map from the Catharsis stage?")) return;
       try {
         await removeVenueMap();
       } catch (error) {
@@ -4394,4 +4394,4 @@
       }
     });
 
-    bootstrapFirstTheater();
+    bootstrapCatharsis();

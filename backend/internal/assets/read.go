@@ -88,7 +88,7 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 
 			if strings.EqualFold(strings.TrimSpace(rec.AssetType), "map") {
-				venueMapVisible, venueErr := assetIsActiveFirstTheaterMap(ctx, pool, assetID)
+				venueMapVisible, venueErr := assetIsActiveTheaterMap(ctx, pool, assetID)
 				if venueErr != nil {
 					writeJSON(w, http.StatusInternalServerError, map[string]any{
 						"ok":    false,
@@ -96,7 +96,7 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 					})
 					return
 				}
-				venueAccessible, venueErr := access.UserCanAccessVenueSlug(ctx, pool, userID, "first-theater")
+				venueAccessible, venueErr := userCanAccessTheaterMapVenue(ctx, pool, userID)
 				if venueErr != nil {
 					writeJSON(w, http.StatusInternalServerError, map[string]any{
 						"ok":    false,
@@ -160,7 +160,7 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if !allowed {
-			venueMapVisible, venueErr := assetIsActiveFirstTheaterMap(ctx, pool, assetID)
+			venueMapVisible, venueErr := assetIsActiveTheaterMap(ctx, pool, assetID)
 			if venueErr != nil {
 				writeJSON(w, http.StatusInternalServerError, map[string]any{
 					"ok":    false,
@@ -168,7 +168,7 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 				})
 				return
 			}
-			venueAccessible, venueErr := access.UserCanAccessVenueSlug(ctx, pool, userID, "first-theater")
+			venueAccessible, venueErr := userCanAccessTheaterMapVenue(ctx, pool, userID)
 			if venueErr != nil {
 				writeJSON(w, http.StatusInternalServerError, map[string]any{
 					"ok":    false,
@@ -231,7 +231,7 @@ func parseAssetRequestPath(path string) (assetID string, wantContent bool) {
 	return trimmed, false
 }
 
-func assetIsActiveFirstTheaterMap(ctx context.Context, pool *pgxpool.Pool, assetID string) (bool, error) {
+func assetIsActiveTheaterMap(ctx context.Context, pool *pgxpool.Pool, assetID string) (bool, error) {
 	var found bool
 	err := pool.QueryRow(ctx, `
 		SELECT EXISTS (
@@ -239,13 +239,26 @@ func assetIsActiveFirstTheaterMap(ctx context.Context, pool *pgxpool.Pool, asset
 			FROM venue_active_maps vm
 			JOIN venues v ON v.id = vm.venue_id
 			WHERE vm.asset_id = $1
-			  AND v.slug = 'first-theater'
+			  AND v.slug IN ('first-theater', 'catharsis')
 		)
 	`, assetID).Scan(&found)
 	if err != nil {
 		return false, err
 	}
 	return found, nil
+}
+
+func userCanAccessTheaterMapVenue(ctx context.Context, pool *pgxpool.Pool, userID string) (bool, error) {
+	for _, slug := range []string{"first-theater", "catharsis"} {
+		allowed, err := access.UserCanAccessVenueSlug(ctx, pool, userID, slug)
+		if err != nil {
+			return false, err
+		}
+		if allowed {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 type assetContentRecord struct {
