@@ -48,6 +48,7 @@ type AccountAuthority struct {
 	IsProducer        bool     `json:"is_producer"`
 	ProducerLocations []string `json:"producer_locations"`
 	CurrentRole       string   `json:"current_role"`
+	IsOperator        bool     `json:"is_operator"`
 }
 
 func HandleAccountMe(pool *pgxpool.Pool) http.HandlerFunc {
@@ -196,10 +197,16 @@ func loadAccountSummary(ctx context.Context, pool *pgxpool.Pool, userID string) 
 		currentRole = "audience"
 	}
 
+	isOperator, err := access.IsOperatorUser(ctx, pool, userID)
+	if err != nil {
+		isOperator = false
+	}
+
 	account.Authority = AccountAuthority{
 		IsProducer:        len(producerLocations) > 0,
 		ProducerLocations: dedupeStrings(producerLocations),
 		CurrentRole:       currentRole,
+		IsOperator:        isOperator,
 	}
 
 	return account, nil

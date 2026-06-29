@@ -146,8 +146,9 @@ World, session, and venue runtime:
 Discord audio remains a Discord pass-through surface. Victory does not capture or stream audio.
 Voice-state participant presence is tracked from Discord Gateway events. Active speaker detection and per-user volume controls remain deferred because the current bot/Gateway path cannot truthfully provide them.
 Venue shells now share reusable helper methods for slug normalization, slot registration, presence preview rendering, and safe refresh hooks.
-Greenroom visibility now also appears when a user owns at least one character workbook, even if the workbook is still a draft.
+Greenroom now renders a workbook-first surface with Face, History, Mechanics, Journal, and module pages instead of the old card editor.
 Catharsis and First Theater now project the active character from session identity into the shell chrome so the user can jump back to Greenroom.
+The account hub now exposes an operator-only test harness that resets the Catharsis first-appearance browser flags so the onboarding can be replayed on demand.
 First Theater keeps its original stage façade; the active map renders in the shared world layer and does not replace the façade or the existing DOM controls. The map can be removed via the map editor's Remove Map action, and supports a `display_mode` of `theater` (masked to the proscenium opening) or `fullscreen` (stretched to the full canvas, façade hidden).
 A persistent square/hex grid renders in that same world layer, aligned with the active map and pinned cards, while unpinned cards stay in the fixed overlay layer above the interactive view. Grid configuration (type, hex orientation, cell size, offsets, opacity, line width, line style, visibility) is server-persisted per venue in `venue_grid_configs` and is visual-only — no snapping or measurement. Configured via a "Configure Grid" stage context-menu item and callout panel with live preview, Save, Close (reverts to last saved), Reset, and Hide/Show.
 First Theater now has a personal browser camera over that shared map/grid world. Middle-mouse drag pans, wheel zoom centers toward the cursor, edge scrolling respects the playable stage rectangle, and the visible `− / 100% / + / Fit` control stays fixed in the safe interface region. Camera state is personal and browser-local, keyed by user/browser plus venue and active map, and `Fit` resets to 100%.
@@ -159,6 +160,7 @@ First Theater now consumes reusable Warehouse token assets through an `Add Token
 Warehouse asset reads still resolve deleted or missing assets to the construction fallback image instead of leaving placements blank.
 First Theater now includes a canonical dice tray that submits `/roll` requests to the backend, renders canonical roll actions from the session stream, and keeps the browser out of result generation. Kernel 51 runtime decomposition and Grant's Cabin diagnostics remain in place, and the installation hard limit still defaults to 8 GB with an 8 GB physical reserve check on uploads.
 Director focus/broadcast and touch controls remain deferred.
+The next implementation-ready kernel slice is the Socio ruleset surface: the staged Catharsis build exists, but the actual ruleset picker and reusable ruleset model have not been introduced yet.
 
 WebSocket:
 - `GET /ws/the-cave`
@@ -204,7 +206,9 @@ Identity and access:
 - `character_cards` remains the canonical workbook root with workbook metadata
 - `active_user_characters`
 - `character_workbook_modules`
+- `character_workbook_entries`
 - `character_journals`
+- `backend/internal/characters/parentage_chart.go` supplies the Stage 1 Parentage v1.1 chart, including the normalized organizational band for rolls 100-120
 - `auth.password_reset_tokens`
 - `auth.discord_identities`
 - `auth.oauth_states`

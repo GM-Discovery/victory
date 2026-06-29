@@ -16,13 +16,14 @@
 - Later productions can add their own module rows without changing the canonical root.
 
 ## History And Journal
-- Append-only workbook facts belong in character-entry style records later.
+- Append-only workbook facts now land in `character_workbook_entries`.
 - Private player notes belong in `character_journals`.
 - Journals do not become canonical history automatically.
 
 ## Greenroom
-- Greenroom becomes visible once the user owns at least one workbook.
-- Draft workbooks stay visible and resumable.
+- Greenroom now renders workbook pages instead of the old card editor.
+- The page set is `Face`, `History`, `Mechanics`, `Journal`, and the active module face page.
+- Draft workbooks stay visible and resumable through the workbook view.
 
 ## Active Character Surface
 - Catharsis and First Theater now show the active workbook in shell chrome.
@@ -32,11 +33,19 @@
 - The Catharsis start button creates or resumes the onboarding draft.
 - The draft is keyed by workbook context so repeated clicks do not duplicate the draft.
 - The flow stays resumable instead of requiring a finished character.
+- Stage 1 rolls now append workbook entries and persist progress through the workbook event route.
+- Operator test accounts can now clear the Catharsis first-appearance browser flags from the account hub to replay the onboarding flow without changing production permissions.
+
+## Implementation-Ready Next Slice
+- Surface a real Socio ruleset selector when the draft flow asks for one.
+- Move the staged parentage/build sequence onto a reusable ruleset model rather than hardcoding it into Catharsis UI.
+- Keep the operator reset as a browser-only test utility until the ruleset model exists.
 
 ## Journal Command
 - `/journal <text>` bypasses venue chat.
 - The command writes to the private workbook journal for the active character.
 
 ## Deferred Work
-- The Stage 1 Parentage chart and full workbook compiler remain deferred until the versioned chart data is supplied.
+- The Stage 1 Parentage chart is now supplied in `backend/internal/characters/parentage_chart.go`.
+- Rolls 100-120 are normalized into the `organizational` band with the shared surrogate floor value `300000`.
 - Stage 2 mechanics are still out of scope for this kernel.

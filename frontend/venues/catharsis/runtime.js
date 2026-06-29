@@ -368,7 +368,13 @@
     const presencePreview = document.getElementById("presence-preview");
     const presenceState = document.getElementById("presence-state");
     const rightCharacterValue = document.getElementById("right-character-value");
+    const characterTrayButton = document.getElementById("character-tray-button");
+    const characterTrayLabel = document.getElementById("character-tray-label");
     const rightCardEditorButton = document.getElementById("right-card-editor-button");
+    const chatDiceTab = document.getElementById("chat-dice-tab");
+    const chatHelpTab = document.getElementById("chat-help-tab");
+    const chatDicePanel = document.getElementById("chat-dice-panel");
+    const chatHelpPanel = document.getElementById("chat-help-panel");
     const chatPanel = document.getElementById("chat-panel");
     const chatHead = document.getElementById("chat-head");
     const chatBadge = document.getElementById("chat-badge");
@@ -729,6 +735,14 @@
       }
       if (rightCharacterValue) {
         rightCharacterValue.textContent = activeCharacterName ? `${activeCharacterName} · ${activeCharacterStatus}` : "No Character";
+      }
+      if (characterTrayLabel) {
+        characterTrayLabel.textContent = activeCharacterName || "New Character";
+      }
+      if (characterTrayButton) {
+        characterTrayButton.title = activeCharacterName
+          ? `Open the workbook for ${activeCharacterName}`
+          : "Begin a new workbook";
       }
       if (networkState) {
         networkState.textContent = currentSessionId ? "Online" : "Idle";
@@ -1116,6 +1130,16 @@
       const edited = Boolean(action?.payload?.edited || action?.edited);
       const label = source === "discord" ? `${author} via Discord Bridge${edited ? " (edited)" : ""}` : author;
       appendChatEntry(label, text);
+    }
+
+    function setChatCompanionTab(mode) {
+      const showDice = String(mode || "dice") !== "help";
+      if (chatDicePanel) chatDicePanel.hidden = !showDice;
+      if (chatHelpPanel) chatHelpPanel.hidden = showDice;
+      chatDiceTab?.classList.toggle("is-active", showDice);
+      chatHelpTab?.classList.toggle("is-active", !showDice);
+      chatDiceTab?.setAttribute("aria-selected", showDice ? "true" : "false");
+      chatHelpTab?.setAttribute("aria-selected", showDice ? "false" : "true");
     }
 
     async function sendChatDraft() {
@@ -3931,9 +3955,22 @@
       const target = activeCharacterId ? `/venues/greenroom/?character_id=${encodeURIComponent(activeCharacterId)}` : "/venues/greenroom/";
       window.location.href = target;
     });
-    rightCardEditorButton?.addEventListener("click", () => {
-      toggleCardEditorFromSelection();
+    characterTrayButton?.addEventListener("click", () => {
+      const activeCharacterId = String(currentIdentity?.active_character?.character_card_id || "").trim();
+      const target = activeCharacterId ? `/venues/greenroom/?character_id=${encodeURIComponent(activeCharacterId)}` : "/venues/greenroom/";
+      window.location.href = target;
     });
+    rightCardEditorButton?.addEventListener("click", () => {
+      const activeCharacterId = String(currentIdentity?.active_character?.character_card_id || "").trim();
+      if (activeCharacterId) {
+        window.location.href = `/venues/greenroom/?character_id=${encodeURIComponent(activeCharacterId)}`;
+        return;
+      }
+      window.VictoryCatharsisOnboarding?.begin?.();
+    });
+    chatDiceTab?.addEventListener("click", () => setChatCompanionTab("dice"));
+    chatHelpTab?.addEventListener("click", () => setChatCompanionTab("help"));
+    setChatCompanionTab("dice");
 
     cameraZoomOutButton?.addEventListener("click", () => {
       if (!stageCamera) return;

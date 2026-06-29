@@ -698,6 +698,11 @@
       border: 0;
     }
 
+    .character-chip {
+      min-width: 12rem;
+      justify-content: space-between;
+    }
+
     .account-avatar {
       display: inline-flex;
       align-items: center;
@@ -1401,6 +1406,61 @@
       display: grid;
     }
 
+    .chat-body {
+      display: grid;
+      grid-template-columns: minmax(220px, 290px) minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      min-height: 0;
+    }
+
+    .chat-sidebar,
+    .chat-main {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .chat-sidebar {
+      align-content: start;
+    }
+
+    .chat-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .chat-tab {
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04);
+      color: #eef4ff;
+      padding: 8px 12px;
+    }
+
+    .chat-tab.is-active {
+      background: rgba(133, 201, 121, 0.16);
+      border-color: rgba(133, 201, 121, 0.28);
+      color: #e7f7e1;
+    }
+
+    .chat-sidebar-panel {
+      display: grid;
+      gap: 10px;
+    }
+
+    .chat-sidebar-copy {
+      margin: 0;
+      padding: 12px 13px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      color: #d5e0d3;
+      line-height: 1.5;
+    }
+
     .chat-log {
       min-height: 0;
       height: 100%;
@@ -1428,6 +1488,11 @@
     .chat-entry strong {
       color: #f0c96b;
       font-size: 0.85rem;
+    }
+
+    .chat-dice-tray .dice-tray {
+      width: 100%;
+      max-width: none;
     }
 
     .chat-row {
@@ -2574,6 +2639,10 @@
                     <button id="boot-live-tools" class="header-pill" type="button" aria-label="Load live stage tools" title="Load live stage tools">▶</button>
                     <a class="header-pill header-pill--back" href="/" aria-label="Back to map" title="Back to map">←</a>
                   </div>
+                  <button id="character-tray-button" class="chip account-chip character-chip" type="button" title="Open the workbook">
+                    <span class="account-avatar" aria-hidden="true">C</span>
+                    <span id="character-tray-label">New Character</span>
+                  </button>
                   <div class="account-menu-wrap">
                     <button id="account-menu-toggle" class="chip account-chip" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Open account menu">
                       <span class="account-avatar" aria-hidden="true">FT</span>
@@ -2705,10 +2774,9 @@
                         <span id="right-opacity-value" class="drawer-settings-value">96%</span>
                       </label>
                     </div>
-                    <div class="drawer-settings-helper">Right drawer settings are stored locally per user and kept intentionally small for now.</div>
+                  <div class="drawer-settings-helper">Right drawer settings are stored locally per user and kept intentionally small for now.</div>
                   </div>
                   <div class="drawer-body">
-                    <div id="first-theater-dice-tray" class="drawer-item"></div>
                     <div class="drawer-item">
                       <strong>Character</strong>
                       <span id="right-character-value">No Character</span>
@@ -2716,7 +2784,7 @@
                     <div class="drawer-item">
                       <strong>Selection</strong>
                       <div class="overlay-actions">
-                        <button id="right-card-editor-button" type="button">Card editor</button>
+                        <button id="right-card-editor-button" type="button">Open workbook</button>
                       </div>
                     </div>
                   </div>
@@ -2728,11 +2796,26 @@
                   <div class="chat-head__label">Chat <span id="chat-badge" class="badge" hidden>0</span></div>
                 </div>
                 <div class="chat-body">
-                  <div class="chat-log" id="chat-log">
-                  </div>
-                  <div class="chat-row">
-                    <input id="chat-input" type="text" placeholder="Start typing here..." />
-                    <button id="chat-send" type="button">Send</button>
+                  <aside class="chat-sidebar" aria-label="Chat companion">
+                    <div class="chat-tabs" role="tablist" aria-label="Chat companion tabs">
+                      <button id="chat-dice-tab" class="chat-tab is-active" type="button" role="tab" aria-selected="true">Dice</button>
+                      <button id="chat-help-tab" class="chat-tab" type="button" role="tab" aria-selected="false">Guide</button>
+                    </div>
+                    <div id="chat-dice-panel" class="chat-sidebar-panel">
+                      <div id="first-theater-dice-tray" class="chat-dice-tray"></div>
+                    </div>
+                    <div id="chat-help-panel" class="chat-sidebar-panel" hidden>
+                      <p class="chat-sidebar-copy">
+                        Use <strong>/roll XdY</strong> for dice. Journal notes route through <strong>/journal</strong>.
+                      </p>
+                    </div>
+                  </aside>
+                  <div class="chat-main">
+                    <div class="chat-log" id="chat-log"></div>
+                    <div class="chat-row">
+                      <input id="chat-input" type="text" placeholder="Start typing here..." />
+                      <button id="chat-send" type="button">Send</button>
+                    </div>
                   </div>
                 </div>
               </section>

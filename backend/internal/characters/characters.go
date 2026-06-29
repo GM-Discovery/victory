@@ -166,6 +166,25 @@ func EnsureKernel23CharacterSurface(ctx context.Context, pool *pgxpool.Pool) err
 		  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 
+		CREATE TABLE IF NOT EXISTS character_workbook_entries (
+		  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		  character_card_id UUID NOT NULL REFERENCES character_cards(id) ON DELETE CASCADE,
+		  module_instance_id UUID REFERENCES character_workbook_modules(id) ON DELETE SET NULL,
+		  author_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		  page_key TEXT NOT NULL DEFAULT 'history',
+		  entry_type TEXT NOT NULL DEFAULT '',
+		  title TEXT NOT NULL DEFAULT '',
+		  body TEXT NOT NULL DEFAULT '',
+		  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+		  stage_number INT,
+		  sort_order INT NOT NULL DEFAULT 0,
+		  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_character_workbook_entries_character
+		  ON character_workbook_entries(character_card_id, sort_order ASC, created_at ASC);
+
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_character_workbook_modules_unique
 		  ON character_workbook_modules(
 		    character_card_id,
@@ -230,6 +249,20 @@ func HandleMyCharacterCards(pool *pgxpool.Pool) http.HandlerFunc {
 			"cards":            cards,
 			"active_persona":   persona,
 			"active_character": activeCharacter,
+		}})
+	}
+}
+
+func HandleParentageChart() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, response{Ok: true, Data: map[string]any{
+			"version": ParentageChartVersionV11,
+			"entries": ParentageChartV11,
 		}})
 	}
 }
@@ -385,12 +418,9 @@ func CreateCard(ctx context.Context, pool *pgxpool.Pool, ownerUserID string, inp
 	}
 
 	input = sanitizeInput(input)
+	input = seedCatharsisStarterDraft(input)
 	if input.Name == "" {
-		if strings.EqualFold(strings.TrimSpace(stringValue(input.WorkbookContext["source"])), "catharsis") {
-			input.Name = "Untitled Character"
-		} else {
-			return CharacterCard{}, errors.New("character_name_required")
-		}
+		return CharacterCard{}, errors.New("character_name_required")
 	}
 
 	locationID, productionID, err := resolveCharacterScope(ctx, pool, ownerUserID)
@@ -496,6 +526,20 @@ func UpdateCard(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID str
 		sheetLinksParam = string(sheetLinksJSON)
 	}
 
+	var workbookStatusParam any
+	if trimmed := strings.TrimSpace(input.WorkbookStatus); trimmed != "" {
+		workbookStatusParam = trimmed
+	}
+
+	var workbookContextParam any
+	if input.WorkbookContext != nil {
+		workbookContextJSON, err := json.Marshal(normalizeWorkbookContext(input.WorkbookContext))
+		if err != nil {
+			return CharacterCard{}, err
+		}
+		workbookContextParam = string(workbookContextJSON)
+	}
+
 	var card CharacterCard
 	var createdAt, updatedAt time.Time
 	var sheetLinksRaw []byte
@@ -510,11 +554,13 @@ func UpdateCard(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID str
 		    public_description = $7,
 		    private_notes = $8,
 		    sheet_links = COALESCE($9::jsonb, sheet_links),
+		    workbook_status = COALESCE($10, workbook_status),
+		    workbook_context = COALESCE($11::jsonb, workbook_context),
 		    updated_at = NOW()
 		WHERE id = $1
 		  AND is_deleted = FALSE
 		RETURNING id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), workbook_status, workbook_context, name, pronouns, portrait_url, color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
-	`, cardID, input.Name, input.Pronouns, input.PortraitURL, input.Color, input.Tagline, input.PublicDescription, input.PrivateNotes, sheetLinksParam).
+	`, cardID, input.Name, input.Pronouns, input.PortraitURL, input.Color, input.Tagline, input.PublicDescription, input.PrivateNotes, sheetLinksParam, workbookStatusParam, workbookContextParam).
 		Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

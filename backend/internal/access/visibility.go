@@ -122,33 +122,26 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-				SELECT v.id, v.slug, v.name, v.kind, 2 AS reason_rank, 'producer_surface'::text AS visible_because
-				FROM venues v
-				JOIN lots l ON l.id = v.lot_id
-				JOIN location_memberships lm ON lm.location_id = l.location_id
-				WHERE v.slug IN ('producers-office', 'middle-school-stage')
-				  AND lm.user_id = $1
-				  AND lm.active = TRUE
-				  AND lm.role = 'producer'
-
-			UNION
-
-			SELECT v.id, v.slug, v.name, v.kind, 3 AS reason_rank, 'director_surface'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 2 AS reason_rank, 'approved_performer_surface'::text AS visible_because
 			FROM venues v
 			JOIN lots l ON l.id = v.lot_id
 			JOIN location_memberships lm ON lm.location_id = l.location_id
-			WHERE v.slug = 'directors-chair'
+			JOIN access_grants ag ON ag.venue_id = v.id
+			WHERE v.slug = 'catharsis'
 			  AND lm.user_id = $1
 			  AND lm.active = TRUE
-			  AND lm.role IN ('producer', 'director')
+			  AND lm.role IN ('producer', 'director', 'cast', 'crew')
+			  AND ag.user_id = $1
+			  AND ag.revoked_at IS NULL
+			  AND (ag.expires_at IS NULL OR ag.expires_at > NOW())
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'performer_surface'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 3 AS reason_rank, 'performer_surface'::text AS visible_because
 			FROM venues v
 			JOIN lots l ON l.id = v.lot_id
 			JOIN location_memberships lm ON lm.location_id = l.location_id
-			WHERE v.slug IN ('audition-hall', 'greenroom', 'trailers', 'workshop', 'library')
+			WHERE v.slug = 'trailers'
 			  AND lm.user_id = $1
 			  AND lm.active = TRUE
 			  AND lm.role IN ('producer', 'director', 'cast', 'crew')
@@ -164,79 +157,6 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 				WHERE cc.owner_user_id = $1
 				  AND cc.is_deleted = FALSE
 			  )
-
-			UNION
-
-			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'delayed_lot_surface'::text AS visible_because
-			FROM venues v
-			JOIN lots l ON l.id = v.lot_id
-			JOIN users u ON u.id = $1::uuid
-			WHERE v.slug = 'soil-experts'
-			  AND u.created_at <= NOW() - INTERVAL '72 hours'
-
-			UNION
-
-			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'performer_membership'::text AS visible_because
-			FROM venues v
-			JOIN memberships m ON m.venue_id = v.id
-			WHERE v.slug IN ('greenroom', 'trailers')
-			  AND m.user_id = $1
-			  AND m.active = TRUE
-			  AND m.production_id IS NOT NULL
-			  AND m.role IN ('director', 'cast', 'crew')
-
-			UNION
-
-			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'approved_performer_surface'::text AS visible_because
-			FROM venues v
-			JOIN lots l ON l.id = v.lot_id
-			JOIN location_memberships lm ON lm.location_id = l.location_id
-			JOIN access_grants ag ON ag.venue_id = v.id
-			WHERE v.slug = 'catharsis'
-			  AND lm.user_id = $1
-			  AND lm.active = TRUE
-			  AND lm.role IN ('producer', 'director', 'cast', 'crew')
-			  AND ag.user_id = $1
-			  AND ag.revoked_at IS NULL
-			  AND (ag.expires_at IS NULL OR ag.expires_at > NOW())
-
-			UNION
-
-			SELECT v.id, v.slug, v.name, v.kind, 5 AS reason_rank, 'venue_membership'::text AS visible_because
-			FROM venues v
-			JOIN memberships m ON m.venue_id = v.id
-			WHERE m.user_id = $1
-			AND m.active = TRUE
-
-			UNION
-
-			SELECT v.id, v.slug, v.name, v.kind, 6 AS reason_rank, 'grant'::text AS visible_because
-			FROM venues v
-			JOIN access_grants ag ON ag.venue_id = v.id
-			WHERE ag.user_id = $1
-			AND ag.revoked_at IS NULL
-			AND (ag.expires_at IS NULL OR ag.expires_at > NOW())
-
-			UNION
-
-			SELECT v.id, v.slug, v.name, v.kind, 7 AS reason_rank, 'location_role'::text AS visible_because
-			FROM venues v
-			JOIN lots l ON l.id = v.lot_id
-			JOIN location_memberships lm ON lm.location_id = l.location_id
-			WHERE lm.user_id = $1
-			AND lm.active = TRUE
-			AND lm.role IN ('producer', 'director', 'cast', 'crew')
-
-			UNION
-
-			SELECT v.id, v.slug, v.name, v.kind, 8 AS reason_rank, 'production_role'::text AS visible_because
-			FROM venues v
-			JOIN memberships m ON m.venue_id = v.id
-			WHERE m.user_id = $1
-			AND m.active = TRUE
-			AND m.production_id IS NOT NULL
-			AND m.role IN ('director', 'cast', 'crew')
-			AND v.slug NOT IN ('grants-cabin')
 		),
 		ranked AS (
 			SELECT

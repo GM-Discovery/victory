@@ -8,136 +8,68 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg: #0f1713;
-      --panel: rgba(21, 30, 24, 0.92);
-      --panel-strong: rgba(13, 20, 16, 0.96);
-      --line: rgba(184, 213, 193, 0.16);
+      --bg-1: #08110d;
+      --bg-2: #121b16;
+      --panel: rgba(17, 25, 20, 0.92);
+      --panel-strong: rgba(10, 15, 12, 0.96);
+      --line: rgba(184, 213, 193, 0.14);
+      --line-strong: rgba(199, 224, 183, 0.22);
+      --text: #eff6eb;
+      --muted: #adc0ac;
       --accent: #c8e2b7;
-      --accent-strong: #f2f6d3;
-      --muted: #b9c9b5;
+      --accent-strong: #f1f6d0;
       --gold: #d1bc7d;
+      --shadow: 0 18px 54px rgba(0, 0, 0, 0.28);
     }
+
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
+      min-height: 100vh;
+      font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: var(--text);
       background:
-        radial-gradient(circle at 20% 10%, rgba(67, 115, 82, 0.34), transparent 32%),
-        radial-gradient(circle at 80% 0%, rgba(140, 178, 131, 0.18), transparent 28%),
-        linear-gradient(180deg, #101915 0%, #08100d 100%);
-      color: #eff6eb;
+        radial-gradient(circle at 20% 12%, rgba(71, 113, 82, 0.34), transparent 24%),
+        radial-gradient(circle at 84% 4%, rgba(142, 180, 126, 0.2), transparent 24%),
+        linear-gradient(180deg, var(--bg-2) 0%, #08110d 100%);
     }
+
+    [hidden] { display: none !important; }
 
     .shell {
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .venue-shell--signed-in .header {
-      position: fixed;
-      inset: 0 0 auto 0;
-      width: 100vw;
-      max-width: none;
-      margin: 0;
-      padding: 0;
-      min-height: 4px;
-      overflow: visible;
-      background: linear-gradient(
-        to bottom,
-        rgba(10, 8, 7, 0.5) 0,
-        rgba(10, 8, 7, 0.16) 2px,
-        rgba(10, 8, 7, 0) 4px
-      );
-      box-shadow: none;
-      backdrop-filter: blur(1px);
-    }
-
-    .venue-shell--signed-in .header::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      height: 220px;
-      z-index: 0;
-      opacity: 0;
-      background: linear-gradient(
-        to bottom,
-        rgba(10, 8, 7, 0.92),
-        rgba(10, 8, 7, 0.72),
-        rgba(10, 8, 7, 0)
-      );
-      backdrop-filter: blur(12px);
-      pointer-events: none;
-      transition: opacity 160ms ease;
-    }
-
-    .venue-shell--signed-in .header:hover::before,
-    .venue-shell--signed-in .header:focus-within::before {
-      opacity: 1;
-    }
-
-    .venue-shell--signed-in .header > * {
-      position: absolute;
-      left: 24px;
-      right: 24px;
-      z-index: 1;
-      opacity: 0;
-      pointer-events: none;
-      transform: translateY(-0.35rem);
-      transition:
-        opacity 140ms ease,
-        transform 180ms ease;
-    }
-
-    .venue-shell--signed-in .header:hover > *,
-    .venue-shell--signed-in .header:focus-within > * {
-      opacity: 1;
-      pointer-events: auto;
-      transform: none;
-    }
-
-    .venue-shell--signed-in .header > :nth-child(1) {
-      top: 16px;
-    }
-
-    .venue-shell--signed-in .header > :nth-child(2) {
-      top: 44px;
-    }
-
-    .venue-shell--signed-in .header > :nth-child(3) {
-      top: 96px;
-    }
-
-    .venue-shell--signed-in .header > :nth-child(4) {
-      top: 190px;
+      padding: 24px;
     }
 
     .header {
-      padding: 22px 24px 12px;
-      max-width: 1280px;
-      width: 100%;
-      margin: 0 auto;
-      box-sizing: border-box;
+      max-width: 1440px;
+      margin: 0 auto 18px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
     }
 
     .eyebrow {
+      margin: 0 0 8px;
       text-transform: uppercase;
       letter-spacing: 0.18em;
       color: var(--gold);
       font-size: 0.76rem;
-      margin: 0 0 8px;
     }
 
     h1 {
       margin: 0;
       font-size: clamp(2rem, 4vw, 3.6rem);
-      line-height: 1.05;
+      line-height: 1;
     }
 
     .subtitle {
       margin: 10px 0 0;
+      max-width: 74ch;
       color: var(--muted);
-      max-width: 72ch;
       line-height: 1.5;
     }
 
@@ -145,183 +77,56 @@
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
-      margin-top: 16px;
+      align-items: center;
+      justify-content: flex-end;
     }
 
+    .button,
     .chip,
-    .button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      border-radius: 999px;
-      text-decoration: none;
+    .tab,
+    .text-button {
       border: 1px solid var(--line);
-      padding: 11px 16px;
+      border-radius: 999px;
+      padding: 10px 15px;
       color: var(--accent-strong);
       background: rgba(255, 255, 255, 0.03);
+      text-decoration: none;
+      font: inherit;
       font-weight: 700;
+      cursor: pointer;
     }
 
     .button {
-      background: linear-gradient(180deg, #314f3f 0%, #223628 100%);
+      background: linear-gradient(180deg, #2f4d3d 0%, #223628 100%);
+    }
+
+    .button[disabled],
+    .text-button[disabled],
+    .tab[disabled] {
+      opacity: 0.55;
+      cursor: not-allowed;
     }
 
     .stage {
-      max-width: 1280px;
-      width: 100%;
+      max-width: 1440px;
       margin: 0 auto;
-      padding: 8px 24px 28px;
-      box-sizing: border-box;
       display: grid;
       gap: 18px;
-      grid-template-columns: minmax(340px, 440px) minmax(340px, 1fr) minmax(320px, 420px);
+      grid-template-columns: minmax(280px, 360px) minmax(420px, 1fr) minmax(280px, 360px);
       align-items: start;
-    }
-
-    .stage.tools-open {
-      grid-template-columns: minmax(340px, 440px) minmax(340px, 1fr) minmax(320px, 420px);
-    }
-
-    [hidden] {
-      display: none !important;
     }
 
     .card {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 18px;
+      box-shadow: var(--shadow);
       padding: 18px;
-      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.24);
-    }
-
-    .hero {
-      grid-column: auto;
-      position: relative;
-      overflow: hidden;
-      padding: 16px;
-      background:
-        radial-gradient(circle at center, rgba(255, 255, 255, 0.06), transparent 58%),
-        var(--panel-strong);
-    }
-
-    .hero img {
-      width: 100%;
-      aspect-ratio: 3 / 4;
-      object-fit: cover;
-      border-radius: 16px;
-      display: block;
-      border: 1px solid rgba(255,255,255,0.1);
-      background: #1a271f;
-    }
-
-    .hero-empty {
-      width: 100%;
-      aspect-ratio: 3 / 4;
-      border-radius: 16px;
-      display: grid;
-      place-items: center;
-      text-align: center;
-      border: 1px dashed rgba(255,255,255,0.16);
-      color: var(--muted);
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)),
-        #17231b;
-    }
-
-    .hero-name {
-      margin: 14px 0 4px;
-      font-size: 1.6rem;
-    }
-
-    .hero-role {
-      color: var(--gold);
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-
-    .hero-bio {
-      margin: 12px 0 0;
-      color: var(--muted);
-      line-height: 1.55;
-      white-space: pre-wrap;
-    }
-
-    .history-list {
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid rgba(255,255,255,0.08);
-      display: grid;
-      gap: 10px;
-    }
-
-    .history-item {
-      padding: 10px 12px;
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 12px;
-      background: rgba(255,255,255,0.03);
-    }
-
-    .history-item strong {
-      display: block;
-      margin-bottom: 4px;
     }
 
     .stack {
       display: grid;
-      gap: 18px;
-    }
-
-    .stack h2,
-    .stack h3 {
-      margin: 0 0 10px;
-    }
-
-    .meta-list {
-      display: grid;
-      gap: 10px;
-      margin-top: 12px;
-    }
-
-    .meta-item {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 10px 0;
-      border-top: 1px solid rgba(255,255,255,0.08);
-    }
-
-    .meta-item:first-child {
-      border-top: 0;
-      padding-top: 0;
-    }
-
-    .meta-label {
-      color: var(--muted);
-      flex: 0 0 auto;
-    }
-
-    .meta-value {
-      text-align: right;
-      color: #f5f7ef;
-      white-space: pre-wrap;
-    }
-
-    .note {
-      color: var(--muted);
-      line-height: 1.55;
-      margin: 0;
-    }
-
-    .empty-state {
-      color: var(--muted);
-      font-style: italic;
-      margin: 0;
-    }
-
-    .mini {
-      font-size: 0.9rem;
-      color: var(--muted);
+      gap: 16px;
     }
 
     .panel-heading {
@@ -329,7 +134,7 @@
       justify-content: space-between;
       gap: 12px;
       align-items: center;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
 
     .panel-heading h2,
@@ -337,29 +142,9 @@
       margin: 0;
     }
 
-    .text-button {
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 9px 12px;
-      background: rgba(255,255,255,0.05);
-      color: var(--accent-strong);
-      cursor: pointer;
-      font: inherit;
-      font-weight: 700;
-    }
-
-    .text-button:hover {
-      background: rgba(255,255,255,0.1);
-    }
-
-    .text-button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .form-grid {
-      display: grid;
-      gap: 12px;
+    .mini {
+      font-size: 0.9rem;
+      color: var(--muted);
     }
 
     .field {
@@ -371,26 +156,24 @@
 
     .field input,
     .field select,
-    .field textarea,
-    .inline-field input {
+    .field textarea {
       width: 100%;
-      box-sizing: border-box;
       border: 1px solid var(--line);
-      border-radius: 10px;
-      background: rgba(5, 10, 8, 0.7);
-      color: #f5f7ef;
-      padding: 10px 11px;
+      border-radius: 12px;
+      background: rgba(7, 12, 9, 0.72);
+      color: var(--text);
+      padding: 11px 12px;
       font: inherit;
       font-weight: 400;
     }
 
     .field textarea {
-      min-height: 92px;
+      min-height: 112px;
       resize: vertical;
     }
 
     .field input[type="color"] {
-      min-height: 42px;
+      min-height: 46px;
       padding: 4px;
     }
 
@@ -407,78 +190,198 @@
       font-size: 0.92rem;
     }
 
-    .character-display {
+    .list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .list-item {
+      display: grid;
+      gap: 6px;
+      padding: 12px 13px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .list-item strong {
+      font-size: 1rem;
+    }
+
+    .list-item span,
+    .list-item p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .tab {
+      padding: 9px 13px;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .tab.is-active {
+      background: linear-gradient(180deg, #304f3f 0%, #24372a 100%);
+      border-color: var(--line-strong);
+      color: var(--accent-strong);
+    }
+
+    .workbook-page {
+      display: grid;
+      gap: 14px;
+    }
+
+    .page-surface {
+      padding: 16px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background:
+        radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.05), transparent 35%),
+        var(--panel-strong);
+    }
+
+    .page-title {
+      margin: 0 0 6px;
+      font-size: 1.55rem;
+    }
+
+    .page-summary {
+      margin: 0 0 16px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .page-section {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .page-section:first-of-type {
+      padding-top: 0;
+      border-top: 0;
+    }
+
+    .page-section h3 {
+      margin: 0;
+      font-size: 1.02rem;
+    }
+
+    .field-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .field-grid .field.full {
+      grid-column: 1 / -1;
+    }
+
+    .workbook-portrait {
+      width: 100%;
+      max-width: 220px;
+      aspect-ratio: 3 / 4;
+      object-fit: cover;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: #17231b;
+    }
+
+    .workbook-portrait-empty {
+      width: 100%;
+      max-width: 220px;
+      aspect-ratio: 3 / 4;
+      border-radius: 18px;
+      border: 1px dashed rgba(255,255,255,0.16);
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .summary-card {
       display: grid;
       gap: 12px;
     }
 
-    .character-portrait {
-      width: 72px;
-      height: 72px;
-      border-radius: 14px;
-      object-fit: cover;
-      border: 2px solid var(--accent);
-      background: #17231b;
-    }
-
-    .character-empty-portrait {
-      width: 72px;
-      height: 72px;
-      border-radius: 14px;
-      border: 2px solid var(--accent);
-      background: #17231b;
-    }
-
-    .character-title {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
-
-    .character-title h3 {
-      margin: 0;
-    }
-
-    .character-copy {
-      margin: 0;
-      color: var(--muted);
-      line-height: 1.55;
-      white-space: pre-wrap;
-    }
-
-    .sheet-list {
+    .summary-title {
       display: grid;
       gap: 8px;
     }
 
-    .sheet-link {
+    .summary-title h2 {
+      margin: 0;
+    }
+
+    .summary-meta {
+      display: grid;
+      gap: 10px;
+    }
+
+    .summary-row {
       display: flex;
       justify-content: space-between;
       gap: 10px;
-      align-items: center;
-      padding: 10px 12px;
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 12px;
-      background: rgba(255,255,255,0.03);
+      align-items: start;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.08);
     }
 
-    .sheet-link strong {
-      display: block;
+    .summary-row:first-child {
+      padding-top: 0;
+      border-top: 0;
     }
 
-    .sheet-link span {
+    .summary-label {
       color: var(--muted);
-      font-size: 0.9rem;
+      flex: 0 0 auto;
     }
 
-    @media (max-width: 1040px) {
-      .stage,
-      .stage.tools-open {
-        grid-template-columns: 1fr;
-      }
+    .summary-value {
+      text-align: right;
+      color: var(--text);
+      white-space: pre-wrap;
+    }
 
-      .hero {
-        grid-column: auto;
+    .note {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .empty-state {
+      margin: 0;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .journal-editor {
+      display: grid;
+      gap: 12px;
+    }
+
+    .journal-entry {
+      display: grid;
+      gap: 4px;
+    }
+
+    .journal-entry strong {
+      color: var(--accent-strong);
+    }
+
+    @media (max-width: 1180px) {
+      .stage {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -495,136 +398,73 @@
 
   <div class="shell">
     <header class="header">
-      <p class="eyebrow">Venue / Identity Surface</p>
-      <h1>The Greenroom</h1>
-      <p class="subtitle">
-        This is the public-facing performer surface. Keep it accurate, keep it safe, and keep sensitive identity details out of view. Birthdates, SSNs, credit card details, and other private records do not belong here.
-      </p>
+      <div>
+        <p class="eyebrow">Venue / Workbook Surface</p>
+        <h1>The Greenroom</h1>
+        <p class="subtitle">
+          The workbook is the primary object here. Face, History, Mechanics, Journal, and the active module all live on separate pages instead of one card dump.
+        </p>
+      </div>
       <div class="toolbar">
-        <a class="button" href="/venues/trailers/">Open Trailers</a>
+        <a class="button" href="/venues/catharsis/">Open Catharsis</a>
+        <a class="chip" href="/venues/trailers/">Open Trailers</a>
         <a class="chip" href="/">Back to Map</a>
       </div>
     </header>
 
     <main id="shell" class="stage">
-      <section class="card stack" id="greenroom-tools">
-        <div class="panel-heading">
-          <h2>Performance Notes</h2>
-          <button class="text-button" id="greenroom-tools-close" type="button">Close Editor</button>
-        </div>
-        <div class="meta-list" id="left-panel"></div>
-
-        <section class="form-grid" id="character-editor" hidden>
-          <div class="panel-heading">
-            <h2 id="character-editor-title">Character Editor</h2>
-          </div>
-
-          <label class="field">
-            Name
-            <input id="character-name" type="text" maxlength="80" autocomplete="off" />
-          </label>
-          <label class="field">
-            Pronouns
-            <input id="character-pronouns" type="text" maxlength="80" autocomplete="off" />
-          </label>
-          <label class="field">
-            Portrait URL
-            <input id="character-portrait-url" type="url" maxlength="500" autocomplete="off" />
-          </label>
-          <label class="field">
-            Color
-            <input id="character-color" type="color" value="#d9c7a6" />
-          </label>
-          <label class="field">
-            Tagline
-            <input id="character-tagline" type="text" maxlength="160" autocomplete="off" />
-          </label>
-          <label class="field">
-            Public Description
-            <textarea id="character-public-description" maxlength="1000"></textarea>
-          </label>
-          <label class="field">
-            Private Notes
-            <textarea id="character-private-notes" maxlength="2000"></textarea>
-          </label>
-
-          <label class="field">
-            Sheet Type
-            <select id="character-sheet-preset">
-              <option value="story-first|blank|Story-First Blank Sheet">Story-First / Blank</option>
-              <option value="dnd5e|adventurer|5e Adventurer Sheet">5e / Adventurer</option>
-              <option value="custom|blank|Custom Blank Sheet">Custom / Blank</option>
-            </select>
-          </label>
-          <label class="field">
-            Sheet URL
-            <input id="character-sheet-url" type="url" maxlength="500" autocomplete="off" />
-          </label>
-          <div class="action-row">
-            <button class="text-button" id="character-sheet-add" type="button">Add Sheet Link</button>
-          </div>
-          <div class="sheet-list" id="character-sheet-editor-list"></div>
-
-          <div class="action-row">
-            <button class="text-button" id="character-save" type="button">Save</button>
-            <button class="text-button" id="character-cancel" type="button">Cancel</button>
-          </div>
-        </section>
-
-      </section>
-
-      <section class="card character-display">
-        <div class="panel-heading">
-          <h2>Character Dressing Room</h2>
-        </div>
-        <label class="field">
-          Character
-          <select id="character-select"></select>
-        </label>
-        <div class="action-row">
-          <button class="text-button" id="character-new" type="button">New</button>
-          <button class="text-button" id="character-edit" type="button">Edit</button>
-        </div>
-        <div id="character-display"></div>
+      <section class="card stack">
         <div>
-          <h3>Sheet Links</h3>
-          <div class="sheet-list" id="character-sheet-display-list"></div>
-        </div>
-        <div class="status-line" id="character-status"></div>
-      </section>
-
-      <section class="card hero" id="hero-card">
-        <div id="hero-visual" class="hero-empty">
-          <div>
-            <strong>Loading profile...</strong>
-            <div class="mini">Your public profile appears here when published.</div>
-          </div>
-        </div>
-        <h2 class="hero-name" id="hero-name">Unknown Participant</h2>
-        <div class="hero-role" id="hero-role">Audience</div>
-        <p class="hero-bio" id="hero-bio">The public bio appears here once published.</p>
-        <div class="history-list" id="history-list"></div>
-      </section>
-
-      <section class="stack">
-        <section class="card">
           <div class="panel-heading">
-            <h2>Public Snapshot</h2>
-            <button class="text-button" id="profile-tools-toggle" type="button">Edit</button>
+            <h2>Workbook Library</h2>
+            <button class="text-button" id="new-workbook-button" type="button">New Workbook</button>
           </div>
-          <p class="note" id="snapshot-note">Loading current public profile...</p>
-          <div class="meta-list" id="right-panel"></div>
+          <label class="field">
+            Character Workbook
+            <select id="character-select"></select>
+          </label>
+        </div>
+
+        <div class="summary-meta" id="left-meta"></div>
+
+        <section>
+          <div class="panel-heading">
+            <h3>Pages</h3>
+            <span class="mini" id="page-hint">Loading workbook...</span>
+          </div>
+          <div class="tabs" id="page-tabs"></div>
+          <div class="status-line" id="library-status"></div>
         </section>
-        <section class="card">
-          <h3>Status</h3>
-          <p class="note" id="status-note">Checking signed-in access...</p>
-        </section>
-        <section class="card">
-          <h3>Future Seam</h3>
-          <p class="note">
-            Character cards can now be put on in The Cave. Sheet links here are references, not playable rules pages yet.
-          </p>
-        </section>
+      </section>
+
+      <section class="card workbook-page">
+        <div class="page-surface" id="page-surface">
+          <div class="panel-heading">
+            <div>
+              <h2 class="page-title" id="page-title">Loading workbook...</h2>
+              <p class="page-summary" id="page-summary"></p>
+            </div>
+            <div class="action-row">
+              <button class="text-button" id="resume-button" type="button">Resume Construction</button>
+            </div>
+          </div>
+          <div id="page-body"></div>
+        </div>
+      </section>
+
+      <section class="card summary-card">
+        <div class="summary-title">
+          <div class="panel-heading">
+            <h2>Workbook Summary</h2>
+            <button class="text-button" id="refresh-button" type="button">Refresh</button>
+          </div>
+          <div id="portrait-slot"></div>
+          <h2 id="summary-name">Unknown Participant</h2>
+          <div class="mini" id="summary-role">Workbook awaiting selection</div>
+        </div>
+        <p class="note" id="summary-note">Select a workbook to see the current face, module, and creation progress.</p>
+        <div class="summary-meta" id="right-meta"></div>
+        <div class="status-line" id="character-status"></div>
       </section>
     </main>
   </div>
@@ -633,42 +473,38 @@
   <script src="/lib/identity.js"></script>
   <script>
     const shell = document.getElementById("shell");
-    const greenroomTools = document.getElementById("greenroom-tools");
-    const greenroomToolsClose = document.getElementById("greenroom-tools-close");
-    const profileToolsToggle = document.getElementById("profile-tools-toggle");
     const characterSelect = document.getElementById("character-select");
-    const characterNew = document.getElementById("character-new");
-    const characterEdit = document.getElementById("character-edit");
-    const characterEditor = document.getElementById("character-editor");
-    const characterEditorTitle = document.getElementById("character-editor-title");
-    const characterName = document.getElementById("character-name");
-    const characterPronouns = document.getElementById("character-pronouns");
-    const characterPortraitURL = document.getElementById("character-portrait-url");
-    const characterColor = document.getElementById("character-color");
-    const characterTagline = document.getElementById("character-tagline");
-    const characterPublicDescription = document.getElementById("character-public-description");
-    const characterPrivateNotes = document.getElementById("character-private-notes");
-    const characterSheetPreset = document.getElementById("character-sheet-preset");
-    const characterSheetURL = document.getElementById("character-sheet-url");
-    const characterSheetAdd = document.getElementById("character-sheet-add");
-    const characterSheetEditorList = document.getElementById("character-sheet-editor-list");
-    const characterSheetDisplayList = document.getElementById("character-sheet-display-list");
-    const characterSave = document.getElementById("character-save");
-    const characterCancel = document.getElementById("character-cancel");
-    const characterDisplay = document.getElementById("character-display");
+    const newWorkbookButton = document.getElementById("new-workbook-button");
+    const pageTabs = document.getElementById("page-tabs");
+    const pageHint = document.getElementById("page-hint");
+    const libraryStatus = document.getElementById("library-status");
+    const pageTitle = document.getElementById("page-title");
+    const pageSummary = document.getElementById("page-summary");
+    const pageBody = document.getElementById("page-body");
+    const resumeButton = document.getElementById("resume-button");
+    const refreshButton = document.getElementById("refresh-button");
+    const summaryName = document.getElementById("summary-name");
+    const summaryRole = document.getElementById("summary-role");
+    const summaryNote = document.getElementById("summary-note");
+    const portraitSlot = document.getElementById("portrait-slot");
+    const leftMeta = document.getElementById("left-meta");
+    const rightMeta = document.getElementById("right-meta");
     const characterStatus = document.getElementById("character-status");
-    let currentRole = "audience";
-    let latestProfileView = null;
-    let characterCards = [];
-    let canDraftCharacters = false;
-    let selectedCharacterId = "";
-    let editingCharacterId = "";
-    let editingSheetLinks = [];
+
+    const state = {
+      role: "audience",
+      canDraft: false,
+      cards: [],
+      selectedCharacterId: "",
+      workbook: null,
+      selectedPageKey: "face",
+      loading: false,
+    };
 
     function requestedCharacterId() {
       try {
         return String(new URLSearchParams(window.location.search).get("character_id") || "").trim();
-      } catch (error) {
+      } catch {
         return "";
       }
     }
@@ -678,656 +514,603 @@
       return text || "Not set";
     }
 
-    function renderMetaList(el, items) {
-      if (!el) return;
-      el.innerHTML = "";
-
-      for (const item of items) {
-        const row = document.createElement("div");
-        row.className = "meta-item";
-
-        const label = document.createElement("div");
-        label.className = "meta-label";
-        label.textContent = item.label;
-
-        const value = document.createElement("div");
-        value.className = "meta-value";
-        value.textContent = item.value;
-
-        row.appendChild(label);
-        row.appendChild(value);
-        el.appendChild(row);
-      }
-    }
-
-    function renderHistoryList(el, entries) {
-      if (!el) return;
-      el.innerHTML = "";
-
-      const cleanEntries = Array.isArray(entries) ? entries : [];
-      if (cleanEntries.length === 0) {
-        const empty = document.createElement("div");
-        empty.className = "note";
-        empty.textContent = "No production history has been published yet.";
-        el.appendChild(empty);
-        return;
-      }
-
-      for (const entry of cleanEntries) {
-        const item = document.createElement("div");
-        item.className = "history-item";
-
-        const title = document.createElement("strong");
-        title.textContent = [entry?.production_name, entry?.role].filter(Boolean).join(", ") || "Production";
-
-        const detail = document.createElement("div");
-        detail.className = "note";
-        detail.textContent = String(entry?.run_period || "").trim() || "Run period not set";
-
-        item.appendChild(title);
-        item.appendChild(detail);
-        el.appendChild(item);
-      }
-    }
-
-    function sheetLinkSummary(links) {
-      const cleanLinks = normalizeSheetLinks(links);
-      if (cleanLinks.length === 0) return "No sheet links yet.";
-      return cleanLinks.map((link) => link.label || "Character Sheet").join(", ");
-    }
-
-    function renderCharacterPanels(profileView) {
-      const card = selectedCharacter();
-      const profile = profileView?.profile || {};
-      const owner = profileView?.owner || {};
-      const publicProfile = profile.public || {};
-
-      if (card) {
-        renderMetaList(document.getElementById("left-panel"), [
-          { label: "Name", value: profileValue(card.name) },
-          { label: "Pronouns", value: profileValue(card.pronouns) },
-          { label: "Tagline", value: profileValue(card.tagline) },
-          { label: "Public Description", value: profileValue(card.public_description) },
-          { label: "Private Notes", value: profileValue(card.private_notes) },
-          { label: "Sheet Links", value: sheetLinkSummary(card.sheet_links || []) },
-        ]);
-
-        renderMetaList(document.getElementById("right-panel"), [
-          { label: "Name", value: profileValue(card.name) },
-          { label: "Pronouns", value: profileValue(card.pronouns) },
-          { label: "Portrait URL", value: profileValue(card.portrait_url) },
-          { label: "Color", value: profileValue(card.color) },
-          { label: "Tagline", value: profileValue(card.tagline) },
-          { label: "Public Description", value: profileValue(card.public_description) },
-          { label: "Sheet Links", value: sheetLinkSummary(card.sheet_links || []) },
-          { label: "Selected", value: "Yes" },
-        ]);
-
-        const snapshotNote = document.getElementById("snapshot-note");
-        if (snapshotNote) {
-          snapshotNote.textContent = "This snapshot follows the selected character.";
-        }
-        return;
-      }
-
-      renderMetaList(document.getElementById("left-panel"), [
-        { label: "Display Name", value: identityDisplayName({
-          user_id: owner.user_id,
-          handle: owner.handle,
-          display_name: publicProfile.display_name || owner.display_name,
-          persona: owner.persona,
-        }) },
-        { label: "Role", value: roleLabel(owner.role) },
-        { label: "Pronouns", value: profileValue(publicProfile.pronouns) },
-        { label: "Age Range", value: profileValue(publicProfile.performance_age_range) },
-        { label: "Favorite Fun", value: profileValue(publicProfile.favorite_fun) },
-        { label: "Most Relaxed", value: profileValue(publicProfile.most_relaxed) },
-        { label: "Favorite Color", value: profileValue(publicProfile.favorite_color) },
-        { label: "Favorite Artist", value: profileValue(publicProfile.favorite_artist) },
-        { label: "Favorite Food", value: profileValue(publicProfile.favorite_food) },
-        { label: "Favorite Song", value: profileValue(publicProfile.favorite_song) },
-      ]);
-
-      renderMetaList(document.getElementById("right-panel"), [
-        { label: "Favorite Place", value: profileValue(publicProfile.favorite_place) },
-        { label: "Favorite Movie or Show", value: profileValue(publicProfile.favorite_movie_or_show) },
-        { label: "Hidden Talent", value: profileValue(publicProfile.hidden_talent) },
-        { label: "Ideal Day", value: profileValue(publicProfile.ideal_day) },
-        { label: "Availability", value: profileValue(publicProfile.availability) },
-        { label: "Credits", value: profileValue(publicProfile.credits) },
-        { label: "Skills", value: profileValue(publicProfile.skills) },
-        { label: "Links", value: profileValue(publicProfile.public_links) },
-        { label: "Published", value: profile.is_published ? "Yes" : "Not yet" },
-      ]);
-
-      const snapshotNote = document.getElementById("snapshot-note");
-      if (snapshotNote) {
-        snapshotNote.textContent = profile.is_published
-          ? "This is the currently published public snapshot."
-          : "Nothing public has been published yet. Trailers controls the draft.";
-      }
-    }
-
-    function renderHero(profileView) {
-      const profile = profileView?.profile || {};
-      const user = profileView?.owner || {};
-      const publicProfile = profile.public || {};
-
-      const displayName = identityDisplayName({
-        user_id: user.user_id,
-        handle: user.handle,
-        display_name: publicProfile.display_name || user.display_name,
-        persona: user.persona,
-      });
-
-      const role = roleLabel(user.role);
-      const stageName = profileValue(publicProfile.stage_name);
-      const headshot = String(publicProfile.headshot_url || "").trim();
-
-      document.getElementById("hero-name").textContent = displayName;
-      document.getElementById("hero-role").textContent = stageName !== "Not set" ? `${role} · ${stageName}` : role;
-      document.getElementById("hero-bio").textContent = profileValue(publicProfile.bio) !== "Not set" ? publicProfile.bio : "The public bio appears here once published.";
-      renderHistoryList(document.getElementById("history-list"), publicProfile.history || []);
-
-      const heroVisual = document.getElementById("hero-visual");
-      if (headshot) {
-        heroVisual.className = "";
-        heroVisual.innerHTML = "";
-        const img = document.createElement("img");
-        img.src = headshot;
-        img.alt = stageName !== "Not set" ? stageName : displayName;
-        heroVisual.appendChild(img);
-      } else {
-        heroVisual.className = "hero-empty";
-        heroVisual.innerHTML = `
-          <div>
-            <strong>No published portrait yet</strong>
-            <div class="mini">Upload one in Trailers, then publish it.</div>
-          </div>
-        `;
-      }
-
-      renderMetaList(document.getElementById("left-panel"), [
-        { label: "Display Name", value: displayName },
-        { label: "Role", value: role },
-        { label: "Pronouns", value: profileValue(publicProfile.pronouns) },
-        { label: "Age Range", value: profileValue(publicProfile.performance_age_range) },
-        { label: "Favorite Fun", value: profileValue(publicProfile.favorite_fun) },
-        { label: "Most Relaxed", value: profileValue(publicProfile.most_relaxed) },
-        { label: "Favorite Color", value: profileValue(publicProfile.favorite_color) },
-        { label: "Favorite Artist", value: profileValue(publicProfile.favorite_artist) },
-        { label: "Favorite Food", value: profileValue(publicProfile.favorite_food) },
-        { label: "Favorite Song", value: profileValue(publicProfile.favorite_song) },
-      ]);
-
-      renderMetaList(document.getElementById("right-panel"), [
-        { label: "Favorite Place", value: profileValue(publicProfile.favorite_place) },
-        { label: "Favorite Movie or Show", value: profileValue(publicProfile.favorite_movie_or_show) },
-        { label: "Hidden Talent", value: profileValue(publicProfile.hidden_talent) },
-        { label: "Ideal Day", value: profileValue(publicProfile.ideal_day) },
-        { label: "Availability", value: profileValue(publicProfile.availability) },
-        { label: "Credits", value: profileValue(publicProfile.credits) },
-        { label: "Skills", value: profileValue(publicProfile.skills) },
-        { label: "Links", value: profileValue(publicProfile.public_links) },
-        { label: "Published", value: profile.is_published ? "Yes" : "Not yet" },
-      ]);
-
-      const snapshotNote = document.getElementById("snapshot-note");
-      snapshotNote.textContent = profile.is_published
-        ? "This is the currently published public snapshot."
-        : "Nothing public has been published yet. Trailers controls the draft.";
-    }
-
-    function selectedCharacter() {
-      return characterCards.find((card) => card.id === selectedCharacterId) || null;
-    }
-
-    function isPerformerRole(role) {
-      const normalized = String(role || "").trim().toLowerCase();
-      return normalized === "producer" || normalized === "director" || normalized === "cast" || normalized === "crew";
-    }
-
     function setStatus(text) {
-      const statusNote = document.getElementById("status-note");
-      if (statusNote) statusNote.textContent = text || "";
+      if (libraryStatus) libraryStatus.textContent = text || "";
     }
 
     function setCharacterStatus(text) {
       if (characterStatus) characterStatus.textContent = text || "";
     }
 
-    function openTools() {
-      if (!greenroomTools) return;
-      shell?.classList.add("tools-open");
-      applyCharacterUI();
+    function selectedCard() {
+      return state.cards.find((card) => card.id === state.selectedCharacterId) || null;
     }
 
-    function closeTools() {
-      if (!greenroomTools) return;
-      closeCharacterEditor();
-      shell?.classList.remove("tools-open");
-      applyCharacterUI();
+    function workbookPages() {
+      return Array.isArray(state.workbook?.pages) ? state.workbook.pages : [];
     }
 
-    function normalizeSheetLinks(links) {
-      const source = Array.isArray(links) ? links : [];
-      return source.map((link) => ({
-        id: String(link?.id || "").trim() || `sheet_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-        ruleset: String(link?.ruleset || "").trim(),
-        sheet_type: String(link?.sheet_type || "").trim(),
-        label: String(link?.label || "").trim() || "Character Sheet",
-        url: String(link?.url || "").trim(),
-        created_at: String(link?.created_at || "").trim() || new Date().toISOString(),
-      })).filter((link) => link.ruleset || link.sheet_type || link.label || link.url);
+    function currentPage() {
+      return workbookPages().find((page) => page.key === state.selectedPageKey) || workbookPages()[0] || null;
     }
 
-    function renderSheetLinks(container, links, editable = false) {
-      if (!container) return;
-      container.innerHTML = "";
-      const cleanLinks = normalizeSheetLinks(links);
-      if (cleanLinks.length === 0) {
-        const empty = document.createElement("p");
-        empty.className = "empty-state";
-        empty.textContent = "No sheet links yet.";
-        container.appendChild(empty);
-        return;
-      }
-
-      cleanLinks.forEach((link, index) => {
+    function renderMetaList(el, items) {
+      if (!el) return;
+      el.innerHTML = "";
+      for (const item of items) {
         const row = document.createElement("div");
-        row.className = "sheet-link";
-
-        const body = document.createElement("div");
-        const title = document.createElement(link.url ? "a" : "strong");
-        title.textContent = link.label || "Character Sheet";
-        if (link.url) {
-          title.href = link.url;
-        }
-        const meta = document.createElement("span");
-        meta.textContent = [link.ruleset, link.sheet_type].filter(Boolean).join(" / ") || "Reference";
-        body.appendChild(title);
-        body.appendChild(meta);
-        row.appendChild(body);
-
-        if (editable) {
-          const remove = document.createElement("button");
-          remove.className = "text-button";
-          remove.type = "button";
-          remove.textContent = "Remove";
-          remove.addEventListener("click", () => {
-            editingSheetLinks.splice(index, 1);
-            renderSheetLinks(characterSheetEditorList, editingSheetLinks, true);
-          });
-          row.appendChild(remove);
-        }
-
-        container.appendChild(row);
-      });
+        row.className = "summary-row";
+        const label = document.createElement("div");
+        label.className = "summary-label";
+        label.textContent = item.label;
+        const value = document.createElement("div");
+        value.className = "summary-value";
+        value.textContent = item.value;
+        row.appendChild(label);
+        row.appendChild(value);
+        el.appendChild(row);
+      }
     }
 
     function renderCharacterSelector() {
-      if (!characterSelect) return;
       characterSelect.innerHTML = "";
-
       const empty = document.createElement("option");
       empty.value = "";
-      empty.textContent = characterCards.length ? "Select a character" : "No character cards yet";
+      empty.textContent = state.cards.length ? "Select a workbook" : "No workbooks yet";
       characterSelect.appendChild(empty);
 
-      for (const card of characterCards) {
+      for (const card of state.cards) {
         const option = document.createElement("option");
         option.value = card.id;
         option.textContent = card.name || "Unnamed Character";
         characterSelect.appendChild(option);
       }
 
-      if (selectedCharacterId && characterCards.some((card) => card.id === selectedCharacterId)) {
-        characterSelect.value = selectedCharacterId;
-      } else {
-        selectedCharacterId = "";
-        characterSelect.value = "";
-      }
-      applyCharacterUI();
+      characterSelect.value = state.selectedCharacterId || "";
     }
 
-    function renderCharacterDisplay() {
-      if (!characterDisplay) return;
-      characterDisplay.innerHTML = "";
-      const card = selectedCharacter();
+    function renderSummary() {
+      const workbook = state.workbook;
+      const card = workbook?.character || selectedCard();
+      const module = workbook?.module || {};
+      const portraitURL = String(card?.portrait_url || "").trim();
 
-      if (!card) {
-        const empty = document.createElement("p");
-        empty.className = "empty-state";
-        empty.textContent = "No character selected.";
-        characterDisplay.appendChild(empty);
-        renderSheetLinks(characterSheetDisplayList, []);
-        return;
-      }
+      summaryName.textContent = profileValue(card?.name || "Unknown Participant");
+      summaryRole.textContent = card ? `Workbook ${profileValue(card.workbook_status || "draft")} · ${profileValue(module?.ruleset_key || "no module")}` : "Workbook awaiting selection";
+      summaryNote.textContent = workbook?.resume_hint || "Select a workbook to see the current face, module, and creation progress.";
 
-      const title = document.createElement("div");
-      title.className = "character-title";
-      const workbookStatus = document.createElement("div");
-      workbookStatus.className = "mini";
-      workbookStatus.textContent = `Workbook: ${profileValue(card.workbook_status || "draft")}`;
-      characterDisplay.appendChild(workbookStatus);
-      const portraitURL = String(card.portrait_url || "").trim();
+      portraitSlot.innerHTML = "";
       if (portraitURL) {
         const img = document.createElement("img");
-        img.className = "character-portrait";
+        img.className = "workbook-portrait";
         img.src = portraitURL;
-        img.alt = card.name || "Character portrait";
-        img.style.borderColor = card.color || "#d9c7a6";
-        title.appendChild(img);
+        img.alt = card?.name || "Character portrait";
+        portraitSlot.appendChild(img);
       } else {
-        const portrait = document.createElement("div");
-        portrait.className = "character-empty-portrait";
-        portrait.style.borderColor = card.color || "#d9c7a6";
-        title.appendChild(portrait);
+        const empty = document.createElement("div");
+        empty.className = "workbook-portrait-empty";
+        empty.textContent = "No portrait yet";
+        portraitSlot.appendChild(empty);
       }
 
-      const nameBlock = document.createElement("div");
-      const name = document.createElement("h3");
-      name.textContent = card.name || "Unnamed Character";
-      const pronouns = document.createElement("div");
-      pronouns.className = "mini";
-      pronouns.textContent = profileValue(card.pronouns);
-      nameBlock.appendChild(name);
-      nameBlock.appendChild(pronouns);
-      title.appendChild(nameBlock);
-      characterDisplay.appendChild(title);
+      renderMetaList(leftMeta, [
+        { label: "Workbook", value: profileValue(card?.workbook_status || "draft") },
+        { label: "Ruleset", value: profileValue(module?.ruleset_key || "Pending") },
+        { label: "Module Version", value: profileValue(module?.ruleset_version || "Pending") },
+        { label: "Current Stage", value: profileValue(module?.current_stage || "Pending") },
+        { label: "Current Event", value: profileValue(module?.current_event || "Pending") },
+      ]);
 
-      for (const value of [card.tagline, card.public_description, card.private_notes]) {
-        const text = String(value || "").trim();
-        if (!text) continue;
-        const copy = document.createElement("p");
-        copy.className = "character-copy";
-        copy.textContent = text;
-        characterDisplay.appendChild(copy);
-      }
-
-      renderSheetLinks(characterSheetDisplayList, card.sheet_links || []);
-      renderCharacterPanels(latestProfileView);
+      renderMetaList(rightMeta, [
+        { label: "Active Page", value: profileValue(state.selectedPageKey || "face") },
+        { label: "Journal Entries", value: String((workbookPages().find((page) => page.key === "journal")?.journals || []).length) },
+        { label: "History Entries", value: String((workbookPages().find((page) => page.key === "history")?.entries || []).length) },
+        { label: "Creation Entries", value: String((workbookPages().find((page) => page.key === "creation_progress")?.entries || []).length) },
+      ]);
     }
 
-    function applyCharacterUI() {
-      const card = selectedCharacter();
-      if (characterNew) characterNew.disabled = !canDraftCharacters;
-      if (characterEdit) characterEdit.disabled = !card || !canDraftCharacters;
-      if (characterSave) characterSave.disabled = !canDraftCharacters;
-      if (characterSheetAdd) characterSheetAdd.disabled = !canDraftCharacters;
-    }
-
-    function loadCharacterEditor(card) {
-      editingCharacterId = card?.id || "";
-      if (characterEditorTitle) characterEditorTitle.textContent = editingCharacterId ? "Edit Character" : "New Character";
-      if (characterName) characterName.value = card?.name || "";
-      if (characterPronouns) characterPronouns.value = card?.pronouns || "";
-      if (characterPortraitURL) characterPortraitURL.value = card?.portrait_url || "";
-      if (characterColor) characterColor.value = card?.color || "#d9c7a6";
-      if (characterTagline) characterTagline.value = card?.tagline || "";
-      if (characterPublicDescription) characterPublicDescription.value = card?.public_description || "";
-      if (characterPrivateNotes) characterPrivateNotes.value = card?.private_notes || "";
-      editingSheetLinks = normalizeSheetLinks(card?.sheet_links || []);
-      renderSheetLinks(characterSheetEditorList, editingSheetLinks, true);
-      if (characterSheetURL) characterSheetURL.value = "";
-    }
-
-    function openCharacterEditor(card) {
-      if (!canDraftCharacters) {
-        setCharacterStatus("Character drafting is not granted yet.");
-        return;
-      }
-      openTools();
-      loadCharacterEditor(card);
-      if (characterEditor) characterEditor.hidden = false;
-      setCharacterStatus("");
-      applyCharacterUI();
-    }
-
-    function closeCharacterEditor() {
-      editingCharacterId = "";
-      editingSheetLinks = [];
-      if (characterEditor) characterEditor.hidden = true;
-      shell?.classList.remove("tools-open");
-      renderSheetLinks(characterSheetEditorList, []);
-    }
-
-    function characterDraft() {
-      return {
-        name: characterName?.value.trim() || "",
-        pronouns: characterPronouns?.value.trim() || "",
-        portrait_url: characterPortraitURL?.value.trim() || "",
-        color: characterColor?.value || "#d9c7a6",
-        tagline: characterTagline?.value.trim() || "",
-        public_description: characterPublicDescription?.value.trim() || "",
-        private_notes: characterPrivateNotes?.value.trim() || "",
-        sheet_links: normalizeSheetLinks(editingSheetLinks),
-      };
-    }
-
-    function selectedSheetPreset() {
-      const [ruleset, sheetType, label] = String(characterSheetPreset?.value || "").split("|");
-      return {
-        ruleset: ruleset || "custom",
-        sheet_type: sheetType || "blank",
-        label: label || "Character Sheet",
-      };
-    }
-
-    function addSheetLink() {
-      const preset = selectedSheetPreset();
-      editingSheetLinks.push({
-        id: `sheet_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-        ruleset: preset.ruleset,
-        sheet_type: preset.sheet_type,
-        label: preset.label,
-        url: characterSheetURL?.value.trim() || "",
-        created_at: new Date().toISOString(),
-      });
-      if (characterSheetURL) characterSheetURL.value = "";
-      renderSheetLinks(characterSheetEditorList, editingSheetLinks, true);
-    }
-
-    async function loadCharacterCards() {
-      try {
-        const response = await fetch("/api/character-cards/me", {
-          method: "GET",
-          credentials: "include",
+    function renderPageTabs() {
+      pageTabs.innerHTML = "";
+      const pages = workbookPages();
+      for (const page of pages) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `tab${page.key === state.selectedPageKey ? " is-active" : ""}`;
+        button.textContent = page.title;
+        button.addEventListener("click", () => {
+          state.selectedPageKey = page.key;
+          renderWorkbook();
         });
-        const result = await response.json().catch(() => null);
-        if (!response.ok || !result?.ok) {
-          throw new Error(result?.data?.error || result?.error || `HTTP ${response.status}`);
-        }
-
-        const data = result.data || {};
-        canDraftCharacters = Boolean(data.can_draft) || isPerformerRole(currentRole);
-        characterCards = Array.isArray(data.cards) ? data.cards : [];
-        const activePersonaId = String(data.active_character?.character_card_id || data.active_persona?.character_card_id || "").trim();
-        const requestedId = requestedCharacterId();
-        if (requestedId && characterCards.some((card) => card.id === requestedId)) {
-          selectedCharacterId = requestedId;
-        }
-        if (activePersonaId && characterCards.some((card) => card.id === activePersonaId)) {
-          selectedCharacterId = activePersonaId;
-        }
-        if (!selectedCharacterId && characterCards.length > 0) {
-          selectedCharacterId = characterCards[0].id;
-        }
-        renderCharacterSelector();
-        renderCharacterDisplay();
-        applyCharacterUI();
-      } catch (err) {
-        canDraftCharacters = isPerformerRole(currentRole);
-        setCharacterStatus(err.message || String(err));
-        renderCharacterSelector();
-        renderCharacterDisplay();
-        applyCharacterUI();
+        pageTabs.appendChild(button);
       }
     }
 
-    async function saveCharacterCard() {
-      const draft = characterDraft();
-      if (!draft.name) {
+    function fieldInput(field) {
+      if (field.input_type === "textarea") {
+        const textarea = document.createElement("textarea");
+        textarea.value = field.value || "";
+        textarea.placeholder = field.placeholder || "";
+        textarea.dataset.key = field.key;
+        return textarea;
+      }
+      if (field.input_type === "color") {
+        const input = document.createElement("input");
+        input.type = "color";
+        input.value = field.value || "#d9c7a6";
+        input.dataset.key = field.key;
+        return input;
+      }
+      const input = document.createElement("input");
+      input.type = field.input_type || "text";
+      input.value = field.value || "";
+      input.placeholder = field.placeholder || "";
+      input.dataset.key = field.key;
+      return input;
+    }
+
+    function pageLabel(pageKey) {
+      const pages = workbookPages();
+      return pages.find((page) => page.key === pageKey)?.title || pageKey;
+    }
+
+    function saveStatusForPage(pageKey) {
+      if (pageKey === "mechanics") return "Saving workbook status...";
+      if (pageKey === "journal") return "Saving journal note...";
+      return "Saving workbook...";
+    }
+
+    async function saveFacePage(page) {
+      const fields = [...pageBody.querySelectorAll("[data-key]")];
+      const draft = {};
+      for (const input of fields) {
+        draft[input.dataset.key] = input.value;
+      }
+      if (!draft.name.trim()) {
         setCharacterStatus("Name is required.");
         return;
       }
-
-      setCharacterStatus("Saving...");
-
-      async function saveRequest(method, url) {
-        const response = await fetch(url, {
-          method,
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(draft),
-        });
-        const raw = await response.text();
-        let result = null;
-        if (raw) {
-          try {
-            result = JSON.parse(raw);
-          } catch (parseError) {
-            console.error("character save parse failed", {
-              method,
-              url,
-              status: response.status,
-              raw,
-              parseError,
-            });
-          }
-        }
-        return { response, raw, result, method, url };
+      setCharacterStatus(saveStatusForPage(page.key));
+      const response = await fetch(`/api/character-cards/${encodeURIComponent(state.selectedCharacterId)}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: draft.name,
+          pronouns: draft.pronouns,
+          portrait_url: draft.portrait_url,
+          color: draft.color,
+          tagline: draft.tagline,
+          public_description: draft.public_description,
+          private_notes: draft.private_notes || "",
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.data?.error || payload?.error || `HTTP ${response.status}`);
       }
-
-      try {
-        let saveAttempt;
-        if (editingCharacterId) {
-          const updateURL = `/api/character-cards/${encodeURIComponent(editingCharacterId)}`;
-          saveAttempt = await saveRequest("PATCH", updateURL);
-          if (saveAttempt.response.status === 404) {
-            saveAttempt = await saveRequest("POST", updateURL);
-          }
-        } else {
-          saveAttempt = await saveRequest("POST", "/api/character-cards");
-        }
-
-        if (!saveAttempt.response.ok || !saveAttempt.result?.ok) {
-          throw new Error(
-            saveAttempt.result?.data?.error ||
-            saveAttempt.result?.error ||
-            `${saveAttempt.method} ${saveAttempt.url} -> ${saveAttempt.raw.trim() || `HTTP ${saveAttempt.response.status}`}`
-          );
-        }
-
-        const saved = saveAttempt.result.data;
-        const index = characterCards.findIndex((card) => card.id === saved.id);
-        if (index >= 0) {
-          characterCards[index] = saved;
-        } else {
-          characterCards.unshift(saved);
-        }
-        selectedCharacterId = saved.id;
-        renderCharacterSelector();
-        renderCharacterDisplay();
-        closeCharacterEditor();
-        setCharacterStatus("Saved.");
-      } catch (err) {
-        setCharacterStatus(err.message || String(err));
-      }
+      state.workbook.character = payload.data;
+      await loadWorkbook(state.selectedCharacterId, { retainPage: true });
+      setCharacterStatus("Face page saved.");
     }
 
-    async function requireSignedInStatus() {
-      const response = await fetch("/api/session/me", {
+    async function saveMechanicsPage() {
+      const workbookStatusInput = pageBody.querySelector('[data-key="workbook_status"]');
+      const workbookStatus = workbookStatusInput ? workbookStatusInput.value.trim() : "";
+      if (!workbookStatus) {
+        setCharacterStatus("Workbook status is required.");
+        return;
+      }
+
+      setCharacterStatus("Saving workbook status...");
+      const response = await fetch(`/api/character-cards/${encodeURIComponent(state.selectedCharacterId)}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: state.workbook.character.name,
+          pronouns: state.workbook.character.pronouns,
+          portrait_url: state.workbook.character.portrait_url,
+          color: state.workbook.character.color,
+          tagline: state.workbook.character.tagline,
+          public_description: state.workbook.character.public_description,
+          private_notes: state.workbook.character.private_notes,
+          workbook_status: workbookStatus,
+          workbook_context: state.workbook.character.workbook_context || {},
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.data?.error || payload?.error || `HTTP ${response.status}`);
+      }
+      await loadWorkbook(state.selectedCharacterId, { retainPage: true });
+      setCharacterStatus("Mechanics saved.");
+    }
+
+    async function saveJournalPage() {
+      const bodyInput = pageBody.querySelector('[data-role="journal-body"]');
+      const body = String(bodyInput?.value || "").trim();
+      if (!body) {
+        setCharacterStatus("Journal text is required.");
+        return;
+      }
+      setCharacterStatus("Saving journal note...");
+      const response = await fetch("/api/character-journals", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          body,
+          visibility: "private",
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.data?.error || payload?.error || `HTTP ${response.status}`);
+      }
+      bodyInput.value = "";
+      await loadWorkbook(state.selectedCharacterId, { retainPage: true });
+      setCharacterStatus("Journal saved.");
+    }
+
+    function renderPage(page) {
+      pageTitle.textContent = page?.title || "Workbook";
+      pageSummary.textContent = page?.summary || "";
+      pageBody.innerHTML = "";
+
+      if (!page) {
+        const empty = document.createElement("p");
+        empty.className = "empty-state";
+        empty.textContent = "Select a workbook to begin.";
+        pageBody.appendChild(empty);
+        return;
+      }
+
+      if (page.key === "face") {
+        const section = document.createElement("div");
+        section.className = "page-section";
+        const grid = document.createElement("div");
+        grid.className = "field-grid";
+        for (const field of page.fields || []) {
+          if (field.editable === false) {
+            const item = document.createElement("div");
+            item.className = "list-item";
+            const title = document.createElement("strong");
+            title.textContent = field.label;
+            const body = document.createElement("p");
+            body.textContent = field.value || "Not set";
+            item.appendChild(title);
+            item.appendChild(body);
+            grid.appendChild(item);
+            continue;
+          }
+
+          const label = document.createElement("label");
+          label.className = `field${field.input_type === "textarea" ? " full" : ""}`;
+          const labelText = document.createElement("span");
+          labelText.textContent = field.label;
+          label.appendChild(labelText);
+          label.appendChild(fieldInput(field));
+          grid.appendChild(label);
+        }
+        section.appendChild(grid);
+        const actions = document.createElement("div");
+        actions.className = "action-row";
+        const save = document.createElement("button");
+        save.className = "text-button";
+        save.type = "button";
+        save.textContent = "Save Face";
+        save.addEventListener("click", async () => {
+          try {
+            await saveFacePage(page);
+          } catch (error) {
+            setCharacterStatus(error.message || String(error));
+          }
+        });
+        actions.appendChild(save);
+        section.appendChild(actions);
+        pageBody.appendChild(section);
+        return;
+      }
+
+      if (page.key === "history" || page.key === "creation_progress") {
+        const entries = Array.isArray(page.entries) ? page.entries : [];
+        if (!entries.length) {
+          const empty = document.createElement("p");
+          empty.className = "empty-state";
+          empty.textContent = "No workbook entries yet.";
+          pageBody.appendChild(empty);
+          return;
+        }
+        const list = document.createElement("div");
+        list.className = "list";
+        for (const entry of entries) {
+          const item = document.createElement("div");
+          item.className = "list-item";
+          const title = document.createElement("strong");
+          title.textContent = entry.title || entry.entry_type || "Entry";
+          const meta = document.createElement("span");
+          meta.textContent = [entry.entry_type, entry.created_at, entry.stage_number ? `Stage ${entry.stage_number}` : ""].filter(Boolean).join(" · ");
+          const body = document.createElement("p");
+          body.textContent = entry.body || "";
+          item.appendChild(title);
+          item.appendChild(meta);
+          item.appendChild(body);
+          list.appendChild(item);
+        }
+        pageBody.appendChild(list);
+        return;
+      }
+
+      if (page.key === "mechanics") {
+        const section = document.createElement("div");
+        section.className = "page-section";
+        const grid = document.createElement("div");
+        grid.className = "field-grid";
+        for (const field of page.fields || []) {
+          const label = document.createElement("label");
+          label.className = "field";
+          if (field.key === "workbook_status") {
+            const labelText = document.createElement("span");
+            labelText.textContent = field.label;
+            label.appendChild(labelText);
+            label.appendChild(fieldInput(field));
+          } else {
+            const labelText = document.createElement("span");
+            labelText.textContent = field.label;
+            label.appendChild(labelText);
+            const value = document.createElement("input");
+            value.type = "text";
+            value.value = field.value || "";
+            value.disabled = true;
+            label.appendChild(value);
+          }
+          grid.appendChild(label);
+        }
+        section.appendChild(grid);
+        const actions = document.createElement("div");
+        actions.className = "action-row";
+        const save = document.createElement("button");
+        save.className = "text-button";
+        save.type = "button";
+        save.textContent = "Save Mechanics";
+        save.addEventListener("click", async () => {
+          try {
+            await saveMechanicsPage();
+          } catch (error) {
+            setCharacterStatus(error.message || String(error));
+          }
+        });
+        actions.appendChild(save);
+        section.appendChild(actions);
+        pageBody.appendChild(section);
+        return;
+      }
+
+      if (page.key === "journal") {
+        const section = document.createElement("div");
+        section.className = "journal-editor";
+        const label = document.createElement("label");
+        label.className = "field";
+        const labelText = document.createElement("span");
+        labelText.textContent = "Add a private note";
+        const textarea = document.createElement("textarea");
+        textarea.dataset.role = "journal-body";
+        textarea.placeholder = "Write a note to yourself. Use /journal in chat to send notes here too.";
+        label.appendChild(labelText);
+        label.appendChild(textarea);
+        section.appendChild(label);
+        const actions = document.createElement("div");
+        actions.className = "action-row";
+        const save = document.createElement("button");
+        save.className = "text-button";
+        save.type = "button";
+        save.textContent = "Save Journal Note";
+        save.addEventListener("click", async () => {
+          try {
+            await saveJournalPage();
+          } catch (error) {
+            setCharacterStatus(error.message || String(error));
+          }
+        });
+        actions.appendChild(save);
+        section.appendChild(actions);
+
+        const notes = document.createElement("div");
+        notes.className = "list";
+        const journals = Array.isArray(page.journals) ? page.journals : [];
+        if (!journals.length) {
+          const empty = document.createElement("p");
+          empty.className = "empty-state";
+          empty.textContent = "No journal entries yet.";
+          notes.appendChild(empty);
+        } else {
+          for (const entry of journals) {
+            const item = document.createElement("div");
+            item.className = "list-item journal-entry";
+            const title = document.createElement("strong");
+            title.textContent = entry.created_at || "Journal entry";
+            const meta = document.createElement("span");
+            meta.textContent = entry.visibility || "private";
+            const body = document.createElement("p");
+            body.textContent = entry.body || "";
+            item.appendChild(title);
+            item.appendChild(meta);
+            item.appendChild(body);
+            notes.appendChild(item);
+          }
+        }
+
+        section.appendChild(notes);
+        pageBody.appendChild(section);
+        return;
+      }
+
+      if (page.key === "module") {
+        const section = document.createElement("div");
+        section.className = "page-section";
+        const list = document.createElement("div");
+        list.className = "list";
+        for (const field of page.fields || []) {
+          const item = document.createElement("div");
+          item.className = "list-item";
+          const title = document.createElement("strong");
+          title.textContent = field.label;
+          const body = document.createElement("p");
+          body.textContent = field.value || "Not set";
+          item.appendChild(title);
+          item.appendChild(body);
+          list.appendChild(item);
+        }
+        section.appendChild(list);
+        pageBody.appendChild(section);
+        return;
+      }
+
+      const empty = document.createElement("p");
+      empty.className = "empty-state";
+      empty.textContent = "This page is not implemented yet.";
+      pageBody.appendChild(empty);
+    }
+
+    function renderWorkbook() {
+      const workbook = state.workbook;
+      if (!workbook) {
+        pageTitle.textContent = "Loading workbook...";
+        pageSummary.textContent = "";
+        pageBody.innerHTML = "";
+        pageHint.textContent = "Loading workbook...";
+        renderSummary();
+        return;
+      }
+
+      const pages = workbookPages();
+      if (!pages.some((page) => page.key === state.selectedPageKey)) {
+        state.selectedPageKey = workbook.active_page || pages[0]?.key || "face";
+      }
+
+      const page = currentPage();
+      pageHint.textContent = page ? page.title : "No pages";
+      renderPageTabs();
+      renderSummary();
+      renderPage(page);
+    }
+
+    async function loadCharacterCards() {
+      const response = await fetch("/api/character-cards/me", { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.data?.error || payload?.error || `HTTP ${response.status}`);
+      }
+
+      const data = payload.data || {};
+      state.canDraft = Boolean(data.can_draft);
+      state.cards = Array.isArray(data.cards) ? data.cards : [];
+      const activeCharacterId = String(data.active_character?.character_card_id || data.active_persona?.character_card_id || "").trim();
+      const requestedId = requestedCharacterId();
+      if (requestedId && state.cards.some((card) => card.id === requestedId)) {
+        state.selectedCharacterId = requestedId;
+      } else if (activeCharacterId && state.cards.some((card) => card.id === activeCharacterId)) {
+        state.selectedCharacterId = activeCharacterId;
+      } else if (!state.selectedCharacterId && state.cards.length > 0) {
+        state.selectedCharacterId = state.cards[0].id;
+      }
+      renderCharacterSelector();
+    }
+
+    async function loadWorkbook(characterId, options = {}) {
+      if (!characterId) {
+        state.workbook = null;
+        renderWorkbook();
+        return;
+      }
+
+      state.loading = true;
+      setStatus("Loading workbook...");
+      const response = await fetch(`/api/character-workbooks/${encodeURIComponent(characterId)}`, {
         credentials: "include",
       });
-
       const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload?.ok || !payload.signed_in) {
-        return { allowed: false, role: "audience" };
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.data?.error || payload?.error || `HTTP ${response.status}`);
       }
-
-      const role = String(payload?.data?.role || "").trim().toLowerCase();
-      return { allowed: true, role: role || "audience" };
+      state.workbook = payload.data || null;
+      if (!options.retainPage) {
+        state.selectedPageKey = state.workbook?.active_page || state.workbook?.pages?.[0]?.key || "face";
+      }
+      state.loading = false;
+      renderWorkbook();
+      setStatus("Workbook loaded.");
     }
 
-    async function bootstrapGreenroom() {
+    function requireSignedInStatus() {
+      return fetch("/api/session/me", { credentials: "include" })
+        .then((response) => response.json().catch(() => null).then((payload) => ({ response, payload })));
+    }
+
+    async function bootstrap() {
       try {
         setStatus("Checking signed-in access...");
         const access = await requireSignedInStatus();
-        if (!access.allowed) {
+        if (!access.response.ok || !access.payload?.ok || !access.payload.signed_in) {
           showForbiddenScreen();
           return;
         }
-        document.querySelector(".shell")?.classList.add("venue-shell--signed-in");
-        currentRole = access.role || "audience";
-
-        setStatus("Loading public profile...");
-        const response = await fetch("/api/profiles/public", {
-          credentials: "include",
-        });
-        const payload = await response.json().catch(() => null);
-
-        if (!response.ok || !payload?.ok) {
-          latestProfileView = {
-            owner: {
-              user_id: "",
-              handle: "",
-              display_name: "Unknown Participant",
-              role: currentRole,
-              persona: null,
-            },
-            profile: {
-              is_published: false,
-              public: {},
-              draft: {},
-              published: {},
-            },
-          };
-          renderHero(latestProfileView);
-          renderCharacterPanels(latestProfileView);
-          setStatus("Profile unavailable right now, but your session is active.");
-        } else {
-          latestProfileView = payload.data;
-          renderHero(latestProfileView);
-          renderCharacterPanels(latestProfileView);
-        }
+        state.role = String(access.payload?.data?.role || "").trim().toLowerCase() || "audience";
+        state.canDraft = state.role === "producer" || state.role === "director" || state.role === "cast" || state.role === "crew";
 
         await loadCharacterCards();
-        setStatus("Greenroom loaded.");
+        if (state.selectedCharacterId) {
+          await loadWorkbook(state.selectedCharacterId);
+        } else {
+          renderWorkbook();
+          setStatus("No workbook selected.");
+        }
       } catch (error) {
         console.error("greenroom bootstrap failed", error);
-        setStatus("Greenroom failed to load, but the page shell is still available.");
+        setStatus("Greenroom failed to load.");
+        setCharacterStatus(error.message || String(error));
       }
     }
 
-    profileToolsToggle?.addEventListener("click", () => {
-      if (characterEditor?.hidden) {
-        openCharacterEditor(selectedCharacter());
-      } else {
-        closeCharacterEditor();
+    characterSelect.addEventListener("change", async () => {
+      state.selectedCharacterId = characterSelect.value;
+      try {
+        await loadWorkbook(state.selectedCharacterId);
+      } catch (error) {
+        setCharacterStatus(error.message || String(error));
       }
     });
-    greenroomToolsClose?.addEventListener("click", closeCharacterEditor);
-    characterSelect?.addEventListener("change", () => {
-      selectedCharacterId = characterSelect.value;
-      renderCharacterDisplay();
-      closeCharacterEditor();
-      applyCharacterUI();
+
+    newWorkbookButton.addEventListener("click", () => {
+      if (!state.canDraft) {
+        setCharacterStatus("Character drafting is not granted yet.");
+        return;
+      }
+      window.location.href = "/venues/catharsis/";
     });
-    characterNew?.addEventListener("click", () => {
-      selectedCharacterId = "";
-      renderCharacterSelector();
-      renderCharacterDisplay();
-      openCharacterEditor(null);
+
+    resumeButton.addEventListener("click", () => {
+      const page = currentPage();
+      if (!page) return;
+      state.selectedPageKey = page.key;
+      renderWorkbook();
+      pageBody.scrollIntoView({ behavior: "smooth", block: "start" });
     });
-    characterEdit?.addEventListener("click", () => {
-      const card = selectedCharacter();
-      if (card) openCharacterEditor(card);
+
+    refreshButton.addEventListener("click", async () => {
+      try {
+        if (state.selectedCharacterId) {
+          await loadWorkbook(state.selectedCharacterId, { retainPage: true });
+        } else {
+          await loadCharacterCards();
+          renderWorkbook();
+        }
+      } catch (error) {
+        setCharacterStatus(error.message || String(error));
+      }
     });
-    characterSheetAdd?.addEventListener("click", addSheetLink);
-    characterSave?.addEventListener("click", saveCharacterCard);
-    characterCancel?.addEventListener("click", closeCharacterEditor);
-    bootstrapGreenroom();
+
+    bootstrap();
   </script>
 </body>
 </html>

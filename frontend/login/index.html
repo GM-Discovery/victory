@@ -202,6 +202,26 @@
       }
     }
 
+    async function redirectIfSignedIn() {
+      try {
+        const response = await fetch("/api/account/me", { credentials: "include" });
+        if (!response.ok) {
+          return false;
+        }
+
+        const payload = await response.json();
+        if (payload && payload.ok && payload.data && payload.data.user) {
+          window.location.replace("/account/");
+          return true;
+        }
+      } catch (error) {
+        return false;
+      }
+
+      return false;
+    }
+
+    redirectIfSignedIn();
     loadAuthProviders();
 
     form.addEventListener("submit", async (event) => {

@@ -93,6 +93,25 @@
       margin: 0;
     }
 
+    .test-harness {
+      margin-top: 16px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.03);
+      display: grid;
+      gap: 10px;
+    }
+
+    .test-harness h2 {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+
+    .test-harness p {
+      margin: 0;
+    }
+
     .button,
     .chip {
       display: inline-flex;
@@ -248,6 +267,16 @@
         <p class="note">Producer authority is granted inside Victory. Discord login alone does not grant producer access. If this account should be a producer, the server operator must run the bootstrap command. There is no public producer grant button on this page.</p>
       </section>
 
+      <section id="test-harness" class="test-harness" hidden>
+        <h2>Operator Test Harness</h2>
+        <p class="note">Reset the Catharsis first-appearance flags in this browser, then reopen Catharsis to replay the onboarding and Socio build flow.</p>
+        <div class="toolbar" style="margin-top: 0;">
+          <button id="reset-catharsis-appearance" class="button" type="button">Reset Catharsis First Appearance</button>
+          <a class="chip" href="/venues/catharsis/">Open Catharsis</a>
+        </div>
+        <p id="test-harness-status" class="note"></p>
+      </section>
+
       <div class="grid">
         <section class="panel">
           <p class="label">Victory Account</p>
@@ -365,6 +394,19 @@
       const authorityHeading = document.getElementById("authority-heading");
       const authorityNote = document.getElementById("authority-note");
       const authorityMeta = document.getElementById("authority-meta");
+      const testHarness = document.getElementById("test-harness");
+      const resetCatharsisAppearanceButton = document.getElementById("reset-catharsis-appearance");
+      const testHarnessStatus = document.getElementById("test-harness-status");
+      const catharsisOnboardingKeys = [
+        "victory:catharsis:onboarding:intro-seen",
+        "victory:catharsis:onboarding:socio-seen",
+      ];
+
+      const setTestHarnessStatus = (text) => {
+        if (testHarnessStatus) {
+          testHarnessStatus.textContent = text || "";
+        }
+      };
 
       try {
         const response = await fetch("/api/account/me", {
@@ -422,6 +464,7 @@
         const authority = account.authority || {};
         const memberships = Array.isArray(account.memberships) ? account.memberships : [];
         const displayName = identityDisplayName(user);
+        const isOperator = Boolean(authority.is_operator);
 
         displayNameEl.textContent = displayName;
         roleEl.textContent = `${roleLabel(authority.current_role)} access`;
@@ -475,6 +518,18 @@
           { label: "Producer locations", value: joinList(authority.producer_locations || []) },
           { label: "Location memberships", value: joinList(memberships.map((membership) => `${membership.location_slug || membership.location_name || "Unknown"} · ${roleLabel(membership.role)}`)) },
         ]);
+        if (testHarness) {
+          testHarness.hidden = !isOperator;
+        }
+        if (resetCatharsisAppearanceButton) {
+          resetCatharsisAppearanceButton.disabled = !isOperator;
+          resetCatharsisAppearanceButton.onclick = () => {
+            for (const key of catharsisOnboardingKeys) {
+              localStorage.removeItem(key);
+            }
+            setTestHarnessStatus("Catharsis first-appearance flags reset for this browser.");
+          };
+        }
 
         try {
           const profileResponse = await fetch("/api/profiles/me", {

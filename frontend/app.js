@@ -435,7 +435,7 @@ async function loadVenues() {
 
     const fallbackPositions = {
       library: { x: 67, y: 87 },
-      "first-theater": { x: 69, y: 62 },
+      "first-theater": { x: 70, y: 61 },
       "middle-school-stage": { x: 101, y: 50 },
       "the-cave": { x: 22, y: 23 },
       "grants-cabin": { x: 28, y: 21 },
@@ -447,7 +447,7 @@ async function loadVenues() {
       catharsis: { x: 36, y: 69 },
       "victory-theater": { x: 82, y: 75 },
       workshop: { x: 75, y: 33 },
-      warehouse: { x: 73, y: 27 },
+      warehouse: { x: 75, y: 27 },
       "soil-experts": { x: 5, y: 66 },
       construction: { x: 26, y: 57 },
       "info-booth": { x: 48, y: 92 },
