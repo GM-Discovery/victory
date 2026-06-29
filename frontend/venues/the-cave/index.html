@@ -5099,6 +5099,19 @@
         chatInput.focus();
         return;
       }
+
+      const journalResult = await window.VictoryMicChat?.sendJournalCommand?.(text, { visibility: "private" });
+      if (journalResult?.handled) {
+        const message = String(journalResult.message || "").replace(/\n+/g, " · ").trim();
+        if (journalResult.ok) {
+          addChatMessage(message || "Journal entry saved privately.", formatTime(), "system");
+        } else if (message) {
+          addChatMessage(message, formatTime(), "system");
+        }
+        chatInput.value = "";
+        chatInput.focus();
+        return;
+      }
     } catch (error) {
       addChatMessage(String(error?.message || error || "Mic command failed"), formatTime(), "system");
       chatInput.focus();

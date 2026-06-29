@@ -150,6 +150,7 @@ func main() {
 	mux.HandleFunc("GET /api/character-cards/me", characters.HandleMyCharacterCards(pool))
 	mux.HandleFunc("/api/character-cards", characters.HandleCreateCharacterCard(pool))
 	mux.HandleFunc("/api/character-cards/", characters.HandleCharacterCardByID(pool))
+	mux.HandleFunc("/api/character-journals", characters.HandleCharacterJournals(pool))
 	mux.HandleFunc("POST /api/character-card-permissions", characters.HandleGrantCharacterPermission(pool))
 	mux.HandleFunc("POST /api/character-card-permissions/revoke", characters.HandleRevokeCharacterPermission(pool))
 	mux.HandleFunc("GET /api/showings", showings.HandleReviewShowings(pool))

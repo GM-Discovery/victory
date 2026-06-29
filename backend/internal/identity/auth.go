@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"victory/backend/internal/access"
+	"victory/backend/internal/characters"
 	"victory/backend/internal/sessions"
 
 	"github.com/jackc/pgx/v5"
@@ -467,6 +468,8 @@ func HandleMe(pool *pgxpool.Pool) http.HandlerFunc {
 			role = "audience"
 		}
 
+		activeCharacter, _ := characters.ActiveCharacterForUser(ctx, pool, userID)
+
 		isOperator, err := access.IsOperatorUser(ctx, pool, userID)
 		if err != nil {
 			isOperator = false
@@ -476,11 +479,12 @@ func HandleMe(pool *pgxpool.Pool) http.HandlerFunc {
 			"ok":        true,
 			"signed_in": true,
 			"data": map[string]any{
-				"user_id":      userID,
-				"handle":       handle,
-				"display_name": displayName,
-				"role":         role,
-				"is_operator":  isOperator,
+				"user_id":          userID,
+				"handle":           handle,
+				"display_name":     displayName,
+				"role":             role,
+				"is_operator":      isOperator,
+				"active_character": activeCharacter,
 			},
 		})
 	}

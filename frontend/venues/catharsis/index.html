@@ -2924,7 +2924,32 @@
         localStorage.setItem(introKey, "1");
         localStorage.setItem(socioKey, "1");
         closeOverlay();
-        document.getElementById("right-card-editor-button")?.click();
+        void (async () => {
+          try {
+            const response = await fetch("/api/character-cards", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                workbook_status: "draft",
+                workbook_context: {
+                  source: "catharsis",
+                  creation_key: "catharsis:onboarding",
+                  ruleset_key: "socio",
+                  ruleset_version: "1.1",
+                },
+              }),
+            });
+            const payload = await response.json().catch(() => null);
+            if (response.ok && payload?.ok && payload?.data?.id) {
+              window.location.href = `/venues/greenroom/?character_id=${encodeURIComponent(payload.data.id)}`;
+              return;
+            }
+          } catch (error) {
+            console.error("catharsis create character failed", error);
+          }
+          document.getElementById("right-card-editor-button")?.click();
+        })();
       });
 
       dismissButton.addEventListener("click", () => {

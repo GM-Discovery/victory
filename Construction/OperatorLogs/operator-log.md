@@ -11,6 +11,34 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-06-29 — Kernel 53 Character Workbook Foundation + Socio Parentage v1.1
+
+### Backend
+- Extended the canonical `character_cards` root with workbook metadata, active-character persistence, workbook module instances, and private journal storage.
+- Added a Catharsis workbook creation/resume seam keyed off workbook context so the first onboarding draft can be resumed instead of duplicated.
+- Added a `POST /api/character-journals` surface for private journal entries targeting the active workbook.
+- Exposed `active_character` on `/api/session/me` and `GET /api/character-cards/me` so the shell can render the loaded workbook state.
+
+### Frontend
+- Wired the Catharsis onboarding start action to create the first draft workbook and route the player into Greenroom.
+- Added a shared `/journal` command path in the venue chat helpers so journal text bypasses venue chat and lands in private workbook storage.
+- Projected the active character into the Catharsis and First Theater shell chrome and made the shell chip jump back to Greenroom.
+- Allowed Greenroom to open directly to a requested workbook via `?character_id=...` and show the workbook status in the character surface.
+
+### Tests
+- Re-ran focused backend coverage for the touched domains:
+  - `cd backend && GOCACHE=/tmp/victory-gocache go test ./internal/characters ./internal/access ./internal/identity ./internal/network`
+- Re-ran frontend syntax checks for the touched shared and venue scripts:
+  - `node --check frontend/lib/victory-mic-chat.js`
+  - `node --check frontend/venues/catharsis/runtime.js`
+  - `node --check frontend/venues/first-theater/runtime.js`
+- Verified diff hygiene:
+  - `git diff --check`
+
+### Notes
+- The full Kernel 53 Parentage Chart v1.1 was not provided in the attachment, so the parentage stage itself remains a foundation rather than a complete playable flow.
+- `go test ./...` still reports an unrelated pre-existing failure in `backend/internal/assets`.
+
 ## 2026-06-25 — Kernel 52 Canonical Dice Actions v1
 
 ### Backend

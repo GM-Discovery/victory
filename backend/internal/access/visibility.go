@@ -155,6 +155,18 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
+			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'owned_workbook_surface'::text AS visible_because
+			FROM venues v
+			WHERE v.slug = 'greenroom'
+			  AND EXISTS (
+				SELECT 1
+				FROM character_cards cc
+				WHERE cc.owner_user_id = $1
+				  AND cc.is_deleted = FALSE
+			  )
+
+			UNION
+
 			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'delayed_lot_surface'::text AS visible_because
 			FROM venues v
 			JOIN lots l ON l.id = v.lot_id

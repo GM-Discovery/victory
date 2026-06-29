@@ -43,6 +43,16 @@
     }
   }
 
+  function normalizeJournalCommand(rawText) {
+    const raw = String(rawText || "").trim();
+    if (!/^\/journal(\s+|$)/i.test(raw)) {
+      return null;
+    }
+
+    const tail = raw.replace(/^\/journal\s*/i, "").trim();
+    return tail;
+  }
+
   function emitMicRefresh(venueSlug) {
     const slug = String(venueSlug || "").trim();
     if (!slug) return;
@@ -147,11 +157,61 @@
     };
   }
 
+  async function sendJournalCommand(rawText, options = {}) {
+    const body = normalizeJournalCommand(rawText);
+    if (body === null) {
+      return { handled: false };
+    }
+
+    if (!body) {
+      return {
+        handled: true,
+        ok: false,
+        message: "Use /journal <text>.",
+      };
+    }
+
+    const response = await fetch("/api/character-journals", {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        body,
+        visibility: String(options.visibility || "private").trim() || "private",
+      }),
+    });
+
+    const payload = await response.json().catch(() => null);
+    const error = payload?.data?.error || payload?.error || `HTTP ${response.status}`;
+
+    if (!response.ok || !payload?.ok) {
+      return {
+        handled: true,
+        ok: false,
+        message: payload?.data?.error === "no_active_character"
+          ? "No active character. Load a character before writing a journal entry."
+          : payload?.data?.message || payload?.data?.detail || error,
+      };
+    }
+
+    return {
+      handled: true,
+      ok: true,
+      message: "Journal entry saved privately.",
+      data: payload.data || {},
+    };
+  }
+
   window.VictoryMicChat = {
     normalizeMicCommand,
     normalizeSessionCommand,
+    normalizeJournalCommand,
     sendMicCommand,
     sendSessionCommand,
+    sendJournalCommand,
     emitMicRefresh,
   };
 })();

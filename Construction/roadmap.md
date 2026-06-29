@@ -62,6 +62,8 @@ Kernel numbers are labels, but from here they should remain stable once assigned
   - Kernel 51A hardens the projected First Theater runtime and Grant's Cabin diagnostics path, while the broader runtime decomposition and operator-console work remain intentionally deferred
 - `52 — Canonical Dice Actions v1`
   - Victory now owns canonical server-generated dice rolls, persists `roll/dice` as an append-only action, and exposes a simple First Theater Dice tray that submits `/roll` requests without client-side random generation
+- `53 — Character Workbook Foundation + Socio Parentage v1.1`
+  - extend the canonical character root into workbook metadata, add the first owned Catharsis Socio draft, private journals, Greenroom visibility on first workbook ownership, and the Stage 1 Parentage foundation that will consume the versioned parentage chart once it is supplied
 
 Ordering note:
 - Showing Review comes before polish-only work

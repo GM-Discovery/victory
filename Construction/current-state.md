@@ -1,14 +1,14 @@
 # Victory Current State
 
 ## Purpose
-This document is the current-state canon for Victory as of Kernel 52.
+This document is the current-state canon for Victory as of Kernel 53.
 
 Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful as history, but this file is the current source of truth when they disagree.
 
 ## Kernel State
-- Current kernel label: **Kernel 52**
-- Current kernel purpose: **Canonical Dice Actions, First Theater Dice Tray, and Server-Generated Randomness**
-- Product state: **Kernel 52 is complete; Kernel 51A/51B remain historical runtime hardening milestones**
+- Current kernel label: **Kernel 53**
+- Current kernel purpose: **Character Workbook Foundation, Catharsis Socio Drafts, and Private Journals**
+- Product state: **Kernel 53 is in progress; Kernel 52 remains complete and Kernel 51A/51B remain historical runtime hardening milestones**
 - Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
 
 ## Current Stack
@@ -102,6 +102,7 @@ Character cards:
 - `GET /api/character-cards/me`
 - `POST /api/character-cards`
 - `PATCH /api/character-cards/{id}`
+- `POST /api/character-journals`
 - Legacy/dormant authority routes still exist, but current product behavior does not rely on them:
   - `POST /api/character-card-permissions`
   - `POST /api/character-card-permissions/revoke`
@@ -145,6 +146,8 @@ World, session, and venue runtime:
 Discord audio remains a Discord pass-through surface. Victory does not capture or stream audio.
 Voice-state participant presence is tracked from Discord Gateway events. Active speaker detection and per-user volume controls remain deferred because the current bot/Gateway path cannot truthfully provide them.
 Venue shells now share reusable helper methods for slug normalization, slot registration, presence preview rendering, and safe refresh hooks.
+Greenroom visibility now also appears when a user owns at least one character workbook, even if the workbook is still a draft.
+Catharsis and First Theater now project the active character from session identity into the shell chrome so the user can jump back to Greenroom.
 First Theater keeps its original stage façade; the active map renders in the shared world layer and does not replace the façade or the existing DOM controls. The map can be removed via the map editor's Remove Map action, and supports a `display_mode` of `theater` (masked to the proscenium opening) or `fullscreen` (stretched to the full canvas, façade hidden).
 A persistent square/hex grid renders in that same world layer, aligned with the active map and pinned cards, while unpinned cards stay in the fixed overlay layer above the interactive view. Grid configuration (type, hex orientation, cell size, offsets, opacity, line width, line style, visibility) is server-persisted per venue in `venue_grid_configs` and is visual-only — no snapping or measurement. Configured via a "Configure Grid" stage context-menu item and callout panel with live preview, Save, Close (reverts to last saved), Reset, and Hide/Show.
 First Theater now has a personal browser camera over that shared map/grid world. Middle-mouse drag pans, wheel zoom centers toward the cursor, edge scrolling respects the playable stage rectangle, and the visible `− / 100% / + / Fit` control stays fixed in the safe interface region. Camera state is personal and browser-local, keyed by user/browser plus venue and active map, and `Fit` resets to 100%.
@@ -198,6 +201,10 @@ Identity and access:
 - `users`
 - `auth.sessions`
 - `auth.password_credentials`
+- `character_cards` remains the canonical workbook root with workbook metadata
+- `active_user_characters`
+- `character_workbook_modules`
+- `character_journals`
 - `auth.password_reset_tokens`
 - `auth.discord_identities`
 - `auth.oauth_states`

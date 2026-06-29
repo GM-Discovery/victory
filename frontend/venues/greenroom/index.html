@@ -665,6 +665,14 @@
     let editingCharacterId = "";
     let editingSheetLinks = [];
 
+    function requestedCharacterId() {
+      try {
+        return String(new URLSearchParams(window.location.search).get("character_id") || "").trim();
+      } catch (error) {
+        return "";
+      }
+    }
+
     function profileValue(value) {
       const text = String(value || "").trim();
       return text || "Not set";
@@ -998,6 +1006,10 @@
 
       const title = document.createElement("div");
       title.className = "character-title";
+      const workbookStatus = document.createElement("div");
+      workbookStatus.className = "mini";
+      workbookStatus.textContent = `Workbook: ${profileValue(card.workbook_status || "draft")}`;
+      characterDisplay.appendChild(workbookStatus);
       const portraitURL = String(card.portrait_url || "").trim();
       if (portraitURL) {
         const img = document.createElement("img");
@@ -1130,7 +1142,11 @@
         const data = result.data || {};
         canDraftCharacters = Boolean(data.can_draft) || isPerformerRole(currentRole);
         characterCards = Array.isArray(data.cards) ? data.cards : [];
-        const activePersonaId = String(data.active_persona?.character_card_id || "").trim();
+        const activePersonaId = String(data.active_character?.character_card_id || data.active_persona?.character_card_id || "").trim();
+        const requestedId = requestedCharacterId();
+        if (requestedId && characterCards.some((card) => card.id === requestedId)) {
+          selectedCharacterId = requestedId;
+        }
         if (activePersonaId && characterCards.some((card) => card.id === activePersonaId)) {
           selectedCharacterId = activePersonaId;
         }

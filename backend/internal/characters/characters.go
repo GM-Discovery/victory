@@ -33,31 +33,35 @@ type SheetLink struct {
 }
 
 type CharacterCard struct {
-	ID                string      `json:"id"`
-	OwnerUserID       string      `json:"owner_user_id"`
-	LocationID        string      `json:"location_id"`
-	ProductionID      string      `json:"production_id,omitempty"`
-	Name              string      `json:"name"`
-	Pronouns          string      `json:"pronouns"`
-	PortraitURL       string      `json:"portrait_url"`
-	Color             string      `json:"color"`
-	Tagline           string      `json:"tagline"`
-	PublicDescription string      `json:"public_description"`
-	PrivateNotes      string      `json:"private_notes,omitempty"`
-	SheetLinks        []SheetLink `json:"sheet_links"`
-	CreatedAt         string      `json:"created_at"`
-	UpdatedAt         string      `json:"updated_at"`
+	ID                string         `json:"id"`
+	OwnerUserID       string         `json:"owner_user_id"`
+	LocationID        string         `json:"location_id"`
+	ProductionID      string         `json:"production_id,omitempty"`
+	WorkbookStatus    string         `json:"workbook_status,omitempty"`
+	WorkbookContext   map[string]any `json:"workbook_context,omitempty"`
+	Name              string         `json:"name"`
+	Pronouns          string         `json:"pronouns"`
+	PortraitURL       string         `json:"portrait_url"`
+	Color             string         `json:"color"`
+	Tagline           string         `json:"tagline"`
+	PublicDescription string         `json:"public_description"`
+	PrivateNotes      string         `json:"private_notes,omitempty"`
+	SheetLinks        []SheetLink    `json:"sheet_links"`
+	CreatedAt         string         `json:"created_at"`
+	UpdatedAt         string         `json:"updated_at"`
 }
 
 type CharacterCardInput struct {
-	Name              string       `json:"name"`
-	Pronouns          string       `json:"pronouns"`
-	PortraitURL       string       `json:"portrait_url"`
-	Color             string       `json:"color"`
-	Tagline           string       `json:"tagline"`
-	PublicDescription string       `json:"public_description"`
-	PrivateNotes      string       `json:"private_notes"`
-	SheetLinks        *[]SheetLink `json:"sheet_links,omitempty"`
+	Name              string         `json:"name"`
+	Pronouns          string         `json:"pronouns"`
+	PortraitURL       string         `json:"portrait_url"`
+	Color             string         `json:"color"`
+	Tagline           string         `json:"tagline"`
+	PublicDescription string         `json:"public_description"`
+	PrivateNotes      string         `json:"private_notes"`
+	SheetLinks        *[]SheetLink   `json:"sheet_links,omitempty"`
+	WorkbookStatus    string         `json:"workbook_status,omitempty"`
+	WorkbookContext   map[string]any `json:"workbook_context,omitempty"`
 }
 
 type PermissionInput struct {
@@ -100,6 +104,8 @@ func EnsureKernel23CharacterSurface(ctx context.Context, pool *pgxpool.Pool) err
 		  owner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		  location_id UUID NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
 		  production_id UUID REFERENCES productions(id) ON DELETE SET NULL,
+		  workbook_status TEXT NOT NULL DEFAULT 'draft',
+		  workbook_context JSONB NOT NULL DEFAULT '{}'::jsonb,
 		  name TEXT NOT NULL,
 		  pronouns TEXT NOT NULL DEFAULT '',
 		  portrait_url TEXT NOT NULL DEFAULT '',
@@ -115,6 +121,10 @@ func EnsureKernel23CharacterSurface(ctx context.Context, pool *pgxpool.Pool) err
 
 		ALTER TABLE character_cards
 		  ADD COLUMN IF NOT EXISTS sheet_links JSONB NOT NULL DEFAULT '[]'::jsonb;
+		ALTER TABLE character_cards
+		  ADD COLUMN IF NOT EXISTS workbook_status TEXT NOT NULL DEFAULT 'draft';
+		ALTER TABLE character_cards
+		  ADD COLUMN IF NOT EXISTS workbook_context JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 		CREATE INDEX IF NOT EXISTS idx_character_cards_owner
 		  ON character_cards(owner_user_id);
@@ -132,6 +142,54 @@ func EnsureKernel23CharacterSurface(ctx context.Context, pool *pgxpool.Pool) err
 
 		CREATE INDEX IF NOT EXISTS idx_current_session_personas_card
 		  ON current_session_personas(character_card_id);
+
+		CREATE TABLE IF NOT EXISTS active_user_characters (
+		  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+		  character_card_id UUID NOT NULL REFERENCES character_cards(id) ON DELETE CASCADE,
+		  activated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+
+		CREATE TABLE IF NOT EXISTS character_workbook_modules (
+		  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		  character_card_id UUID NOT NULL REFERENCES character_cards(id) ON DELETE CASCADE,
+		  ruleset_key TEXT NOT NULL,
+		  ruleset_version TEXT NOT NULL DEFAULT '',
+		  production_id UUID REFERENCES productions(id) ON DELETE SET NULL,
+		  venue_id UUID REFERENCES venues(id) ON DELETE SET NULL,
+		  module_status TEXT NOT NULL DEFAULT 'draft',
+		  creation_flow_version TEXT NOT NULL DEFAULT 'v1',
+		  parentage_chart_version TEXT NOT NULL DEFAULT '',
+		  current_stage INT NOT NULL DEFAULT 1,
+		  current_event TEXT NOT NULL DEFAULT '',
+		  module_context JSONB NOT NULL DEFAULT '{}'::jsonb,
+		  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_character_workbook_modules_unique
+		  ON character_workbook_modules(
+		    character_card_id,
+		    ruleset_key
+		  );
+
+		CREATE TABLE IF NOT EXISTS character_journals (
+		  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		  character_card_id UUID NOT NULL REFERENCES character_cards(id) ON DELETE CASCADE,
+		  module_instance_id UUID REFERENCES character_workbook_modules(id) ON DELETE SET NULL,
+		  author_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		  visibility TEXT NOT NULL DEFAULT 'private',
+		  body TEXT NOT NULL DEFAULT '',
+		  venue_id UUID REFERENCES venues(id) ON DELETE SET NULL,
+		  session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
+		  showing_id UUID REFERENCES showings(id) ON DELETE SET NULL,
+		  archived_at TIMESTAMPTZ,
+		  deleted_at TIMESTAMPTZ,
+		  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_character_journals_character
+		  ON character_journals(character_card_id, created_at DESC);
 	`)
 	return err
 }
@@ -165,11 +223,13 @@ func HandleMyCharacterCards(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		persona, _ := ActivePersonaForLatestCaveSession(ctx, pool, userID)
+		activeCharacter, _ := ActiveCharacterForUser(ctx, pool, userID)
 
 		writeJSON(w, http.StatusOK, response{Ok: true, Data: map[string]any{
-			"can_draft":      canDraft,
-			"cards":          cards,
-			"active_persona": persona,
+			"can_draft":        canDraft,
+			"cards":            cards,
+			"active_persona":   persona,
+			"active_character": activeCharacter,
 		}})
 	}
 }
@@ -326,7 +386,11 @@ func CreateCard(ctx context.Context, pool *pgxpool.Pool, ownerUserID string, inp
 
 	input = sanitizeInput(input)
 	if input.Name == "" {
-		return CharacterCard{}, errors.New("character_name_required")
+		if strings.EqualFold(strings.TrimSpace(stringValue(input.WorkbookContext["source"])), "catharsis") {
+			input.Name = "Untitled Character"
+		} else {
+			return CharacterCard{}, errors.New("character_name_required")
+		}
 	}
 
 	locationID, productionID, err := resolveCharacterScope(ctx, pool, ownerUserID)
@@ -334,19 +398,42 @@ func CreateCard(ctx context.Context, pool *pgxpool.Pool, ownerUserID string, inp
 		return CharacterCard{}, err
 	}
 
+	workbookStatus := strings.TrimSpace(input.WorkbookStatus)
+	if workbookStatus == "" {
+		workbookStatus = "draft"
+	}
+	workbookContextJSON, err := json.Marshal(normalizeWorkbookContext(input.WorkbookContext))
+	if err != nil {
+		return CharacterCard{}, err
+	}
 	sheetLinksJSON, err := json.Marshal(sheetLinksFromInput(input))
 	if err != nil {
 		return CharacterCard{}, err
 	}
 
+	if existing, ok, err := findDraftCharacterForContext(ctx, pool, ownerUserID, workbookContextJSON); err != nil {
+		return CharacterCard{}, err
+	} else if ok {
+		if err := ensureWorkbookModule(ctx, pool, existing.ID, existing.WorkbookContext, existing.WorkbookStatus); err != nil {
+			return CharacterCard{}, err
+		}
+		if err := setActiveCharacter(ctx, pool, ownerUserID, existing.ID); err != nil {
+			return CharacterCard{}, err
+		}
+		return existing, nil
+	}
+
 	var card CharacterCard
 	var createdAt, updatedAt time.Time
 	var sheetLinksRaw []byte
+	var workbookContextRaw []byte
 	err = pool.QueryRow(ctx, `
 		INSERT INTO character_cards (
 			owner_user_id,
 			location_id,
 			production_id,
+			workbook_status,
+			workbook_context,
 			name,
 			pronouns,
 			portrait_url,
@@ -356,15 +443,22 @@ func CreateCard(ctx context.Context, pool *pgxpool.Pool, ownerUserID string, inp
 			private_notes,
 			sheet_links
 		)
-		VALUES ($1, $2, NULLIF($3, '')::uuid, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
-		RETURNING id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), name, pronouns, portrait_url, color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
-	`, ownerUserID, locationID, productionID, input.Name, input.Pronouns, input.PortraitURL, input.Color, input.Tagline, input.PublicDescription, input.PrivateNotes, string(sheetLinksJSON)).
-		Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
+		VALUES ($1, $2, NULLIF($3, '')::uuid, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)
+		RETURNING id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), workbook_status, workbook_context, name, pronouns, portrait_url, color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
+	`, ownerUserID, locationID, productionID, workbookStatus, string(workbookContextJSON), input.Name, input.Pronouns, input.PortraitURL, input.Color, input.Tagline, input.PublicDescription, input.PrivateNotes, string(sheetLinksJSON)).
+		Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
 	if err != nil {
 		return CharacterCard{}, err
 	}
 
+	card.WorkbookContext = decodeJSONMap(workbookContextRaw)
 	if err := finishCharacterCard(&card, sheetLinksRaw, createdAt, updatedAt); err != nil {
+		return CharacterCard{}, err
+	}
+	if err := ensureWorkbookModule(ctx, pool, card.ID, card.WorkbookContext, workbookStatus); err != nil {
+		return CharacterCard{}, err
+	}
+	if err := setActiveCharacter(ctx, pool, ownerUserID, card.ID); err != nil {
 		return CharacterCard{}, err
 	}
 	return card, nil
@@ -405,6 +499,7 @@ func UpdateCard(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID str
 	var card CharacterCard
 	var createdAt, updatedAt time.Time
 	var sheetLinksRaw []byte
+	var workbookContextRaw []byte
 	err = pool.QueryRow(ctx, `
 		UPDATE character_cards
 		SET name = $2,
@@ -418,9 +513,9 @@ func UpdateCard(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID str
 		    updated_at = NOW()
 		WHERE id = $1
 		  AND is_deleted = FALSE
-		RETURNING id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), name, pronouns, portrait_url, color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
+		RETURNING id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), workbook_status, workbook_context, name, pronouns, portrait_url, color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
 	`, cardID, input.Name, input.Pronouns, input.PortraitURL, input.Color, input.Tagline, input.PublicDescription, input.PrivateNotes, sheetLinksParam).
-		Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
+		Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return CharacterCard{}, errors.New("character_card_not_found")
@@ -428,6 +523,7 @@ func UpdateCard(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID str
 		return CharacterCard{}, err
 	}
 
+	card.WorkbookContext = decodeJSONMap(workbookContextRaw)
 	if err := finishCharacterCard(&card, sheetLinksRaw, createdAt, updatedAt); err != nil {
 		return CharacterCard{}, err
 	}
@@ -456,7 +552,7 @@ func CanEditCard(ctx context.Context, q characterQuerier, actorUserID, cardID st
 
 func ListOwnedCards(ctx context.Context, pool *pgxpool.Pool, userID string) ([]CharacterCard, error) {
 	rows, err := pool.Query(ctx, `
-		SELECT id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), name, pronouns, portrait_url, color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
+		SELECT id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), workbook_status, workbook_context, name, pronouns, portrait_url, color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
 		FROM character_cards
 		WHERE owner_user_id = $1
 		  AND is_deleted = FALSE
@@ -472,9 +568,11 @@ func ListOwnedCards(ctx context.Context, pool *pgxpool.Pool, userID string) ([]C
 		var card CharacterCard
 		var createdAt, updatedAt time.Time
 		var sheetLinksRaw []byte
-		if err := rows.Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt); err != nil {
+		var workbookContextRaw []byte
+		if err := rows.Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt); err != nil {
 			return nil, err
 		}
+		card.WorkbookContext = decodeJSONMap(workbookContextRaw)
 		if err := finishCharacterCard(&card, sheetLinksRaw, createdAt, updatedAt); err != nil {
 			return nil, err
 		}

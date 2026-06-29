@@ -705,6 +705,9 @@
     function updateShellMetaPresentation() {
       const displayName = String(currentIdentity?.display_name || "").trim();
       const handle = String(currentIdentity?.handle || "").trim();
+      const activeCharacter = currentIdentity?.active_character || null;
+      const activeCharacterName = String(activeCharacter?.display_name || activeCharacter?.name || "").trim();
+      const activeCharacterStatus = String(activeCharacter?.workbook_status || "").trim() || "Draft";
       const genericDisplayNames = new Set(["web user", "webuser", "browser user", "browser", "account", "user"]);
       const identityLabel = displayName && !genericDisplayNames.has(displayName.toLowerCase())
         ? displayName
@@ -716,7 +719,7 @@
         roleValue.textContent = roleLabel(currentRole);
       }
       if (characterValue) {
-        characterValue.textContent = "No Character";
+        characterValue.textContent = activeCharacterName ? `${activeCharacterName} · ${activeCharacterStatus}` : "No Character";
       }
       if (viewValue) {
         viewValue.textContent = "Self";
@@ -725,7 +728,7 @@
         pingValue.textContent = Number.isFinite(lastPingMs) ? `${lastPingMs}ms` : "—";
       }
       if (rightCharacterValue) {
-        rightCharacterValue.textContent = "No Character";
+        rightCharacterValue.textContent = activeCharacterName ? `${activeCharacterName} · ${activeCharacterStatus}` : "No Character";
       }
       if (networkState) {
         networkState.textContent = currentSessionId ? "Online" : "Idle";
@@ -1180,6 +1183,24 @@
         }
       } catch (error) {
         appendSystemChatNotice(String(error?.message || error || "Mic command failed"));
+        chatInput.value = "";
+        return;
+      }
+
+      try {
+        const journalResult = await window.VictoryMicChat?.sendJournalCommand?.(text, { visibility: "private" });
+        if (journalResult?.handled) {
+          const message = String(journalResult.message || "").replace(/\n+/g, " · ").trim();
+          if (journalResult.ok) {
+            appendSystemChatNotice(message || "Journal entry saved privately.");
+          } else if (message) {
+            appendSystemChatNotice(message);
+          }
+          chatInput.value = "";
+          return;
+        }
+      } catch (error) {
+        appendSystemChatNotice(String(error?.message || error || "Journal save failed"));
         chatInput.value = "";
         return;
       }
@@ -3905,6 +3926,11 @@
       }
     });
     chatSend?.addEventListener("click", sendChatDraft);
+    rightCharacterValue?.addEventListener("click", () => {
+      const activeCharacterId = String(currentIdentity?.active_character?.character_card_id || "").trim();
+      const target = activeCharacterId ? `/venues/greenroom/?character_id=${encodeURIComponent(activeCharacterId)}` : "/venues/greenroom/";
+      window.location.href = target;
+    });
     rightCardEditorButton?.addEventListener("click", () => {
       toggleCardEditorFromSelection();
     });
