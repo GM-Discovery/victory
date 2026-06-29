@@ -11,8 +11,8 @@ func TestSeedCatharsisStarterDraftUsesRequestedRoll(t *testing.T) {
 	}
 
 	got := seedCatharsisStarterDraft(input)
-	if got.Name != "Merchant Paragon" {
-		t.Fatalf("Name = %q, want Merchant Paragon", got.Name)
+	if got.Name != "" {
+		t.Fatalf("Name = %q, want untouched (Roman-numeral default is assigned by CreateCard, not chart seeding)", got.Name)
 	}
 	if got.Tagline == "" || got.Tagline == input.Tagline {
 		t.Fatalf("expected tagline to be seeded, got %q", got.Tagline)

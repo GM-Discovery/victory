@@ -402,11 +402,10 @@
         <p class="eyebrow">Venue / Workbook Surface</p>
         <h1>The Greenroom</h1>
         <p class="subtitle">
-          The workbook is the primary object here. Face, History, Mechanics, Journal, and the active module all live on separate pages instead of one card dump.
+          This is where you select things about your characters. This is separate from your profile, accessible in the "Trailers" venue.
         </p>
       </div>
       <div class="toolbar">
-        <a class="button" href="/venues/catharsis/">Open Catharsis</a>
         <a class="chip" href="/venues/trailers/">Open Trailers</a>
         <a class="chip" href="/">Back to Map</a>
       </div>
@@ -559,10 +558,12 @@
       empty.textContent = state.cards.length ? "Select a workbook" : "No workbooks yet";
       characterSelect.appendChild(empty);
 
+      const romanNumeralNamePattern = /^M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/;
       for (const card of state.cards) {
         const option = document.createElement("option");
         option.value = card.id;
-        option.textContent = card.name || "Unnamed Character";
+        const name = card.name || "Unnamed Character";
+        option.textContent = romanNumeralNamePattern.test(name) ? `${name} (auto-named)` : name;
         characterSelect.appendChild(option);
       }
 
@@ -678,8 +679,8 @@
           name: draft.name,
           pronouns: draft.pronouns,
           portrait_url: draft.portrait_url,
-          color: draft.color,
-          tagline: draft.tagline,
+          aura: draft.color,
+          Quote: draft.tagline,
           public_description: draft.public_description,
           private_notes: draft.private_notes || "",
         }),
@@ -710,8 +711,8 @@
           name: state.workbook.character.name,
           pronouns: state.workbook.character.pronouns,
           portrait_url: state.workbook.character.portrait_url,
-          color: state.workbook.character.color,
-          tagline: state.workbook.character.tagline,
+          aura: state.workbook.character.color,
+          Quote: state.workbook.character.tagline,
           public_description: state.workbook.character.public_description,
           private_notes: state.workbook.character.private_notes,
           workbook_status: workbookStatus,
@@ -1086,7 +1087,7 @@
         setCharacterStatus("Character drafting is not granted yet.");
         return;
       }
-      window.location.href = "/venues/catharsis/";
+      window.location.href = "/venues/catharsis/?new_character=1";
     });
 
     resumeButton.addEventListener("click", () => {

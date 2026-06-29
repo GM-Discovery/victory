@@ -149,6 +149,7 @@ func main() {
 	mux.HandleFunc("/api/profiles/admin/publish", profiles.HandleAdminPublishProfile(pool))
 	mux.HandleFunc("GET /api/characters/parentage-chart", characters.HandleParentageChart())
 	mux.HandleFunc("GET /api/character-cards/me", characters.HandleMyCharacterCards(pool))
+	mux.HandleFunc("POST /api/character-cards/parentage-roll", characters.HandleRequestParentageRoll(pool))
 	mux.HandleFunc("/api/character-cards", characters.HandleCreateCharacterCard(pool))
 	mux.HandleFunc("/api/character-cards/", characters.HandleCharacterCardByID(pool))
 	mux.HandleFunc("/api/character-workbooks/", characters.HandleCharacterWorkbookByID(pool))

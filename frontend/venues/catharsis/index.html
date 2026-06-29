@@ -1069,6 +1069,11 @@
       justify-content: space-between;
     }
 
+    .character-chip__auto-name {
+      font-style: italic;
+      opacity: 0.85;
+    }
+
     .account-avatar {
       display: inline-flex;
       align-items: center;
@@ -3307,44 +3312,7 @@
         <p>
           Stage 2 is parked as a shell only. Conception mechanics are not implemented in Kernel 53.
         </p>
-        <div hidden>
-          <div class="catharsis-roll-prompt">
-            <div class="catharsis-roll-prompt__summary">
-              <strong>Ready to roll?</strong>
-              <span>Choose a d4 or roll them all.</span>
-            </div>
-            <div class="catharsis-roll-results" aria-label="Childhood stage totals">
-              <div class="catharsis-roll-result">
-                <span>D4 1</span>
-                <strong id="catharsis-childhood-die-1">--</strong>
-              </div>
-              <div class="catharsis-roll-result">
-                <span>D4 2</span>
-                <strong id="catharsis-childhood-die-2">--</strong>
-              </div>
-              <div class="catharsis-roll-result">
-                <span>D4 3</span>
-                <strong id="catharsis-childhood-die-3">--</strong>
-              </div>
-              <div class="catharsis-roll-result">
-                <span>D4 4</span>
-                <strong id="catharsis-childhood-die-4">--</strong>
-              </div>
-              <div class="catharsis-roll-result catharsis-roll-result--total">
-                <span>Total</span>
-                <strong id="catharsis-childhood-roll-total">--</strong>
-              </div>
-            </div>
-          </div>
-          <div class="catharsis-onboarding__actions catharsis-childhood-roll-actions">
-            <button id="catharsis-childhood-roll-1" type="button">D4 1</button>
-            <button id="catharsis-childhood-roll-2" type="button">D4 2</button>
-            <button id="catharsis-childhood-roll-3" type="button">D4 3</button>
-            <button id="catharsis-childhood-roll-4" type="button">D4 4</button>
-            <button id="catharsis-childhood-roll-all" type="button">All d4s</button>
-          </div>
-          <p id="catharsis-onboarding-childhood-status" class="catharsis-onboarding__status" aria-live="polite"></p>
-        </div>
+        <p id="catharsis-onboarding-childhood-status" class="catharsis-onboarding__status" aria-live="polite"></p>
         <div class="catharsis-onboarding__actions">
           <button id="catharsis-onboarding-childhood-continue" type="button">Return to workbook</button>
         </div>

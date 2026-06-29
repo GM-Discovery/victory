@@ -110,6 +110,11 @@ migrations=(
   "$ROOT/database/migrations/024_kernel39_discord_gateway_intake.sql"
   "$ROOT/database/migrations/025_kernel42_neutral_install_location.sql"
   "$ROOT/database/migrations/026_kernel46_first_theater_map.sql"
+  "$ROOT/database/migrations/027_kernel47_map_display_mode.sql"
+  "$ROOT/database/migrations/028_kernel47_grid_config.sql"
+  "$ROOT/database/migrations/029_kernel49_warehouse_storage.sql"
+  "$ROOT/database/migrations/030_kernel51_capacity_guardrails.sql"
+  "$ROOT/database/migrations/031_kernel53_character_workbook_foundation.sql"
 )
 
 for migration in "${migrations[@]}"; do

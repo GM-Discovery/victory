@@ -511,6 +511,12 @@ func insertWorkbookEntry(ctx context.Context, pool *pgxpool.Pool, cardID, module
 		sortOrder = index + 1
 	}
 
+	if existing, ok, err := findDuplicateWorkbookEntry(ctx, pool, cardID, entryType, title, body); err != nil {
+		return CharacterWorkbookEntry{}, err
+	} else if ok {
+		return existing, nil
+	}
+
 	var entry CharacterWorkbookEntry
 	var payloadRaw []byte
 	var createdAt, updatedAt time.Time
@@ -543,6 +549,44 @@ func insertWorkbookEntry(ctx context.Context, pool *pgxpool.Pool, cardID, module
 	entry.CreatedAt = createdAt.UTC().Format(time.RFC3339)
 	entry.UpdatedAt = updatedAt.UTC().Format(time.RFC3339)
 	return entry, nil
+}
+
+// findDuplicateWorkbookEntry guards the append-only history ledger against
+// stacking identical entries when a client resubmits the same builder step
+// (resume, double click, retry). It only matches the most recent entry with
+// the same character/entry_type/title/body, so a genuine correction with
+// different content still inserts a new row.
+func findDuplicateWorkbookEntry(ctx context.Context, pool *pgxpool.Pool, cardID, entryType, title, body string) (CharacterWorkbookEntry, bool, error) {
+	if entryType == "" {
+		return CharacterWorkbookEntry{}, false, nil
+	}
+
+	var entry CharacterWorkbookEntry
+	var payloadRaw []byte
+	var createdAt, updatedAt time.Time
+	err := pool.QueryRow(ctx, `
+		SELECT id::text, character_card_id::text, COALESCE(module_instance_id::text, ''), author_user_id::text, page_key, entry_type, title, body, payload, COALESCE(stage_number, 0), sort_order, created_at, updated_at
+		FROM character_workbook_entries
+		WHERE character_card_id = $1 AND entry_type = $2 AND title = $3 AND body = $4
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, cardID, entryType, title, body).
+		Scan(&entry.ID, &entry.CharacterCardID, &entry.ModuleInstanceID, &entry.AuthorUserID, &entry.PageKey, &entry.EntryType, &entry.Title, &entry.Body, &payloadRaw, &entry.StageNumber, &entry.SortOrder, &createdAt, &updatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return CharacterWorkbookEntry{}, false, nil
+		}
+		return CharacterWorkbookEntry{}, false, err
+	}
+	if len(payloadRaw) > 0 {
+		_ = json.Unmarshal(payloadRaw, &entry.Payload)
+	}
+	if entry.Payload == nil {
+		entry.Payload = map[string]any{}
+	}
+	entry.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+	entry.UpdatedAt = updatedAt.UTC().Format(time.RFC3339)
+	return entry, true, nil
 }
 
 func updateWorkbookContextAfterEvents(ctx context.Context, pool *pgxpool.Pool, cardID string, input WorkbookEventRequest, entries []CharacterWorkbookEntry) error {

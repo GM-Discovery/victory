@@ -48,4 +48,14 @@
 ## Deferred Work
 - The Stage 1 Parentage chart is now supplied in `backend/internal/characters/parentage_chart.go`.
 - Rolls 100-120 are normalized into the `organizational` band with the shared surrogate floor value `300000`.
-- Stage 2 mechanics are still out of scope for this kernel.
+- Stage 2 mechanics are still out of scope for this kernel; the Stage 2 panel is a shell only (`Stages of Childhood → Conception`) with no rollable controls.
+
+## Kernel 53 Correction Pass
+- Starting Credit retention is strictly `> 50` (confirmed already correct; boundary tests for 49/50/51 exist in `socio_build_test.go`).
+- The Stage 2 d4 "childhood die" rolling mechanic was removed from `onboarding.js`/`index.html`; only the interstitial shell remains.
+- The donor `3d20` roll is now server-authoritative: `POST /api/character-cards/parentage-roll` (`backend/internal/characters/parentage_roll.go`) generates and locks the roll per `(owner, draft_token, event_key)` in `character_workbook_rolls`; `CreateCard` rebuilds `socio_parentage_parents` solely from these locked rolls before seeding, ignoring any client-supplied roll/credit fields.
+- `character_workbook_entries` and `character_workbook_rolls` are now created by migration (`031_kernel53_character_workbook_foundation.sql`, renumbered from a colliding `018`); they previously existed on the live DB only via undocumented manual creation.
+- `RecordWorkbookEvents` now dedupes identical (character, entry_type, title, body) entries to prevent history stacking on resume.
+- `/journal` now supports PATCH (edit) and DELETE (archive), author-scoped; these were previously stubbed `501`.
+- New characters default to the lowest unused Roman numeral name (`I`, `II`, ...); Greenroom and the active-character chip mark auto-named characters so it's visible the name hasn't been chosen yet.
+- The Greenroom "New Workbook" dead end (it could never actually start a second character) is fixed via a `?new_character=1` signal that forces Catharsis to reopen the builder.

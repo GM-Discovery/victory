@@ -29,6 +29,7 @@ type CharacterJournalEntry struct {
 }
 
 type journalInput struct {
+	ID         string `json:"id"`
 	Body       string `json:"body"`
 	Visibility string `json:"visibility"`
 }
@@ -65,9 +66,28 @@ func HandleCharacterJournals(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			writeJSON(w, http.StatusOK, response{Ok: true, Data: entry})
 		case http.MethodPatch:
-			writeJSON(w, http.StatusNotImplemented, response{Ok: false, Data: map[string]any{"error": "journal_editing_pending"}})
+			var input journalInput
+			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+				writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "invalid_json"}})
+				return
+			}
+			entry, err := UpdateCharacterJournal(ctx, pool, userID, input.ID, input.Body)
+			if err != nil {
+				writeCharacterError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, response{Ok: true, Data: entry})
 		case http.MethodDelete:
-			writeJSON(w, http.StatusNotImplemented, response{Ok: false, Data: map[string]any{"error": "journal_deletion_pending"}})
+			var input journalInput
+			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+				writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "invalid_json"}})
+				return
+			}
+			if err := ArchiveCharacterJournal(ctx, pool, userID, input.ID); err != nil {
+				writeCharacterError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, response{Ok: true, Data: map[string]any{"id": input.ID}})
 		default:
 			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
 		}
@@ -130,6 +150,71 @@ func SaveCharacterJournal(ctx context.Context, pool *pgxpool.Pool, authorUserID,
 	entry.CreatedAt = createdAt.UTC().Format(time.RFC3339)
 	entry.UpdatedAt = updatedAt.UTC().Format(time.RFC3339)
 	return entry, nil
+}
+
+// UpdateCharacterJournal lets the author edit their own journal entry body.
+// Journal edits never touch canonical character history.
+func UpdateCharacterJournal(ctx context.Context, pool *pgxpool.Pool, authorUserID, entryID, body string) (CharacterJournalEntry, error) {
+	authorUserID = strings.TrimSpace(authorUserID)
+	entryID = strings.TrimSpace(entryID)
+	body = strings.TrimSpace(body)
+	if authorUserID == "" {
+		return CharacterJournalEntry{}, errors.New("not_authenticated")
+	}
+	if entryID == "" {
+		return CharacterJournalEntry{}, errors.New("journal_id_required")
+	}
+	if body == "" {
+		return CharacterJournalEntry{}, errors.New("journal_body_required")
+	}
+
+	var entry CharacterJournalEntry
+	var createdAt, updatedAt time.Time
+	var archivedAt, deletedAt *time.Time
+	err := pool.QueryRow(ctx, `
+		UPDATE character_journals
+		SET body = $3, updated_at = NOW()
+		WHERE id = $1::uuid AND author_user_id = $2 AND deleted_at IS NULL
+		RETURNING id::text, character_card_id::text, COALESCE(module_instance_id::text, ''), author_user_id::text, visibility, body, COALESCE(venue_id::text, ''), COALESCE(session_id::text, ''), COALESCE(showing_id::text, ''), archived_at, deleted_at, created_at, updated_at
+	`, entryID, authorUserID, body).Scan(&entry.ID, &entry.CharacterCardID, &entry.ModuleInstanceID, &entry.AuthorUserID, &entry.Visibility, &entry.Body, &entry.VenueID, &entry.SessionID, &entry.ShowingID, &archivedAt, &deletedAt, &createdAt, &updatedAt)
+	if err != nil {
+		return CharacterJournalEntry{}, err
+	}
+
+	if archivedAt != nil {
+		entry.ArchivedAt = archivedAt.UTC().Format(time.RFC3339)
+	}
+	if deletedAt != nil {
+		entry.DeletedAt = deletedAt.UTC().Format(time.RFC3339)
+	}
+	entry.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+	entry.UpdatedAt = updatedAt.UTC().Format(time.RFC3339)
+	return entry, nil
+}
+
+// ArchiveCharacterJournal soft-deletes the author's own journal entry.
+func ArchiveCharacterJournal(ctx context.Context, pool *pgxpool.Pool, authorUserID, entryID string) error {
+	authorUserID = strings.TrimSpace(authorUserID)
+	entryID = strings.TrimSpace(entryID)
+	if authorUserID == "" {
+		return errors.New("not_authenticated")
+	}
+	if entryID == "" {
+		return errors.New("journal_id_required")
+	}
+
+	tag, err := pool.Exec(ctx, `
+		UPDATE character_journals
+		SET deleted_at = NOW(), updated_at = NOW()
+		WHERE id = $1::uuid AND author_user_id = $2 AND deleted_at IS NULL
+	`, entryID, authorUserID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
 }
 
 func ListCharacterJournals(ctx context.Context, pool *pgxpool.Pool, authorUserID string) ([]CharacterJournalEntry, error) {

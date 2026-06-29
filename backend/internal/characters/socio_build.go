@@ -19,9 +19,6 @@ func seedCatharsisStarterDraft(input CharacterCardInput) CharacterCardInput {
 
 	entry := catharsisPrimaryParentageEntry(context)
 	parentageRoll, _ := parseCatharsisRoll(context["socio_parentage_roll"])
-	if strings.TrimSpace(input.Name) == "" {
-		input.Name = entry.SocialClass
-	}
 	if strings.TrimSpace(input.Tagline) == "" {
 		input.Tagline = fmt.Sprintf("Parentage roll %d · %s", parentageRoll, entry.SocialClass)
 	}

@@ -35,20 +35,6 @@
   const buildWheelWindow = document.getElementById("catharsis-wheel-window");
   const buildLockButton = document.getElementById("catharsis-build-lock-in");
   const buildRerollButton = document.getElementById("catharsis-build-reroll");
-  const childhoodRollButtons = [
-    document.getElementById("catharsis-childhood-roll-1"),
-    document.getElementById("catharsis-childhood-roll-2"),
-    document.getElementById("catharsis-childhood-roll-3"),
-    document.getElementById("catharsis-childhood-roll-4"),
-  ];
-  const childhoodRollAllButton = document.getElementById("catharsis-childhood-roll-all");
-  const childhoodDieResultNodes = [
-    document.getElementById("catharsis-childhood-die-1"),
-    document.getElementById("catharsis-childhood-die-2"),
-    document.getElementById("catharsis-childhood-die-3"),
-    document.getElementById("catharsis-childhood-die-4"),
-  ];
-  const childhoodRollTotalNode = document.getElementById("catharsis-childhood-roll-total");
   const childhoodContinueButton = document.getElementById("catharsis-onboarding-childhood-continue");
   const characterTrayButton = document.getElementById("character-tray-button");
   const characterTrayLabel = document.getElementById("character-tray-label");
@@ -81,16 +67,6 @@
     !buildWheelWindow ||
     !buildLockButton ||
     !buildRerollButton ||
-    !childhoodRollButtons[0] ||
-    !childhoodRollButtons[1] ||
-    !childhoodRollButtons[2] ||
-    !childhoodRollButtons[3] ||
-    !childhoodRollAllButton ||
-    !childhoodDieResultNodes[0] ||
-    !childhoodDieResultNodes[1] ||
-    !childhoodDieResultNodes[2] ||
-    !childhoodDieResultNodes[3] ||
-    !childhoodRollTotalNode ||
     !childhoodContinueButton
   ) {
     return;
@@ -111,11 +87,53 @@
     workbookContext: {},
     parentageRows: [],
     startingWealth: 0,
-    childhoodDieTotals: [null, null, null, null],
-    childhoodTotalRoll: null,
+    draftToken: "",
+    donorRolls: { egg_donor: null, sperm_donor: null },
   };
 
   let buildSequenceToken = 0;
+
+  const draftTokenKey = "victory:catharsis:onboarding:draft-token";
+
+  const ensureDraftToken = () => {
+    if (state.draftToken) return state.draftToken;
+    let token = "";
+    try {
+      token = localStorage.getItem(draftTokenKey) || "";
+    } catch (error) {
+      token = "";
+    }
+    if (!token) {
+      token = window.crypto?.randomUUID ? window.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      try {
+        localStorage.setItem(draftTokenKey, token);
+      } catch (error) {
+        // localStorage unavailable; the token still works for this session.
+      }
+    }
+    state.draftToken = token;
+    return token;
+  };
+
+  const donorEventKeyForPhase = () => (state.phase === 1 ? "egg_donor" : "sperm_donor");
+
+  const fetchDonorRoll = async () => {
+    const eventKey = donorEventKeyForPhase();
+    if (state.donorRolls[eventKey]) return state.donorRolls[eventKey];
+
+    const response = await fetch("/api/character-cards/parentage-roll", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ draft_token: ensureDraftToken(), event_key: eventKey }),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.ok || !payload?.data) {
+      throw new Error(payload?.data?.error || payload?.error || `Parentage roll failed (${response.status}).`);
+    }
+    state.donorRolls[eventKey] = payload.data;
+    return payload.data;
+  };
 
   const escapeHtml = (value) => String(value)
     .replaceAll("&", "&amp;")
@@ -194,61 +212,6 @@
         </div>
       `;
     }).join("");
-  };
-
-  const renderChildhoodState = () => {
-    const rolledCount = state.childhoodDieTotals.filter((value) => Number.isFinite(value)).length;
-    const total = state.childhoodDieTotals.reduce((sum, value) => sum + (Number(value) || 0), 0);
-
-    state.childhoodDieTotals.forEach((value, index) => {
-      const button = childhoodRollButtons[index];
-      const resultNode = childhoodDieResultNodes[index];
-      if (value == null) {
-        button.disabled = false;
-        button.classList.remove("is-rolled");
-        button.textContent = `D4 ${index + 1}`;
-        resultNode.textContent = "--";
-        return;
-      }
-
-      button.classList.add("is-rolled");
-      button.disabled = true;
-      button.textContent = `D4 ${index + 1}: ${value}`;
-      resultNode.textContent = String(value);
-    });
-
-    childhoodRollAllButton.disabled = rolledCount === childhoodRollButtons.length;
-    childhoodRollAllButton.textContent = rolledCount === childhoodRollButtons.length ? "All d4s rolled" : "All d4s";
-    childhoodRollTotalNode.textContent = rolledCount ? String(total) : "--";
-
-    if (rolledCount < childhoodRollButtons.length) {
-      childhoodContinueButton.disabled = true;
-      setChildhoodStatus(rolledCount ? `${rolledCount} of 4 d4s are locked in.` : "Roll the childhood stages one at a time, or all together.");
-      return;
-    }
-
-    state.childhoodTotalRoll = total;
-    childhoodContinueButton.disabled = false;
-    setChildhoodStatus("The childhood stage is ready to continue.");
-  };
-
-  const resetChildhoodRollState = () => {
-    state.childhoodDieTotals = [null, null, null, null];
-    state.childhoodTotalRoll = null;
-    buildSequenceToken += 1;
-    childhoodRollButtons.forEach((button, index) => {
-      button.disabled = false;
-      button.classList.remove("is-rolled");
-      button.textContent = `D4 ${index + 1}`;
-    });
-    childhoodDieResultNodes.forEach((node) => {
-      node.textContent = "--";
-    });
-    childhoodRollTotalNode.textContent = "--";
-    childhoodRollAllButton.disabled = false;
-    childhoodRollAllButton.textContent = "All d4s";
-    childhoodContinueButton.disabled = true;
-    setChildhoodStatus("Roll the childhood stages one at a time, or all together.");
   };
 
   const showChapterPanel = () => {
@@ -515,16 +478,19 @@
     return state.parentageChart;
   };
 
-  const animateButtonRoll = async (button, label, token, duration = 720, sides = 20) => {
-    let face = 1;
+  // Animates the same flicker reveal as before, but always lands on the
+  // server-determined canonical face. The flicker frames are decorative
+  // only; they never decide the outcome.
+  const animateButtonRollToValue = async (button, label, token, duration, finalFace) => {
     const startedAt = Date.now();
     while (Date.now() - startedAt < duration) {
       if (token !== buildSequenceToken) return null;
-      face = randomDie(sides);
-      button.textContent = `${label}: ${face}`;
+      button.textContent = `${label}: ${randomDie(20)}`;
       await sleep(58);
     }
-    return token === buildSequenceToken ? face : null;
+    if (token !== buildSequenceToken) return null;
+    button.textContent = `${label}: ${finalFace}`;
+    return finalFace;
   };
 
   const rollDie = async (index) => {
@@ -537,15 +503,29 @@
     setSocioStatus(`${label} is rolling.`);
     setBuildStatus(`${label} is rolling.`);
 
-    const firstRoll = await animateButtonRoll(button, label, token);
+    let donorRoll;
+    try {
+      donorRoll = await fetchDonorRoll();
+    } catch (error) {
+      console.error("catharsis parentage roll request failed", error);
+      if (token !== buildSequenceToken) return;
+      setSocioStatus("Could not reach the dice. Try again.");
+      setBuildStatus("Could not reach the dice. Try again.");
+      button.disabled = false;
+      return;
+    }
+    if (token !== buildSequenceToken) return;
+
+    const chain = donorRoll.dice?.[index]?.chain || [donorRoll.dice?.[index]?.subtotal ?? 1];
+    const firstRoll = await animateButtonRollToValue(button, label, token, 720, chain[0]);
     if (firstRoll == null || token !== buildSequenceToken) return;
 
     let dieTotal = firstRoll;
-    if (firstRoll === 20) {
+    if (chain.length > 1) {
       setSocioStatus(`${label} exploded on 20.`);
       setBuildStatus(`${label} exploded on 20. Rolling it once more.`);
       await sleep(220);
-      const secondRoll = await animateButtonRoll(button, `${label} +`, token, 520);
+      const secondRoll = await animateButtonRollToValue(button, `${label} +`, token, 520, chain[1]);
       if (secondRoll == null || token !== buildSequenceToken) return;
       dieTotal += secondRoll;
       button.textContent = `${label}: 20 + ${secondRoll} = ${dieTotal}`;
@@ -593,38 +573,6 @@
     setSocioStatus("You have two parents so we're doing the process a second time to see about your other parent.");
   };
 
-  const rollChildhoodDie = async (index) => {
-    if (state.childhoodDieTotals[index] != null) return;
-
-    const button = childhoodRollButtons[index];
-    const token = buildSequenceToken;
-    const label = `D4 ${index + 1}`;
-    button.disabled = true;
-    setChildhoodStatus(`${label} is rolling.`);
-
-    const face = await animateButtonRoll(button, label, token, 640, 4);
-    if (face == null || token !== buildSequenceToken) return;
-
-    button.textContent = `${label}: ${face}`;
-    state.childhoodDieTotals[index] = face;
-    renderChildhoodState();
-    if (state.childhoodDieTotals.every((value) => Number.isFinite(value))) {
-      localStorage.setItem(introKey, "1");
-      localStorage.setItem(socioKey, "1");
-    }
-  };
-
-  const rollAllChildhoodDice = async () => {
-    for (let index = 0; index < childhoodRollButtons.length; index += 1) {
-      if (state.childhoodDieTotals[index] == null) {
-        await rollChildhoodDie(index);
-      }
-      if (state.childhoodDieTotals.every((value) => Number.isFinite(value))) {
-        return;
-      }
-    }
-  };
-
   const createCharacterFromRoll = async () => {
     if (!state.canDraft) {
       setSocioStatus("Character drafting is not granted yet.");
@@ -649,6 +597,7 @@
       const cardContext = {
         source: "catharsis",
         creation_key: "catharsis:onboarding",
+        draft_token: ensureDraftToken(),
         ruleset_key: "socio",
         ruleset_version: "1.1",
         socio_parentage_roll: total,
@@ -688,6 +637,13 @@
       state.workbookContext = { ...cardContext, ...(card.workbook_context || {}) };
       state.activeCharacter = { ...card, character_card_id: String(card.id || card.character_card_id || "") };
       refreshCharacterTray();
+      try {
+        localStorage.removeItem(draftTokenKey);
+      } catch (error) {
+        // ignore; a stale token only affects a future fresh build.
+      }
+      state.draftToken = "";
+      state.donorRolls = { egg_donor: null, sperm_donor: null };
 
       const serverParentRows = Array.isArray(state.workbookContext.socio_parentage_parents)
         ? state.workbookContext.socio_parentage_parents
@@ -831,7 +787,7 @@
   const continueFromChapter = async () => {
     if (!state.workbookCardId) {
       showChildhoodPanel();
-      setChildhoodStatus("Roll the childhood stages one at a time, or all together.");
+      setChildhoodStatus("Stage 2 is parked as a shell only. Return to the workbook when you are ready.");
       return;
     }
 
@@ -884,13 +840,25 @@
     closeOverlay();
   };
 
+  const romanNumeralNamePattern = /^M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/;
+  const isAutoNamedCharacter = (name) => {
+    const trimmed = String(name || "").trim();
+    return trimmed !== "" && romanNumeralNamePattern.test(trimmed);
+  };
+
   const refreshCharacterTray = () => {
     const activeCharacterName = String(state.activeCharacter?.display_name || state.activeCharacter?.name || "").trim();
     if (characterTrayLabel) {
       characterTrayLabel.textContent = activeCharacterName || "New Character";
+      characterTrayLabel.title = isAutoNamedCharacter(activeCharacterName)
+        ? "Auto-named — click to open the workbook and rename"
+        : "";
+      characterTrayLabel.classList.toggle("character-chip__auto-name", isAutoNamedCharacter(activeCharacterName));
     }
     if (characterTrayButton) {
-      characterTrayButton.title = activeCharacterName ? `Open the workbook for ${activeCharacterName}` : "Open the workbook";
+      characterTrayButton.title = activeCharacterName
+        ? (isAutoNamedCharacter(activeCharacterName) ? `Open the workbook for ${activeCharacterName} (auto-named)` : `Open the workbook for ${activeCharacterName}`)
+        : "Open the workbook";
     }
   };
 
@@ -944,16 +912,6 @@
     void continueFromChapter();
   });
 
-  childhoodRollButtons.forEach((button, index) => {
-    button.addEventListener("click", () => {
-      void rollChildhoodDie(index);
-    });
-  });
-
-  childhoodRollAllButton.addEventListener("click", () => {
-    void rollAllChildhoodDice();
-  });
-
   childhoodContinueButton.addEventListener("click", () => {
     void continueFromChildhood();
   });
@@ -966,8 +924,6 @@
     state.workbookContext = {};
     state.parentageRows = [];
     state.startingWealth = 0;
-    state.childhoodDieTotals = [null, null, null, null];
-    state.childhoodTotalRoll = null;
     resetRollState(false);
 
     try {
@@ -983,10 +939,17 @@
       }
       refreshCharacterTray();
 
+      const requestedNewCharacter = new URLSearchParams(window.location.search).get("new_character") === "1";
+      if (requestedNewCharacter) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("new_character");
+        window.history.replaceState({}, "", url.toString());
+      }
+
       const shouldShowOnboarding = state.canDraft && state.cards.length === 0;
       const hasSeenIntro = localStorage.getItem(introKey) === "1";
       const hasSeenSocio = localStorage.getItem(socioKey) === "1";
-      if (shouldShowOnboarding || (!hasSeenIntro && !hasSeenSocio)) {
+      if (requestedNewCharacter || shouldShowOnboarding || (!hasSeenIntro && !hasSeenSocio)) {
         showIntro();
         return;
       }

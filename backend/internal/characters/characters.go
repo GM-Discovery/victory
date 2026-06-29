@@ -267,6 +267,51 @@ func HandleParentageChart() http.HandlerFunc {
 	}
 }
 
+func HandleRequestParentageRoll(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+
+		userID, err := requireUser(ctx, pool, r)
+		if err != nil {
+			writeAuthError(w, err)
+			return
+		}
+
+		var body struct {
+			DraftToken string `json:"draft_token"`
+			EventKey   string `json:"event_key"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "invalid_json"}})
+			return
+		}
+
+		canDraft, err := CanDraftCharacter(ctx, pool, userID)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, response{Ok: false, Data: map[string]any{"error": "permission_lookup_failed"}})
+			return
+		}
+		if !canDraft {
+			writeJSON(w, http.StatusForbidden, response{Ok: false, Data: map[string]any{"error": "character_draft_permission_required"}})
+			return
+		}
+
+		result, err := RequestCatharsisParentageRoll(ctx, pool, userID, body.DraftToken, body.EventKey)
+		if err != nil {
+			writeCharacterError(w, err)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, response{Ok: true, Data: result})
+	}
+}
+
 func HandleCreateCharacterCard(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -418,10 +463,14 @@ func CreateCard(ctx context.Context, pool *pgxpool.Pool, ownerUserID string, inp
 	}
 
 	input = sanitizeInput(input)
-	input = seedCatharsisStarterDraft(input)
-	if input.Name == "" {
-		return CharacterCard{}, errors.New("character_name_required")
+	if strings.ToLower(strings.TrimSpace(stringValue(input.WorkbookContext["source"]))) == "catharsis" {
+		resolved, err := attachCanonicalCatharsisParentageRows(ctx, pool, ownerUserID, input)
+		if err != nil {
+			return CharacterCard{}, err
+		}
+		input = resolved
 	}
+	input = seedCatharsisStarterDraft(input)
 
 	locationID, productionID, err := resolveCharacterScope(ctx, pool, ownerUserID)
 	if err != nil {
@@ -451,6 +500,14 @@ func CreateCard(ctx context.Context, pool *pgxpool.Pool, ownerUserID string, inp
 			return CharacterCard{}, err
 		}
 		return existing, nil
+	}
+
+	if strings.TrimSpace(input.Name) == "" {
+		defaultName, err := nextUnusedRomanNumeralName(ctx, pool, ownerUserID)
+		if err != nil {
+			return CharacterCard{}, err
+		}
+		input.Name = defaultName
 	}
 
 	var card CharacterCard

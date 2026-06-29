@@ -32,6 +32,39 @@ CREATE TABLE IF NOT EXISTS character_workbook_modules (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_character_workbook_modules_unique
   ON character_workbook_modules(character_card_id, ruleset_key);
 
+CREATE TABLE IF NOT EXISTS character_workbook_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  character_card_id UUID NOT NULL REFERENCES character_cards(id) ON DELETE CASCADE,
+  module_instance_id UUID REFERENCES character_workbook_modules(id) ON DELETE SET NULL,
+  author_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  page_key TEXT NOT NULL DEFAULT 'history',
+  entry_type TEXT NOT NULL DEFAULT '',
+  title TEXT NOT NULL DEFAULT '',
+  body TEXT NOT NULL DEFAULT '',
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  stage_number INT,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_character_workbook_entries_character
+  ON character_workbook_entries(character_card_id, sort_order, created_at);
+
+CREATE TABLE IF NOT EXISTS character_workbook_rolls (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  draft_token TEXT NOT NULL,
+  event_key TEXT NOT NULL,
+  dice_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  roll_total INT NOT NULL,
+  coin_flip_roll INT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_character_workbook_rolls_unique
+  ON character_workbook_rolls(owner_user_id, draft_token, event_key);
+
 CREATE TABLE IF NOT EXISTS character_journals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   character_card_id UUID NOT NULL REFERENCES character_cards(id) ON DELETE CASCADE,

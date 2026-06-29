@@ -1080,3 +1080,27 @@ Implement `perform/speak` using the same action pipeline:
 - The socket controller owns transport mechanics only; it does not replace projected state or the dispatcher
 - No new user-facing feature was added in this pass
 - Fixed a missing `onPong` guard in the socket controller so pong handling no longer risks a runtime ReferenceError
+
+## Kernel 53 Correction — Retention Threshold, Stage 2 Lockdown, Server-Authoritative Dice
+
+Confirmed the `>50` Starting Credit retention threshold was already correct (with boundary tests for 49/50/51 already in place) and removed the hidden Stage 2 d4 "Stages of Childhood" rolling mechanic, leaving Stage 2 as a pure interstitial shell ("Stages of Childhood → Conception") with no executed mechanics.
+
+While assembling report-back evidence, found and fixed several real defects beyond the two named corrections:
+- The donor 3d20 parentage roll was client-trusted, not server-authoritative — the browser rolled the dice and the server accepted whatever total it was sent. Added a new idempotent, crypto-secure server-side roll endpoint (`POST /api/character-cards/parentage-roll`) keyed by `(owner, draft_token, event_key)`, and made `CreateCard` rebuild `socio_parentage_parents` solely from the server-locked rolls, discarding any client-supplied roll/credit fields. The frontend reel animation is unchanged — it now lands on the server-determined face instead of a client-random one.
+- `character_workbook_entries` and the new `character_workbook_rolls` table were missing from migrations entirely (existing only via undocumented manual creation on the live DB); the Kernel 53 migration was also misnumbered `018` (colliding with `018_kernel32_discord_oauth.sql`). Renamed it to `031_kernel53_character_workbook_foundation.sql`, added the missing tables, and brought `scripts/smoke/fresh-install.sh`'s migration list up to date through 031.
+- The "New Workbook" button in Greenroom was a dead end: it routed to Catharsis, but Catharsis only shows the Create Character flow when the user owns zero cards, so a second character could never be started. Added a `?new_character=1` signal Catharsis now honors to force-open the builder.
+- `RecordWorkbookEvents`/`insertWorkbookEntry` had no duplicate guard, so resuming the same draft (a direct symptom of the New Workbook dead end) stacked duplicate parentage/coin-flip/chapter-handoff history entries. Added a same-character/entry_type/title/body dedupe check before insert.
+- `/journal` PATCH (edit) and DELETE (archive) were stubbed `501 Not Implemented` despite being required acceptance criteria. Implemented both, author-scoped.
+- New characters now default to the lowest unused Roman numeral (`I`, `II`, ...) instead of the parentage chart's social class name, with a UI hint marking auto-named characters so it's obvious a name hasn't been intentionally chosen yet.
+- Deleted one live stray draft ("Night Watchperson") that had accumulated 4 duplicate sets of parentage/chapter-handoff entries from repeated dead-end "New Workbook" attempts, per explicit operator confirmation.
+
+### Tests
+- `cd backend && go test ./internal/characters/...` (all passing, no DB access)
+- `go build ./...`, `go vet ./...`, `gofmt -l` on touched packages
+- `git diff --check`
+
+### Live Verification
+- Rebuilt and restarted `victory-backend`; applied migration `031` to the live DB (additive-only, `IF NOT EXISTS` throughout)
+- Full Playwright smoke against `https://victory.amurray.family` using a minted test session: Create Character → Egg Donor roll (server-determined, Roll disables) → Sperm Donor roll → Stage 1 summary → Stage 2 shell (`Stages of Childhood → Conception`, no d4 controls present) → refresh (no reroll, active-character chip persists) → Greenroom (workbook, Face, Parentage Summary, combined Starting Credit all correct: roll 26/Farm Hand/credit 30/not eligible, roll 37/Inn Keeper/credit 65/retained, combined 65)
+- Verified `/journal` create/edit/delete via direct API calls against the live backend
+- Deleted the test character and revoked the test session afterward
