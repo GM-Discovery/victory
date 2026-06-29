@@ -3,6 +3,7 @@ package identity
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -36,23 +37,105 @@ func HandleCreatePermissionRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		input.VenueSlug = strings.ToLower(strings.TrimSpace(input.VenueSlug))
+		input.RequestedRole = strings.ToLower(strings.TrimSpace(input.RequestedRole))
+		input.Note = strings.TrimSpace(input.Note)
+
 		if input.VenueSlug == "" || input.RequestedRole == "" {
 			http.Error(w, "venue_slug and requested_role are required", http.StatusBadRequest)
 			return
 		}
 
-		_, err = pool.Exec(ctx, `
-			INSERT INTO permission_requests (user_id, venue_slug, requested_role, note)
-			VALUES ($1, $2, $3, $4)
-		`, userID, input.VenueSlug, input.RequestedRole, input.Note)
+		tx, err := pool.Begin(ctx)
 		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer tx.Rollback(ctx)
+
+		autoApprove := input.VenueSlug == "catharsis" && (input.RequestedRole == "cast" || input.RequestedRole == "actor")
+		requestedRole := input.RequestedRole
+		if requestedRole == "actor" {
+			requestedRole = "cast"
+		}
+
+		var requestID string
+		err = tx.QueryRow(ctx, `
+			INSERT INTO permission_requests (user_id, venue_slug, requested_role, note, status, reviewed_at)
+			VALUES ($1, $2, $3, $4, $5, CASE WHEN $5 = 'approved' THEN NOW() ELSE NULL END)
+			RETURNING id::text
+		`, userID, input.VenueSlug, requestedRole, input.Note, map[bool]string{true: "approved", false: "pending"}[autoApprove]).Scan(&requestID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if autoApprove {
+			var venueID, locationID string
+			err = tx.QueryRow(ctx, `
+				SELECT v.id::text, l.location_id::text
+				FROM venues v
+				JOIN lots l ON l.id = v.lot_id
+				WHERE v.slug = $1
+				LIMIT 1
+			`, input.VenueSlug).Scan(&venueID, &locationID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			_, err = tx.Exec(ctx, `
+				INSERT INTO location_memberships (location_id, user_id, role, granted_by_user_id, active)
+				VALUES ($1::uuid, $2::uuid, 'cast', $2::uuid, TRUE)
+				ON CONFLICT (location_id, user_id, role) DO UPDATE
+				SET active = TRUE,
+				    granted_by_user_id = EXCLUDED.granted_by_user_id
+			`, locationID, userID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			_, err = tx.Exec(ctx, `
+				INSERT INTO access_grants (location_id, user_id, grant_type, venue_id, granted_by_user_id, created_at)
+				VALUES ($1::uuid, $2::uuid, 'venue_access', $3::uuid, $2::uuid, NOW())
+				ON CONFLICT DO NOTHING
+			`, locationID, userID, venueID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			_, err = tx.Exec(ctx, `
+				INSERT INTO messages (message_type, to_user_id, subject, body, venue_slug, is_read)
+				VALUES (
+				  'message',
+				  $1::uuid,
+				  $2,
+				  $3,
+				  $4,
+				  FALSE
+				)
+			`, userID,
+				"Catharsis actor access approved",
+				"Your actor access to Catharsis was auto-approved. The message is waiting here for later reference.",
+				input.VenueSlug)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		if err := tx.Commit(ctx); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"ok": true,
+			"ok":            true,
+			"request_id":    requestID,
+			"auto_approved": autoApprove,
 		})
 	}
 }

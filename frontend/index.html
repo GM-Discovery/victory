@@ -12,9 +12,12 @@
   <main class="app-shell map-shell">
     <header class="app-header">
       <div class="brand-row">
-        <div>
-          <h1>Victory Map</h1>
-          <p class="app-subtitle">Choose a visible venue.</p>
+        <div class="header-left">
+          <button id="map-menu-toggle" class="map-menu-toggle" type="button" aria-controls="map-menu" aria-expanded="false">menu</button>
+          <div class="brand-copy">
+            <h1>Victory Map</h1>
+            <p class="app-subtitle">Choose a visible venue.</p>
+          </div>
         </div>
 
         <div class="account-controls">
@@ -36,6 +39,19 @@
       </div>
     </section>
   </main>
+
+  <div id="map-menu" class="map-menu" hidden role="dialog" aria-modal="false" aria-labelledby="map-menu-title">
+    <div class="map-menu-sheet">
+      <div class="map-menu-header">
+        <div>
+          <p class="map-menu-eyebrow">Site Outline</p>
+          <h2 id="map-menu-title">Map Locations</h2>
+        </div>
+        <button id="map-menu-close" class="map-menu-close" type="button" aria-label="Close map menu">×</button>
+      </div>
+      <div id="map-menu-outline" class="map-menu-outline"></div>
+    </div>
+  </div>
 
   <div id="info-booth-modal" class="booth-modal" hidden role="dialog" aria-modal="true" aria-labelledby="info-booth-title">
     <div class="booth-sheet">
@@ -81,6 +97,28 @@
           <div class="mini">Come for the VTT. Stay for the shows it can hold.</div>
         </div>
         <a id="info-booth-mailbox" class="booth-button" href="/mailbox/">Open Mailbox</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="soil-experts-modal" class="soil-experts-modal" hidden role="dialog" aria-modal="true" aria-labelledby="soil-experts-title">
+    <div class="soil-experts-sheet">
+      <button id="soil-experts-close" class="soil-experts-close" type="button" aria-label="Close Soil Experts">×</button>
+      <p class="soil-experts-eyebrow">Bread Standard</p>
+      <h2 id="soil-experts-title" class="soil-experts-title">Soil Experts</h2>
+      <div class="soil-experts-asset">
+        <img src="/assets/mudfarm.png" alt="Soil Experts asset" />
+      </div>
+      <div class="soil-experts-copy">
+        <p>
+          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Article 17 of the Bread Standard preserves the ceremonial handling of loam, crust, and the incidental burdens of cultivation. Nulla facilisi. Integer vitae metus sed eros maximus ullamcorper. The details below remain intentionally verbose, procedural, and scrollable for later legal text.
+        </p>
+        <p>
+          Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Proin in sem vitae justo vulputate tincidunt. Curabitur congue, nibh at ultricies sagittis, risus tellus viverra mi, in volutpat lectus dolor sit amet augue. Aenean non tincidunt eros. Donec et nisl sed purus gravida cursus.
+        </p>
+        <p>
+          Suspendisse potenti. Donec ultrices, lorem sit amet tristique accumsan, nibh lorem aliquet nisl, sit amet volutpat sem justo in augue. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas.
+        </p>
       </div>
     </div>
   </div>

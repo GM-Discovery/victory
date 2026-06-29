@@ -306,7 +306,7 @@ func TestDiscordGatewayMessageCreateSkipsWrongLocationThread(t *testing.T) {
 		VALUES (
 			$1::uuid,
 			$2::uuid,
-			'gateway-edit-fixture',
+			'gateway-thread-fixture',
 			$3::uuid,
 			$4::uuid,
 			'guild-1',
@@ -578,43 +578,43 @@ func setupDiscordGatewayEditFixture(t *testing.T, pool *pgxpool.Pool) (locationI
 	t.Helper()
 
 	ctx := context.Background()
-	venueSlug := "gateway-edit-fixture"
-	locationSlug := "gateway-edit-location"
-	userHandle := "gateway_editor"
+	venueSlug := "gateway-thread-fixture"
+	locationSlug := "gateway-thread-location"
+	userHandle := "gateway_thread_editor"
 
 	if err := pool.QueryRow(ctx, `
 		INSERT INTO locations (name, slug)
 		VALUES ($1, $2)
 		RETURNING id::text
-	`, "Gateway Edit Location", locationSlug).Scan(&locationID); err != nil {
+	`, "Gateway Thread Location", locationSlug).Scan(&locationID); err != nil {
 		t.Fatalf("insert location: %v", err)
 	}
 	if err := pool.QueryRow(ctx, `
 		INSERT INTO lots (location_id, name, slug)
 		VALUES ($1::uuid, $2, $3)
 		RETURNING id::text
-	`, locationID, "Gateway Edit Lot", "gateway-edit-lot").Scan(&lotID); err != nil {
+	`, locationID, "Gateway Thread Lot", "gateway-thread-lot").Scan(&lotID); err != nil {
 		t.Fatalf("insert lot: %v", err)
 	}
 	if err := pool.QueryRow(ctx, `
 		INSERT INTO venues (lot_id, name, slug, kind, config)
 		VALUES ($1::uuid, $2, $3, 'presentation', jsonb_build_object('chat_enabled', TRUE))
 		RETURNING id::text
-	`, lotID, "Gateway Edit Venue", venueSlug).Scan(&venueID); err != nil {
+	`, lotID, "Gateway Thread Venue", venueSlug).Scan(&venueID); err != nil {
 		t.Fatalf("insert venue: %v", err)
 	}
 	if err := pool.QueryRow(ctx, `
 		INSERT INTO productions (location_id, name, slug)
 		VALUES ($1::uuid, $2, $3)
 		RETURNING id::text
-	`, locationID, "Gateway Edit Production", "gateway-edit-production").Scan(&productionID); err != nil {
+	`, locationID, "Gateway Thread Production", "gateway-thread-production").Scan(&productionID); err != nil {
 		t.Fatalf("insert production: %v", err)
 	}
 	if err := pool.QueryRow(ctx, `
 		INSERT INTO users (handle, display_name)
 		VALUES ($1, $2)
 		RETURNING id::text
-	`, userHandle, "Gateway Editor").Scan(&userID); err != nil {
+	`, userHandle, "Gateway Thread Editor").Scan(&userID); err != nil {
 		t.Fatalf("insert user: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `
@@ -671,7 +671,7 @@ func setupDiscordGatewayEditFixture(t *testing.T, pool *pgxpool.Pool) (locationI
 			'guild-1',
 			'parent-1',
 			'thread-1',
-			'Gateway Edit Thread',
+			'Gateway Thread',
 			$6::uuid,
 			'discord-user-1',
 			NOW(),

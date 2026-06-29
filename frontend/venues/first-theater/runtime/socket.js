@@ -74,6 +74,10 @@
         return { kind: "showing_update", message: msg };
       }
 
+      if (msg.type === "venue/update") {
+        return { kind: "venue_update", message: msg };
+      }
+
       if (msg.type === "error") {
         handlers.onError(String(msg.error || "action_denied"), msg);
         return { kind: "error", error: String(msg.error || "action_denied"), message: msg };

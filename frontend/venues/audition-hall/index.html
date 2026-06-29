@@ -104,6 +104,9 @@
 
     <div class="panel">
       <h2>Request Access</h2>
+      <p class="muted">
+        The default flow here is actor access for Catharsis. Submit the request once, and the approval will land in your mailbox with the venue unlock.
+      </p>
       <form id="request-form">
         <label for="requested-venue">Requested Venue</label>
         <select id="requested-venue" required>
@@ -165,6 +168,23 @@
     const requestForm = document.getElementById("request-form");
     const requestStatus = document.getElementById("request-status");
     const myRequests = document.getElementById("my-requests");
+    const requestedVenue = document.getElementById("requested-venue");
+    const requestedRole = document.getElementById("requested-role");
+    const searchParams = new URLSearchParams(window.location.search);
+
+    if (requestedVenue && searchParams.get("venue") === "catharsis") {
+      requestedVenue.value = "catharsis";
+    }
+    if (requestedRole && searchParams.get("role") === "cast") {
+      requestedRole.value = "cast";
+    }
+
+    if (requestedVenue && !searchParams.get("venue")) {
+      requestedVenue.value = "catharsis";
+    }
+    if (requestedRole && !searchParams.get("role")) {
+      requestedRole.value = "cast";
+    }
 
     async function loadMyRequests() {
       myRequests.innerHTML = `<div class="muted">Loading requests...</div>`;
@@ -235,6 +255,12 @@
 
         if (!res.ok || !payload.ok) {
           throw new Error(payload.error || `Request failed (HTTP ${res.status})`);
+        }
+
+        if (payload.auto_approved) {
+          requestStatus.textContent = "Approved. Opening your mailbox.";
+          window.location.href = "/mailbox/";
+          return;
         }
 
         requestStatus.textContent = "Request submitted.";

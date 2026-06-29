@@ -143,6 +143,9 @@ type discordGatewayConn struct {
 }
 
 func RunDiscordGatewayWorker(ctx context.Context, pool *pgxpool.Pool, hub *Hub, presenceStore *identity.DiscordAudioPresenceStore, cfg identity.DiscordServerLinkConfig, gatewayCfg identity.DiscordGatewayConfig) {
+	// This worker owns the Discord backend integration surface.
+	// Keep the gateway-thread venue and related fixtures around unless this
+	// bridge is intentionally being retired.
 	location, err := loadDiscordGatewayLocation(ctx, pool)
 	if err != nil {
 		log.Printf("discord gateway location lookup failed: %v", err)

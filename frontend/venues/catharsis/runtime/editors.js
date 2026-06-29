@@ -485,6 +485,7 @@
       const nextState = body.data || null;
       setCurrentVenueMapState(nextState);
       setCurrentVenueMapAssetID(String(nextState?.asset_id || assetID || ""));
+      mapEditorSelectedAssetID = String(nextState?.asset_id || assetID || "");
       setMapEditorDirty(false);
       if (controls.file) controls.file.value = "";
       syncMapEditorWithState();
@@ -506,11 +507,14 @@
       }
       setCurrentVenueMapState(null);
       setCurrentVenueMapAssetID("");
+      mapEditorSelectedAssetID = "";
       setMapEditorDirty(false);
+      setMapEditorOriginalState(null);
       if (deps.getMapEditorElements?.().file) deps.getMapEditorElements().file.value = "";
       deps.setMapEditorPreviewURL?.("");
       syncMapEditorWithState();
       livePreviewMapOnStage();
+      hideMapEditorController();
       return null;
     }
 

@@ -17,6 +17,12 @@ type VisibleVenue struct {
 	NotificationCount int    `json:"notification_count,omitempty"`
 }
 
+var hiddenMainMapVenueSlugs = map[string]struct{}{
+	"gateway-thread":         {},
+	"gateway-thread-fixture": {},
+	"gateway-thread-venue":   {},
+}
+
 func CurrentLocationRole(ctx context.Context, pool *pgxpool.Pool, userID string) (string, error) {
 	if strings.TrimSpace(userID) == "" {
 		return "audience", nil
@@ -77,30 +83,13 @@ func CurrentUserIDFromRequest(ctx context.Context, pool *pgxpool.Pool, rawCookie
 
 func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string) ([]VisibleVenue, error) {
 	if strings.TrimSpace(userID) == "" {
-		rows, err := pool.Query(ctx, `
-			SELECT v.slug, v.name, v.kind, 'public'::text AS visible_because
-			FROM venues v
-			WHERE v.is_public = TRUE
-			  AND v.slug NOT IN ('library', 'soil-experts')
-			ORDER BY v.slug
-		`)
-		if err != nil {
-			return nil, err
-		}
-		defer rows.Close()
-
-		var out []VisibleVenue
-		for rows.Next() {
-			var v VisibleVenue
-			if err := rows.Scan(&v.Slug, &v.Name, &v.Kind, &v.VisibleBecause); err != nil {
-				return nil, err
-			}
-			out = append(out, v)
-		}
-		return out, rows.Err()
+		return []VisibleVenue{}, nil
 	}
 
 	if ok, err := IsOperatorUser(ctx, pool, userID); err == nil && ok {
+		// Operator visibility is intentionally broad, but gateway/thread fixtures
+		// are still stripped from the main map so Discord backend plumbing does
+		// not leak into the public venue surface.
 		rows, err := pool.Query(ctx, `
 			SELECT v.slug, v.name, v.kind, 'operator'::text AS visible_because
 			FROM venues v
@@ -117,6 +106,9 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 			if err := rows.Scan(&v.Slug, &v.Name, &v.Kind, &v.VisibleBecause); err != nil {
 				return nil, err
 			}
+			if isHiddenMainMapVenueSlug(v.Slug) {
+				continue
+			}
 			out = append(out, v)
 		}
 		return out, rows.Err()
@@ -124,20 +116,13 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 	rows, err := pool.Query(ctx, `
 		WITH visible AS (
-			SELECT v.id, v.slug, v.name, v.kind, 1 AS reason_rank, 'public'::text AS visible_because
-			FROM venues v
-			WHERE v.is_public = TRUE
-			  AND v.slug NOT IN ('library', 'soil-experts')
-
-			UNION
-
-			SELECT v.id, v.slug, v.name, v.kind, 2 AS reason_rank, 'authenticated_surface'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 1 AS reason_rank, 'authenticated_surface'::text AS visible_because
 			FROM venues v
 			WHERE v.slug IN ('audition-hall')
 
 			UNION
 
-				SELECT v.id, v.slug, v.name, v.kind, 3 AS reason_rank, 'producer_surface'::text AS visible_because
+				SELECT v.id, v.slug, v.name, v.kind, 2 AS reason_rank, 'producer_surface'::text AS visible_because
 				FROM venues v
 				JOIN lots l ON l.id = v.lot_id
 				JOIN location_memberships lm ON lm.location_id = l.location_id
@@ -148,7 +133,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'director_surface'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 3 AS reason_rank, 'director_surface'::text AS visible_because
 			FROM venues v
 			JOIN lots l ON l.id = v.lot_id
 			JOIN location_memberships lm ON lm.location_id = l.location_id
@@ -159,7 +144,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 5 AS reason_rank, 'performer_surface'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'performer_surface'::text AS visible_because
 			FROM venues v
 			JOIN lots l ON l.id = v.lot_id
 			JOIN location_memberships lm ON lm.location_id = l.location_id
@@ -170,18 +155,16 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 5 AS reason_rank, 'delayed_lot_surface'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'delayed_lot_surface'::text AS visible_because
 			FROM venues v
 			JOIN lots l ON l.id = v.lot_id
-			JOIN location_memberships lm ON lm.location_id = l.location_id
+			JOIN users u ON u.id = $1::uuid
 			WHERE v.slug = 'soil-experts'
-			  AND lm.user_id = $1
-			  AND lm.active = TRUE
-			  AND lm.created_at <= NOW() - INTERVAL '72 hours'
+			  AND u.created_at <= NOW() - INTERVAL '72 hours'
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 5 AS reason_rank, 'performer_membership'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'performer_membership'::text AS visible_because
 			FROM venues v
 			JOIN memberships m ON m.venue_id = v.id
 			WHERE v.slug IN ('greenroom', 'trailers')
@@ -192,7 +175,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 5 AS reason_rank, 'approved_performer_surface'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'approved_performer_surface'::text AS visible_because
 			FROM venues v
 			JOIN lots l ON l.id = v.lot_id
 			JOIN location_memberships lm ON lm.location_id = l.location_id
@@ -207,7 +190,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 6 AS reason_rank, 'venue_membership'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 5 AS reason_rank, 'venue_membership'::text AS visible_because
 			FROM venues v
 			JOIN memberships m ON m.venue_id = v.id
 			WHERE m.user_id = $1
@@ -215,7 +198,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 7 AS reason_rank, 'grant'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 6 AS reason_rank, 'grant'::text AS visible_because
 			FROM venues v
 			JOIN access_grants ag ON ag.venue_id = v.id
 			WHERE ag.user_id = $1
@@ -224,18 +207,17 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 8 AS reason_rank, 'location_role'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 7 AS reason_rank, 'location_role'::text AS visible_because
 			FROM venues v
 			JOIN lots l ON l.id = v.lot_id
 			JOIN location_memberships lm ON lm.location_id = l.location_id
 			WHERE lm.user_id = $1
 			AND lm.active = TRUE
 			AND lm.role IN ('producer', 'director', 'cast', 'crew')
-			AND v.slug NOT IN ('grants-cabin')
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 9 AS reason_rank, 'production_role'::text AS visible_because
+			SELECT v.id, v.slug, v.name, v.kind, 8 AS reason_rank, 'production_role'::text AS visible_because
 			FROM venues v
 			JOIN memberships m ON m.venue_id = v.id
 			WHERE m.user_id = $1
@@ -271,6 +253,9 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 		if err := rows.Scan(&v.Slug, &v.Name, &v.Kind, &v.VisibleBecause); err != nil {
 			return nil, err
 		}
+		if isHiddenMainMapVenueSlug(v.Slug) {
+			continue
+		}
 		out = append(out, v)
 	}
 	if err := rows.Err(); err != nil {
@@ -286,6 +271,11 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 	}
 
 	return out, nil
+}
+
+func isHiddenMainMapVenueSlug(slug string) bool {
+	_, ok := hiddenMainMapVenueSlugs[strings.ToLower(strings.TrimSpace(slug))]
+	return ok
 }
 
 func resolveVenueNotificationCounts(ctx context.Context, pool *pgxpool.Pool) (map[string]int, error) {

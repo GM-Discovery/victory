@@ -91,6 +91,10 @@
       display: none;
     }
 
+    .modal-open {
+      overflow: hidden;
+    }
+
     .corner-controls {
       position: fixed;
       top: auto;
@@ -254,6 +258,70 @@
 
     .stage-empty-card button:hover {
       background: rgba(240, 208, 155, 0.18);
+    }
+
+    .catharsis-onboarding {
+      position: fixed;
+      inset: 0;
+      z-index: 120;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(5, 6, 7, 0.76);
+      backdrop-filter: blur(14px);
+    }
+
+    .catharsis-onboarding__sheet {
+      width: min(900px, 100%);
+      border-radius: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background:
+        radial-gradient(circle at top, rgba(232, 192, 121, 0.16), transparent 34%),
+        linear-gradient(180deg, rgba(18, 14, 12, 0.98), rgba(10, 8, 7, 0.98));
+      color: #f7efe3;
+      padding: 24px;
+      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
+      display: grid;
+      gap: 18px;
+    }
+
+    .catharsis-onboarding__panel {
+      display: grid;
+      gap: 12px;
+    }
+
+    .catharsis-onboarding__panel h2 {
+      margin: 0;
+      font-size: clamp(1.8rem, 3vw, 2.6rem);
+    }
+
+    .catharsis-onboarding__panel p {
+      margin: 0;
+      color: rgba(247, 239, 227, 0.84);
+      line-height: 1.6;
+      max-width: 74ch;
+    }
+
+    .catharsis-onboarding__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .catharsis-onboarding__actions button {
+      padding: 11px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 232, 190, 0.22);
+      background: rgba(255, 255, 255, 0.04);
+      color: #fff2d0;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .catharsis-onboarding__actions button:hover {
+      background: rgba(255, 255, 255, 0.08);
     }
 
     .stage-summary {
@@ -2742,6 +2810,33 @@
     </div>
   </div>
 
+  <div id="catharsis-onboarding" class="catharsis-onboarding" hidden>
+    <div class="catharsis-onboarding__sheet">
+      <div id="catharsis-onboarding-intro" class="catharsis-onboarding__panel">
+        <p class="eyebrow">Catharsis Welcome</p>
+        <h2>Four trays live in the header.</h2>
+        <p>
+          Chat, presence, tools, and diagnostics stay visible from the shell. Close this once, and the Socio starter prompt will take over so you can step into the character surface first.
+        </p>
+        <div class="catharsis-onboarding__actions">
+          <button id="catharsis-onboarding-continue" type="button">Continue</button>
+        </div>
+      </div>
+
+      <div id="catharsis-onboarding-socio" class="catharsis-onboarding__panel" hidden>
+        <p class="eyebrow">Start Socio</p>
+        <h2>Begin the character path.</h2>
+        <p>
+          This opens the Catharsis character surface and kicks off the opening 120-item chart and 3d20 exploding sequence before the next minigame takes over.
+        </p>
+        <div class="catharsis-onboarding__actions">
+          <button id="catharsis-onboarding-start" type="button">Start Socio</button>
+          <button id="catharsis-onboarding-dismiss" type="button">Not now</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="/lib/forbidden.js"></script>
   <script src="/lib/pixi.min.js"></script>
   <script src="/lib/victory-pixi-stage.js"></script>
@@ -2784,6 +2879,66 @@
         window.VictoryCatharsis?.start?.();
       }, { once: true });
       document.head.appendChild(script);
+    })();
+  </script>
+  <script>
+    (function () {
+      const introKey = "victory:catharsis:onboarding:intro-seen";
+      const socioKey = "victory:catharsis:onboarding:socio-seen";
+      const overlay = document.getElementById("catharsis-onboarding");
+      const introPanel = document.getElementById("catharsis-onboarding-intro");
+      const socioPanel = document.getElementById("catharsis-onboarding-socio");
+      const introButton = document.getElementById("catharsis-onboarding-continue");
+      const startButton = document.getElementById("catharsis-onboarding-start");
+      const dismissButton = document.getElementById("catharsis-onboarding-dismiss");
+
+      if (!overlay || !introPanel || !socioPanel || !introButton || !startButton || !dismissButton) {
+        return;
+      }
+
+      const closeOverlay = () => {
+        overlay.hidden = true;
+        document.body.classList.remove("modal-open");
+      };
+
+      const showSocioPrompt = () => {
+        introPanel.hidden = true;
+        socioPanel.hidden = false;
+        overlay.hidden = false;
+        document.body.classList.add("modal-open");
+      };
+
+      const showIntro = () => {
+        introPanel.hidden = false;
+        socioPanel.hidden = true;
+        overlay.hidden = false;
+        document.body.classList.add("modal-open");
+      };
+
+      introButton.addEventListener("click", () => {
+        localStorage.setItem(introKey, "1");
+        showSocioPrompt();
+      });
+
+      startButton.addEventListener("click", () => {
+        localStorage.setItem(introKey, "1");
+        localStorage.setItem(socioKey, "1");
+        closeOverlay();
+        document.getElementById("right-card-editor-button")?.click();
+      });
+
+      dismissButton.addEventListener("click", () => {
+        localStorage.setItem(introKey, "1");
+        localStorage.setItem(socioKey, "1");
+        closeOverlay();
+      });
+
+      if (localStorage.getItem(introKey) === "1" || localStorage.getItem(socioKey) === "1") {
+        overlay.hidden = true;
+        return;
+      }
+
+      showIntro();
     })();
   </script>
 </body>

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"victory/backend/internal/access"
+	"victory/backend/internal/network"
 	"victory/backend/internal/sessions"
 
 	"github.com/jackc/pgx/v5"
@@ -37,6 +38,7 @@ type venueMapState struct {
 	Scale           float64        `json:"scale"`
 	SafeMargin      int            `json:"safe_margin"`
 	DisplayMode     string         `json:"display_mode"`
+	UpdatedAt       string         `json:"updated_at,omitempty"`
 	CreatedByUserID string         `json:"created_by_user_id,omitempty"`
 	UpdatedByUserID string         `json:"updated_by_user_id,omitempty"`
 	Asset           *venueMapAsset `json:"asset,omitempty"`
@@ -65,7 +67,7 @@ type venueMapRequest struct {
 	DisplayMode string  `json:"display_mode"`
 }
 
-func HandleVenueMap(pool *pgxpool.Pool) http.HandlerFunc {
+func HandleVenueMap(hub *network.Hub, pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		venueSlug := resolveVenueMapSlug(r)
 		if !isSupportedTheaterVenueSlug(venueSlug) {
@@ -80,9 +82,9 @@ func HandleVenueMap(pool *pgxpool.Pool) http.HandlerFunc {
 		case http.MethodGet:
 			handleVenueMapGet(w, r, pool, venueSlug)
 		case http.MethodPost:
-			handleVenueMapSave(w, r, pool, venueSlug)
+			handleVenueMapSave(w, r, hub, pool, venueSlug)
 		case http.MethodDelete:
-			handleVenueMapDelete(w, r, pool, venueSlug)
+			handleVenueMapDelete(w, r, hub, pool, venueSlug)
 		default:
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
 				"ok":    false,
@@ -162,7 +164,7 @@ func handleVenueMapGet(w http.ResponseWriter, r *http.Request, pool *pgxpool.Poo
 	})
 }
 
-func handleVenueMapSave(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, venueSlug string) {
+func handleVenueMapSave(w http.ResponseWriter, r *http.Request, hub *network.Hub, pool *pgxpool.Pool, venueSlug string) {
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
 
@@ -353,13 +355,15 @@ func handleVenueMapSave(w http.ResponseWriter, r *http.Request, pool *pgxpool.Po
 		return
 	}
 
+	broadcastVenueMapUpdate(hub, venueSlug, state)
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":   true,
 		"data": state,
 	})
 }
 
-func handleVenueMapDelete(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, venueSlug string) {
+func handleVenueMapDelete(w http.ResponseWriter, r *http.Request, hub *network.Hub, pool *pgxpool.Pool, venueSlug string) {
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 
@@ -396,10 +400,29 @@ func handleVenueMapDelete(w http.ResponseWriter, r *http.Request, pool *pgxpool.
 		return
 	}
 
+	broadcastVenueMapUpdate(hub, venueSlug, nil)
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":   true,
 		"data": nil,
 	})
+}
+
+func broadcastVenueMapUpdate(hub *network.Hub, venueSlug string, state any) {
+	if hub == nil {
+		return
+	}
+
+	msgOut, err := json.Marshal(map[string]any{
+		"type":       "venue/update",
+		"venue_slug": strings.ToLower(strings.TrimSpace(venueSlug)),
+		"map_state":  state,
+	})
+	if err != nil {
+		return
+	}
+
+	hub.Broadcast(msgOut)
 }
 
 func resolveVenueMapAccess(ctx context.Context, pool *pgxpool.Pool, r *http.Request) (string, bool, error) {
@@ -473,7 +496,7 @@ func resolveVenueLocation(ctx context.Context, pool *pgxpool.Pool, venueSlug str
 func loadVenueMapState(ctx context.Context, pool *pgxpool.Pool, venueSlug string) (venueMapState, error) {
 	var state venueMapState
 	var asset venueMapAsset
-	var assetID, fit, displayMode, createdByUserID, updatedByUserID string
+	var assetID, fit, displayMode, updatedAt, createdByUserID, updatedByUserID string
 	var cropX, cropY, scale float64
 	var safeMargin int
 	var assetOriginalFilename, assetSourceMime, assetSniffedMime, assetType string
@@ -490,6 +513,7 @@ func loadVenueMapState(ctx context.Context, pool *pgxpool.Pool, venueSlug string
 			COALESCE(vm.scale, 1),
 			COALESCE(vm.safe_margin, 24),
 			COALESCE(vm.display_mode, 'theater'),
+			COALESCE(vm.updated_at::text, ''),
 			COALESCE(vm.created_by_user_id::text, ''),
 			COALESCE(vm.updated_by_user_id::text, ''),
 			COALESCE(a.id::text, ''),
@@ -515,6 +539,7 @@ func loadVenueMapState(ctx context.Context, pool *pgxpool.Pool, venueSlug string
 		&scale,
 		&safeMargin,
 		&displayMode,
+		&updatedAt,
 		&createdByUserID,
 		&updatedByUserID,
 		&asset.AssetID,
@@ -540,6 +565,7 @@ func loadVenueMapState(ctx context.Context, pool *pgxpool.Pool, venueSlug string
 		Scale:           scale,
 		SafeMargin:      safeMargin,
 		DisplayMode:     displayMode,
+		UpdatedAt:       strings.TrimSpace(updatedAt),
 		CreatedByUserID: strings.TrimSpace(createdByUserID),
 		UpdatedByUserID: strings.TrimSpace(updatedByUserID),
 	}

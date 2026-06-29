@@ -1693,6 +1693,7 @@
       setSmokeLine: (...args) => setSmokeLine(...args),
       normalizeOverlayPoint: (...args) => normalizeOverlayPoint(...args),
       setRecentPlacementMarker: (...args) => setRecentPlacementMarker(...args),
+      getVenueSlug: () => "catharsis",
       smokeMode,
       setLocalPositionOverrideForModel: (...args) => setLocalPositionOverrideForModel(...args),
       sendAction: (...args) => sendAction(...args),
@@ -2215,8 +2216,20 @@
     async function saveGridConfig() { return editors?.saveGridConfig?.(); }
     async function refreshVenueGridConfig() { return editors?.refreshVenueGridConfig?.(); }
 
+    function venueMapTextureURLForState(state) {
+      const assetURL = String(state?.asset?.content_url || "").trim();
+      if (!assetURL) {
+        return "";
+      }
+      const revision = String(state?.updated_at || "").trim();
+      if (!revision) {
+        return assetURL;
+      }
+      return `${assetURL}${assetURL.includes("?") ? "&" : "?"}v=${encodeURIComponent(revision)}`;
+    }
+
     async function ensureVenueMapTexture() {
-      const assetURL = String(currentVenueMapState?.asset?.content_url || "").trim();
+      const assetURL = venueMapTextureURLForState(currentVenueMapState);
       if (!assetURL || !window.PIXI) {
         venueMapTexture = null;
         venueMapTextureURL = "";
@@ -2238,7 +2251,7 @@
             venueMapTextureFailedURL = assetURL;
             return null;
           }
-          if (String(currentVenueMapState?.asset?.content_url || "").trim() === assetURL) {
+          if (venueMapTextureURLForState(currentVenueMapState) === assetURL) {
             venueMapTexture = resolvedTexture;
             venueMapTextureURL = assetURL;
             venueMapTextureFailedURL = "";
@@ -2253,6 +2266,13 @@
         });
       venueMapTexturePromise.assetURL = assetURL;
       return venueMapTexturePromise;
+    }
+
+    function clearVenueMapTexture() {
+      venueMapTexture = null;
+      venueMapTextureURL = "";
+      venueMapTexturePromise = null;
+      venueMapTextureFailedURL = "";
     }
 
     const computeStagePlayableBounds = (width, height) => {
@@ -2274,17 +2294,22 @@
       mapLayer.removeChildren();
       mapLayer.mask = null;
       const state = currentVenueMapState;
-      if (!state || !state.asset || !String(state.asset.content_url || "").trim()) {
+      const assetURL = venueMapTextureURLForState(state);
+      if (!state || !state.asset || !assetURL) {
+        clearVenueMapTexture();
+        if (stageCamera && String(stageCamera.getView?.().activeMapId || "")) {
+          stageCamera.setActiveMapId?.("", { reset: false });
+        }
         return computeStagePlayableBounds(width, height);
       }
 
-      if (!venueMapTexture || venueMapTextureURL !== state.asset.content_url) {
-        if (venueMapTextureFailedURL === state.asset.content_url) {
+      if (!venueMapTexture || venueMapTextureURL !== assetURL) {
+        if (venueMapTextureFailedURL === assetURL) {
           return computeStagePlayableBounds(width, height);
         }
         ensureVenueMapTexture().then((texture) => {
           if (!texture) return;
-          if (currentVenueMapState?.asset?.content_url === state.asset.content_url) {
+          if (venueMapTextureURLForState(currentVenueMapState) === assetURL) {
             renderPixiScene();
           }
         });

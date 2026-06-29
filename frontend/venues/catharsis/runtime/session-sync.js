@@ -77,6 +77,7 @@
     const setSmokeLine = typeof deps.setSmokeLine === "function" ? deps.setSmokeLine : () => {};
     const normalizeOverlayPoint = typeof deps.normalizeOverlayPoint === "function" ? deps.normalizeOverlayPoint : (point) => ({ screen_x: Number(point?.x || 0), screen_y: Number(point?.y || 0) });
     const setRecentPlacementMarker = typeof deps.setRecentPlacementMarker === "function" ? deps.setRecentPlacementMarker : () => {};
+    const getVenueSlug = typeof deps.getVenueSlug === "function" ? deps.getVenueSlug : () => "";
     const smokeMode = Boolean(deps.smokeMode);
 
     let currentSnapshot = null;
@@ -468,6 +469,15 @@
       if (msg.kind === "showing_update") {
         await refreshWorld();
         updateChatPresentation();
+        return msg;
+      }
+
+      if (msg.kind === "venue_update") {
+        const venueSlug = String(msg.message?.venue_slug || "").trim().toLowerCase();
+        const currentVenueSlug = String(getVenueSlug() || "").trim().toLowerCase();
+        if (!venueSlug || venueSlug === currentVenueSlug) {
+          await refreshVenueMapState();
+        }
         return msg;
       }
 
