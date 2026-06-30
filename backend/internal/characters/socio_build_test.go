@@ -30,6 +30,17 @@ func TestSeedCatharsisStarterDraftUsesRequestedRoll(t *testing.T) {
 	if got.WorkbookContext["socio_parentage_class"] != "Merchant Paragon" {
 		t.Fatalf("socio_parentage_class = %v, want Merchant Paragon", got.WorkbookContext["socio_parentage_class"])
 	}
+
+	rows := normalizeCatharsisParentageRows(got.WorkbookContext["socio_parentage_parents"])
+	if len(rows) != 1 {
+		t.Fatalf("expected one parent row, got %d", len(rows))
+	}
+	if rows[0]["coin_flip_result"] != "pending" {
+		t.Fatalf("coin_flip_result = %v, want pending (coin flip must not auto-resolve at character creation)", rows[0]["coin_flip_result"])
+	}
+	if got.WorkbookContext["socio_starting_wealth"] != 0 {
+		t.Fatalf("socio_starting_wealth = %v, want 0 (unresolved until the player flips)", got.WorkbookContext["socio_starting_wealth"])
+	}
 }
 
 func TestSeedCatharsisStarterDraftLeavesNonCatharsisInputAlone(t *testing.T) {
@@ -102,10 +113,10 @@ func TestResolveCatharsisParentageContextRetentionBoundaries(t *testing.T) {
 			if gotRoll := toInt(row["coin_flip_roll"]); gotRoll != tt.wantRoll {
 				t.Fatalf("coin_flip_roll = %d, want %d", gotRoll, tt.wantRoll)
 			}
-			if gotWealth, _ := parseCatharsisRoll(row["inherited_wealth"]); gotWealth != tt.wantWealth {
+			if gotWealth, _ := parseCatharsisInt(row["inherited_wealth"]); gotWealth != tt.wantWealth {
 				t.Fatalf("inherited_wealth = %d, want %d", gotWealth, tt.wantWealth)
 			}
-			if gotWealth, _ := parseCatharsisRoll(got["socio_starting_wealth"]); gotWealth != tt.wantWealth {
+			if gotWealth, _ := parseCatharsisInt(got["socio_starting_wealth"]); gotWealth != tt.wantWealth {
 				t.Fatalf("socio_starting_wealth = %d, want %d", gotWealth, tt.wantWealth)
 			}
 			if gotCalls := calls; gotCalls != tt.wantCalls {

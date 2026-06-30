@@ -265,15 +265,20 @@
       inset: 0;
       z-index: 120;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
       padding: 24px;
       background: rgba(5, 6, 7, 0.76);
       backdrop-filter: blur(14px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     .catharsis-onboarding__sheet {
       width: min(900px, 100%);
+      margin: auto 0;
+      max-height: calc(100vh - 48px);
+      overflow-y: auto;
       border-radius: 24px;
       border: 1px solid rgba(255, 255, 255, 0.12);
       background:
@@ -605,6 +610,106 @@
 
     .catharsis-childhood-roll-actions button {
       min-width: 96px;
+    }
+
+    .catharsis-chapter2-bonus-choices,
+    .catharsis-chapter2-traits {
+      display: grid;
+      gap: 8px;
+      text-align: left;
+      margin: 12px 0;
+    }
+
+    .catharsis-chapter2-bonus-choice,
+    .catharsis-chapter2-trait {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid rgba(240, 208, 155, 0.22);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.18);
+    }
+
+    .catharsis-chapter2-bonus-choice label,
+    .catharsis-chapter2-trait label {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .catharsis-chapter2-trait .catharsis-chapter2-trait-cost {
+      opacity: 0.75;
+      font-size: 0.85em;
+    }
+
+    .catharsis-chapter2-representation-wrap,
+    .catharsis-chapter2-companion-wrap {
+      display: grid;
+      gap: 6px;
+      text-align: left;
+      margin: 12px 0;
+    }
+
+    .catharsis-chapter2-representation-wrap textarea,
+    .catharsis-chapter2-companion-wrap input[type="text"] {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(240, 208, 155, 0.22);
+      border-radius: 8px;
+      color: inherit;
+      padding: 8px;
+      font: inherit;
+    }
+
+    .catharsis-chapter2-companion-toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .catharsis-chapter2-allocation-rows {
+      display: grid;
+      gap: 8px;
+      margin: 8px 0 12px;
+    }
+
+    .catharsis-chapter2-allocation-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    .catharsis-chapter2-allocation-row input[type="number"] {
+      width: 64px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(240, 208, 155, 0.22);
+      border-radius: 6px;
+      color: inherit;
+      padding: 4px 6px;
+      font: inherit;
+    }
+
+    .catharsis-onboarding__coinflip {
+      align-content: center;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .catharsis-coinflip-coin {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 12px auto;
+      border: 2px solid rgba(240, 208, 155, 0.45);
+      background: radial-gradient(circle at 35% 30%, rgba(232, 192, 121, 0.35), rgba(10, 8, 7, 0.9));
+      font-weight: 700;
+      font-size: 1.1rem;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
     }
 
     .catharsis-roll-actions {
@@ -3294,6 +3399,22 @@
         </div>
       </div>
 
+      <div id="catharsis-onboarding-coinflip" class="catharsis-onboarding__panel catharsis-onboarding__coinflip" hidden>
+        <p class="eyebrow">Inheritance</p>
+        <h2 id="catharsis-coinflip-title">Parent 1 may pass down wealth</h2>
+        <p id="catharsis-coinflip-copy">This parent's starting credit qualifies for retention. Flip the coin to see if it passes to you.</p>
+        <div class="catharsis-coinflip-coin" aria-hidden="true">
+          <span id="catharsis-coinflip-face">?</span>
+        </div>
+        <div class="catharsis-onboarding__actions">
+          <button id="catharsis-coinflip-button" type="button">Flip the coin</button>
+        </div>
+        <p id="catharsis-coinflip-status" class="catharsis-onboarding__status" aria-live="polite"></p>
+        <div class="catharsis-onboarding__actions">
+          <button id="catharsis-coinflip-continue" type="button" disabled>Continue</button>
+        </div>
+      </div>
+
       <div id="catharsis-onboarding-chapter" class="catharsis-onboarding__panel catharsis-onboarding__chapter" hidden>
         <p class="eyebrow">Chapter II</p>
         <h2>Childhood Stages</h2>
@@ -3306,15 +3427,88 @@
         </div>
       </div>
 
-      <div id="catharsis-onboarding-childhood" class="catharsis-onboarding__panel catharsis-onboarding__childhood" hidden>
-        <p class="eyebrow">Chapter II: Childhood Stages</p>
-        <h2>Stages of Childhood → Conception</h2>
-        <p>
-          Stage 2 is parked as a shell only. Conception mechanics are not implemented in Kernel 53.
-        </p>
-        <p id="catharsis-onboarding-childhood-status" class="catharsis-onboarding__status" aria-live="polite"></p>
+      <div id="catharsis-onboarding-chapter2" class="catharsis-onboarding__panel catharsis-onboarding__chapter2" hidden>
+        <p class="eyebrow">Chapter II: Lifepath</p>
+        <h2 id="catharsis-chapter2-stage-name">Stage</h2>
+        <p id="catharsis-chapter2-intro" class="catharsis-build-copy"></p>
+
+        <div class="catharsis-build-metrics">
+          <div class="catharsis-build-metric">
+            <span>Fate Points</span>
+            <strong id="catharsis-chapter2-fp">--</strong>
+          </div>
+          <div class="catharsis-build-metric">
+            <span>Stage</span>
+            <strong id="catharsis-chapter2-stage-number">--</strong>
+          </div>
+          <div class="catharsis-build-metric">
+            <span id="catharsis-chapter2-primary-attr-label">Attribute</span>
+            <strong id="catharsis-chapter2-primary-attr-total">--</strong>
+          </div>
+        </div>
+
+        <div class="catharsis-roll-prompt">
+          <div class="catharsis-roll-prompt__summary">
+            <strong id="catharsis-chapter2-primary-label">Roll for this stage</strong>
+            <span id="catharsis-chapter2-enhancement-hint">A 1d6 enhancement costs 3 Fate Points and keeps the higher result.</span>
+          </div>
+          <div class="catharsis-roll-results" aria-label="Stage roll">
+            <div class="catharsis-roll-result">
+              <span>d4</span>
+              <strong id="catharsis-chapter2-d4">--</strong>
+            </div>
+            <div class="catharsis-roll-result">
+              <span>d6 (enhanced)</span>
+              <strong id="catharsis-chapter2-d6">--</strong>
+            </div>
+            <div class="catharsis-roll-result catharsis-roll-result--total">
+              <span>Final</span>
+              <strong id="catharsis-chapter2-final">--</strong>
+            </div>
+          </div>
+        </div>
+        <div class="catharsis-onboarding__actions catharsis-roll-actions">
+          <button id="catharsis-chapter2-roll-d4" type="button">Roll d4</button>
+          <button id="catharsis-chapter2-roll-d6" type="button">Enhance (3 FP, roll d6)</button>
+        </div>
+
+        <div id="catharsis-chapter2-allocation" class="catharsis-chapter2-allocation" hidden>
+          <p class="catharsis-onboarding__hint">Stage 9 special allocation: 1 point must go to Craft, the rest are yours to distribute.</p>
+          <div id="catharsis-chapter2-allocation-rows" class="catharsis-chapter2-allocation-rows"></div>
+        </div>
+
+        <div id="catharsis-chapter2-bonus-choices" class="catharsis-chapter2-bonus-choices" role="radiogroup" aria-label="Bonus choice"></div>
+
+        <div id="catharsis-chapter2-representation-wrap" class="catharsis-chapter2-representation-wrap" hidden>
+          <label for="catharsis-chapter2-representation">Representation (optional, freeform — no mechanical effect)</label>
+          <textarea id="catharsis-chapter2-representation" rows="3"></textarea>
+        </div>
+
+        <div id="catharsis-chapter2-companion-wrap" class="catharsis-chapter2-companion-wrap" hidden>
+          <label class="catharsis-chapter2-companion-toggle-label">
+            <input type="checkbox" id="catharsis-chapter2-companion-toggle" />
+            <span id="catharsis-chapter2-companion-label">Companion</span>
+          </label>
+          <input type="text" id="catharsis-chapter2-companion-name" placeholder="Companion name (optional placeholder)" />
+        </div>
+
+        <div id="catharsis-chapter2-traits" class="catharsis-chapter2-traits"></div>
+
+        <p id="catharsis-chapter2-status" class="catharsis-onboarding__status" aria-live="polite"></p>
+
         <div class="catharsis-onboarding__actions">
-          <button id="catharsis-onboarding-childhood-continue" type="button">Return to workbook</button>
+          <button id="catharsis-chapter2-complete" type="button" disabled>Complete stage</button>
+        </div>
+      </div>
+
+      <div id="catharsis-onboarding-chapter3" class="catharsis-onboarding__panel catharsis-onboarding__chapter" hidden>
+        <p class="eyebrow">Chapter III</p>
+        <h2>The Lifepath Closes</h2>
+        <p>
+          Chapter II is complete. Your Fate Points and attributes carry forward into play.
+        </p>
+        <div class="catharsis-onboarding__actions">
+          <button id="catharsis-onboarding-chapter3-continue" type="button">Return to workbook</button>
         </div>
       </div>
     </div>

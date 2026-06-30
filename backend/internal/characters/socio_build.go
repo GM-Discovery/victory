@@ -14,7 +14,10 @@ func seedCatharsisStarterDraft(input CharacterCardInput) CharacterCardInput {
 		return input
 	}
 
-	context = resolveCatharsisParentageContext(context, randomCatharsisD2)
+	// Coin flips for parent inheritance are deferred to an explicit
+	// player-triggered action (see RequestCatharsisCoinFlip) rather than
+	// auto-resolved here at character creation.
+	context = resolveCatharsisParentageContext(context, nil)
 	input.WorkbookContext = context
 
 	entry := catharsisPrimaryParentageEntry(context)
@@ -33,7 +36,7 @@ func seedCatharsisStarterDraft(input CharacterCardInput) CharacterCardInput {
 			entry.StartingCredit,
 		)
 	}
-	if startingWealth, ok := parseCatharsisRoll(context["socio_starting_wealth"]); ok && startingWealth > 0 {
+	if startingWealth, ok := parseCatharsisInt(context["socio_starting_wealth"]); ok && startingWealth > 0 {
 		sourceClass := strings.TrimSpace(stringValue(context["socio_starting_wealth_source_class"]))
 		if sourceClass != "" {
 			input.PrivateNotes = strings.TrimSpace(input.PrivateNotes + fmt.Sprintf(" Starting wealth resolved to %d from %s.", startingWealth, sourceClass))
@@ -126,7 +129,7 @@ func normalizeCatharsisParentageRows(value any) []map[string]any {
 		if normalized == nil {
 			normalized = map[string]any{}
 		}
-		if _, ok := parseCatharsisRoll(normalized["parent_index"]); !ok {
+		if _, ok := parseCatharsisInt(normalized["parent_index"]); !ok {
 			normalized["parent_index"] = idx + 1
 		}
 		out = append(out, normalized)
@@ -147,7 +150,7 @@ func enrichCatharsisParentageRows(rows []map[string]any, rollD2 func() int) ([]m
 			normalized = map[string]any{}
 		}
 
-		parentIndex, _ := parseCatharsisRoll(normalized["parent_index"])
+		parentIndex, _ := parseCatharsisInt(normalized["parent_index"])
 		if parentIndex == 0 {
 			parentIndex = len(enrichedRows) + 1
 		}
@@ -158,7 +161,7 @@ func enrichCatharsisParentageRows(rows []map[string]any, rollD2 func() int) ([]m
 		}
 
 		startCredit := entry.StartingCredit
-		if explicitCredit, ok := parseCatharsisRoll(normalized["starting_credit"]); ok {
+		if explicitCredit, ok := parseCatharsisInt(normalized["starting_credit"]); ok {
 			startCredit = explicitCredit
 		}
 		coinFlipRoll := 0
@@ -166,30 +169,34 @@ func enrichCatharsisParentageRows(rows []map[string]any, rollD2 func() int) ([]m
 		inheritancePassed := false
 		inheritedWealth := 0
 		if startCredit > 50 {
-			coinFlipRoll = 1
-			if rollD2 != nil {
-				coinFlipRoll = rollD2()
-			}
-			if coinFlipRoll != 1 {
-				coinFlipRoll = 2
-			}
-			if coinFlipRoll == 2 {
-				coinFlipResult = "retain"
-				inheritancePassed = true
-				inheritedWealth = startCredit
-				if inheritedWealth > startingWealth {
-					startingWealth = inheritedWealth
-					inheritedParent = map[string]any{
-						"parent_index":    parentIndex,
-						"roll_total":      roll,
-						"social_class":    entry.SocialClass,
-						"starting_credit": startCredit,
-					}
-				}
-			} else {
-				coinFlipResult = "lose"
-			}
 			eligibleParents = append(eligibleParents, parentIndex)
+			if rollD2 == nil {
+				// No roll callback supplied: the coin flip is deferred to an
+				// explicit, player-triggered action (the inheritance coin
+				// flip is not auto-resolved at character creation).
+				coinFlipResult = "pending"
+			} else {
+				coinFlipRoll = rollD2()
+				if coinFlipRoll != 1 {
+					coinFlipRoll = 2
+				}
+				if coinFlipRoll == 2 {
+					coinFlipResult = "retain"
+					inheritancePassed = true
+					inheritedWealth = startCredit
+					if inheritedWealth > startingWealth {
+						startingWealth = inheritedWealth
+						inheritedParent = map[string]any{
+							"parent_index":    parentIndex,
+							"roll_total":      roll,
+							"social_class":    entry.SocialClass,
+							"starting_credit": startCredit,
+						}
+					}
+				} else {
+					coinFlipResult = "lose"
+				}
+			}
 		}
 
 		normalized["parent_index"] = parentIndex
@@ -261,6 +268,32 @@ func parseCatharsisRoll(value any) (int, bool) {
 		var parsed int
 		if _, err := fmt.Sscanf(strings.TrimSpace(v), "%d", &parsed); err == nil {
 			return clampCatharsisRoll(parsed)
+		}
+	}
+	return 0, false
+}
+
+// parseCatharsisInt parses an arbitrary numeric/stringly-typed workbook
+// context field into an int with no range clamping. Use this (not
+// parseCatharsisRoll) for fields that are not a 3d20 roll total, such as
+// parent_index (1-2) or starting_credit (which can legitimately fall
+// outside the 3-120 roll range).
+func parseCatharsisInt(value any) (int, bool) {
+	switch v := value.(type) {
+	case int:
+		return v, true
+	case int32:
+		return int(v), true
+	case int64:
+		return int(v), true
+	case float64:
+		return int(v), true
+	case float32:
+		return int(v), true
+	case string:
+		var parsed int
+		if _, err := fmt.Sscanf(strings.TrimSpace(v), "%d", &parsed); err == nil {
+			return parsed, true
 		}
 	}
 	return 0, false

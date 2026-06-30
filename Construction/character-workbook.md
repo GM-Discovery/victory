@@ -48,7 +48,17 @@
 ## Deferred Work
 - The Stage 1 Parentage chart is now supplied in `backend/internal/characters/parentage_chart.go`.
 - Rolls 100-120 are normalized into the `organizational` band with the shared surrogate floor value `300000`.
-- Stage 2 mechanics are still out of scope for this kernel; the Stage 2 panel is a shell only (`Stages of Childhood → Conception`) with no rollable controls.
+- Stage 2 mechanics are still out of scope for this kernel; the Stage 2 panel is a shell only (`Stages of Childhood → Conception`) with no rollable controls. (Superseded by Kernel 54, below — Stage 2 is now the second of ten live Chapter 2 stages.)
+
+## Kernel 54 — Chapter 2 Lifepath System
+- Chapter 2 ("Lifepath") is 10 stages (Preconception, Genetics, Infancy, Toddlerhood, Childhood, School Age, Upper School, Teen/Middle, High School, Young Adult), each mapped to one of the 10 attributes (Spirit, Might, Empathy, Grace, Awareness, Intellect, Lore, Presence, Craft, Resolve). Rules data lives in `backend/internal/characters/chapter2_rules.go`, version `0.3`.
+- Characters start with 12 Fate Points (FP); unspent FP carries into play. Each stage: roll a server-locked d4 → optional 3 FP enhancement (roll d6, keep `max(d4, d6)`) → the roll applies to the stage's primary attribute (Stage 9 is the exception, see below) → choose exactly 1 of 4 bonus choices (+1 to a named attribute) → optional companion purchase (1-2 FP) → 0-2 trait purchases (4-5 FP each, descriptive only) → complete the stage. Stage 2 additionally has an optional freeform Representation field with no mechanical effect.
+- Stage 9 (High School) is special: 1 point of the final roll must go to Craft; the rest is freely distributed by the player across any non-Craft attributes (stacking on one attribute is allowed), all subject to the hard attribute cap.
+- Hard attribute cap is 10 per attribute, enforced server-side by blocking the stage commit (not truncating); there is no separate Bonus Point cap.
+- Dice are server-authoritative and idempotent (`POST /api/character-cards/chapter2-roll`, backed by the same `character_workbook_rolls` table Kernel 53 introduced) — repeated requests for the same stage/die never reroll. A companion `GET /api/character-cards/chapter2-roll` status endpoint lets the frontend restore an in-progress (rolled-but-not-yet-completed) stage's locked roll on page refresh.
+- Stage completion is append-only and idempotent: `POST /api/character-cards/chapter2-stage` re-validates everything server-side (bonus choice, trait ownership, FP balance, attribute cap, Stage 9 allocation) and re-posting an already-completed stage returns the existing result rather than re-applying deltas.
+- Chapter 2 completes after Stage 10, transitioning `workbook_context.current_stage` to `3` (Chapter 3 — out of scope for this kernel, shown as a mechanics-free interstitial shell).
+- The venue (Catharsis) fixes the active ruleset; the player does not select a ruleset inside Chapter 2.
 
 ## Kernel 53 Correction Pass
 - Starting Credit retention is strictly `> 50` (confirmed already correct; boundary tests for 49/50/51 exist in `socio_build_test.go`).

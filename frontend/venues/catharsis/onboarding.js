@@ -7,12 +7,44 @@
   const socioPanel = document.getElementById("catharsis-onboarding-socio");
   const buildPanel = document.getElementById("catharsis-onboarding-build");
   const chapterPanel = document.getElementById("catharsis-onboarding-chapter");
-  const childhoodPanel = document.getElementById("catharsis-onboarding-childhood");
   const introButton = document.getElementById("catharsis-onboarding-continue");
   const dismissButton = document.getElementById("catharsis-onboarding-dismiss");
   const socioStatus = document.getElementById("catharsis-onboarding-socio-status");
   const chapterContinueButton = document.getElementById("catharsis-onboarding-chapter-continue");
-  const childhoodStatus = document.getElementById("catharsis-onboarding-childhood-status");
+  const chapter2Panel = document.getElementById("catharsis-onboarding-chapter2");
+  const chapter3Panel = document.getElementById("catharsis-onboarding-chapter3");
+  const chapter3ContinueButton = document.getElementById("catharsis-onboarding-chapter3-continue");
+  const coinFlipPanel = document.getElementById("catharsis-onboarding-coinflip");
+  const coinFlipTitle = document.getElementById("catharsis-coinflip-title");
+  const coinFlipCopy = document.getElementById("catharsis-coinflip-copy");
+  const coinFlipFace = document.getElementById("catharsis-coinflip-face");
+  const coinFlipButton = document.getElementById("catharsis-coinflip-button");
+  const coinFlipStatus = document.getElementById("catharsis-coinflip-status");
+  const coinFlipContinueButton = document.getElementById("catharsis-coinflip-continue");
+  const ch2StageName = document.getElementById("catharsis-chapter2-stage-name");
+  const ch2Intro = document.getElementById("catharsis-chapter2-intro");
+  const ch2Fp = document.getElementById("catharsis-chapter2-fp");
+  const ch2StageNumber = document.getElementById("catharsis-chapter2-stage-number");
+  const ch2PrimaryAttrLabel = document.getElementById("catharsis-chapter2-primary-attr-label");
+  const ch2PrimaryAttrTotal = document.getElementById("catharsis-chapter2-primary-attr-total");
+  const ch2PrimaryLabel = document.getElementById("catharsis-chapter2-primary-label");
+  const ch2D4 = document.getElementById("catharsis-chapter2-d4");
+  const ch2D6 = document.getElementById("catharsis-chapter2-d6");
+  const ch2Final = document.getElementById("catharsis-chapter2-final");
+  const ch2RollD4Button = document.getElementById("catharsis-chapter2-roll-d4");
+  const ch2RollD6Button = document.getElementById("catharsis-chapter2-roll-d6");
+  const ch2AllocationWrap = document.getElementById("catharsis-chapter2-allocation");
+  const ch2AllocationRows = document.getElementById("catharsis-chapter2-allocation-rows");
+  const ch2BonusChoices = document.getElementById("catharsis-chapter2-bonus-choices");
+  const ch2RepresentationWrap = document.getElementById("catharsis-chapter2-representation-wrap");
+  const ch2Representation = document.getElementById("catharsis-chapter2-representation");
+  const ch2CompanionWrap = document.getElementById("catharsis-chapter2-companion-wrap");
+  const ch2CompanionToggle = document.getElementById("catharsis-chapter2-companion-toggle");
+  const ch2CompanionLabel = document.getElementById("catharsis-chapter2-companion-label");
+  const ch2CompanionName = document.getElementById("catharsis-chapter2-companion-name");
+  const ch2Traits = document.getElementById("catharsis-chapter2-traits");
+  const ch2Status = document.getElementById("catharsis-chapter2-status");
+  const ch2CompleteButton = document.getElementById("catharsis-chapter2-complete");
   const rollButtons = [
     document.getElementById("catharsis-roll-1"),
     document.getElementById("catharsis-roll-2"),
@@ -35,7 +67,6 @@
   const buildWheelWindow = document.getElementById("catharsis-wheel-window");
   const buildLockButton = document.getElementById("catharsis-build-lock-in");
   const buildRerollButton = document.getElementById("catharsis-build-reroll");
-  const childhoodContinueButton = document.getElementById("catharsis-onboarding-childhood-continue");
   const characterTrayButton = document.getElementById("character-tray-button");
   const characterTrayLabel = document.getElementById("character-tray-label");
 
@@ -45,7 +76,16 @@
     !socioPanel ||
     !buildPanel ||
     !chapterPanel ||
-    !childhoodPanel ||
+    !chapter2Panel ||
+    !chapter3Panel ||
+    !chapter3ContinueButton ||
+    !coinFlipPanel ||
+    !coinFlipTitle ||
+    !coinFlipCopy ||
+    !coinFlipFace ||
+    !coinFlipButton ||
+    !coinFlipStatus ||
+    !coinFlipContinueButton ||
     !introButton ||
     !dismissButton ||
     !chapterContinueButton ||
@@ -67,7 +107,30 @@
     !buildWheelWindow ||
     !buildLockButton ||
     !buildRerollButton ||
-    !childhoodContinueButton
+    !ch2StageName ||
+    !ch2Intro ||
+    !ch2Fp ||
+    !ch2StageNumber ||
+    !ch2PrimaryAttrLabel ||
+    !ch2PrimaryAttrTotal ||
+    !ch2PrimaryLabel ||
+    !ch2D4 ||
+    !ch2D6 ||
+    !ch2Final ||
+    !ch2RollD4Button ||
+    !ch2RollD6Button ||
+    !ch2AllocationWrap ||
+    !ch2AllocationRows ||
+    !ch2BonusChoices ||
+    !ch2RepresentationWrap ||
+    !ch2Representation ||
+    !ch2CompanionWrap ||
+    !ch2CompanionToggle ||
+    !ch2CompanionLabel ||
+    !ch2CompanionName ||
+    !ch2Traits ||
+    !ch2Status ||
+    !ch2CompleteButton
   ) {
     return;
   }
@@ -89,6 +152,10 @@
     startingWealth: 0,
     draftToken: "",
     donorRolls: { egg_donor: null, sperm_donor: null },
+    chapter2Rules: null,
+    chapter2: null,
+    coinFlipQueue: [],
+    coinFlipResults: {},
   };
 
   let buildSequenceToken = 0;
@@ -167,8 +234,8 @@
     if (buildStatus) buildStatus.textContent = text || "";
   };
 
-  const setChildhoodStatus = (text) => {
-    if (childhoodStatus) childhoodStatus.textContent = text || "";
+  const setCh2Status = (text) => {
+    if (ch2Status) ch2Status.textContent = text || "";
   };
 
   const phaseLabel = () => (state.phase === 1 ? "first parent" : "other parent");
@@ -214,30 +281,614 @@
     }).join("");
   };
 
-  const showChapterPanel = () => {
+  const hideAllOnboardingPanels = () => {
     introPanel.hidden = true;
     socioPanel.hidden = true;
     buildPanel.hidden = true;
+    chapterPanel.hidden = true;
+    chapter2Panel.hidden = true;
+    chapter3Panel.hidden = true;
+    coinFlipPanel.hidden = true;
+  };
+
+  const showChapterPanel = () => {
+    hideAllOnboardingPanels();
     chapterPanel.hidden = false;
-    childhoodPanel.hidden = true;
     overlay.hidden = false;
     buildSequenceToken += 1;
     document.body.classList.add("modal-open");
     chapterContinueButton.focus();
   };
 
-  const showChildhoodPanel = () => {
-    introPanel.hidden = true;
-    socioPanel.hidden = true;
-    buildPanel.hidden = true;
-    chapterPanel.hidden = true;
-    childhoodPanel.hidden = false;
+  // --- Chapter 2: Lifepath (Kernel 54) ---
+
+  const loadChapter2Rules = async () => {
+    if (state.chapter2Rules) return state.chapter2Rules;
+    const response = await fetch("/api/characters/chapter2-rules", { credentials: "include" });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.ok || !payload?.data) {
+      throw new Error(payload?.data?.error || payload?.error || `Chapter 2 rules load failed (${response.status}).`);
+    }
+    state.chapter2Rules = payload.data;
+    return state.chapter2Rules;
+  };
+
+  const chapter2StageRules = (stageNumber) => {
+    const stages = state.chapter2Rules?.stages || [];
+    return stages.find((stage) => Number(stage.stage_number) === Number(stageNumber)) || null;
+  };
+
+  const chapter2Ctx = () => {
+    const wb = getCurrentWorkbookContext();
+    return wb.chapter2 && typeof wb.chapter2 === "object" ? wb.chapter2 : null;
+  };
+
+  const ch2DefaultState = () => ({
+    version: state.chapter2Rules?.version || "",
+    starting_fp: Number(state.chapter2Rules?.starting_fp) || 12,
+    fp_balance: Number(state.chapter2Rules?.starting_fp) || 12,
+    current_stage: 1,
+    attributes: {},
+    stages: {},
+  });
+
+  const ch2Local = {
+    stageNumber: 1,
+    stageRules: null,
+    rolls: null,
+    useEnhancement: false,
+    bonusChoiceId: "",
+    traitIds: [],
+    companionPurchased: false,
+    companionTarget: "",
+    representationText: "",
+    allocation: {},
+  };
+
+  const ch2ResetLocalSelections = () => {
+    ch2Local.useEnhancement = false;
+    ch2Local.bonusChoiceId = "";
+    ch2Local.traitIds = [];
+    ch2Local.companionPurchased = false;
+    ch2Local.companionTarget = "";
+    ch2Local.representationText = "";
+    ch2Local.allocation = {};
+  };
+
+  const ch2FinalRoll = () => {
+    if (!ch2Local.rolls) return null;
+    const d4 = Number(ch2Local.rolls.d4);
+    const d6 = ch2Local.useEnhancement && ch2Local.rolls.d6 != null ? Number(ch2Local.rolls.d6) : null;
+    if (d6 == null) return d4;
+    return Math.max(d4, d6);
+  };
+
+  const ch2RenderBonusChoices = () => {
+    const stage = ch2Local.stageRules;
+    ch2BonusChoices.innerHTML = (stage.bonus_choices || []).map((choice) => `
+      <div class="catharsis-chapter2-bonus-choice">
+        <input type="radio" name="ch2-bonus" id="ch2-bonus-${escapeHtml(choice.id)}" value="${escapeHtml(choice.id)}" ${ch2Local.bonusChoiceId === choice.id ? "checked" : ""} />
+        <label for="ch2-bonus-${escapeHtml(choice.id)}">
+          <strong>${escapeHtml(choice.name)} (+${escapeHtml(choice.modifier)} ${escapeHtml(choice.target_attribute)})</strong>
+        </label>
+      </div>
+    `).join("");
+    ch2BonusChoices.querySelectorAll("input[name=ch2-bonus]").forEach((input) => {
+      input.addEventListener("change", () => {
+        ch2Local.bonusChoiceId = input.value;
+        ch2RenderCompleteGate();
+      });
+    });
+  };
+
+  const ch2RenderTraits = () => {
+    const stage = ch2Local.stageRules;
+    const traits = stage.traits || [];
+    if (!traits.length) {
+      ch2Traits.innerHTML = "";
+      return;
+    }
+    ch2Traits.innerHTML = `<p class="catharsis-onboarding__hint">Optional traits (0-2, descriptive only):</p>` + traits.map((trait) => `
+      <div class="catharsis-chapter2-trait">
+        <input type="checkbox" id="ch2-trait-${escapeHtml(trait.id)}" value="${escapeHtml(trait.id)}" ${ch2Local.traitIds.includes(trait.id) ? "checked" : ""} />
+        <label for="ch2-trait-${escapeHtml(trait.id)}">
+          <strong>${escapeHtml(trait.name)} <span class="catharsis-chapter2-trait-cost">(${escapeHtml(trait.cost_fp)} FP)</span></strong>
+          <span>${escapeHtml(trait.description)}</span>
+        </label>
+      </div>
+    `).join("");
+    ch2Traits.querySelectorAll("input[type=checkbox]").forEach((input) => {
+      input.addEventListener("change", () => {
+        if (input.checked) {
+          if (ch2Local.traitIds.length >= 2) {
+            input.checked = false;
+            setCh2Status("At most 2 traits per stage.");
+            return;
+          }
+          ch2Local.traitIds.push(input.value);
+        } else {
+          ch2Local.traitIds = ch2Local.traitIds.filter((id) => id !== input.value);
+        }
+        ch2RenderCompleteGate();
+      });
+    });
+  };
+
+  const ch2RenderAllocation = () => {
+    const stage = ch2Local.stageRules;
+    if (!stage.has_special_allocation) {
+      ch2AllocationWrap.hidden = true;
+      return;
+    }
+    ch2AllocationWrap.hidden = false;
+    const finalRoll = ch2FinalRoll();
+    const attributes = state.chapter2Rules?.attributes || ["Spirit", "Might", "Empathy", "Grace", "Awareness", "Intellect", "Lore", "Presence", "Craft", "Resolve"];
+    ch2AllocationRows.innerHTML = attributes.map((attr) => `
+      <div class="catharsis-chapter2-allocation-row">
+        <span>${escapeHtml(attr)}</span>
+        <input type="number" min="0" max="${finalRoll || 0}" value="${ch2Local.allocation[attr] || 0}" data-attr="${escapeHtml(attr)}" />
+      </div>
+    `).join("");
+    ch2AllocationRows.querySelectorAll("input[type=number]").forEach((input) => {
+      input.addEventListener("input", () => {
+        const attr = input.dataset.attr;
+        const value = Math.max(0, Number(input.value) || 0);
+        ch2Local.allocation[attr] = value;
+        ch2RenderCompleteGate();
+      });
+    });
+  };
+
+  const ch2RenderCompleteGate = () => {
+    const stage = ch2Local.stageRules;
+    const finalRoll = ch2FinalRoll();
+    let ready = finalRoll != null && Boolean(ch2Local.bonusChoiceId);
+
+    if (stage.has_special_allocation && ready) {
+      const total = Object.values(ch2Local.allocation).reduce((sum, v) => sum + (Number(v) || 0), 0);
+      const craft = Number(ch2Local.allocation.Craft) || 0;
+      ready = total === finalRoll && craft >= 1;
+    }
+
+    ch2CompleteButton.disabled = !ready;
+  };
+
+  const ch2RenderStagePanel = () => {
+    const stage = ch2Local.stageRules;
+    const ctx = chapter2Ctx() || ch2DefaultState();
+
+    ch2StageName.textContent = `Stage ${stage.stage_number}: ${stage.name}`;
+    ch2Intro.textContent = stage.canonical_intro || stage.purpose || "";
+    ch2Fp.textContent = String(ctx.fp_balance ?? "--");
+    ch2StageNumber.textContent = `${stage.stage_number} / 10`;
+    ch2PrimaryAttrLabel.textContent = stage.has_special_allocation ? "Craft (min)" : stage.primary_attribute;
+    ch2PrimaryAttrTotal.textContent = String((ctx.attributes || {})[stage.has_special_allocation ? "Craft" : stage.primary_attribute] ?? 0);
+    ch2PrimaryLabel.textContent = `Roll for ${stage.name}`;
+
+    ch2D4.textContent = ch2Local.rolls ? String(ch2Local.rolls.d4) : "--";
+    ch2D6.textContent = ch2Local.rolls?.d6 != null ? String(ch2Local.rolls.d6) : "--";
+    ch2Final.textContent = ch2FinalRoll() != null ? String(ch2FinalRoll()) : "--";
+
+    ch2RollD4Button.disabled = Boolean(ch2Local.rolls);
+    ch2RollD6Button.disabled = !ch2Local.rolls || ch2Local.rolls.d6 != null || Number(ctx.fp_balance) < 3;
+    ch2RollD6Button.hidden = false;
+
+    ch2RepresentationWrap.hidden = !stage.has_representation_field;
+    if (stage.has_representation_field) {
+      ch2Representation.value = ch2Local.representationText;
+    }
+
+    ch2CompanionWrap.hidden = !stage.companion;
+    if (stage.companion) {
+      ch2CompanionLabel.textContent = `${stage.companion.name} (${stage.companion.cost_fp} FP) — ${stage.companion.description}`;
+      ch2CompanionToggle.checked = ch2Local.companionPurchased;
+      ch2CompanionName.hidden = !ch2Local.companionPurchased;
+      ch2CompanionName.value = ch2Local.companionTarget;
+    }
+
+    ch2RenderBonusChoices();
+    ch2RenderTraits();
+    ch2RenderAllocation();
+    ch2RenderCompleteGate();
+    setCh2Status("");
+  };
+
+  const showChapter2Panel = async (stageNumber) => {
+    hideAllOnboardingPanels();
     overlay.hidden = false;
     document.body.classList.add("modal-open");
-    setChildhoodStatus("Stage 2 is parked as a shell only. Return to the workbook when you are ready.");
-    childhoodContinueButton.disabled = false;
-    childhoodContinueButton.focus();
+    setCh2Status("Loading stage...");
+    chapter2Panel.hidden = false;
+
+    try {
+      await loadChapter2Rules();
+    } catch (error) {
+      console.error("chapter2 rules load failed", error);
+      setCh2Status("Could not load Chapter II rules. Try again.");
+      return;
+    }
+
+    const stage = chapter2StageRules(stageNumber);
+    if (!stage) {
+      setCh2Status(`Unknown stage ${stageNumber}.`);
+      return;
+    }
+
+    ch2Local.stageNumber = stageNumber;
+    ch2Local.stageRules = stage;
+    ch2Local.rolls = null;
+    ch2ResetLocalSelections();
+
+    const ctx = chapter2Ctx();
+    const existingStage = ctx?.stages?.[String(stageNumber)];
+    if (existingStage?.completed) {
+      // Already committed: show as read-only completed summary and advance.
+      ch2Local.rolls = { d4: existingStage.final_roll, d6: null };
+      ch2Local.useEnhancement = Boolean(existingStage.enhancement_used);
+      ch2RenderStagePanel();
+      setCh2Status(`Stage ${stageNumber} is already complete.`);
+      ch2RollD4Button.disabled = true;
+      ch2RollD6Button.disabled = true;
+      ch2CompleteButton.disabled = false;
+      ch2CompleteButton.textContent = stageNumber >= 10 ? "Continue to Chapter III" : "Continue to next stage";
+      return;
+    }
+
+    ch2CompleteButton.textContent = "Complete stage";
+
+    // The stage isn't committed yet, but a d4 (and maybe d6) may already be
+    // locked server-side from a prior visit. Restore it instead of showing a
+    // blank roll, so a refresh never looks like the roll was lost or rerolled.
+    try {
+      const params = new URLSearchParams({
+        character_card_id: state.workbookCardId,
+        stage_number: String(stageNumber),
+      });
+      const response = await fetch(`/api/character-cards/chapter2-roll?${params.toString()}`, { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      const rolls = payload?.ok ? payload?.data?.rolls : null;
+      if (rolls) {
+        ch2Local.rolls = { d4: Number(rolls.d4), d6: rolls.d6 != null ? Number(rolls.d6) : null };
+        ch2Local.useEnhancement = rolls.d6 != null;
+      }
+    } catch (error) {
+      console.error("chapter2 roll status load failed", error);
+    }
+
+    ch2RenderStagePanel();
   };
+
+  const ch2RequestRoll = async (dieType) => {
+    const response = await fetch("/api/character-cards/chapter2-roll", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        character_card_id: state.workbookCardId,
+        stage_number: ch2Local.stageNumber,
+        die_type: dieType,
+      }),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.ok || !payload?.data) {
+      throw new Error(payload?.data?.error || payload?.error || `Chapter 2 roll failed (${response.status}).`);
+    }
+    return payload.data;
+  };
+
+  const ch2RollD4 = async () => {
+    if (ch2Local.rolls) return;
+    ch2RollD4Button.disabled = true;
+    setCh2Status("Rolling...");
+    const token = buildSequenceToken;
+    try {
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < 480) {
+        if (token !== buildSequenceToken) return;
+        ch2D4.textContent = String(randomDie(4));
+        await sleep(58);
+      }
+      const result = await ch2RequestRoll("d4");
+      if (token !== buildSequenceToken) return;
+      ch2Local.rolls = { d4: Number(result.value), d6: null };
+      ch2RenderStagePanel();
+      setCh2Status("Roll locked.");
+    } catch (error) {
+      console.error("chapter2 d4 roll failed", error);
+      setCh2Status("Could not roll. Try again.");
+      ch2RollD4Button.disabled = false;
+    }
+  };
+
+  const ch2RollD6 = async () => {
+    if (!ch2Local.rolls || ch2Local.rolls.d6 != null) return;
+    ch2RollD6Button.disabled = true;
+    setCh2Status("Enhancing...");
+    const token = buildSequenceToken;
+    try {
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < 480) {
+        if (token !== buildSequenceToken) return;
+        ch2D6.textContent = String(randomDie(6));
+        await sleep(58);
+      }
+      const result = await ch2RequestRoll("d6");
+      if (token !== buildSequenceToken) return;
+      ch2Local.rolls.d6 = Number(result.value);
+      ch2Local.useEnhancement = true;
+      ch2RenderStagePanel();
+      setCh2Status("Enhancement locked.");
+    } catch (error) {
+      console.error("chapter2 d6 roll failed", error);
+      setCh2Status("Could not enhance. Try again.");
+      ch2RollD6Button.disabled = false;
+    }
+  };
+
+  const ch2CompleteStage = async () => {
+    const ctx = chapter2Ctx();
+    const stageKey = String(ch2Local.stageNumber);
+    if (ctx?.stages?.[stageKey]?.completed) {
+      const nextStage = ch2Local.stageNumber + 1;
+      if (ch2Local.stageNumber >= 10) {
+        showChapter3Panel();
+        return;
+      }
+      await showChapter2Panel(nextStage);
+      return;
+    }
+
+    ch2CompleteButton.disabled = true;
+    setCh2Status("Saving stage...");
+    try {
+      const response = await fetch("/api/character-cards/chapter2-stage", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          character_card_id: state.workbookCardId,
+          stage_number: ch2Local.stageNumber,
+          use_enhancement: ch2Local.useEnhancement,
+          bonus_choice_id: ch2Local.bonusChoiceId,
+          companion_purchased: ch2Local.companionPurchased,
+          companion_target: ch2Local.companionTarget,
+          trait_ids: ch2Local.traitIds,
+          allocation: ch2Local.stageRules.has_special_allocation ? ch2Local.allocation : undefined,
+          representation_text: ch2Local.representationText,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok || !payload?.data) {
+        throw new Error(payload?.data?.error || payload?.error || `Stage commit failed (${response.status}).`);
+      }
+
+      // The stage endpoint already persisted workbook_context (including the
+      // chapter2 sub-object) server-side. Only the flat stage result comes
+      // back here; refresh state.workbookContext afterward instead of
+      // patching it from this response, so we never clobber it with a stale
+      // client-side copy.
+      const result = payload.data;
+
+      const stageEntry = {
+        page_key: "history",
+        entry_type: "chapter2_stage",
+        title: `Stage ${ch2Local.stageNumber}: ${ch2Local.stageRules.name}`,
+        body: `Final roll ${result.final_roll}. Bonus: ${ch2Local.bonusChoiceId}.`,
+        stage_number: ch2Local.stageNumber,
+        sort_order: ch2Local.stageNumber,
+        payload: {
+          source: "catharsis",
+          ruleset_key: "socio",
+          ruleset_version: "1.1",
+          chapter2_result: result,
+        },
+      };
+
+      await postWorkbookEvents(state.workbookCardId, {
+        character_card_id: state.workbookCardId,
+        module_key: "socio",
+        module_status: result.completed && ch2Local.stageNumber >= 10 ? "complete" : "draft",
+        current_stage: result.next_stage ? 2 : 3,
+        current_event: result.next_stage ? `chapter2_stage_${result.next_stage}` : "chapter2_complete",
+        workbook_status: "draft",
+        entries: [stageEntry],
+      });
+
+      await refreshWorkbookContextFromServer();
+
+      if (result.next_stage) {
+        await showChapter2Panel(result.next_stage);
+      } else {
+        showChapter3Panel();
+      }
+    } catch (error) {
+      console.error("chapter2 stage commit failed", error);
+      setCh2Status(String(error.message || "Could not save this stage."));
+      ch2CompleteButton.disabled = false;
+    }
+  };
+
+  const showChapter3Panel = () => {
+    hideAllOnboardingPanels();
+    chapter3Panel.hidden = false;
+    overlay.hidden = false;
+    document.body.classList.add("modal-open");
+    chapter3ContinueButton.focus();
+  };
+
+  // --- Inheritance coin flip ---
+
+  const goToChapterTwoFromBuildPanel = async () => {
+    hideAllOnboardingPanels();
+    buildPanel.hidden = false;
+    overlay.hidden = false;
+    document.body.classList.add("modal-open");
+    const card = state.activeCharacter;
+    const lastParent = state.parentageRows[state.parentageRows.length - 1] || {};
+    buildTitle.textContent = String(card?.name || lastParent.social_class || "Socio Candidate").trim();
+    buildCopy.textContent = state.startingWealth > 0
+      ? `Catharsis finished the two-pass parentage. Starting wealth resolved to ${state.startingWealth}.`
+      : "Catharsis finished the two-pass parentage. No wealth inheritance passed the gate.";
+    buildClass.textContent = String(lastParent.social_class || card?.name || "Unknown").trim();
+    buildCredit.textContent = String(lastParent.starting_credit || "--");
+    setBuildStatus(`Ready: ${String(card?.name || lastParent.social_class || "Socio Candidate").trim()}`);
+    await sleep(620);
+    showChapterPanel();
+    setBuildStatus("Chapter II is ready.");
+  };
+
+  const showCoinFlipPanel = () => {
+    hideAllOnboardingPanels();
+    coinFlipPanel.hidden = false;
+    overlay.hidden = false;
+    document.body.classList.add("modal-open");
+
+    const parentIndex = state.coinFlipQueue[0];
+    const row = state.parentageRows.find((parent) => Number(parent.parent_index) === Number(parentIndex)) || {};
+    coinFlipTitle.textContent = `Parent ${parentIndex} may pass down wealth`;
+    coinFlipCopy.textContent = `Starting credit ${row.starting_credit ?? "--"} (${row.social_class || "Unknown"}) qualifies for retention. Flip the coin to see if it passes to you.`;
+    coinFlipFace.textContent = "?";
+    coinFlipButton.disabled = false;
+    coinFlipButton.textContent = "Flip the coin";
+    coinFlipStatus.textContent = "";
+    coinFlipContinueButton.disabled = true;
+    coinFlipButton.focus();
+  };
+
+  const runCoinFlip = async () => {
+    const parentIndex = state.coinFlipQueue[0];
+    if (parentIndex == null) return;
+    coinFlipButton.disabled = true;
+    coinFlipStatus.textContent = "Flipping...";
+    const token = ++buildSequenceToken;
+
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < 900) {
+      if (token !== buildSequenceToken) return;
+      coinFlipFace.textContent = Math.random() < 0.5 ? "Heads" : "Tails";
+      await sleep(90);
+    }
+    if (token !== buildSequenceToken) return;
+
+    let result;
+    try {
+      const response = await fetch("/api/character-cards/coin-flip", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ character_card_id: state.workbookCardId, parent_index: parentIndex }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok || !payload?.data) {
+        throw new Error(payload?.data?.error || payload?.error || `Coin flip failed (${response.status}).`);
+      }
+      result = payload.data;
+    } catch (error) {
+      console.error("catharsis coin flip failed", error);
+      if (token !== buildSequenceToken) return;
+      coinFlipStatus.textContent = "Could not flip the coin. Try again.";
+      coinFlipButton.disabled = false;
+      return;
+    }
+    if (token !== buildSequenceToken) return;
+
+    state.coinFlipResults[parentIndex] = result;
+    const row = state.parentageRows.find((parent) => Number(parent.parent_index) === Number(parentIndex));
+    if (row) {
+      row.coin_flip_roll = result.coin_flip_roll;
+      row.coin_flip_result = result.coin_flip_result;
+      row.inheritance_passed = result.inheritance_passed;
+      row.inherited_wealth = result.inherited_wealth;
+    }
+    state.startingWealth = Number(result.starting_wealth) || 0;
+
+    const won = result.coin_flip_result === "retain";
+    coinFlipFace.textContent = won ? "Retained!" : "Lost.";
+    coinFlipStatus.textContent = won
+      ? `Parent ${parentIndex}'s wealth passes down: +${result.inherited_wealth} starting credit.`
+      : `Parent ${parentIndex}'s wealth does not pass down.`;
+    coinFlipContinueButton.disabled = false;
+    coinFlipContinueButton.focus();
+  };
+
+  const advanceCoinFlipQueue = async () => {
+    const finishedParentIndex = state.coinFlipQueue.shift();
+    const result = state.coinFlipResults[finishedParentIndex];
+
+    if (result && state.workbookCardId) {
+      try {
+        await postWorkbookEvents(state.workbookCardId, {
+          character_card_id: state.workbookCardId,
+          module_key: "socio",
+          module_status: "draft",
+          workbook_status: "draft",
+          entries: [
+            {
+              page_key: "history",
+              entry_type: "coin_flip",
+              title: `Parent ${finishedParentIndex} coin flip`,
+              body: `Parent ${finishedParentIndex} retention resolved to ${result.coin_flip_result} and ${result.inherited_wealth} starting wealth.`,
+              stage_number: 1,
+              sort_order: 1,
+              payload: {
+                ...result,
+                source: "catharsis",
+                ruleset_key: "socio",
+                ruleset_version: "1.1",
+              },
+            },
+          ],
+        });
+      } catch (error) {
+        console.error("catharsis coin flip history write failed", error);
+      }
+    }
+
+    if (state.coinFlipQueue.length > 0) {
+      showCoinFlipPanel();
+      return;
+    }
+
+    await goToChapterTwoFromBuildPanel();
+  };
+
+  coinFlipButton.addEventListener("click", () => {
+    void runCoinFlip();
+  });
+
+  coinFlipContinueButton.addEventListener("click", () => {
+    void advanceCoinFlipQueue();
+  });
+
+  ch2RollD4Button.addEventListener("click", () => {
+    void ch2RollD4();
+  });
+
+  ch2RollD6Button.addEventListener("click", () => {
+    void ch2RollD6();
+  });
+
+  ch2Representation.addEventListener("input", () => {
+    ch2Local.representationText = ch2Representation.value;
+  });
+
+  ch2CompanionToggle.addEventListener("change", () => {
+    ch2Local.companionPurchased = ch2CompanionToggle.checked;
+    ch2CompanionName.hidden = !ch2Local.companionPurchased;
+    ch2RenderCompleteGate();
+  });
+
+  ch2CompanionName.addEventListener("input", () => {
+    ch2Local.companionTarget = ch2CompanionName.value;
+  });
+
+  ch2CompleteButton.addEventListener("click", () => {
+    void ch2CompleteStage();
+  });
+
+  chapter3ContinueButton.addEventListener("click", () => {
+    closeOverlay();
+  });
 
   const getCurrentWorkbookContext = () => {
     const workbookContext = state.workbookContext && typeof state.workbookContext === "object" ? state.workbookContext : {};
@@ -326,6 +977,21 @@
     return payload.data || {};
   };
 
+  const refreshWorkbookContextFromServer = async () => {
+    const response = await fetch("/api/character-cards/me", { credentials: "include" });
+    const payload = await response.json().catch(() => null);
+    const data = payload?.data || {};
+    const activeCharacterId = String(state.activeCharacter?.character_card_id || state.workbookCardId || "");
+    const cards = Array.isArray(data.cards) ? data.cards : [];
+    const refreshed = data.active_character?.character_card_id === activeCharacterId
+      ? data.active_character
+      : cards.find((card) => String(card.id || card.character_card_id || "") === activeCharacterId);
+    if (refreshed) {
+      state.workbookContext = { ...(refreshed.workbook_context || {}) };
+      state.activeCharacter = { ...state.activeCharacter, ...refreshed };
+    }
+  };
+
   const resetRollState = (editable = true) => {
     state.dieTotals = [null, null, null];
     state.totalRoll = null;
@@ -411,11 +1077,8 @@
   };
 
   const showIntro = () => {
+    hideAllOnboardingPanels();
     introPanel.hidden = false;
-    socioPanel.hidden = true;
-    buildPanel.hidden = true;
-    chapterPanel.hidden = true;
-    childhoodPanel.hidden = true;
     overlay.hidden = false;
     resetRollState(false);
     setSocioStatus("");
@@ -423,11 +1086,8 @@
   };
 
   const showSocioPrompt = () => {
-    introPanel.hidden = true;
+    hideAllOnboardingPanels();
     socioPanel.hidden = false;
-    buildPanel.hidden = true;
-    chapterPanel.hidden = true;
-    childhoodPanel.hidden = true;
     overlay.hidden = false;
     resetRollState(true);
     setSocioStatus(phasePrompt());
@@ -444,11 +1104,8 @@
   };
 
   const showBuildPanel = () => {
-    introPanel.hidden = true;
-    socioPanel.hidden = true;
+    hideAllOnboardingPanels();
     buildPanel.hidden = false;
-    chapterPanel.hidden = true;
-    childhoodPanel.hidden = true;
     overlay.hidden = false;
     buildTitle.textContent = state.phase === 1 ? "First parent revealed" : "Second parent revealed";
     buildCopy.textContent = state.phase === 1
@@ -654,6 +1311,9 @@
       state.parentageRows = serverParentRows;
       state.startingWealth = serverStartingWealth;
 
+      // Coin-flip history entries are written later, once each flip is
+      // actually resolved by the player (see runCoinFlip/advanceCoinFlipQueue)
+      // rather than here, since the result is not known yet at this point.
       const historyEntries = [
         {
           page_key: "history",
@@ -669,56 +1329,21 @@
             ruleset_version: "1.1",
           },
         },
-      ];
-
-      if (Number(firstParentRow?.starting_credit || 0) > 50) {
-        historyEntries.push({
+        {
           page_key: "history",
-          entry_type: "coin_flip",
-          title: "Parent 1 coin flip",
-          body: `Parent 1 retention resolved to ${firstParentRow.coin_flip_result || "pending"} and ${firstParentRow.inherited_wealth || 0} starting wealth.`,
+          entry_type: "parentage_roll",
+          title: "Parent 2 roll",
+          body: summarizeParentRows([secondParentRow]),
           stage_number: 1,
           sort_order: 2,
-          payload: {
-            ...firstParentRow,
-            source: "catharsis",
-            ruleset_key: "socio",
-            ruleset_version: "1.1",
-          },
-        });
-      }
-
-      historyEntries.push({
-        page_key: "history",
-        entry_type: "parentage_roll",
-        title: "Parent 2 roll",
-        body: summarizeParentRows([secondParentRow]),
-        stage_number: 1,
-        sort_order: historyEntries.length + 1,
-        payload: {
-          ...secondParentRow,
-          source: "catharsis",
-          ruleset_key: "socio",
-          ruleset_version: "1.1",
-        },
-      });
-
-      if (Number(secondParentRow?.starting_credit || 0) > 50) {
-        historyEntries.push({
-          page_key: "history",
-          entry_type: "coin_flip",
-          title: "Parent 2 coin flip",
-          body: `Parent 2 retention resolved to ${secondParentRow.coin_flip_result || "pending"} and ${secondParentRow.inherited_wealth || 0} starting wealth.`,
-          stage_number: 1,
-          sort_order: historyEntries.length + 1,
           payload: {
             ...secondParentRow,
             source: "catharsis",
             ruleset_key: "socio",
             ruleset_version: "1.1",
           },
-        });
-      }
+        },
+      ];
 
       historyEntries.push({
         page_key: "creation_progress",
@@ -758,16 +1383,30 @@
 
       if (sequenceToken !== buildSequenceToken) return;
       buildTitle.textContent = String(card?.name || firstParentRow.social_class || "Socio Candidate").trim();
-      buildCopy.textContent = serverStartingWealth > 0
-        ? `Catharsis finished the two-pass parentage. Starting wealth resolved to ${serverStartingWealth}.`
-        : "Catharsis finished the two-pass parentage. No wealth inheritance passed the gate.";
       buildRoll.textContent = String(total);
       buildClass.textContent = String(secondParentRow.social_class || card?.name || "Unknown").trim();
       buildCredit.textContent = String(secondParentRow.starting_credit || "--");
       renderWheelWindow(total);
-      setBuildStatus(`Ready: ${String(card?.name || secondParentRow.social_class || "Socio Candidate").trim()}`);
       localStorage.setItem(introKey, "1");
       localStorage.setItem(socioKey, "1");
+
+      state.coinFlipQueue = serverParentRows
+        .filter((parent) => Boolean(parent.coin_flip_eligible))
+        .map((parent) => Number(parent.parent_index))
+        .filter((index) => Number.isFinite(index));
+      state.coinFlipResults = {};
+
+      if (state.coinFlipQueue.length > 0) {
+        buildCopy.textContent = "Catharsis finished the two-pass parentage. At least one parent qualifies for inheritance retention — flip the coin to find out.";
+        setBuildStatus("Inheritance coin flip is ready.");
+        await sleep(620);
+        if (sequenceToken !== buildSequenceToken) return;
+        showCoinFlipPanel();
+        return;
+      }
+
+      buildCopy.textContent = "Catharsis finished the two-pass parentage. No wealth inheritance passed the gate.";
+      setBuildStatus(`Ready: ${String(card?.name || secondParentRow.social_class || "Socio Candidate").trim()}`);
       await sleep(620);
       if (sequenceToken !== buildSequenceToken) return;
       showChapterPanel();
@@ -786,8 +1425,7 @@
 
   const continueFromChapter = async () => {
     if (!state.workbookCardId) {
-      showChildhoodPanel();
-      setChildhoodStatus("Stage 2 is parked as a shell only. Return to the workbook when you are ready.");
+      await showChapter2Panel(1);
       return;
     }
 
@@ -800,20 +1438,20 @@
         module_key: "socio",
         module_status: "draft",
         current_stage: 2,
-        current_event: "childhood_stages",
+        current_event: "chapter2_stage_1",
         workbook_status: "draft",
         workbook_context: {
           ...getCurrentWorkbookContext(),
           current_stage: 2,
-          current_event: "childhood_stages",
+          current_event: "chapter2_stage_1",
           active_page: "face",
         },
         entries: [
           {
             page_key: "creation_progress",
             entry_type: "chapter_handoff",
-            title: "Chapter II: Childhood Stages",
-            body: "Catharsis opened the next chapter and handed the workbook into the childhood stage.",
+            title: "Chapter II: Lifepath",
+            body: "Catharsis opened the next chapter and handed the workbook into the Lifepath stages.",
             stage_number: 2,
             sort_order: 1,
             payload: {
@@ -825,19 +1463,13 @@
         ],
       });
       if (sequenceToken !== buildSequenceToken) return;
-      showChildhoodPanel();
-      setChildhoodStatus("Stage 2 is parked as a shell only. Return to the workbook when you are ready.");
+      await showChapter2Panel(1);
     } catch (error) {
       if (sequenceToken !== buildSequenceToken) return;
       console.error("catharsis chapter handoff failed", error);
       chapterContinueButton.disabled = false;
       setBuildStatus("Could not save Chapter II handoff.");
     }
-  };
-
-  const continueFromChildhood = async () => {
-    buildSequenceToken += 1;
-    closeOverlay();
   };
 
   const romanNumeralNamePattern = /^M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/;
@@ -912,10 +1544,6 @@
     void continueFromChapter();
   });
 
-  childhoodContinueButton.addEventListener("click", () => {
-    void continueFromChildhood();
-  });
-
   void (async () => {
     await loadParentageChart();
     state.phase = 1;
@@ -944,6 +1572,18 @@
         const url = new URL(window.location.href);
         url.searchParams.delete("new_character");
         window.history.replaceState({}, "", url.toString());
+      }
+
+      // An in-progress Chapter 2 draft always takes priority over the
+      // "first time in this browser" intro gate below — otherwise a fresh
+      // browser/profile/incognito session (no localStorage flags yet) would
+      // drop a resuming player back into Stage 1 character creation instead
+      // of their already-existing draft.
+      if (!requestedNewCharacter && state.workbookCardId && Number(state.workbookContext?.current_stage) === 2) {
+        const ctx = chapter2Ctx();
+        const resumeStage = Math.min(10, Math.max(1, Number(ctx?.current_stage) || 1));
+        await showChapter2Panel(resumeStage);
+        return;
       }
 
       const shouldShowOnboarding = state.canDraft && state.cards.length === 0;

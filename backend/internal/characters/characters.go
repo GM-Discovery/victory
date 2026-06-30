@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -264,6 +265,185 @@ func HandleParentageChart() http.HandlerFunc {
 			"version": ParentageChartVersionV11,
 			"entries": ParentageChartV11,
 		}})
+	}
+}
+
+func HandleChapter2Rules() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
+			return
+		}
+		writeJSON(w, http.StatusOK, response{Ok: true, Data: map[string]any{
+			"version":       Chapter2Version,
+			"starting_fp":   Chapter2StartingFP,
+			"attribute_cap": Chapter2AttributeCap,
+			"attributes":    AllChapter2Attributes,
+			"ratings":       AttributeScaleRatings,
+			"stages":        Chapter2Rules,
+		}})
+	}
+}
+
+func HandleChapter2Roll(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireUser(ctx, pool, r)
+		if err != nil {
+			writeAuthError(w, err)
+			return
+		}
+		var body struct {
+			CharacterCardID string `json:"character_card_id"`
+			StageNumber     int    `json:"stage_number"`
+			DieType         string `json:"die_type"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "invalid_json"}})
+			return
+		}
+		allowed, err := CanEditCard(ctx, pool, userID, strings.TrimSpace(body.CharacterCardID))
+		if err != nil {
+			writeCharacterError(w, err)
+			return
+		}
+		if !allowed {
+			writeJSON(w, http.StatusForbidden, response{Ok: false, Data: map[string]any{"error": "forbidden"}})
+			return
+		}
+		value, err := RequestChapter2Roll(ctx, pool, userID, strings.TrimSpace(body.CharacterCardID), body.StageNumber, strings.TrimSpace(body.DieType))
+		if err != nil {
+			writeCharacterError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, response{Ok: true, Data: map[string]any{
+			"stage_number": body.StageNumber,
+			"die_type":     body.DieType,
+			"value":        value,
+		}})
+	}
+}
+
+func HandleChapter2RollStatus(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireUser(ctx, pool, r)
+		if err != nil {
+			writeAuthError(w, err)
+			return
+		}
+		cardID := strings.TrimSpace(r.URL.Query().Get("character_card_id"))
+		stageNumber, _ := strconv.Atoi(r.URL.Query().Get("stage_number"))
+		allowed, err := CanEditCard(ctx, pool, userID, cardID)
+		if err != nil {
+			writeCharacterError(w, err)
+			return
+		}
+		if !allowed {
+			writeJSON(w, http.StatusForbidden, response{Ok: false, Data: map[string]any{"error": "forbidden"}})
+			return
+		}
+		rolls, err := LoadChapter2StageRolls(ctx, pool, userID, cardID, stageNumber)
+		if err != nil {
+			writeCharacterError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, response{Ok: true, Data: map[string]any{"rolls": rolls}})
+	}
+}
+
+func HandleChapter2Stage(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireUser(ctx, pool, r)
+		if err != nil {
+			writeAuthError(w, err)
+			return
+		}
+		var input Chapter2StageInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "invalid_json"}})
+			return
+		}
+		result, newContext, err := CommitChapter2Stage(ctx, pool, userID, input)
+		if err != nil {
+			writeCharacterError(w, err)
+			return
+		}
+		// Persist the updated workbook context.
+		wbContextJSON, merr := json.Marshal(newContext)
+		if merr == nil {
+			_, _ = pool.Exec(ctx, `
+				UPDATE character_cards SET workbook_context = $2::jsonb, updated_at = NOW()
+				WHERE id = $1 AND is_deleted = FALSE
+			`, strings.TrimSpace(input.CharacterCardID), string(wbContextJSON))
+		}
+		// Update the module stage tracking.
+		currentEvent := fmt.Sprintf("chapter2_stage_%d", result.StageNumber+1)
+		if result.NextStage == 0 {
+			currentEvent = "chapter2_complete"
+		}
+		_, _ = pool.Exec(ctx, `
+			UPDATE character_workbook_modules
+			SET current_stage = $2, current_event = $3, module_context = $4::jsonb, updated_at = NOW()
+			WHERE character_card_id = $1 AND ruleset_key = 'socio'
+		`, strings.TrimSpace(input.CharacterCardID), 2, currentEvent, string(wbContextJSON))
+
+		writeJSON(w, http.StatusOK, response{Ok: true, Data: result})
+	}
+}
+
+func HandleCatharsisCoinFlip(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireUser(ctx, pool, r)
+		if err != nil {
+			writeAuthError(w, err)
+			return
+		}
+		var body struct {
+			CharacterCardID string `json:"character_card_id"`
+			ParentIndex     int    `json:"parent_index"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "invalid_json"}})
+			return
+		}
+		allowed, err := CanEditCard(ctx, pool, userID, strings.TrimSpace(body.CharacterCardID))
+		if err != nil {
+			writeCharacterError(w, err)
+			return
+		}
+		if !allowed {
+			writeJSON(w, http.StatusForbidden, response{Ok: false, Data: map[string]any{"error": "forbidden"}})
+			return
+		}
+		result, err := RequestCatharsisCoinFlip(ctx, pool, userID, strings.TrimSpace(body.CharacterCardID), body.ParentIndex)
+		if err != nil {
+			writeCharacterError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, response{Ok: true, Data: result})
 	}
 }
 
