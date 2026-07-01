@@ -1136,3 +1136,54 @@ First live Playwright smoke test (Stage 1 → Chapter 2 Stage 1 → Stage 2, rol
 - Refresh-recovery re-verified after the fix: locked d4 value (`4`) identical before and after refresh, stage number unchanged, roll button correctly stayed disabled, `GET /api/character-cards/chapter2-roll` returned `200` with the matching locked value both before the roll (`rolls: null`) and after (`rolls: {d4: 4, final_roll: 4, ...}`)
 - Test character cards and test sessions deleted after each verification pass
 - Not yet exercised live: Stage 9's special allocation UI, a full 10-stage run through to the Chapter 3 transition, FP-balance blocking at zero, and the attribute hard-cap rejection path — these are covered by the backend's validation logic and unit tests but not yet driven end-to-end through the browser
+
+## Kernel 55 — Chapter 3: Character Archetypes
+
+Implemented "Chapter 3: Character Archetypes" per the Kernel 55 spec and canonical source data (script.js, dataset v1.0.0): 14 archetypes, direct-selection path, full 15-question reflective quiz with complete result experience, single explicit confirmation event, History/Mechanics/Face projections, Chapter 4 boundary shell, and append-only Director override.
+
+### Source data fidelity
+- Kernel author supplied `script.js` as the canonical implementation reference (no separate JSON file available). Verified 15 questions / 89 answers / 14 archetypes — matches the kernel spec's stated counts exactly.
+- All archetype profile text (titles, codes, echo text, motto, shortDescription, primary{intro,strengths,challenges,socio}, hexaco, hexacoPlain, coreDrives, primaryAttribute, secondaryAttribute, keySkill, notices, strengthsList, growthEdges, groupRole, underStress, playSuggestions, questionsToAsk, howToHelpYourself) ported verbatim from script.js, with no editorializing.
+- All 15 questions and 89 answers (including exact text, maxSelections limits, scoring weights, and Question 15's selfGuess mapping) ported verbatim into a client-only `chapter3-quiz-data.js` module — this data is never sent to or received by the server.
+
+### Backend (`backend/internal/characters/`)
+- `chapter3_archetypes.go` (new) — versioned archetype catalog as Go structs (14 entries), `Chapter3ArchetypeDatasetVersion = "1.0.0"`, `Chapter3RulesetVersion = "1.1"`, `Chapter3ArchetypeByKey()` lookup, `ValidateChapter3Archetypes()` integrity check (count, duplicate keys, display-order contiguity, Mechanics fields presence).
+- `chapter3_select.go` (new) — `CommitChapter3Archetype`: validates auth/permission, Chapter 2 Stage 10 completion (wbContext["chapter2"].stages["10"].completed), archetype key against catalog, idempotency (re-submitting same already-confirmed key returns existing result without re-writing), stores `Chapter3Fact` in `workbook_context["chapter3"]` (stable ID, key, title, code, primaryAttribute, secondaryAttribute, keySkill, confirmed, confirmed_at, selection_count), sets current_stage=4 / current_event="chapter3_archetype_confirmed", writes a `history` entry via `RecordWorkbookEvents` server-side (actor-resolved, canonical character name from `character_cards.name`, no quiz data, body format: "[Name] selected [Archetype] for their archetype."), updates `character_workbook_modules`. Override path (Director/permitted actor): `override=true` bypasses the idempotency early-return and appends a new `archetype_override` history entry.
+- `workbook_pages.go` — added `chapter3FaceWidgetFields(context)` (compact archetype title + motto shown on the Face page once confirmed) and `chapter3MechanicsFields(context)` (archetype stable ID, primary/secondary attribute, key skill — the stable machine-readable inputs Kernel 56 needs for Chapter 4 skill-group selection); both appended to their respective pages in `buildWorkbookPages`.
+- `chapter3_archetypes_test.go` / `chapter3_select_test.go` (new) — `ValidateChapter3Archetypes`, `Chapter3ArchetypeByKey` known-good/unknown-key, display_order contiguity, `CommitChapter3Archetype` auth/cardID/archetypeKey/unknown-key guards (pure, no DB), `chapter2Complete` stage-10 gate (empty/stage-9-only/stage-10-complete cases), `loadChapter3Fact` round-trip.
+- Routes: `GET /api/characters/chapter3-archetypes` (public, returns full catalog), `POST /api/character-cards/chapter3-confirm` (auth + CanEditCard).
+
+### Frontend (`frontend/venues/catharsis/`)
+- `chapter3-quiz-data.js` (new) — client-only IIFE exporting `window.VictoryChapter3QuizData` with the 15 questions / 89 answers / scoring weights, plus `datasetVersion = "1.0.0"`. Never sent to server.
+- `index.html` — renamed old Chapter III "Lifepath Closes" shell (now replaced by the real Chapter 3 archetype flow) to `#catharsis-onboarding-chapter4` ("Chapter IV: The Archetype Is Set"). Added `#catharsis-onboarding-chapter3-archetype` (contains `#catharsis-chapter3-content` for dynamic rendering). Added CSS for the dynamic content: dropdown, echo cards, quiz answer buttons (`.ch3-answer-btn` + `.is-selected` toggle), resonance bar rows, profile grid, pills, echo grid. Loads `chapter3-quiz-data.js` before `onboarding.js`.
+- `onboarding.js` — full Chapter 3 module:
+  - `loadChapter3Catalog()`: fetches and caches the archetype catalog sorted by `display_order`.
+  - Quiz scoring: `ch3CalculateMaxPossibleScores()`, `ch3GetAllResults()` (raw%, +12 Resonance bump, sort by rawPercent desc / points desc / key asc), `ch3GetConfidenceLabel()` (Very strong / Strong / Moderate / Emerging), `ch3GetBlendedProfileItems()` (mirrors script.js's composition logic: 3 primary + 1 from each echo, top-up from remainder).
+  - `ch3GetSelfGuess()` + `ch3RenderPrediction()`: matches the reference matching/contrast commentary behavior exactly.
+  - `ch3RenderIntro()`: title card, "Answer as your character" framing, dropdown of 14 archetypes in display order, echo preview beneath, "Confirm Archetype" + "Take the Archetype Quiz" buttons.
+  - `ch3RenderQuizQuestion()`: question text + progress ("Question N of 15"), multi/single-select answer buttons with toggle, disabled Continue until at least one answer selected.
+  - `ch3RenderQuizResult()`: full result experience — primary title/Resonance%/confidence, motto blockquote, short description, core drive pills, Top Patterns bars (5), two echo cards (2nd/3rd), Primary Profile narrative (intro/strengths/challenges/socio), Personality Pattern (HEXACO + plain text + attribute callout: primary/secondary/key skill), What You Notice / In A Group, blended Natural Strengths / Growth Edges lists, Questions To Ask / How To Help lists, Under Stress / In Socio- lists, self-prediction comparison (match or contrast commentary), full 14-archetype Resonance breakdown bars, final dropdown (preselected to primary result, player may change), "Take the Quiz Again" / "Confirm and Continue" buttons.
+  - `ch3RenderConfirm()`: explicit confirmation screen "Select [Archetype] as this character's archetype?" + echo preview + Back + Confirm and Continue.
+  - `ch3SubmitConfirmation()`: calls `POST /api/character-cards/chapter3-confirm`, refreshes workbook context, advances to Chapter IV panel on success.
+  - `renderChapter3Content()`: mode dispatcher (intro / quiz-question / quiz-result / confirm).
+  - `showChapter3ArchetypePanel()`: entry point, loads catalog, sets mode "intro", renders.
+  - Resume logic (init IIFE): `current_stage === 2` → resume Chapter 2 (existing); `current_stage === 3` → `showChapter3ArchetypePanel()` (no quiz restore per spec, returns to intro title screen); `current_stage === 4` → normal overlay-hidden path (Chapter 3 is complete).
+  - Chapter 2 Stage 10 completion now calls `showChapter3ArchetypePanel()` instead of the old Chapter III "Lifepath Closes" stub shell.
+  - All excluded standalone-site features omitted: no report ID generation, no result URL, no share card canvas, no embed code, no clipboard tools, no download links, no external marketing links.
+
+### Tests
+- `go test ./internal/characters/...` — all new Chapter 3 tests plus all prior Kernel 53/54 tests pass (no DB access)
+- `go build ./...`, `go vet ./...`, `gofmt -l` clean
+- `node --check` on `onboarding.js` and `chapter3-quiz-data.js`
+- Quiz answer count verified: `15 questions, 89 answers` confirmed via `node -e` against the quiz data file — matches spec
+
+### Live Verification
+- Rebuilt and restarted `victory-backend`; confirmed `GET /api/characters/chapter3-archetypes` responds with 14 archetypes, correct dataset_version "1.0.0"
+- **Direct-selection path** (test character "I", Catalyst): Chapter III title screen → dropdown echo text update confirmed ("You bring energy and momentum wherever you go…") → "Select The Catalyst as this character's archetype?" confirmation screen → Chapter IV "The Archetype Is Set" screen ✓
+- **Quiz path** (test character "II", Builder): 15 questions answered (2 answers on multi-select, 1 on Q15) → full result page all 19 sections rendered with no undefined/NaN/object text → dropdown preselected to "Builder" → "Select The Builder as this character's archetype?" → Chapter IV screen ✓
+- **Idempotency**: re-posting same confirm returns `{"ok":true,"completed":true,"overridden":false}`, DB confirms `selection_count: 1` — no duplicate history entry created ✓
+- **History**: exactly one `archetype_selection` entry per card, body reads "I selected Catalyst for their archetype." / "II selected Builder for their archetype." — no quiz details, resonance values, or echo text leaked ✓ (the "I"/"II" in the body are the characters' Roman-numeral auto-names, consistent with Kernel 53 naming convention)
+- **Mechanics**: `workbook_context["chapter3"]` contains `primary_attribute`, `secondary_attribute`, `key_skill` matching `chapter3_archetypes.go` for each selection; both characters at `current_stage=4` ✓
+- **Face**: workbook pages API includes `chapter3_archetype` and `chapter3_archetype_summary` fields on the Face page for confirmed characters ✓
+- No console errors during either path. The pre-existing director-console/session-join 403s noted in prior test runs remain present and are out of scope
+- All test character cards soft-deleted, test sessions revoked after each pass

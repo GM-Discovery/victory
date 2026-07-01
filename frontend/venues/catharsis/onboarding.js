@@ -12,8 +12,10 @@
   const socioStatus = document.getElementById("catharsis-onboarding-socio-status");
   const chapterContinueButton = document.getElementById("catharsis-onboarding-chapter-continue");
   const chapter2Panel = document.getElementById("catharsis-onboarding-chapter2");
-  const chapter3Panel = document.getElementById("catharsis-onboarding-chapter3");
-  const chapter3ContinueButton = document.getElementById("catharsis-onboarding-chapter3-continue");
+  const chapter3ArchetypePanel = document.getElementById("catharsis-onboarding-chapter3-archetype");
+  const chapter3Content = document.getElementById("catharsis-chapter3-content");
+  const chapter4Panel = document.getElementById("catharsis-onboarding-chapter4");
+  const chapter4ContinueButton = document.getElementById("catharsis-onboarding-chapter4-continue");
   const coinFlipPanel = document.getElementById("catharsis-onboarding-coinflip");
   const coinFlipTitle = document.getElementById("catharsis-coinflip-title");
   const coinFlipCopy = document.getElementById("catharsis-coinflip-copy");
@@ -77,8 +79,10 @@
     !buildPanel ||
     !chapterPanel ||
     !chapter2Panel ||
-    !chapter3Panel ||
-    !chapter3ContinueButton ||
+    !chapter3ArchetypePanel ||
+    !chapter3Content ||
+    !chapter4Panel ||
+    !chapter4ContinueButton ||
     !coinFlipPanel ||
     !coinFlipTitle ||
     !coinFlipCopy ||
@@ -156,6 +160,19 @@
     chapter2: null,
     coinFlipQueue: [],
     coinFlipResults: {},
+    chapter3Catalog: null,
+    chapter3: {
+      mode: "intro",
+      selectedKey: "",
+      pendingConfirmKey: "",
+      confirmSource: "direct",
+      quiz: {
+        currentQuestion: 0,
+        scores: {},
+        selectedAnswers: [],
+        selectedThisQuestion: [],
+      },
+    },
   };
 
   let buildSequenceToken = 0;
@@ -287,7 +304,8 @@
     buildPanel.hidden = true;
     chapterPanel.hidden = true;
     chapter2Panel.hidden = true;
-    chapter3Panel.hidden = true;
+    chapter3ArchetypePanel.hidden = true;
+    chapter4Panel.hidden = true;
     coinFlipPanel.hidden = true;
   };
 
@@ -699,7 +717,7 @@
       if (result.next_stage) {
         await showChapter2Panel(result.next_stage);
       } else {
-        showChapter3Panel();
+        await showChapter3ArchetypePanel();
       }
     } catch (error) {
       console.error("chapter2 stage commit failed", error);
@@ -708,12 +726,430 @@
     }
   };
 
-  const showChapter3Panel = () => {
+  const showChapter4Panel = () => {
     hideAllOnboardingPanels();
-    chapter3Panel.hidden = false;
+    chapter4Panel.hidden = false;
     overlay.hidden = false;
     document.body.classList.add("modal-open");
-    chapter3ContinueButton.focus();
+    chapter4ContinueButton.focus();
+  };
+
+  // --- Chapter 3: Character Archetypes (direct selection + quiz) ---
+
+  const DISPLAY_PERCENT_BUMP = 12;
+
+  const loadChapter3Catalog = async () => {
+    if (state.chapter3Catalog) return state.chapter3Catalog;
+    const response = await fetch("/api/characters/chapter3-archetypes", { credentials: "include" });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.ok || !payload?.data) {
+      throw new Error(payload?.data?.error || payload?.error || `Chapter 3 archetype catalog load failed (${response.status}).`);
+    }
+    const list = Array.isArray(payload.data.archetypes) ? payload.data.archetypes : [];
+    list.sort((a, b) => Number(a.display_order) - Number(b.display_order));
+    state.chapter3Catalog = list;
+    return list;
+  };
+
+  const ch3ArchetypeByKey = (key) => (state.chapter3Catalog || []).find((a) => a.key === key) || null;
+
+  const ch3CalculateMaxPossibleScores = () => {
+    const maxScores = {};
+    (state.chapter3Catalog || []).forEach((a) => { maxScores[a.key] = 0; });
+    const questions = window.VictoryChapter3QuizData.questions;
+    questions.forEach((question) => {
+      const maxSelections = question.maxSelections || 1;
+      Object.keys(maxScores).forEach((key) => {
+        const possible = question.answers
+          .map((answer) => (answer.scores && answer.scores[key]) ? answer.scores[key] : 0)
+          .sort((a, b) => b - a)
+          .slice(0, maxSelections)
+          .reduce((sum, value) => sum + value, 0);
+        maxScores[key] += possible;
+      });
+    });
+    return maxScores;
+  };
+
+  const ch3GetAllResults = () => {
+    const maxScores = ch3CalculateMaxPossibleScores();
+    const scores = state.chapter3.quiz.scores;
+    return Object.keys(maxScores)
+      .map((key) => {
+        const points = scores[key] || 0;
+        const max = maxScores[key] || 1;
+        const rawPercent = Math.round((points / max) * 100);
+        return { key, points, max, rawPercent, percent: rawPercent + DISPLAY_PERCENT_BUMP };
+      })
+      .sort((a, b) => b.rawPercent - a.rawPercent || b.points - a.points || a.key.localeCompare(b.key));
+  };
+
+  const ch3GetConfidenceLabel = (primaryPercent, secondPercent) => {
+    const gap = primaryPercent - secondPercent;
+    if (primaryPercent >= 95 && gap >= 15) return "Very strong";
+    if (primaryPercent >= 82 && gap >= 8) return "Strong";
+    if (primaryPercent >= 65) return "Moderate";
+    return "Emerging";
+  };
+
+  const ch3GetBlendedProfileItems = (primary, second, third, field, total = 5) => {
+    const primaryItems = Array.isArray(primary?.[field]) ? primary[field] : [];
+    const secondItems = Array.isArray(second?.[field]) ? second[field] : [];
+    const thirdItems = Array.isArray(third?.[field]) ? third[field] : [];
+    const chosen = [];
+    const addItem = (item) => { if (item && !chosen.includes(item)) chosen.push(item); };
+    primaryItems.slice(0, 3).forEach(addItem);
+    addItem(secondItems[0]);
+    addItem(thirdItems[0]);
+    [...primaryItems.slice(3), ...secondItems.slice(1), ...thirdItems.slice(1)].forEach((item) => {
+      if (chosen.length < total) addItem(item);
+    });
+    return chosen.slice(0, total);
+  };
+
+  const ch3GetSelfGuess = () => {
+    const questions = window.VictoryChapter3QuizData.questions;
+    const finalIndex = questions.length - 1;
+    const finalSelection = state.chapter3.quiz.selectedAnswers.find((item) => item.question === finalIndex);
+    if (!finalSelection) return null;
+    const answer = questions[finalIndex].answers[finalSelection.answer];
+    return answer?.selfGuess || null;
+  };
+
+  const ch3RenderList = (items) => (items || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+
+  const ch3RenderPills = (items) => (items || []).map((item) => `<span class="ch3-pill">${escapeHtml(item)}</span>`).join("");
+
+  const ch3RenderBars = (allResults, options = {}) => {
+    const limit = options.limit || null;
+    const results = limit ? allResults.slice(0, limit) : allResults;
+    return `
+      <div class="ch3-profile-section">
+        <h3>${escapeHtml(options.title || "Archetype Breakdown")}</h3>
+        ${options.description ? `<p class="small">${escapeHtml(options.description)}</p>` : ""}
+        ${results.map((result) => {
+          const archetype = ch3ArchetypeByKey(result.key);
+          const title = archetype?.title || result.key;
+          const barWidth = Math.max(3, Math.min(100, result.percent));
+          return `
+            <div class="ch3-bar-row">
+              <div class="ch3-bar-label"><span>${escapeHtml(title)}</span><strong>${result.percent}%</strong></div>
+              <div class="ch3-bar-track"><div class="ch3-bar-fill" style="width:${barWidth}%"></div></div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  };
+
+  const ch3RenderPrediction = (primaryKey) => {
+    const selfGuess = ch3GetSelfGuess();
+    if (!selfGuess) return "";
+    const guessed = ch3ArchetypeByKey(selfGuess);
+    const primary = ch3ArchetypeByKey(primaryKey);
+    if (!guessed || !primary) return "";
+    if (selfGuess === primaryKey) {
+      return `
+        <div class="ch3-profile-section">
+          <h3>How You See Yourself</h3>
+          <p><strong>You called it.</strong> The value you picked lines up with your strongest result: <strong>${escapeHtml(primary.title)}</strong>.</p>
+          <p>That usually means the way you like to see yourself is pretty close to the pattern your answers showed.</p>
+        </div>
+      `;
+    }
+    const guessedNoun = guessed.title.replace(/^The\s+/i, "");
+    const primaryNoun = primary.title.replace(/^The\s+/i, "");
+    return `
+      <div class="ch3-profile-section">
+        <h3>How You See Yourself</h3>
+        <p>You chose a value connected to <strong>${escapeHtml(guessed.title)}</strong>, but your answers pointed more strongly toward <strong>${escapeHtml(primary.title)}</strong>.</p>
+        <p>That does not mean you were wrong. It may mean <strong>${escapeHtml(guessedNoun)}</strong> is how you like to think of yourself, while <strong>${escapeHtml(primaryNoun)}</strong> is closer to the pattern your habits reveal.</p>
+        <p><strong>The ${escapeHtml(guessedNoun)} in you:</strong> ${escapeHtml(guessed.short_description || guessed.primary?.intro || "")}</p>
+      </div>
+    `;
+  };
+
+  const ch3ArchetypeOptionsHtml = (selectedKey) => (state.chapter3Catalog || [])
+    .map((a) => `<option value="${escapeHtml(a.key)}" ${a.key === selectedKey ? "selected" : ""}>${escapeHtml(a.title)}</option>`)
+    .join("");
+
+  const ch3RenderIntro = () => {
+    const selectedKey = state.chapter3.selectedKey || (state.chapter3Catalog || [])[0]?.key || "";
+    state.chapter3.selectedKey = selectedKey;
+    const selected = ch3ArchetypeByKey(selectedKey);
+    chapter3Content.innerHTML = `
+      <p class="eyebrow">Chapter III</p>
+      <h2>Character Archetypes</h2>
+      <p>Answer as your character. What would this character do, notice, value, fear, or choose in each situation?</p>
+      <div class="ch3-select">
+        <label for="ch3-archetype-select">Choose an Archetype</label>
+        <select id="ch3-archetype-select">${ch3ArchetypeOptionsHtml(selectedKey)}</select>
+      </div>
+      ${selected ? `<div class="ch3-echo-card"><p>${escapeHtml(selected.echo)}</p></div>` : ""}
+      <p id="ch3-status" class="catharsis-onboarding__status" aria-live="polite"></p>
+      <div class="catharsis-onboarding__actions">
+        <button id="ch3-confirm-direct" type="button">Confirm Archetype</button>
+        <button id="ch3-take-quiz" type="button">Take the Archetype Quiz</button>
+      </div>
+    `;
+
+    document.getElementById("ch3-archetype-select").addEventListener("change", (event) => {
+      state.chapter3.selectedKey = event.target.value;
+      ch3RenderIntro();
+    });
+    document.getElementById("ch3-confirm-direct").addEventListener("click", () => {
+      state.chapter3.pendingConfirmKey = state.chapter3.selectedKey;
+      state.chapter3.confirmSource = "direct";
+      state.chapter3.mode = "confirm";
+      renderChapter3Content();
+    });
+    document.getElementById("ch3-take-quiz").addEventListener("click", () => {
+      state.chapter3.quiz = { currentQuestion: 0, scores: {}, selectedAnswers: [], selectedThisQuestion: [] };
+      (state.chapter3Catalog || []).forEach((a) => { state.chapter3.quiz.scores[a.key] = 0; });
+      state.chapter3.mode = "quiz-question";
+      renderChapter3Content();
+    });
+  };
+
+  const ch3RenderQuizQuestion = () => {
+    const questions = window.VictoryChapter3QuizData.questions;
+    const index = state.chapter3.quiz.currentQuestion;
+    const q = questions[index];
+    const maxSelections = q.maxSelections || 1;
+    state.chapter3.quiz.selectedThisQuestion = [];
+
+    chapter3Content.innerHTML = `
+      <p class="eyebrow">Chapter III: Archetype Quiz</p>
+      <p class="small">Question ${index + 1} of ${questions.length}</p>
+      <h2>${escapeHtml(q.text)}</h2>
+      <p class="catharsis-onboarding__hint">${maxSelections === 1 ? "Choose one answer." : `Choose up to ${maxSelections} answers.`}</p>
+      <div class="ch3-answers" id="ch3-answers"></div>
+      <div class="catharsis-onboarding__actions">
+        <button id="ch3-quiz-continue" type="button" disabled>Continue</button>
+      </div>
+    `;
+
+    const answersDiv = document.getElementById("ch3-answers");
+    q.answers.forEach((answer, answerIndex) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "ch3-answer-btn";
+      button.textContent = answer.text;
+      button.addEventListener("click", () => {
+        const selected = state.chapter3.quiz.selectedThisQuestion;
+        const already = selected.includes(answerIndex);
+        if (already) {
+          state.chapter3.quiz.selectedThisQuestion = selected.filter((i) => i !== answerIndex);
+          button.classList.remove("is-selected");
+        } else if (maxSelections === 1) {
+          state.chapter3.quiz.selectedThisQuestion = [answerIndex];
+          answersDiv.querySelectorAll(".ch3-answer-btn").forEach((btn) => btn.classList.remove("is-selected"));
+          button.classList.add("is-selected");
+        } else if (selected.length < maxSelections) {
+          state.chapter3.quiz.selectedThisQuestion.push(answerIndex);
+          button.classList.add("is-selected");
+        }
+        document.getElementById("ch3-quiz-continue").disabled = state.chapter3.quiz.selectedThisQuestion.length === 0;
+      });
+      answersDiv.appendChild(button);
+    });
+
+    document.getElementById("ch3-quiz-continue").addEventListener("click", () => {
+      state.chapter3.quiz.selectedThisQuestion.forEach((answerIndex) => {
+        const answer = q.answers[answerIndex];
+        state.chapter3.quiz.selectedAnswers.push({ question: index, answer: answerIndex });
+        Object.entries(answer.scores || {}).forEach(([key, points]) => {
+          state.chapter3.quiz.scores[key] = (state.chapter3.quiz.scores[key] || 0) + points;
+        });
+      });
+      state.chapter3.quiz.currentQuestion += 1;
+      if (state.chapter3.quiz.currentQuestion >= questions.length) {
+        state.chapter3.mode = "quiz-result";
+      }
+      renderChapter3Content();
+    });
+  };
+
+  const ch3RenderQuizResult = () => {
+    const allResults = ch3GetAllResults();
+    const top = allResults.slice(0, 3);
+    const primaryResult = top[0];
+    const secondResult = top[1];
+    const thirdResult = top[2];
+    const primary = ch3ArchetypeByKey(primaryResult.key);
+    const second = ch3ArchetypeByKey(secondResult.key);
+    const third = ch3ArchetypeByKey(thirdResult.key);
+    const confidence = ch3GetConfidenceLabel(primaryResult.percent, secondResult.percent);
+
+    chapter3Content.innerHTML = `
+      <p class="eyebrow">Chapter III: Archetype Quiz Result</p>
+      <p class="small">Your strongest Socio-Archetype pattern is</p>
+      <h2>${escapeHtml(primary.title)}</h2>
+      <p><strong>${primaryResult.percent}% Resonance</strong> &middot; Result confidence: ${escapeHtml(confidence)}</p>
+      <div class="ch3-echo-card">
+        <blockquote>${escapeHtml(primary.motto || "")}</blockquote>
+        <p>${escapeHtml(primary.short_description || "")}</p>
+        <div>${ch3RenderPills(primary.core_drives)}</div>
+      </div>
+
+      ${ch3RenderBars(allResults, { limit: 5, title: "Top Patterns", description: "Your five strongest normalized archetype signals." })}
+
+      <div class="ch3-profile-section">
+        <h3>Your Echoes</h3>
+        <div class="ch3-echo-grid">
+          <div class="ch3-echo-card"><h4>${escapeHtml(second.title)} &mdash; ${secondResult.percent}%</h4><p>${escapeHtml(second.echo)}</p></div>
+          <div class="ch3-echo-card"><h4>${escapeHtml(third.title)} &mdash; ${thirdResult.percent}%</h4><p>${escapeHtml(third.echo)}</p></div>
+        </div>
+      </div>
+
+      <div class="ch3-profile-grid">
+        <div class="ch3-profile-section">
+          <h3>Primary Profile</h3>
+          <p>${escapeHtml(primary.primary?.intro || "")}</p>
+          <p>${escapeHtml(primary.primary?.strengths || "")}</p>
+          <p>${escapeHtml(primary.primary?.challenges || "")}</p>
+          <p>${escapeHtml(primary.primary?.socio || "")}</p>
+        </div>
+        <div class="ch3-profile-section">
+          <h3>Personality Pattern</h3>
+          <p><strong>${escapeHtml(primary.hexaco || "")}</strong></p>
+          <p>${escapeHtml(primary.hexaco_plain || "")}</p>
+          <h3>What People Notice First</h3>
+          <p>What people first notice about you is your <strong>${escapeHtml(primary.primary_attribute || "")}</strong>, followed by your <strong>${escapeHtml(primary.secondary_attribute || "")}</strong>.</p>
+          <p>Your key skill is your ability to use <strong>${escapeHtml(primary.key_skill || "")}</strong>.</p>
+        </div>
+      </div>
+
+      <div class="ch3-profile-grid">
+        <div class="ch3-profile-section"><h3>What You Notice</h3><p>${escapeHtml(primary.notices || "")}</p></div>
+        <div class="ch3-profile-section"><h3>In A Group</h3><p>${escapeHtml(primary.group_role || "")}</p></div>
+      </div>
+
+      <div class="ch3-profile-grid">
+        <div class="ch3-profile-section"><h3>Natural Strengths</h3><ul>${ch3RenderList(ch3GetBlendedProfileItems(primary, second, third, "strengths_list"))}</ul></div>
+        <div class="ch3-profile-section"><h3>Growth Edges</h3><ul>${ch3RenderList(ch3GetBlendedProfileItems(primary, second, third, "growth_edges"))}</ul></div>
+      </div>
+
+      <div class="ch3-profile-grid">
+        <div class="ch3-profile-section"><h3>Questions To Ask Yourself</h3><ul>${ch3RenderList(primary.questions_to_ask)}</ul></div>
+        <div class="ch3-profile-section"><h3>How To Help Yourself</h3><ul>${ch3RenderList(primary.how_to_help_yourself)}</ul></div>
+      </div>
+
+      <div class="ch3-profile-grid">
+        <div class="ch3-profile-section"><h3>Under Stress</h3><p>${escapeHtml(primary.under_stress || "")}</p></div>
+        <div class="ch3-profile-section"><h3>In Socio-</h3><ul>${ch3RenderList(primary.play_suggestions)}</ul></div>
+      </div>
+
+      ${ch3RenderPrediction(primary.key)}
+
+      ${ch3RenderBars(allResults, { title: "Full Archetype Breakdown", description: "All fourteen archetype signals from this result." })}
+
+      <div class="ch3-select">
+        <label for="ch3-archetype-select">Confirm your archetype</label>
+        <select id="ch3-archetype-select">${ch3ArchetypeOptionsHtml(primary.key)}</select>
+      </div>
+      <div class="catharsis-onboarding__actions">
+        <button id="ch3-take-quiz-again" type="button">Take the Quiz Again</button>
+        <button id="ch3-confirm-from-quiz" type="button">Confirm and Continue</button>
+      </div>
+    `;
+
+    state.chapter3.selectedKey = primary.key;
+    document.getElementById("ch3-archetype-select").addEventListener("change", (event) => {
+      state.chapter3.selectedKey = event.target.value;
+    });
+    document.getElementById("ch3-take-quiz-again").addEventListener("click", () => {
+      state.chapter3.mode = "intro";
+      renderChapter3Content();
+    });
+    document.getElementById("ch3-confirm-from-quiz").addEventListener("click", () => {
+      state.chapter3.pendingConfirmKey = state.chapter3.selectedKey;
+      state.chapter3.confirmSource = "quiz";
+      state.chapter3.mode = "confirm";
+      renderChapter3Content();
+    });
+  };
+
+  const ch3RenderConfirm = () => {
+    const archetype = ch3ArchetypeByKey(state.chapter3.pendingConfirmKey);
+    chapter3Content.innerHTML = `
+      <p class="eyebrow">Chapter III</p>
+      <h2>Select ${escapeHtml(archetype?.title || "")} as this character's archetype?</h2>
+      ${archetype ? `<div class="ch3-echo-card"><p>${escapeHtml(archetype.echo)}</p></div>` : ""}
+      <p id="ch3-status" class="catharsis-onboarding__status" aria-live="polite"></p>
+      <div class="catharsis-onboarding__actions">
+        <button id="ch3-confirm-back" type="button">Back</button>
+        <button id="ch3-confirm-final" type="button">Confirm and Continue</button>
+      </div>
+    `;
+
+    document.getElementById("ch3-confirm-back").addEventListener("click", () => {
+      state.chapter3.mode = state.chapter3.confirmSource === "quiz" ? "quiz-result" : "intro";
+      renderChapter3Content();
+    });
+    document.getElementById("ch3-confirm-final").addEventListener("click", () => {
+      void ch3SubmitConfirmation();
+    });
+  };
+
+  const ch3SubmitConfirmation = async () => {
+    const button = document.getElementById("ch3-confirm-final");
+    const status = document.getElementById("ch3-status");
+    if (button) button.disabled = true;
+    if (status) status.textContent = "Saving...";
+    try {
+      const response = await fetch("/api/character-cards/chapter3-confirm", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          character_card_id: state.workbookCardId,
+          archetype_key: state.chapter3.pendingConfirmKey,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok || !payload?.data) {
+        throw new Error(payload?.data?.error || payload?.error || `Archetype confirmation failed (${response.status}).`);
+      }
+      await refreshWorkbookContextFromServer();
+      showChapter4Panel();
+    } catch (error) {
+      console.error("chapter3 archetype confirm failed", error);
+      if (status) status.textContent = String(error.message || "Could not save the archetype. Try again.");
+      if (button) button.disabled = false;
+    }
+  };
+
+  const renderChapter3Content = () => {
+    if (state.chapter3.mode === "quiz-question") {
+      ch3RenderQuizQuestion();
+    } else if (state.chapter3.mode === "quiz-result") {
+      ch3RenderQuizResult();
+    } else if (state.chapter3.mode === "confirm") {
+      ch3RenderConfirm();
+    } else {
+      ch3RenderIntro();
+    }
+  };
+
+  const showChapter3ArchetypePanel = async () => {
+    hideAllOnboardingPanels();
+    chapter3ArchetypePanel.hidden = false;
+    overlay.hidden = false;
+    document.body.classList.add("modal-open");
+    chapter3Content.innerHTML = "<p>Loading archetypes...</p>";
+
+    try {
+      await loadChapter3Catalog();
+    } catch (error) {
+      console.error("chapter3 catalog load failed", error);
+      chapter3Content.innerHTML = "<p>Could not load Chapter III archetypes. Try again.</p>";
+      return;
+    }
+
+    state.chapter3.mode = "intro";
+    state.chapter3.selectedKey = "";
+    renderChapter3Content();
   };
 
   // --- Inheritance coin flip ---
@@ -886,7 +1322,7 @@
     void ch2CompleteStage();
   });
 
-  chapter3ContinueButton.addEventListener("click", () => {
+  chapter4ContinueButton.addEventListener("click", () => {
     closeOverlay();
   });
 
@@ -1583,6 +2019,16 @@
         const ctx = chapter2Ctx();
         const resumeStage = Math.min(10, Math.max(1, Number(ctx?.current_stage) || 1));
         await showChapter2Panel(resumeStage);
+        return;
+      }
+
+      // Chapter 3 is never restored mid-quiz (quiz state is intentionally
+      // client-only and not canonical) — an unconfirmed Chapter 3 always
+      // resumes at the title screen. A confirmed Chapter 3 has already
+      // advanced current_stage to 4, so it falls through to the normal
+      // "no onboarding needed" path below.
+      if (!requestedNewCharacter && state.workbookCardId && Number(state.workbookContext?.current_stage) === 3) {
+        await showChapter3ArchetypePanel();
         return;
       }
 

@@ -155,6 +155,8 @@ func main() {
 	mux.HandleFunc("POST /api/character-cards/chapter2-roll", characters.HandleChapter2Roll(pool))
 	mux.HandleFunc("GET /api/character-cards/chapter2-roll", characters.HandleChapter2RollStatus(pool))
 	mux.HandleFunc("POST /api/character-cards/chapter2-stage", characters.HandleChapter2Stage(pool))
+	mux.HandleFunc("GET /api/characters/chapter3-archetypes", characters.HandleChapter3Archetypes())
+	mux.HandleFunc("POST /api/character-cards/chapter3-confirm", characters.HandleChapter3Confirm(pool))
 	mux.HandleFunc("/api/character-cards", characters.HandleCreateCharacterCard(pool))
 	mux.HandleFunc("/api/character-cards/", characters.HandleCharacterCardByID(pool))
 	mux.HandleFunc("/api/character-workbooks/", characters.HandleCharacterWorkbookByID(pool))

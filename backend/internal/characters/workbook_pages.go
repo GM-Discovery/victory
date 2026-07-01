@@ -352,13 +352,13 @@ func buildWorkbookPages(card CharacterCard, module map[string]any, entries []Cha
 			Kind:     "mechanics",
 			Summary:  "Ruleset and mechanical state derived from the module.",
 			Editable: true,
-			Fields: []WorkbookPageField{
+			Fields: append([]WorkbookPageField{
 				{Key: "workbook_status", Label: "Workbook Status", Value: card.WorkbookStatus, InputType: "text", Placeholder: "draft", Editable: true},
 				{Key: "ruleset_key", Label: "Ruleset", Value: stringValue(module["ruleset_key"]), InputType: "text", Editable: false},
 				{Key: "ruleset_version", Label: "Ruleset Version", Value: stringValue(module["ruleset_version"]), InputType: "text", Editable: false},
 				{Key: "current_stage", Label: "Current Stage", Value: intValueString(module["current_stage"]), InputType: "text", Editable: false},
 				{Key: "current_event", Label: "Current Event", Value: stringValue(module["current_event"]), InputType: "text", Editable: false},
-			},
+			}, chapter3MechanicsFields(card.WorkbookContext)...),
 		},
 		{
 			Key:      "journal",
@@ -678,7 +678,51 @@ func workbookRootSummaryFields(card CharacterCard) []WorkbookPageField {
 	if event := stringValue(context["current_event"]); strings.TrimSpace(event) != "" {
 		fields = append(fields, WorkbookPageField{Key: "current_event_summary", Label: "Current Event", Value: event, InputType: "text", Editable: false})
 	}
+	fields = append(fields, chapter3FaceWidgetFields(context)...)
 	return fields
+}
+
+// chapter3FaceWidgetFields renders the compact, permanent Chapter 3
+// archetype widget for the Face page (title, motto/short description) once
+// an archetype has been confirmed.
+func chapter3FaceWidgetFields(context map[string]any) []WorkbookPageField {
+	raw, ok := context["chapter3"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	confirmed, _ := raw["confirmed"].(bool)
+	if !confirmed {
+		return nil
+	}
+	archetype, _ := Chapter3ArchetypeByKey(stringValue(raw["archetype_key"]))
+	summary := archetype.Motto
+	if summary == "" {
+		summary = archetype.ShortDescription
+	}
+	return []WorkbookPageField{
+		{Key: "chapter3_archetype", Label: "Archetype", Value: stringValue(raw["archetype_title"]), InputType: "text", Editable: false},
+		{Key: "chapter3_archetype_summary", Label: "Archetype Summary", Value: summary, InputType: "textarea", Editable: false},
+	}
+}
+
+// chapter3MechanicsFields silently projects the confirmed archetype's
+// Mechanics dependencies (primary/secondary attribute, key skill) needed by
+// Kernel 56's Chapter 4 skill-group selection.
+func chapter3MechanicsFields(context map[string]any) []WorkbookPageField {
+	raw, ok := context["chapter3"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	confirmed, _ := raw["confirmed"].(bool)
+	if !confirmed {
+		return nil
+	}
+	return []WorkbookPageField{
+		{Key: "chapter3_archetype_stable_id", Label: "Archetype ID", Value: stringValue(raw["archetype_stable_id"]), InputType: "text", Editable: false},
+		{Key: "chapter3_primary_attribute", Label: "Archetype Primary Attribute", Value: stringValue(raw["primary_attribute"]), InputType: "text", Editable: false},
+		{Key: "chapter3_secondary_attribute", Label: "Archetype Secondary Attribute", Value: stringValue(raw["secondary_attribute"]), InputType: "text", Editable: false},
+		{Key: "chapter3_key_skill", Label: "Archetype Key Skill", Value: stringValue(raw["key_skill"]), InputType: "text", Editable: false},
+	}
 }
 
 func socioParentageSummary(context map[string]any) string {

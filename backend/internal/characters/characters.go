@@ -408,6 +408,51 @@ func HandleChapter2Stage(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+func HandleChapter3Archetypes() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
+			return
+		}
+		writeJSON(w, http.StatusOK, response{Ok: true, Data: map[string]any{
+			"dataset_version": Chapter3ArchetypeDatasetVersion,
+			"ruleset_version": Chapter3RulesetVersion,
+			"archetypes":      Chapter3Archetypes,
+		}})
+	}
+}
+
+func HandleChapter3Confirm(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireUser(ctx, pool, r)
+		if err != nil {
+			writeAuthError(w, err)
+			return
+		}
+		var body struct {
+			CharacterCardID string `json:"character_card_id"`
+			ArchetypeKey    string `json:"archetype_key"`
+			Override        bool   `json:"override"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "invalid_json"}})
+			return
+		}
+		result, _, err := CommitChapter3Archetype(ctx, pool, userID, body.CharacterCardID, body.ArchetypeKey, body.Override)
+		if err != nil {
+			writeCharacterError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, response{Ok: true, Data: result})
+	}
+}
+
 func HandleCatharsisCoinFlip(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -1305,7 +1350,7 @@ func writeCharacterError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusUnauthorized, response{Ok: false, Data: map[string]any{"error": err.Error()}})
 	case err.Error() == "forbidden", strings.Contains(err.Error(), "permission_required"), err.Error() == "target_must_be_cast_or_crew":
 		writeJSON(w, http.StatusForbidden, response{Ok: false, Data: map[string]any{"error": err.Error()}})
-	case strings.Contains(err.Error(), "required"):
+	case strings.Contains(err.Error(), "required"), strings.Contains(err.Error(), "unknown_"), strings.Contains(err.Error(), "invalid_"), strings.Contains(err.Error(), "not_eligible"), strings.Contains(err.Error(), "not_found_"):
 		writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": err.Error()}})
 	default:
 		writeJSON(w, http.StatusInternalServerError, response{Ok: false, Data: map[string]any{"error": "character_kernel_failed"}})
