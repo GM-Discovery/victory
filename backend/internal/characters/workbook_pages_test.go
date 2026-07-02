@@ -75,3 +75,59 @@ func TestBuildWorkbookPagesIncludesCatharsisSummaryFields(t *testing.T) {
 		t.Fatalf("expected socio_starting_wealth field on face page")
 	}
 }
+
+func TestBuildWorkbookPagesIncludesChapter4SkillFields(t *testing.T) {
+	card := CharacterCard{
+		Name: "Test Character",
+		WorkbookContext: map[string]any{
+			"source": "catharsis",
+			"chapter4": map[string]any{
+				"skill_stable_id": "SKILL_CRAFT_ARTIFICE",
+				"skill_name":      "Artifice",
+				"attribute_id":    "ATTR_CRAFT",
+				"attribute_name":  "Craft",
+				"training_state":  "trained",
+				"die_size":        "d6",
+				"confirmed":       true,
+			},
+		},
+	}
+
+	pages := buildWorkbookPages(card, nil, nil, nil)
+	var face, mechanics CharacterWorkbookPage
+	for _, page := range pages {
+		if page.Key == "face" {
+			face = page
+		}
+		if page.Key == "mechanics" {
+			mechanics = page
+		}
+	}
+
+	faceHasSkill := false
+	for _, field := range face.Fields {
+		if field.Key == "chapter4_first_skill" && field.Value == "Artifice" {
+			faceHasSkill = true
+		}
+	}
+	if !faceHasSkill {
+		t.Fatalf("expected chapter4_first_skill=Artifice on face page, got fields %+v", face.Fields)
+	}
+
+	mechanicsHasSkill := false
+	mechanicsHasDie := false
+	for _, field := range mechanics.Fields {
+		if field.Key == "chapter4_skill_stable_id" && field.Value == "SKILL_CRAFT_ARTIFICE" {
+			mechanicsHasSkill = true
+		}
+		if field.Key == "chapter4_die_size" && field.Value == "d6" {
+			mechanicsHasDie = true
+		}
+	}
+	if !mechanicsHasSkill {
+		t.Fatalf("expected chapter4_skill_stable_id on mechanics page, got fields %+v", mechanics.Fields)
+	}
+	if !mechanicsHasDie {
+		t.Fatalf("expected chapter4_die_size=d6 on mechanics page, got fields %+v", mechanics.Fields)
+	}
+}

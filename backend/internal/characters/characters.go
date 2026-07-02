@@ -453,6 +453,70 @@ func HandleChapter3Confirm(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+func HandleChapter4Group(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireUser(ctx, pool, r)
+		if err != nil {
+			writeAuthError(w, err)
+			return
+		}
+		cardID := strings.TrimSpace(r.URL.Query().Get("character_card_id"))
+		result, err := ResolveChapter4Group(ctx, pool, userID, cardID)
+		if err != nil {
+			writeCharacterError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, response{Ok: true, Data: result})
+	}
+}
+
+func HandleChapter4Confirm(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireUser(ctx, pool, r)
+		if err != nil {
+			writeAuthError(w, err)
+			return
+		}
+		var body struct {
+			CharacterCardID string `json:"character_card_id"`
+			SkillID         string `json:"skill_id"`
+			Override        bool   `json:"override"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "invalid_json"}})
+			return
+		}
+		result, _, err := CommitChapter4FirstSkill(ctx, pool, userID, body.CharacterCardID, body.SkillID, body.Override)
+		if err != nil {
+			writeCharacterError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, response{Ok: true, Data: result})
+	}
+}
+
+func HandleChapter4Courtyard() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
+			return
+		}
+		writeJSON(w, http.StatusOK, response{Ok: true, Data: LoadChapter4CourtyardScene()})
+	}
+}
+
 func HandleCatharsisCoinFlip(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {

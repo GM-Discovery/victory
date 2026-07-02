@@ -358,7 +358,7 @@ func buildWorkbookPages(card CharacterCard, module map[string]any, entries []Cha
 				{Key: "ruleset_version", Label: "Ruleset Version", Value: stringValue(module["ruleset_version"]), InputType: "text", Editable: false},
 				{Key: "current_stage", Label: "Current Stage", Value: intValueString(module["current_stage"]), InputType: "text", Editable: false},
 				{Key: "current_event", Label: "Current Event", Value: stringValue(module["current_event"]), InputType: "text", Editable: false},
-			}, chapter3MechanicsFields(card.WorkbookContext)...),
+			}, append(chapter3MechanicsFields(card.WorkbookContext), chapter4MechanicsFields(card.WorkbookContext)...)...),
 		},
 		{
 			Key:      "journal",
@@ -679,6 +679,7 @@ func workbookRootSummaryFields(card CharacterCard) []WorkbookPageField {
 		fields = append(fields, WorkbookPageField{Key: "current_event_summary", Label: "Current Event", Value: event, InputType: "text", Editable: false})
 	}
 	fields = append(fields, chapter3FaceWidgetFields(context)...)
+	fields = append(fields, chapter4FaceWidgetFields(context)...)
 	return fields
 }
 
@@ -722,6 +723,47 @@ func chapter3MechanicsFields(context map[string]any) []WorkbookPageField {
 		{Key: "chapter3_primary_attribute", Label: "Archetype Primary Attribute", Value: stringValue(raw["primary_attribute"]), InputType: "text", Editable: false},
 		{Key: "chapter3_secondary_attribute", Label: "Archetype Secondary Attribute", Value: stringValue(raw["secondary_attribute"]), InputType: "text", Editable: false},
 		{Key: "chapter3_key_skill", Label: "Archetype Key Skill", Value: stringValue(raw["key_skill"]), InputType: "text", Editable: false},
+	}
+}
+
+// chapter4FaceWidgetFields renders the compact, permanent Chapter 4 first
+// trained skill widget for the Face page (name, attribute, d6) once a first
+// skill has been confirmed. Per Kernel 56, after onboarding completes the
+// Face page prioritizes archetype + first skill over the ten creation
+// attributes.
+func chapter4FaceWidgetFields(context map[string]any) []WorkbookPageField {
+	raw, ok := context["chapter4"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	confirmed, _ := raw["confirmed"].(bool)
+	if !confirmed {
+		return nil
+	}
+	return []WorkbookPageField{
+		{Key: "chapter4_first_skill", Label: "First Trained Skill", Value: stringValue(raw["skill_name"]), InputType: "text", Editable: false},
+		{Key: "chapter4_first_skill_die", Label: "Training Die", Value: stringValue(raw["die_size"]), InputType: "text", Editable: false},
+	}
+}
+
+// chapter4MechanicsFields silently projects the confirmed first-skill fact
+// (stable ID, attribute, training state, die size, helpers) so later dice
+// actions can act on it by stable skill ID rather than parsing display text.
+func chapter4MechanicsFields(context map[string]any) []WorkbookPageField {
+	raw, ok := context["chapter4"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	confirmed, _ := raw["confirmed"].(bool)
+	if !confirmed {
+		return nil
+	}
+	return []WorkbookPageField{
+		{Key: "chapter4_skill_stable_id", Label: "First Skill ID", Value: stringValue(raw["skill_stable_id"]), InputType: "text", Editable: false},
+		{Key: "chapter4_skill_name", Label: "First Skill", Value: stringValue(raw["skill_name"]), InputType: "text", Editable: false},
+		{Key: "chapter4_skill_attribute", Label: "First Skill Attribute", Value: stringValue(raw["attribute_name"]), InputType: "text", Editable: false},
+		{Key: "chapter4_training_state", Label: "Training State", Value: stringValue(raw["training_state"]), InputType: "text", Editable: false},
+		{Key: "chapter4_die_size", Label: "Training Die", Value: stringValue(raw["die_size"]), InputType: "text", Editable: false},
 	}
 }
 

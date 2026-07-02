@@ -797,6 +797,52 @@
       text-align: left;
     }
 
+    .ch4-skill-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      text-align: left;
+      margin: 12px 0;
+    }
+
+    .ch4-skill-card {
+      border: 1px solid rgba(240, 208, 155, 0.22);
+      border-radius: 10px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.18);
+      cursor: pointer;
+    }
+
+    .ch4-skill-card.is-selected {
+      border-color: #f0d09b;
+      background: rgba(232, 192, 121, 0.18);
+    }
+
+    .ch4-skill-card h4 {
+      margin: 0 0 4px;
+      font-size: 1rem;
+    }
+
+    .ch4-skill-card p {
+      margin: 0;
+      font-size: 0.88em;
+      opacity: 0.85;
+    }
+
+    .ch4-key-skill-marker {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(240, 208, 155, 0.4);
+      font-size: 0.78em;
+    }
+
+    .ch4-capacity {
+      font-weight: 600;
+      margin: 8px 0;
+    }
+
     .catharsis-coinflip-coin {
       width: 120px;
       height: 120px;
@@ -3605,15 +3651,18 @@
         <div id="catharsis-chapter3-content"></div>
       </div>
 
-      <div id="catharsis-onboarding-chapter4" class="catharsis-onboarding__panel catharsis-onboarding__chapter" hidden>
-        <p class="eyebrow">Chapter IV</p>
-        <h2>The Archetype Is Set</h2>
-        <p>
-          Chapter III is complete. Your character's archetype, Fate Points, and attributes carry forward into play.
-        </p>
-        <div class="catharsis-onboarding__actions">
-          <button id="catharsis-onboarding-chapter4-continue" type="button">Return to workbook</button>
-        </div>
+      <div id="catharsis-onboarding-chapter4" class="catharsis-onboarding__panel catharsis-onboarding__chapter3-archetype" hidden>
+        <div id="catharsis-chapter4-content"></div>
+      </div>
+
+      <div id="catharsis-onboarding-curtain" class="catharsis-onboarding__panel catharsis-onboarding__chapter" hidden>
+        <p class="eyebrow">Onboarding Complete</p>
+        <h2>The Curtain Opens</h2>
+        <p id="catharsis-curtain-copy">Your character is ready.</p>
+      </div>
+
+      <div id="catharsis-onboarding-courtyard" class="catharsis-onboarding__panel catharsis-onboarding__chapter3-archetype" hidden>
+        <div id="catharsis-courtyard-content"></div>
       </div>
     </div>
   </div>

@@ -15,7 +15,11 @@
   const chapter3ArchetypePanel = document.getElementById("catharsis-onboarding-chapter3-archetype");
   const chapter3Content = document.getElementById("catharsis-chapter3-content");
   const chapter4Panel = document.getElementById("catharsis-onboarding-chapter4");
-  const chapter4ContinueButton = document.getElementById("catharsis-onboarding-chapter4-continue");
+  const chapter4Content = document.getElementById("catharsis-chapter4-content");
+  const curtainPanel = document.getElementById("catharsis-onboarding-curtain");
+  const curtainCopy = document.getElementById("catharsis-curtain-copy");
+  const courtyardPanel = document.getElementById("catharsis-onboarding-courtyard");
+  const courtyardContent = document.getElementById("catharsis-courtyard-content");
   const coinFlipPanel = document.getElementById("catharsis-onboarding-coinflip");
   const coinFlipTitle = document.getElementById("catharsis-coinflip-title");
   const coinFlipCopy = document.getElementById("catharsis-coinflip-copy");
@@ -82,7 +86,11 @@
     !chapter3ArchetypePanel ||
     !chapter3Content ||
     !chapter4Panel ||
-    !chapter4ContinueButton ||
+    !chapter4Content ||
+    !curtainPanel ||
+    !curtainCopy ||
+    !courtyardPanel ||
+    !courtyardContent ||
     !coinFlipPanel ||
     !coinFlipTitle ||
     !coinFlipCopy ||
@@ -306,6 +314,8 @@
     chapter2Panel.hidden = true;
     chapter3ArchetypePanel.hidden = true;
     chapter4Panel.hidden = true;
+    curtainPanel.hidden = true;
+    courtyardPanel.hidden = true;
     coinFlipPanel.hidden = true;
   };
 
@@ -726,12 +736,207 @@
     }
   };
 
-  const showChapter4Panel = () => {
+  // --- Chapter 4: First Skill and Courtyard Entry ---
+
+  const ch4Local = {
+    mode: "title",
+    group: null,
+    selectedSkillId: "",
+  };
+
+  const ch4RenderTitle = () => {
+    const g = ch4Local.group;
+    chapter4Content.innerHTML = `
+      <p class="eyebrow">Chapter IV</p>
+      <h2>Skills</h2>
+      <p>Your character's attribute score represents how many distinct skills they may develop in that attribute.</p>
+      <p>This screen presents the ten skills associated with <strong>${escapeHtml(g.archetype_title)}</strong>'s resolved attribute group.</p>
+      <p>The highlighted key skill fits the selected archetype especially well but is not mandatory. You are choosing the character's first trained skill.</p>
+      <div class="ch3-echo-card">
+        <p><strong>Archetype:</strong> ${escapeHtml(g.archetype_title)}</p>
+        <p><strong>${escapeHtml(g.attribute_name)}:</strong> ${g.attribute_score}</p>
+        <p class="ch4-capacity">${escapeHtml(g.attribute_name)} skills: ${g.current_skill_count} of ${g.capacity}</p>
+        <p><strong>Key skill:</strong> ${escapeHtml(g.key_skill_name)}</p>
+      </div>
+      <div class="catharsis-onboarding__actions">
+        <button id="ch4-continue-to-skills" type="button">Continue to Skills</button>
+      </div>
+    `;
+    document.getElementById("ch4-continue-to-skills").addEventListener("click", () => {
+      ch4Local.mode = "draft";
+      renderChapter4Content();
+    });
+  };
+
+  const ch4RenderDraft = () => {
+    const g = ch4Local.group;
+    chapter4Content.innerHTML = `
+      <p class="eyebrow">Chapter IV: Skills</p>
+      <h2>${escapeHtml(g.attribute_name)} Skills</h2>
+      <p class="ch4-capacity">${escapeHtml(g.attribute_name)} skills: ${g.current_skill_count} of ${g.capacity}</p>
+      <div class="ch4-skill-grid" id="ch4-skill-grid"></div>
+      <p id="ch4-status" class="catharsis-onboarding__status" aria-live="polite"></p>
+      <div class="catharsis-onboarding__actions">
+        <button id="ch4-back" type="button">Back</button>
+        <button id="ch4-confirm-draft" type="button" disabled>Confirm</button>
+      </div>
+    `;
+
+    const grid = document.getElementById("ch4-skill-grid");
+    g.skills.forEach((skill) => {
+      const card = document.createElement("div");
+      card.className = "ch4-skill-card";
+      if (skill.id === ch4Local.selectedSkillId) card.classList.add("is-selected");
+      const isKeySkill = skill.id === g.key_skill_id;
+      card.innerHTML = `
+        <h4>${escapeHtml(skill.name)}</h4>
+        <p>${escapeHtml(skill.card_description)}</p>
+        ${isKeySkill ? `<span class="ch4-key-skill-marker">Key Skill for ${escapeHtml(g.archetype_title)}</span>` : ""}
+      `;
+      card.addEventListener("click", () => {
+        ch4Local.selectedSkillId = skill.id;
+        grid.querySelectorAll(".ch4-skill-card").forEach((el) => el.classList.remove("is-selected"));
+        card.classList.add("is-selected");
+        document.getElementById("ch4-confirm-draft").disabled = false;
+      });
+      grid.appendChild(card);
+    });
+
+    document.getElementById("ch4-back").addEventListener("click", () => {
+      ch4Local.mode = "title";
+      renderChapter4Content();
+    });
+    document.getElementById("ch4-confirm-draft").addEventListener("click", () => {
+      ch4Local.mode = "confirm";
+      renderChapter4Content();
+    });
+  };
+
+  const ch4RenderConfirm = () => {
+    const g = ch4Local.group;
+    const skill = g.skills.find((s) => s.id === ch4Local.selectedSkillId);
+    const nextCount = g.current_skill_count + 1;
+    chapter4Content.innerHTML = `
+      <p class="eyebrow">Chapter IV</p>
+      <h2>Add ${escapeHtml(skill.name)} as this character's first trained skill?</h2>
+      <p><strong>${escapeHtml(g.attribute_name)} skills:</strong> ${g.current_skill_count} of ${g.capacity} &rarr; ${nextCount} of ${g.capacity}</p>
+      <p><strong>Training die:</strong> d6</p>
+      <p id="ch4-status" class="catharsis-onboarding__status" aria-live="polite"></p>
+      <div class="catharsis-onboarding__actions">
+        <button id="ch4-choose-another" type="button">Choose Another</button>
+        <button id="ch4-confirm-final" type="button">Confirm and Complete Character</button>
+      </div>
+    `;
+    document.getElementById("ch4-choose-another").addEventListener("click", () => {
+      ch4Local.mode = "draft";
+      renderChapter4Content();
+    });
+    document.getElementById("ch4-confirm-final").addEventListener("click", () => {
+      void ch4SubmitConfirmation();
+    });
+  };
+
+  const ch4SubmitConfirmation = async () => {
+    const button = document.getElementById("ch4-confirm-final");
+    const status = document.getElementById("ch4-status");
+    if (button) button.disabled = true;
+    if (status) status.textContent = "Saving...";
+    try {
+      const response = await fetch("/api/character-cards/chapter4-confirm", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          character_card_id: state.workbookCardId,
+          skill_id: ch4Local.selectedSkillId,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok || !payload?.data) {
+        throw new Error(payload?.data?.error || payload?.error || `Skill confirmation failed (${response.status}).`);
+      }
+      await refreshWorkbookContextFromServer();
+      await showCurtainTransition(payload.data);
+    } catch (error) {
+      console.error("chapter4 skill confirm failed", error);
+      if (status) status.textContent = String(error.message || "Could not save the skill. Try again.");
+      if (button) button.disabled = false;
+    }
+  };
+
+  const renderChapter4Content = () => {
+    if (ch4Local.mode === "draft") {
+      ch4RenderDraft();
+    } else if (ch4Local.mode === "confirm") {
+      ch4RenderConfirm();
+    } else {
+      ch4RenderTitle();
+    }
+  };
+
+  const showChapter4Panel = async () => {
     hideAllOnboardingPanels();
     chapter4Panel.hidden = false;
     overlay.hidden = false;
     document.body.classList.add("modal-open");
-    chapter4ContinueButton.focus();
+    chapter4Content.innerHTML = "<p>Loading skills...</p>";
+
+    try {
+      const params = new URLSearchParams({ character_card_id: state.workbookCardId });
+      const response = await fetch(`/api/character-cards/chapter4-group?${params.toString()}`, { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok || !payload?.data) {
+        throw new Error(payload?.data?.error || payload?.error || `Chapter 4 group load failed (${response.status}).`);
+      }
+      ch4Local.group = payload.data;
+      ch4Local.selectedSkillId = "";
+      ch4Local.mode = "title";
+      renderChapter4Content();
+    } catch (error) {
+      console.error("chapter4 group load failed", error);
+      chapter4Content.innerHTML = "<p>Could not load Chapter IV skills. Try again.</p>";
+    }
+  };
+
+  const showCurtainTransition = async (skillResult) => {
+    hideAllOnboardingPanels();
+    curtainPanel.hidden = false;
+    overlay.hidden = false;
+    document.body.classList.add("modal-open");
+    curtainCopy.textContent = `${skillResult?.skill_name || "Your first skill"} is trained at d6. Onboarding is complete.`;
+    await sleep(900);
+    await showCourtyardScene();
+  };
+
+  const showCourtyardScene = async () => {
+    hideAllOnboardingPanels();
+    courtyardPanel.hidden = false;
+    overlay.hidden = false;
+    document.body.classList.add("modal-open");
+    courtyardContent.innerHTML = "<p>Entering the Courtyard...</p>";
+    try {
+      const response = await fetch("/api/characters/chapter4-courtyard", { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok || !payload?.data) {
+        throw new Error(payload?.data?.error || payload?.error || `Courtyard scene load failed (${response.status}).`);
+      }
+      const scene = payload.data;
+      courtyardContent.innerHTML = `
+        <p class="eyebrow">Locked Courtyard</p>
+        <h2>${escapeHtml(scene.title)}</h2>
+        ${(scene.description || []).map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
+        <p><strong>Present:</strong> ${(scene.npcs || []).map(escapeHtml).join(", ")}</p>
+        <div class="catharsis-onboarding__actions">
+          <button id="ch4-courtyard-continue" type="button">Continue</button>
+        </div>
+      `;
+      document.getElementById("ch4-courtyard-continue").addEventListener("click", () => {
+        closeOverlay();
+      });
+    } catch (error) {
+      console.error("chapter4 courtyard load failed", error);
+      courtyardContent.innerHTML = "<p>Could not load the Courtyard. Refresh to try again.</p>";
+    }
   };
 
   // --- Chapter 3: Character Archetypes (direct selection + quiz) ---
@@ -1112,7 +1317,7 @@
         throw new Error(payload?.data?.error || payload?.error || `Archetype confirmation failed (${response.status}).`);
       }
       await refreshWorkbookContextFromServer();
-      showChapter4Panel();
+      await showChapter4Panel();
     } catch (error) {
       console.error("chapter3 archetype confirm failed", error);
       if (status) status.textContent = String(error.message || "Could not save the archetype. Try again.");
@@ -1320,10 +1525,6 @@
 
   ch2CompleteButton.addEventListener("click", () => {
     void ch2CompleteStage();
-  });
-
-  chapter4ContinueButton.addEventListener("click", () => {
-    closeOverlay();
   });
 
   const getCurrentWorkbookContext = () => {
@@ -2029,6 +2230,16 @@
       // "no onboarding needed" path below.
       if (!requestedNewCharacter && state.workbookCardId && Number(state.workbookContext?.current_stage) === 3) {
         await showChapter3ArchetypePanel();
+        return;
+      }
+
+      // An unconfirmed Chapter 4 always resumes at the title/group screen
+      // (temporary card selection is not restored, per spec); a confirmed
+      // Chapter 4 has already advanced current_stage to 5, so it falls
+      // through to the normal "no onboarding needed" path below and the
+      // character's post-onboarding functions are simply available.
+      if (!requestedNewCharacter && state.workbookCardId && Number(state.workbookContext?.current_stage) === 4) {
+        await showChapter4Panel();
         return;
       }
 
