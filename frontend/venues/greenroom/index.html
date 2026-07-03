@@ -20,6 +20,8 @@
       --accent-strong: #f1f6d0;
       --gold: #d1bc7d;
       --shadow: 0 18px 54px rgba(0, 0, 0, 0.28);
+      --font-body: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
     }
 
     * { box-sizing: border-box; }
@@ -27,12 +29,22 @@
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-family: var(--font-body);
       color: var(--text);
       background:
-        radial-gradient(circle at 20% 12%, rgba(71, 113, 82, 0.34), transparent 24%),
-        radial-gradient(circle at 84% 4%, rgba(142, 180, 126, 0.2), transparent 24%),
+        radial-gradient(circle at 20% 12%, rgba(71, 113, 82, 0.42), transparent 24%),
+        radial-gradient(circle at 84% 4%, rgba(142, 180, 126, 0.22), transparent 24%),
+        radial-gradient(circle at 50% 100%, rgba(201, 169, 104, 0.12), transparent 24%),
         linear-gradient(180deg, var(--bg-2) 0%, #08110d 100%);
+    }
+
+    h1,
+    h2,
+    h3,
+    .page-title,
+    .summary-title h2 {
+      font-family: var(--font-display);
+      letter-spacing: 0.01em;
     }
 
     [hidden] { display: none !important; }
@@ -40,6 +52,30 @@
     .shell {
       min-height: 100vh;
       padding: 24px;
+      position: relative;
+      overflow: clip;
+    }
+
+    .shell::before,
+    .shell::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .shell::before {
+      background:
+        radial-gradient(circle at 18% 8%, rgba(201, 169, 104, 0.18), transparent 14%),
+        radial-gradient(circle at 82% 14%, rgba(120, 167, 118, 0.16), transparent 18%),
+        radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.04), transparent 24%);
+      opacity: 0.9;
+    }
+
+    .shell::after {
+      background:
+        linear-gradient(180deg, rgba(8, 17, 13, 0.1), rgba(8, 17, 13, 0.32) 55%, rgba(8, 17, 13, 0.56));
     }
 
     .header {
@@ -50,6 +86,10 @@
       align-items: end;
       justify-content: space-between;
       gap: 16px;
+      position: relative;
+      z-index: 1;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(184, 213, 193, 0.12);
     }
 
     .eyebrow {
@@ -71,6 +111,7 @@
       max-width: 74ch;
       color: var(--muted);
       line-height: 1.5;
+      text-wrap: pretty;
     }
 
     .toolbar {
@@ -94,10 +135,20 @@
       font: inherit;
       font-weight: 700;
       cursor: pointer;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, color 160ms ease;
     }
 
     .button {
       background: linear-gradient(180deg, #2f4d3d 0%, #223628 100%);
+    }
+
+    .button:hover,
+    .chip:hover,
+    .tab:hover,
+    .text-button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(199, 224, 183, 0.28);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
     }
 
     .button[disabled],
@@ -114,14 +165,19 @@
       gap: 18px;
       grid-template-columns: minmax(280px, 360px) minmax(420px, 1fr) minmax(280px, 360px);
       align-items: start;
+      position: relative;
+      z-index: 1;
     }
 
     .card {
-      background: var(--panel);
-      border: 1px solid var(--line);
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.05), transparent 34%),
+        var(--panel);
+      border: 1px solid rgba(184, 213, 193, 0.14);
       border-radius: 18px;
       box-shadow: var(--shadow);
       padding: 18px;
+      backdrop-filter: blur(12px);
     }
 
     .stack {
@@ -140,6 +196,7 @@
     .panel-heading h2,
     .panel-heading h3 {
       margin: 0;
+      text-wrap: balance;
     }
 
     .mini {
@@ -195,13 +252,34 @@
       gap: 10px;
     }
 
+    .workbook-list-section {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border: 1px solid rgba(184, 213, 193, 0.12);
+      border-radius: 16px;
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.04), transparent 40%),
+        rgba(255, 255, 255, 0.02);
+    }
+
+    .workbook-list-section .panel-heading {
+      margin-bottom: 0;
+    }
+
+    .workbook-list-section .list {
+      gap: 8px;
+    }
+
     .list-item {
       display: grid;
       gap: 6px;
       padding: 12px 13px;
       border-radius: 14px;
       border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.03);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03)),
+        rgba(255, 255, 255, 0.03);
     }
 
     .list-item strong {
@@ -214,6 +292,32 @@
       color: var(--muted);
       line-height: 1.5;
       white-space: pre-wrap;
+    }
+
+    .workbook-entry {
+      width: 100%;
+      text-align: left;
+      appearance: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+    }
+
+    .workbook-entry:hover {
+      transform: translateY(-1px);
+      border-color: rgba(199, 224, 183, 0.24);
+      box-shadow: 0 14px 24px rgba(0, 0, 0, 0.16);
+    }
+
+    .workbook-entry.is-selected {
+      border-color: var(--line-strong);
+      background:
+        linear-gradient(180deg, rgba(241, 246, 208, 0.11), rgba(255, 255, 255, 0.06)),
+        rgba(255, 255, 255, 0.06);
+    }
+
+    .workbook-list-section .empty-state {
+      padding: 8px 2px 2px;
     }
 
     .tabs {
@@ -234,6 +338,10 @@
       color: var(--accent-strong);
     }
 
+    .tab:hover {
+      border-color: rgba(199, 224, 183, 0.28);
+    }
+
     .workbook-page {
       display: grid;
       gap: 14px;
@@ -246,11 +354,13 @@
       background:
         radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.05), transparent 35%),
         var(--panel-strong);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02), 0 18px 40px rgba(0, 0, 0, 0.2);
     }
 
     .page-title {
       margin: 0 0 6px;
       font-size: 1.55rem;
+      line-height: 1.05;
     }
 
     .page-summary {
@@ -295,6 +405,7 @@
       border-radius: 18px;
       border: 1px solid rgba(255,255,255,0.1);
       background: #17231b;
+      box-shadow: 0 16px 34px rgba(0, 0, 0, 0.22);
     }
 
     .workbook-portrait-empty {
@@ -312,11 +423,23 @@
     .summary-card {
       display: grid;
       gap: 12px;
+      position: relative;
+    }
+
+    .summary-card::before {
+      content: "";
+      position: absolute;
+      inset: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(201, 224, 183, 0.08);
+      pointer-events: none;
     }
 
     .summary-title {
       display: grid;
       gap: 8px;
+      position: relative;
+      z-index: 1;
     }
 
     .summary-title h2 {
@@ -326,6 +449,8 @@
     .summary-meta {
       display: grid;
       gap: 10px;
+      position: relative;
+      z-index: 1;
     }
 
     .summary-row {
@@ -357,6 +482,7 @@
       margin: 0;
       color: var(--muted);
       line-height: 1.55;
+      text-wrap: pretty;
     }
 
     .empty-state {
@@ -382,6 +508,90 @@
     @media (max-width: 1180px) {
       .stage {
         grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .shell {
+        padding: 16px;
+      }
+
+      .header {
+        align-items: start;
+        margin-bottom: 14px;
+        padding-bottom: 12px;
+      }
+
+      .toolbar {
+        width: 100%;
+        justify-content: stretch;
+      }
+
+      .toolbar .chip {
+        flex: 1 1 0;
+        text-align: center;
+      }
+
+      .stage {
+        gap: 14px;
+      }
+
+      .card {
+        padding: 14px;
+      }
+
+      .panel-heading {
+        align-items: start;
+        flex-direction: column;
+      }
+
+      .action-row {
+        width: 100%;
+      }
+
+      .action-row .text-button,
+      .action-row .button {
+        width: 100%;
+      }
+
+      .page-surface {
+        padding: 14px;
+      }
+
+      .summary-card::before {
+        inset: 10px;
+      }
+    }
+
+    @media (min-width: 1181px) {
+      .summary-card {
+        position: sticky;
+        top: 24px;
+      }
+
+      .card {
+        transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+      }
+
+      .card:hover {
+        border-color: rgba(199, 224, 183, 0.2);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .button,
+      .chip,
+      .tab,
+      .text-button,
+      .workbook-entry,
+      .card {
+        transition: none;
+      }
+    }
+
+    @media (max-width: 1180px) {
+      .workbook-list-section {
+        padding: 12px;
       }
     }
   </style>
@@ -425,6 +635,7 @@
         </div>
 
         <div class="summary-meta" id="left-meta"></div>
+        <div class="stack" id="library-sections"></div>
 
         <section>
           <div class="panel-heading">
@@ -487,6 +698,7 @@
     const summaryNote = document.getElementById("summary-note");
     const portraitSlot = document.getElementById("portrait-slot");
     const leftMeta = document.getElementById("left-meta");
+    const librarySections = document.getElementById("library-sections");
     const rightMeta = document.getElementById("right-meta");
     const characterStatus = document.getElementById("character-status");
 
@@ -495,6 +707,7 @@
       canDraft: false,
       cards: [],
       selectedCharacterId: "",
+      activeCharacterId: "",
       workbook: null,
       selectedPageKey: "face",
       loading: false,
@@ -523,6 +736,46 @@
 
     function selectedCard() {
       return state.cards.find((card) => card.id === state.selectedCharacterId) || null;
+    }
+
+    function cardWorkbookStatus(card) {
+      return String(card?.workbook_status || "draft").trim().toLowerCase();
+    }
+
+    function isCompleteCard(card) {
+      return cardWorkbookStatus(card) === "complete";
+    }
+
+    function isDraftCard(card) {
+      return !isCompleteCard(card);
+    }
+
+    function updateResumeButton() {
+      const card = selectedCard();
+      if (!card) {
+        resumeButton.textContent = "Resume Construction";
+        resumeButton.disabled = true;
+        resumeButton.dataset.mode = "";
+        return;
+      }
+
+      if (isDraftCard(card)) {
+        resumeButton.textContent = "Resume Draft";
+        resumeButton.disabled = false;
+        resumeButton.dataset.mode = "resume";
+        return;
+      }
+
+      if (state.activeCharacterId && state.activeCharacterId === card.id) {
+        resumeButton.textContent = "Active Character";
+        resumeButton.disabled = true;
+        resumeButton.dataset.mode = "active";
+        return;
+      }
+
+      resumeButton.textContent = "Make Active";
+      resumeButton.disabled = false;
+      resumeButton.dataset.mode = "activate";
     }
 
     function workbookPages() {
@@ -570,6 +823,63 @@
       characterSelect.value = state.selectedCharacterId || "";
     }
 
+    function renderCharacterListSection(title, items, emptyLabel) {
+      const section = document.createElement("section");
+      section.className = "workbook-list-section";
+      const heading = document.createElement("div");
+      heading.className = "panel-heading";
+      const h = document.createElement("h3");
+      h.textContent = title;
+      const count = document.createElement("span");
+      count.className = "mini";
+      count.textContent = String(items.length);
+      heading.appendChild(h);
+      heading.appendChild(count);
+      section.appendChild(heading);
+
+      const list = document.createElement("div");
+      list.className = "list";
+      if (!items.length) {
+        const empty = document.createElement("p");
+        empty.className = "empty-state";
+        empty.textContent = emptyLabel;
+        list.appendChild(empty);
+      } else {
+        for (const card of items) {
+          const item = document.createElement("button");
+          item.type = "button";
+          item.className = `list-item workbook-entry${card.id === state.selectedCharacterId ? " is-selected" : ""}`;
+          const title = document.createElement("strong");
+          title.textContent = card.name || "Unnamed Character";
+          const meta = document.createElement("span");
+          const status = cardWorkbookStatus(card);
+          meta.textContent = `${status === "complete" ? "Completed character" : "Characters in Progress"} · ${status}`;
+          const body = document.createElement("p");
+          body.textContent = card.workbook_context?.current_event || card.workbook_context?.current_stage ? `Stage ${card.workbook_context?.current_stage || "?"} · ${card.workbook_context?.current_event || "No event"}` : "Workbook ready to resume.";
+          item.appendChild(title);
+          item.appendChild(meta);
+          item.appendChild(body);
+          item.addEventListener("click", () => {
+            state.selectedCharacterId = card.id;
+            renderWorkbook();
+          });
+          list.appendChild(item);
+        }
+      }
+
+      section.appendChild(list);
+      return section;
+    }
+
+    function renderWorkbookLibrarySections() {
+      if (!librarySections) return;
+      const completed = state.cards.filter((card) => isCompleteCard(card));
+      const drafts = state.cards.filter((card) => isDraftCard(card));
+      librarySections.innerHTML = "";
+      librarySections.appendChild(renderCharacterListSection("Characters", completed, "No completed characters yet."));
+      librarySections.appendChild(renderCharacterListSection("Characters in Progress", drafts, "No drafts in progress."));
+    }
+
     function renderSummary() {
       const workbook = state.workbook;
       const card = workbook?.character || selectedCard();
@@ -577,7 +887,9 @@
       const portraitURL = String(card?.portrait_url || "").trim();
 
       summaryName.textContent = profileValue(card?.name || "Unknown Participant");
-      summaryRole.textContent = card ? `Workbook ${profileValue(card.workbook_status || "draft")} · ${profileValue(module?.ruleset_key || "no module")}` : "Workbook awaiting selection";
+      summaryRole.textContent = card
+        ? `Workbook ${profileValue(card.workbook_status || "draft")} · ${profileValue(module?.ruleset_key || "no module")}${state.activeCharacterId === card.id ? " · Active persona" : ""}`
+        : "Workbook awaiting selection";
       summaryNote.textContent = workbook?.resume_hint || "Select a workbook to see the current face, module, and creation progress.";
 
       portraitSlot.innerHTML = "";
@@ -608,6 +920,8 @@
         { label: "History Entries", value: String((workbookPages().find((page) => page.key === "history")?.entries || []).length) },
         { label: "Creation Entries", value: String((workbookPages().find((page) => page.key === "creation_progress")?.entries || []).length) },
       ]);
+
+      updateResumeButton();
     }
 
     function renderPageTabs() {
@@ -981,6 +1295,7 @@
         pageBody.innerHTML = "";
         pageHint.textContent = "Loading workbook...";
         renderSummary();
+        renderWorkbookLibrarySections();
         return;
       }
 
@@ -993,6 +1308,7 @@
       pageHint.textContent = page ? page.title : "No pages";
       renderPageTabs();
       renderSummary();
+      renderWorkbookLibrarySections();
       renderPage(page);
     }
 
@@ -1006,12 +1322,14 @@
       const data = payload.data || {};
       state.canDraft = Boolean(data.can_draft);
       state.cards = Array.isArray(data.cards) ? data.cards : [];
-      const activeCharacterId = String(data.active_character?.character_card_id || data.active_persona?.character_card_id || "").trim();
+      state.activeCharacterId = String(data.active_character?.character_card_id || data.active_persona?.character_card_id || "").trim();
       const requestedId = requestedCharacterId();
       if (requestedId && state.cards.some((card) => card.id === requestedId)) {
         state.selectedCharacterId = requestedId;
-      } else if (activeCharacterId && state.cards.some((card) => card.id === activeCharacterId)) {
-        state.selectedCharacterId = activeCharacterId;
+      } else if (state.activeCharacterId && state.cards.some((card) => card.id === state.activeCharacterId)) {
+        state.selectedCharacterId = state.activeCharacterId;
+      } else if (!state.selectedCharacterId && state.cards.some((card) => isCompleteCard(card))) {
+        state.selectedCharacterId = state.cards.find((card) => isCompleteCard(card))?.id || "";
       } else if (!state.selectedCharacterId && state.cards.length > 0) {
         state.selectedCharacterId = state.cards[0].id;
       }
@@ -1092,10 +1410,32 @@
 
     resumeButton.addEventListener("click", () => {
       const page = currentPage();
-      if (!page) return;
-      state.selectedPageKey = page.key;
-      renderWorkbook();
-      pageBody.scrollIntoView({ behavior: "smooth", block: "start" });
+      const card = selectedCard();
+      if (!card) return;
+      if (resumeButton.dataset.mode === "resume") {
+        window.location.href = `/venues/catharsis/?character_id=${encodeURIComponent(card.id)}`;
+        return;
+      }
+      if (resumeButton.dataset.mode === "activate") {
+        void (async () => {
+          try {
+            setCharacterStatus("Making active...");
+            const response = await fetch(`/api/character-cards/${encodeURIComponent(card.id)}/activate`, {
+              method: "POST",
+              credentials: "include",
+            });
+            const payload = await response.json().catch(() => null);
+            if (!response.ok || !payload?.ok) {
+              throw new Error(payload?.data?.error || payload?.error || `HTTP ${response.status}`);
+            }
+            setCharacterStatus("Character activated.");
+            await loadCharacterCards();
+            await loadWorkbook(state.selectedCharacterId, { retainPage: true });
+          } catch (error) {
+            setCharacterStatus(error.message || String(error));
+          }
+        })();
+      }
     });
 
     refreshButton.addEventListener("click", async () => {

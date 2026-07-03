@@ -1,6 +1,5 @@
 (function () {
-  const introKey = "victory:catharsis:onboarding:intro-seen";
-  const socioKey = "victory:catharsis:onboarding:socio-seen";
+  const introKey = "victory:catharsis:venue-intro:v1";
 
   const overlay = document.getElementById("catharsis-onboarding");
   const introPanel = document.getElementById("catharsis-onboarding-intro");
@@ -174,6 +173,13 @@
       selectedKey: "",
       pendingConfirmKey: "",
       confirmSource: "direct",
+      custom: {
+        name: "",
+        summary: "",
+        primaryAttribute: "Craft",
+        secondaryAttribute: "Grace",
+        mechanicalEffect: "",
+      },
       quiz: {
         currentQuestion: 0,
         scores: {},
@@ -184,6 +190,7 @@
   };
 
   let buildSequenceToken = 0;
+  let introReturnFocus = null;
 
   const draftTokenKey = "victory:catharsis:onboarding:draft-token";
 
@@ -249,6 +256,10 @@
   const closeOverlay = () => {
     overlay.hidden = true;
     document.body.classList.remove("modal-open");
+    const fallback = characterTrayButton || rightCardEditorButton || introButton;
+    const target = introReturnFocus && typeof introReturnFocus.focus === "function" ? introReturnFocus : fallback;
+    introReturnFocus = null;
+    target?.focus?.();
   };
 
   const setSocioStatus = (text) => {
@@ -659,7 +670,7 @@
     if (ctx?.stages?.[stageKey]?.completed) {
       const nextStage = ch2Local.stageNumber + 1;
       if (ch2Local.stageNumber >= 10) {
-        showChapter3Panel();
+        await showChapter3ArchetypePanel();
         return;
       }
       await showChapter2Panel(nextStage);
@@ -742,6 +753,10 @@
     mode: "title",
     group: null,
     selectedSkillId: "",
+    custom: {
+      name: "",
+      description: "",
+    },
   };
 
   const ch4RenderTitle = () => {
@@ -751,12 +766,14 @@
       <h2>Skills</h2>
       <p>Your character's attribute score represents how many distinct skills they may develop in that attribute.</p>
       <p>This screen presents the ten skills associated with <strong>${escapeHtml(g.archetype_title)}</strong>'s resolved attribute group.</p>
-      <p>The highlighted key skill fits the selected archetype especially well but is not mandatory. You are choosing the character's first trained skill.</p>
+      <p>${g.custom_archetype ? "This custom archetype uses the current attribute group, and the first skill you confirm becomes its key skill." : "The highlighted key skill fits the selected archetype especially well but is not mandatory. You are choosing the character's first trained skill."}</p>
       <div class="ch3-echo-card">
         <p><strong>Archetype:</strong> ${escapeHtml(g.archetype_title)}</p>
         <p><strong>${escapeHtml(g.attribute_name)}:</strong> ${g.attribute_score}</p>
         <p class="ch4-capacity">${escapeHtml(g.attribute_name)} skills: ${g.current_skill_count} of ${g.capacity}</p>
         <p><strong>Key skill:</strong> ${escapeHtml(g.key_skill_name)}</p>
+        ${g.archetype_summary ? `<p><strong>Summary:</strong> ${escapeHtml(g.archetype_summary)}</p>` : ""}
+        ${g.mechanical_effect ? `<p><strong>Mechanical effect:</strong> ${escapeHtml(g.mechanical_effect)}</p>` : ""}
       </div>
       <div class="catharsis-onboarding__actions">
         <button id="ch4-continue-to-skills" type="button">Continue to Skills</button>
@@ -774,11 +791,13 @@
       <p class="eyebrow">Chapter IV: Skills</p>
       <h2>${escapeHtml(g.attribute_name)} Skills</h2>
       <p class="ch4-capacity">${escapeHtml(g.attribute_name)} skills: ${g.current_skill_count} of ${g.capacity}</p>
+      ${g.custom_archetype ? `<p class="catharsis-onboarding__hint">This custom archetype is waiting for its first skill to become the key skill.</p>` : ""}
       <div class="ch4-skill-grid" id="ch4-skill-grid"></div>
       <p id="ch4-status" class="catharsis-onboarding__status" aria-live="polite"></p>
       <div class="catharsis-onboarding__actions">
         <button id="ch4-back" type="button">Back</button>
         <button id="ch4-confirm-draft" type="button" disabled>Confirm</button>
+        <button id="ch4-custom-skill" type="button">Create Custom Skill</button>
       </div>
     `;
 
@@ -810,6 +829,10 @@
       ch4Local.mode = "confirm";
       renderChapter4Content();
     });
+    document.getElementById("ch4-custom-skill").addEventListener("click", () => {
+      ch4Local.mode = "custom";
+      renderChapter4Content();
+    });
   };
 
   const ch4RenderConfirm = () => {
@@ -836,19 +859,104 @@
     });
   };
 
+  const ch4RenderCustom = () => {
+    const custom = ch4Local.custom;
+    chapter4Content.innerHTML = `
+      <p class="eyebrow">Chapter IV: Skills</p>
+      <h2>Create a Custom Skill</h2>
+      <p>The governing attribute is locked to ${escapeHtml(ch4Local.group.attribute_name)}. Give the skill a name and a short card description.</p>
+      <div class="field-grid">
+        <label class="field">
+          <span>Skill Name</span>
+          <input id="ch4-custom-name" type="text" value="${escapeHtml(custom.name)}" maxlength="80" />
+        </label>
+        <label class="field">
+          <span>Card Description</span>
+          <textarea id="ch4-custom-description" rows="3" maxlength="200">${escapeHtml(custom.description)}</textarea>
+        </label>
+      </div>
+      <p id="ch4-custom-status" class="catharsis-onboarding__status" aria-live="polite"></p>
+      <div class="catharsis-onboarding__actions">
+        <button id="ch4-custom-back" type="button">Back</button>
+        <button id="ch4-custom-continue" type="button">Review Custom Skill</button>
+      </div>
+    `;
+
+    const syncCustom = () => {
+      ch4Local.custom = {
+        name: document.getElementById("ch4-custom-name").value,
+        description: document.getElementById("ch4-custom-description").value,
+      };
+    };
+    ["ch4-custom-name", "ch4-custom-description"].forEach((id) => {
+      document.getElementById(id).addEventListener("input", syncCustom);
+      document.getElementById(id).addEventListener("change", syncCustom);
+    });
+
+    document.getElementById("ch4-custom-back").addEventListener("click", () => {
+      ch4Local.mode = "draft";
+      renderChapter4Content();
+    });
+    document.getElementById("ch4-custom-continue").addEventListener("click", () => {
+      syncCustom();
+      if (!ch4Local.custom.name.trim()) {
+        document.getElementById("ch4-custom-status").textContent = "Skill name is required.";
+        return;
+      }
+      if (!ch4Local.custom.description.trim()) {
+        document.getElementById("ch4-custom-status").textContent = "Skill description is required.";
+        return;
+      }
+      ch4Local.mode = "custom-confirm";
+      renderChapter4Content();
+    });
+  };
+
+  const ch4RenderCustomConfirm = () => {
+    const g = ch4Local.group;
+    chapter4Content.innerHTML = `
+      <p class="eyebrow">Chapter IV: Skills</p>
+      <h2>Confirm Custom Skill</h2>
+      <div class="ch3-echo-card">
+        <h3>${escapeHtml(ch4Local.custom.name)}</h3>
+        <p>${escapeHtml(ch4Local.custom.description)}</p>
+        <p><strong>Attribute:</strong> ${escapeHtml(g.attribute_name)}</p>
+        <p><strong>Training Die:</strong> d6</p>
+      </div>
+      <p id="ch4-custom-confirm-status" class="catharsis-onboarding__status" aria-live="polite"></p>
+      <div class="catharsis-onboarding__actions">
+        <button id="ch4-custom-confirm-back" type="button">Edit Custom Skill</button>
+        <button id="ch4-custom-confirm-final" type="button">Confirm and Complete Character</button>
+      </div>
+    `;
+
+    document.getElementById("ch4-custom-confirm-back").addEventListener("click", () => {
+      ch4Local.mode = "custom";
+      renderChapter4Content();
+    });
+    document.getElementById("ch4-custom-confirm-final").addEventListener("click", () => {
+      void ch4SubmitConfirmation();
+    });
+  };
+
   const ch4SubmitConfirmation = async () => {
-    const button = document.getElementById("ch4-confirm-final");
-    const status = document.getElementById("ch4-status");
+    const button = document.getElementById("ch4-confirm-final") || document.getElementById("ch4-custom-confirm-final");
+    const status = document.getElementById("ch4-status") || document.getElementById("ch4-custom-confirm-status");
     if (button) button.disabled = true;
     if (status) status.textContent = "Saving...";
     try {
+      const isCustom = ch4Local.mode === "custom-confirm";
       const response = await fetch("/api/character-cards/chapter4-confirm", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           character_card_id: state.workbookCardId,
-          skill_id: ch4Local.selectedSkillId,
+          skill_id: isCustom ? "custom" : ch4Local.selectedSkillId,
+          custom_skill: isCustom ? {
+            name: ch4Local.custom.name,
+            description: ch4Local.custom.description,
+          } : undefined,
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -869,6 +977,10 @@
       ch4RenderDraft();
     } else if (ch4Local.mode === "confirm") {
       ch4RenderConfirm();
+    } else if (ch4Local.mode === "custom") {
+      ch4RenderCustom();
+    } else if (ch4Local.mode === "custom-confirm") {
+      ch4RenderCustomConfirm();
     } else {
       ch4RenderTitle();
     }
@@ -942,6 +1054,7 @@
   // --- Chapter 3: Character Archetypes (direct selection + quiz) ---
 
   const DISPLAY_PERCENT_BUMP = 12;
+  const CHAPTER4_ATTRIBUTES = ["Awareness", "Craft", "Empathy", "Grace", "Intellect", "Lore", "Might", "Presence", "Resolve", "Spirit"];
 
   const loadChapter3Catalog = async () => {
     if (state.chapter3Catalog) return state.chapter3Catalog;
@@ -1095,6 +1208,7 @@
       <div class="catharsis-onboarding__actions">
         <button id="ch3-confirm-direct" type="button">Confirm Archetype</button>
         <button id="ch3-take-quiz" type="button">Take the Archetype Quiz</button>
+        <button id="ch3-create-custom" type="button">Create Custom Archetype</button>
       </div>
     `;
 
@@ -1112,6 +1226,10 @@
       state.chapter3.quiz = { currentQuestion: 0, scores: {}, selectedAnswers: [], selectedThisQuestion: [] };
       (state.chapter3Catalog || []).forEach((a) => { state.chapter3.quiz.scores[a.key] = 0; });
       state.chapter3.mode = "quiz-question";
+      renderChapter3Content();
+    });
+    document.getElementById("ch3-create-custom").addEventListener("click", () => {
+      state.chapter3.mode = "custom";
       renderChapter3Content();
     });
   };
@@ -1297,19 +1415,132 @@
     });
   };
 
+  const ch3RenderCustom = () => {
+    const custom = state.chapter3.custom;
+    chapter3Content.innerHTML = `
+      <p class="eyebrow">Chapter III</p>
+      <h2>Create a Custom Archetype</h2>
+      <p>Custom archetypes are character-owned. Give it a name, a short echo, two different attributes, and an optional mechanical note.</p>
+      <div class="field-grid">
+        <label class="field">
+          <span>Archetype Name</span>
+          <input id="ch3-custom-name" type="text" value="${escapeHtml(custom.name)}" maxlength="80" />
+        </label>
+        <label class="field">
+          <span>Short Echo / Description</span>
+          <textarea id="ch3-custom-summary" rows="3" maxlength="200">${escapeHtml(custom.summary)}</textarea>
+        </label>
+        <label class="field">
+          <span>Primary Attribute</span>
+          <select id="ch3-custom-primary">${CHAPTER4_ATTRIBUTES.map((name) => `<option value="${escapeHtml(name)}"${name === custom.primaryAttribute ? " selected" : ""}>${escapeHtml(name)}</option>`).join("")}</select>
+        </label>
+        <label class="field">
+          <span>Secondary Attribute</span>
+          <select id="ch3-custom-secondary">${CHAPTER4_ATTRIBUTES.map((name) => `<option value="${escapeHtml(name)}"${name === custom.secondaryAttribute ? " selected" : ""}>${escapeHtml(name)}</option>`).join("")}</select>
+        </label>
+        <label class="field">
+          <span>Mechanical Effect (optional)</span>
+          <textarea id="ch3-custom-effect" rows="3" maxlength="200">${escapeHtml(custom.mechanicalEffect)}</textarea>
+        </label>
+      </div>
+      <p id="ch3-custom-status" class="catharsis-onboarding__status" aria-live="polite"></p>
+      <div class="catharsis-onboarding__actions">
+        <button id="ch3-custom-back" type="button">Back</button>
+        <button id="ch3-custom-continue" type="button">Review Custom Archetype</button>
+      </div>
+    `;
+
+    const syncCustom = () => {
+      const name = document.getElementById("ch3-custom-name").value;
+      const summary = document.getElementById("ch3-custom-summary").value;
+      const primaryAttribute = document.getElementById("ch3-custom-primary").value;
+      const secondaryAttribute = document.getElementById("ch3-custom-secondary").value;
+      const mechanicalEffect = document.getElementById("ch3-custom-effect").value;
+      state.chapter3.custom = { name, summary, primaryAttribute, secondaryAttribute, mechanicalEffect };
+    };
+
+    ["ch3-custom-name", "ch3-custom-summary", "ch3-custom-primary", "ch3-custom-secondary", "ch3-custom-effect"].forEach((id) => {
+      document.getElementById(id).addEventListener("input", syncCustom);
+      document.getElementById(id).addEventListener("change", syncCustom);
+    });
+
+    document.getElementById("ch3-custom-back").addEventListener("click", () => {
+      state.chapter3.mode = "intro";
+      renderChapter3Content();
+    });
+    document.getElementById("ch3-custom-continue").addEventListener("click", () => {
+      syncCustom();
+      const custom = state.chapter3.custom;
+      if (!custom.name.trim()) {
+        document.getElementById("ch3-custom-status").textContent = "Archetype name is required.";
+        return;
+      }
+      if (!custom.summary.trim()) {
+        document.getElementById("ch3-custom-status").textContent = "Short echo / description is required.";
+        return;
+      }
+      if (!custom.primaryAttribute.trim() || !custom.secondaryAttribute.trim()) {
+        document.getElementById("ch3-custom-status").textContent = "Both attributes are required.";
+        return;
+      }
+      if (custom.primaryAttribute === custom.secondaryAttribute) {
+        document.getElementById("ch3-custom-status").textContent = "Primary and secondary attributes must be different.";
+        return;
+      }
+      state.chapter3.mode = "custom-confirm";
+      renderChapter3Content();
+    });
+  };
+
+  const ch3RenderCustomConfirm = () => {
+    const custom = state.chapter3.custom;
+    chapter3Content.innerHTML = `
+      <p class="eyebrow">Chapter III</p>
+      <h2>Confirm Custom Archetype</h2>
+      <div class="ch3-echo-card">
+        <h3>${escapeHtml(custom.name)}</h3>
+        <p>${escapeHtml(custom.summary)}</p>
+        <p><strong>Primary:</strong> ${escapeHtml(custom.primaryAttribute)}</p>
+        <p><strong>Secondary:</strong> ${escapeHtml(custom.secondaryAttribute)}</p>
+        ${custom.mechanicalEffect.trim() ? `<p><strong>Mechanical Effect:</strong> ${escapeHtml(custom.mechanicalEffect)}</p>` : ""}
+      </div>
+      <p id="ch3-custom-confirm-status" class="catharsis-onboarding__status" aria-live="polite"></p>
+      <div class="catharsis-onboarding__actions">
+        <button id="ch3-custom-confirm-back" type="button">Edit Custom Archetype</button>
+        <button id="ch3-custom-confirm-final" type="button">Confirm and Continue</button>
+      </div>
+    `;
+
+    document.getElementById("ch3-custom-confirm-back").addEventListener("click", () => {
+      state.chapter3.mode = "custom";
+      renderChapter3Content();
+    });
+    document.getElementById("ch3-custom-confirm-final").addEventListener("click", () => {
+      void ch3SubmitConfirmation();
+    });
+  };
+
   const ch3SubmitConfirmation = async () => {
-    const button = document.getElementById("ch3-confirm-final");
-    const status = document.getElementById("ch3-status");
+    const button = document.getElementById("ch3-confirm-final") || document.getElementById("ch3-custom-confirm-final");
+    const status = document.getElementById("ch3-status") || document.getElementById("ch3-custom-confirm-status");
     if (button) button.disabled = true;
     if (status) status.textContent = "Saving...";
     try {
+      const isCustom = state.chapter3.mode === "custom-confirm";
       const response = await fetch("/api/character-cards/chapter3-confirm", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           character_card_id: state.workbookCardId,
-          archetype_key: state.chapter3.pendingConfirmKey,
+          archetype_key: isCustom ? "custom" : state.chapter3.pendingConfirmKey,
+          custom_archetype: isCustom ? {
+            name: state.chapter3.custom.name,
+            summary: state.chapter3.custom.summary,
+            primary_attribute: state.chapter3.custom.primaryAttribute,
+            secondary_attribute: state.chapter3.custom.secondaryAttribute,
+            mechanical_effect: state.chapter3.custom.mechanicalEffect,
+          } : undefined,
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -1332,6 +1563,10 @@
       ch3RenderQuizResult();
     } else if (state.chapter3.mode === "confirm") {
       ch3RenderConfirm();
+    } else if (state.chapter3.mode === "custom") {
+      ch3RenderCustom();
+    } else if (state.chapter3.mode === "custom-confirm") {
+      ch3RenderCustomConfirm();
     } else {
       ch3RenderIntro();
     }
@@ -1364,15 +1599,16 @@
     buildPanel.hidden = false;
     overlay.hidden = false;
     document.body.classList.add("modal-open");
-    const card = state.activeCharacter;
+    const workbookCard = state.cards.find((card) => String(card.id || card.character_card_id || "") === String(state.workbookCardId)) || null;
     const lastParent = state.parentageRows[state.parentageRows.length - 1] || {};
-    buildTitle.textContent = String(card?.name || lastParent.social_class || "Socio Candidate").trim();
+    const cardLabel = workbookCard?.display_name || workbookCard?.name || state.activeCharacter?.display_name || state.activeCharacter?.name || lastParent.social_class || "Socio Candidate";
+    buildTitle.textContent = String(cardLabel).trim();
     buildCopy.textContent = state.startingWealth > 0
       ? `Catharsis finished the two-pass parentage. Starting wealth resolved to ${state.startingWealth}.`
       : "Catharsis finished the two-pass parentage. No wealth inheritance passed the gate.";
-    buildClass.textContent = String(lastParent.social_class || card?.name || "Unknown").trim();
-    buildCredit.textContent = String(lastParent.starting_credit || "--");
-    setBuildStatus(`Ready: ${String(card?.name || lastParent.social_class || "Socio Candidate").trim()}`);
+    buildClass.textContent = String(lastParent.social_class || workbookCard?.name || state.activeCharacter?.name || "Unknown").trim();
+    buildCredit.textContent = String(lastParent.starting_credit ?? "--");
+    setBuildStatus(`Ready: ${String(cardLabel).trim()}`);
     await sleep(620);
     showChapterPanel();
     setBuildStatus("Chapter II is ready.");
@@ -1387,7 +1623,7 @@
     const parentIndex = state.coinFlipQueue[0];
     const row = state.parentageRows.find((parent) => Number(parent.parent_index) === Number(parentIndex)) || {};
     coinFlipTitle.textContent = `Parent ${parentIndex} may pass down wealth`;
-    coinFlipCopy.textContent = `Starting credit ${row.starting_credit ?? "--"} (${row.social_class || "Unknown"}) qualifies for retention. Flip the coin to see if it passes to you.`;
+    coinFlipCopy.textContent = `Roll ${row.roll_total ?? "--"} landed ${row.social_class || "Unknown"}. Its starting credit is ${row.starting_credit ?? "--"}; flip the coin to see whether that credit passes to you.`;
     coinFlipFace.textContent = "?";
     coinFlipButton.disabled = false;
     coinFlipButton.textContent = "Flip the coin";
@@ -1543,6 +1779,8 @@
   const buildParentageBundle = () => {
     const firstRoll = Number(state.parentRolls[0]) || 0;
     const secondRoll = Number(state.parentRolls[1]) || 0;
+    const effectiveRoll = Math.max(firstRoll, secondRoll);
+    const totalRoll = firstRoll + secondRoll;
     const parentRolls = [firstRoll, secondRoll];
     const parentRows = parentRolls.map((roll, index) => {
       const entry = findParentageEntry(roll);
@@ -1570,10 +1808,10 @@
         ruleset_key: "socio",
         ruleset_version: "1.1",
         socio_parentage_chart_version: state.parentageChartVersion,
-        socio_parentage_roll: firstRoll + secondRoll,
+        socio_parentage_roll: effectiveRoll,
         socio_parentage_first_roll: firstRoll,
         socio_parentage_second_roll: secondRoll,
-        socio_parentage_total_roll: firstRoll + secondRoll,
+        socio_parentage_total_roll: totalRoll,
         socio_parentage_passes: 2,
         socio_parentage_parents: parentRows,
         socio_wealth_eligible_parents: parentRows.filter((parent) => parent.coin_flip_eligible).map((parent) => parent.parent_index),
@@ -1618,14 +1856,14 @@
     const response = await fetch("/api/character-cards/me", { credentials: "include" });
     const payload = await response.json().catch(() => null);
     const data = payload?.data || {};
-    const activeCharacterId = String(state.activeCharacter?.character_card_id || state.workbookCardId || "");
+    const activeCharacterId = String(state.workbookCardId || state.activeCharacter?.character_card_id || "");
     const cards = Array.isArray(data.cards) ? data.cards : [];
     const refreshed = data.active_character?.character_card_id === activeCharacterId
       ? data.active_character
       : cards.find((card) => String(card.id || card.character_card_id || "") === activeCharacterId);
     if (refreshed) {
       state.workbookContext = { ...(refreshed.workbook_context || {}) };
-      state.activeCharacter = { ...state.activeCharacter, ...refreshed };
+      state.cards = cards.length ? cards : state.cards;
     }
   };
 
@@ -1713,27 +1951,33 @@
     setSocioStatus("");
   };
 
-  const showIntro = () => {
+  const openIntroOverlay = ({ preserveRollState = false } = {}) => {
+    introReturnFocus = document.activeElement;
     hideAllOnboardingPanels();
     introPanel.hidden = false;
     overlay.hidden = false;
-    resetRollState(false);
+    if (!preserveRollState) {
+      resetRollState(false);
+    }
     setSocioStatus("");
     document.body.classList.add("modal-open");
+    introButton.focus();
   };
 
   const showSocioPrompt = () => {
+    introReturnFocus = document.activeElement;
     hideAllOnboardingPanels();
     socioPanel.hidden = false;
     overlay.hidden = false;
     resetRollState(true);
     setSocioStatus(phasePrompt());
     document.body.classList.add("modal-open");
+    rollButtons[0].focus();
   };
 
   window.VictoryCatharsisOnboarding = {
     begin: () => {
-      showIntro();
+      openIntroOverlay({ preserveRollState: true });
     },
     continue: () => {
       showSocioPrompt();
@@ -1839,7 +2083,6 @@
       setBuildStatus(`${phaseLabel()[0].toUpperCase()}${phaseLabel().slice(1)} revealed.`);
       buildLockButton.focus();
       localStorage.setItem(introKey, "1");
-      localStorage.setItem(socioKey, "1");
       return;
     }
 
@@ -1888,13 +2131,14 @@
     try {
       const bundle = buildParentageBundle();
       const total = bundle.parentRows[0].roll_total + bundle.parentRows[1].roll_total;
+      const effectiveRoll = Math.max(bundle.parentRows[0].roll_total || 0, bundle.parentRows[1].roll_total || 0);
       const cardContext = {
         source: "catharsis",
         creation_key: "catharsis:onboarding",
         draft_token: ensureDraftToken(),
         ruleset_key: "socio",
         ruleset_version: "1.1",
-        socio_parentage_roll: total,
+        socio_parentage_roll: effectiveRoll,
         socio_parentage_first_roll: Number(state.parentRolls[0]) || 0,
         socio_parentage_second_roll: currentRoll,
         socio_parentage_total_roll: total,
@@ -1929,7 +2173,10 @@
       const card = payload.data;
       state.workbookCardId = String(card.id || "");
       state.workbookContext = { ...cardContext, ...(card.workbook_context || {}) };
-      state.activeCharacter = { ...card, character_card_id: String(card.id || card.character_card_id || "") };
+      state.cards = [
+        ...state.cards.filter((entry) => String(entry.id || entry.character_card_id || "") !== String(card.id || card.character_card_id || "")),
+        { ...card, character_card_id: String(card.id || card.character_card_id || "") },
+      ];
       refreshCharacterTray();
       try {
         localStorage.removeItem(draftTokenKey);
@@ -2025,7 +2272,6 @@
       buildCredit.textContent = String(secondParentRow.starting_credit || "--");
       renderWheelWindow(total);
       localStorage.setItem(introKey, "1");
-      localStorage.setItem(socioKey, "1");
 
       state.coinFlipQueue = serverParentRows
         .filter((parent) => Boolean(parent.coin_flip_eligible))
@@ -2116,7 +2362,14 @@
   };
 
   const refreshCharacterTray = () => {
-    const activeCharacterName = String(state.activeCharacter?.display_name || state.activeCharacter?.name || "").trim();
+    const workingCard = state.cards.find((card) => card.id === state.workbookCardId) || null;
+    const activeCharacterName = String(
+      workingCard?.display_name ||
+      workingCard?.name ||
+      state.activeCharacter?.display_name ||
+      state.activeCharacter?.name ||
+      ""
+    ).trim();
     if (characterTrayLabel) {
       characterTrayLabel.textContent = activeCharacterName || "New Character";
       characterTrayLabel.title = isAutoNamedCharacter(activeCharacterName)
@@ -2132,23 +2385,21 @@
   };
 
   characterTrayButton?.addEventListener("click", () => {
-    const activeCharacterId = String(state.activeCharacter?.character_card_id || state.activeCharacter?.id || "").trim();
-    if (activeCharacterId) {
-      window.location.href = `/venues/greenroom/?character_id=${encodeURIComponent(activeCharacterId)}`;
+    const workingCharacterId = String(state.workbookCardId || state.activeCharacter?.character_card_id || state.activeCharacter?.id || "").trim();
+    if (workingCharacterId) {
+      window.location.href = `/venues/greenroom/?character_id=${encodeURIComponent(workingCharacterId)}`;
       return;
     }
-    showIntro();
+    openIntroOverlay({ preserveRollState: true });
   });
 
   introButton.addEventListener("click", async () => {
     localStorage.setItem(introKey, "1");
-    await loadParentageChart();
-    showSocioPrompt();
+    closeOverlay();
   });
 
   dismissButton.addEventListener("click", () => {
     localStorage.setItem(introKey, "1");
-    localStorage.setItem(socioKey, "1");
     buildSequenceToken += 1;
     closeOverlay();
   });
@@ -2192,15 +2443,27 @@
     resetRollState(false);
 
     try {
+      const requestedCharacterId = String(new URLSearchParams(window.location.search).get("character_id") || "").trim();
       const response = await fetch("/api/character-cards/me", { credentials: "include" });
       const payload = await response.json().catch(() => null);
       const data = payload?.data || {};
       state.canDraft = Boolean(data.can_draft);
       state.cards = Array.isArray(data.cards) ? data.cards : [];
       state.activeCharacter = data.active_character || null;
-      if (state.activeCharacter?.character_card_id) {
-        state.workbookCardId = String(state.activeCharacter.character_card_id || "");
-        state.workbookContext = { ...(state.activeCharacter.workbook_context || {}) };
+      if (requestedCharacterId) {
+        state.workbookCardId = requestedCharacterId;
+        const workbookResponse = await fetch(`/api/character-workbooks/${encodeURIComponent(requestedCharacterId)}`, { credentials: "include" });
+        const workbookPayload = await workbookResponse.json().catch(() => null);
+        if (workbookResponse.ok && workbookPayload?.ok && workbookPayload?.data) {
+          state.workbookContext = { ...((workbookPayload.data.character || {}).workbook_context || {}) };
+          const requestedCard = workbookPayload.data.character || null;
+          if (requestedCard) {
+            state.cards = [
+              ...state.cards.filter((card) => String(card.id || card.character_card_id || "") !== requestedCharacterId),
+              { ...requestedCard, character_card_id: String(requestedCard.id || requestedCard.character_card_id || requestedCharacterId) },
+            ];
+          }
+        }
       }
       refreshCharacterTray();
 
@@ -2243,11 +2506,19 @@
         return;
       }
 
+      if (!requestedNewCharacter && state.workbookCardId && Number(state.workbookContext?.current_stage) === 1 && Array.isArray(state.workbookContext?.socio_parentage_history)) {
+        showChapterPanel();
+        return;
+      }
+
       const shouldShowOnboarding = state.canDraft && state.cards.length === 0;
       const hasSeenIntro = localStorage.getItem(introKey) === "1";
-      const hasSeenSocio = localStorage.getItem(socioKey) === "1";
-      if (requestedNewCharacter || shouldShowOnboarding || (!hasSeenIntro && !hasSeenSocio)) {
-        showIntro();
+      if (requestedNewCharacter) {
+        showSocioPrompt();
+        return;
+      }
+      if (shouldShowOnboarding || !hasSeenIntro) {
+        openIntroOverlay();
         return;
       }
     } catch (error) {

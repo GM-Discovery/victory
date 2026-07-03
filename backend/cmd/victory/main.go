@@ -77,6 +77,7 @@ func main() {
 	if err := characters.EnsureKernel23CharacterSurface(ctx, pool); err != nil {
 		log.Fatalf("kernel 23 character bootstrap failed: %v", err)
 	}
+	characters.SetMaxCharacterCardsPerAccount(parseIntEnv("CHARACTER_ACCOUNT_LIMIT", 50))
 	if err := identity.EnsureKernel39DiscordGatewaySurface(ctx, pool); err != nil {
 		log.Fatalf("kernel 39 discord gateway bootstrap failed: %v", err)
 	}
@@ -579,6 +580,18 @@ func parseDiscordGatewayIntents(raw string) int64 {
 	value, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil {
 		return 0
+	}
+	return value
+}
+
+func parseIntEnv(key string, fallback int) int {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 {
+		return fallback
 	}
 	return value
 }

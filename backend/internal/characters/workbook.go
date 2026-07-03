@@ -42,14 +42,14 @@ func decodeJSONMap(raw []byte) map[string]any {
 }
 
 func findDraftCharacterForContext(ctx context.Context, pool *pgxpool.Pool, ownerUserID string, workbookContextJSON []byte) (CharacterCard, bool, error) {
-	contextSource := ""
+	draftToken := ""
 	if len(workbookContextJSON) > 0 {
 		var parsed map[string]any
 		if err := json.Unmarshal(workbookContextJSON, &parsed); err == nil {
-			contextSource = strings.TrimSpace(stringValue(parsed["source"]))
+			draftToken = strings.TrimSpace(stringValue(parsed["draft_token"]))
 		}
 	}
-	if contextSource == "" {
+	if draftToken == "" {
 		return CharacterCard{}, false, nil
 	}
 
@@ -62,10 +62,10 @@ func findDraftCharacterForContext(ctx context.Context, pool *pgxpool.Pool, owner
 		WHERE owner_user_id = $1
 		  AND is_deleted = FALSE
 		  AND workbook_status = 'draft'
-		  AND workbook_context ->> 'source' = $2
+		  AND workbook_context ->> 'draft_token' = $2
 		ORDER BY updated_at DESC, created_at DESC
 		LIMIT 1
-	`, ownerUserID, contextSource).Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
+	`, ownerUserID, draftToken).Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return CharacterCard{}, false, nil
@@ -157,36 +157,10 @@ func ActiveCharacterForUser(ctx context.Context, q characterQuerier, userID stri
 			"workbook_context":  decodeJSONMap(contextRaw),
 		}, nil
 	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return nil, err
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
 	}
-
-	err = q.QueryRow(ctx, `
-		SELECT id::text, name, pronouns, portrait_url, color, tagline, workbook_status, workbook_context
-		FROM character_cards
-		WHERE owner_user_id = $1
-		  AND is_deleted = FALSE
-		ORDER BY updated_at DESC, created_at DESC
-		LIMIT 1
-	`, userID).Scan(&cardID, &name, &pronouns, &portraitURL, &color, &tagline, &status, &contextRaw)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	return map[string]any{
-		"character_card_id": cardID,
-		"name":              name,
-		"display_name":      name,
-		"pronouns":          pronouns,
-		"portrait_url":      portraitURL,
-		"color":             color,
-		"tagline":           tagline,
-		"workbook_status":   status,
-		"workbook_context":  decodeJSONMap(contextRaw),
-	}, nil
+	return nil, err
 }
 
 func stringValue(value any) string {

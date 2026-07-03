@@ -24,6 +24,15 @@ const DraftCapability = "character_card:draft"
 
 const maxSheetLinks = 12
 
+var maxCharacterCardsPerAccount = 50
+
+func SetMaxCharacterCardsPerAccount(limit int) {
+	if limit < 1 {
+		return
+	}
+	maxCharacterCardsPerAccount = limit
+}
+
 type SheetLink struct {
 	ID        string `json:"id"`
 	Ruleset   string `json:"ruleset"`
@@ -439,12 +448,29 @@ func HandleChapter3Confirm(pool *pgxpool.Pool) http.HandlerFunc {
 			CharacterCardID string `json:"character_card_id"`
 			ArchetypeKey    string `json:"archetype_key"`
 			Override        bool   `json:"override"`
+			CustomArchetype *struct {
+				Name               string `json:"name"`
+				Summary            string `json:"summary"`
+				PrimaryAttribute   string `json:"primary_attribute"`
+				SecondaryAttribute string `json:"secondary_attribute"`
+				MechanicalEffect   string `json:"mechanical_effect"`
+			} `json:"custom_archetype"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "invalid_json"}})
 			return
 		}
-		result, _, err := CommitChapter3Archetype(ctx, pool, userID, body.CharacterCardID, body.ArchetypeKey, body.Override)
+		var custom *Chapter3CustomArchetypeInput
+		if body.CustomArchetype != nil {
+			custom = &Chapter3CustomArchetypeInput{
+				Name:               body.CustomArchetype.Name,
+				Summary:            body.CustomArchetype.Summary,
+				PrimaryAttribute:   body.CustomArchetype.PrimaryAttribute,
+				SecondaryAttribute: body.CustomArchetype.SecondaryAttribute,
+				MechanicalEffect:   body.CustomArchetype.MechanicalEffect,
+			}
+		}
+		result, _, err := CommitChapter3Archetype(ctx, pool, userID, body.CharacterCardID, body.ArchetypeKey, custom, body.Override)
 		if err != nil {
 			writeCharacterError(w, err)
 			return
@@ -493,12 +519,23 @@ func HandleChapter4Confirm(pool *pgxpool.Pool) http.HandlerFunc {
 			CharacterCardID string `json:"character_card_id"`
 			SkillID         string `json:"skill_id"`
 			Override        bool   `json:"override"`
+			CustomSkill     *struct {
+				Name        string `json:"name"`
+				Description string `json:"description"`
+			} `json:"custom_skill"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "invalid_json"}})
 			return
 		}
-		result, _, err := CommitChapter4FirstSkill(ctx, pool, userID, body.CharacterCardID, body.SkillID, body.Override)
+		var custom *Chapter4CustomSkillInput
+		if body.CustomSkill != nil {
+			custom = &Chapter4CustomSkillInput{
+				Name:        body.CustomSkill.Name,
+				Description: body.CustomSkill.Description,
+			}
+		}
+		result, _, err := CommitChapter4FirstSkill(ctx, pool, userID, body.CharacterCardID, body.SkillID, custom, body.Override)
 		if err != nil {
 			writeCharacterError(w, err)
 			return
@@ -640,7 +677,38 @@ func HandleCharacterCardByID(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		cardID := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/api/character-cards/"))
+		path := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/api/character-cards/"))
+		if strings.HasSuffix(path, "/activate") {
+			if r.Method != http.MethodPost {
+				writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
+				return
+			}
+			cardID := strings.TrimSpace(strings.TrimSuffix(path, "/activate"))
+			if cardID == "" {
+				writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "character_card_id_required"}})
+				return
+			}
+
+			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+			defer cancel()
+
+			userID, err := requireUser(ctx, pool, r)
+			if err != nil {
+				writeAuthError(w, err)
+				return
+			}
+
+			card, err := ActivateCharacterCard(ctx, pool, userID, cardID)
+			if err != nil {
+				writeCharacterError(w, err)
+				return
+			}
+
+			writeJSON(w, http.StatusOK, response{Ok: true, Data: card})
+			return
+		}
+
+		cardID := path
 		if cardID == "" || cardID == "me" {
 			writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "character_card_id_required"}})
 			return
@@ -669,6 +737,47 @@ func HandleCharacterCardByID(pool *pgxpool.Pool) http.HandlerFunc {
 
 		writeJSON(w, http.StatusOK, response{Ok: true, Data: card})
 	}
+}
+
+func ActivateCharacterCard(ctx context.Context, pool *pgxpool.Pool, userID, cardID string) (map[string]any, error) {
+	userID = strings.TrimSpace(userID)
+	cardID = strings.TrimSpace(cardID)
+	if userID == "" {
+		return nil, errors.New("not_authenticated")
+	}
+	if cardID == "" {
+		return nil, errors.New("character_card_id_required")
+	}
+
+	var ownerID, workbookStatus string
+	if err := pool.QueryRow(ctx, `
+		SELECT owner_user_id::text, workbook_status
+		FROM character_cards
+		WHERE id = $1
+		  AND is_deleted = FALSE
+		LIMIT 1
+	`, cardID).Scan(&ownerID, &workbookStatus); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.New("character_card_not_found")
+		}
+		return nil, err
+	}
+	if ownerID != userID {
+		return nil, errors.New("forbidden")
+	}
+	if strings.ToLower(strings.TrimSpace(workbookStatus)) != "complete" {
+		return nil, errors.New("completed_character_required")
+	}
+
+	if err := setActiveCharacter(ctx, pool, userID, cardID); err != nil {
+		return nil, err
+	}
+
+	activeCharacter, err := ActiveCharacterForUser(ctx, pool, userID)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"active_character": activeCharacter}, nil
 }
 
 func HandleGrantCharacterPermission(pool *pgxpool.Pool) http.HandlerFunc {
@@ -785,10 +894,13 @@ func CreateCard(ctx context.Context, pool *pgxpool.Pool, ownerUserID string, inp
 		if err := ensureWorkbookModule(ctx, pool, existing.ID, existing.WorkbookContext, existing.WorkbookStatus); err != nil {
 			return CharacterCard{}, err
 		}
-		if err := setActiveCharacter(ctx, pool, ownerUserID, existing.ID); err != nil {
-			return CharacterCard{}, err
-		}
 		return existing, nil
+	}
+
+	if ok, err := canCreateCharacterCard(ctx, pool, ownerUserID); err != nil {
+		return CharacterCard{}, err
+	} else if !ok {
+		return CharacterCard{}, errors.New("character_card_limit_reached")
 	}
 
 	if strings.TrimSpace(input.Name) == "" {
@@ -832,9 +944,6 @@ func CreateCard(ctx context.Context, pool *pgxpool.Pool, ownerUserID string, inp
 		return CharacterCard{}, err
 	}
 	if err := ensureWorkbookModule(ctx, pool, card.ID, card.WorkbookContext, workbookStatus); err != nil {
-		return CharacterCard{}, err
-	}
-	if err := setActiveCharacter(ctx, pool, ownerUserID, card.ID); err != nil {
 		return CharacterCard{}, err
 	}
 	return card, nil
@@ -971,6 +1080,37 @@ func ListOwnedCards(ctx context.Context, pool *pgxpool.Pool, userID string) ([]C
 		out = append(out, card)
 	}
 	return out, rows.Err()
+}
+
+func countOwnedCharacterCards(ctx context.Context, q characterQuerier, userID string) (int, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return 0, errors.New("not_authenticated")
+	}
+
+	var count int
+	if err := q.QueryRow(ctx, `
+		SELECT COUNT(*)::int
+		FROM character_cards
+		WHERE owner_user_id = $1
+		  AND is_deleted = FALSE
+	`, userID).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func canCreateCharacterCard(ctx context.Context, q characterQuerier, userID string) (bool, error) {
+	if limit := maxCharacterCardsPerAccount; limit > 0 {
+		count, err := countOwnedCharacterCards(ctx, q, userID)
+		if err != nil {
+			return false, err
+		}
+		if count >= limit {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func PersonaForCard(ctx context.Context, q characterQuerier, userID, cardID string) (map[string]any, error) {

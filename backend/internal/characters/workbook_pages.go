@@ -663,12 +663,25 @@ func workbookRootSummaryFields(card CharacterCard) []WorkbookPageField {
 		return nil
 	}
 
+	effectiveRoll := catharsisEffectiveParentageRoll(context)
+	combinedRoll := catharsisCombinedParentageRoll(context)
+	effectiveEntry, ok := ParentageChartEntryForRoll(effectiveRoll)
+	if !ok {
+		effectiveEntry, _ = ParentageChartEntryForRoll(3)
+	}
+	startingCredit := titleizeContextValue(effectiveEntry.StartingCredit)
+	if effectiveRoll == 0 {
+		startingCredit = titleizeContextValue(context["socio_parentage_starting_credit"])
+	}
+
 	fields := []WorkbookPageField{
 		{Key: "workbook_source", Label: "Workbook Source", Value: titleizeContextValue(context["source"]), InputType: "text", Editable: false},
 		{Key: "socio_parentage_chart_version", Label: "Parentage Chart", Value: titleizeContextValue(context["socio_parentage_chart_version"]), InputType: "text", Editable: false},
-		{Key: "socio_parentage_roll", Label: "Parentage Roll", Value: titleizeContextValue(context["socio_parentage_roll"]), InputType: "text", Editable: false},
+		{Key: "socio_parentage_roll", Label: "Parentage Roll", Value: titleizeContextValue(effectiveRoll), InputType: "text", Editable: false},
+		{Key: "socio_parentage_total_roll", Label: "Combined Roll", Value: titleizeContextValue(combinedRoll), InputType: "text", Editable: false},
 		{Key: "socio_parentage_summary", Label: "Parentage Summary", Value: socioParentageSummary(context), InputType: "textarea", Editable: false},
 		{Key: "socio_starting_wealth", Label: "Starting Wealth", Value: titleizeContextValue(context["socio_starting_wealth"]), InputType: "text", Editable: false},
+		{Key: "socio_parentage_starting_credit", Label: "Resolved Starting Credit", Value: startingCredit, InputType: "text", Editable: false},
 		{Key: "socio_wealth_inheritance", Label: "Wealth Inheritance", Value: socioInheritanceSummary(context), InputType: "textarea", Editable: false},
 	}
 
@@ -695,15 +708,22 @@ func chapter3FaceWidgetFields(context map[string]any) []WorkbookPageField {
 	if !confirmed {
 		return nil
 	}
-	archetype, _ := Chapter3ArchetypeByKey(stringValue(raw["archetype_key"]))
-	summary := archetype.Motto
-	if summary == "" {
-		summary = archetype.ShortDescription
+	summary := stringValue(raw["custom_summary"])
+	if strings.TrimSpace(summary) == "" {
+		archetype, _ := Chapter3ArchetypeByKey(stringValue(raw["archetype_key"]))
+		summary = archetype.Motto
+		if summary == "" {
+			summary = archetype.ShortDescription
+		}
 	}
-	return []WorkbookPageField{
+	fields := []WorkbookPageField{
 		{Key: "chapter3_archetype", Label: "Archetype", Value: stringValue(raw["archetype_title"]), InputType: "text", Editable: false},
 		{Key: "chapter3_archetype_summary", Label: "Archetype Summary", Value: summary, InputType: "textarea", Editable: false},
 	}
+	if effect := stringValue(raw["mechanical_effect"]); strings.TrimSpace(effect) != "" {
+		fields = append(fields, WorkbookPageField{Key: "chapter3_mechanical_effect", Label: "Mechanical Effect", Value: effect, InputType: "textarea", Editable: false})
+	}
+	return fields
 }
 
 // chapter3MechanicsFields silently projects the confirmed archetype's
@@ -718,12 +738,19 @@ func chapter3MechanicsFields(context map[string]any) []WorkbookPageField {
 	if !confirmed {
 		return nil
 	}
-	return []WorkbookPageField{
+	fields := []WorkbookPageField{
 		{Key: "chapter3_archetype_stable_id", Label: "Archetype ID", Value: stringValue(raw["archetype_stable_id"]), InputType: "text", Editable: false},
 		{Key: "chapter3_primary_attribute", Label: "Archetype Primary Attribute", Value: stringValue(raw["primary_attribute"]), InputType: "text", Editable: false},
 		{Key: "chapter3_secondary_attribute", Label: "Archetype Secondary Attribute", Value: stringValue(raw["secondary_attribute"]), InputType: "text", Editable: false},
 		{Key: "chapter3_key_skill", Label: "Archetype Key Skill", Value: stringValue(raw["key_skill"]), InputType: "text", Editable: false},
 	}
+	if strings.EqualFold(stringValue(raw["archetype_key"]), "custom") {
+		fields = append(fields,
+			WorkbookPageField{Key: "chapter3_custom_summary", Label: "Custom Summary", Value: stringValue(raw["custom_summary"]), InputType: "textarea", Editable: false},
+			WorkbookPageField{Key: "chapter3_mechanical_effect", Label: "Mechanical Effect", Value: stringValue(raw["mechanical_effect"]), InputType: "textarea", Editable: false},
+		)
+	}
+	return fields
 }
 
 // chapter4FaceWidgetFields renders the compact, permanent Chapter 4 first
@@ -740,10 +767,14 @@ func chapter4FaceWidgetFields(context map[string]any) []WorkbookPageField {
 	if !confirmed {
 		return nil
 	}
-	return []WorkbookPageField{
+	fields := []WorkbookPageField{
 		{Key: "chapter4_first_skill", Label: "First Trained Skill", Value: stringValue(raw["skill_name"]), InputType: "text", Editable: false},
 		{Key: "chapter4_first_skill_die", Label: "Training Die", Value: stringValue(raw["die_size"]), InputType: "text", Editable: false},
 	}
+	if desc := stringValue(raw["skill_description"]); strings.TrimSpace(desc) != "" {
+		fields = append(fields, WorkbookPageField{Key: "chapter4_first_skill_description", Label: "Skill Description", Value: desc, InputType: "textarea", Editable: false})
+	}
+	return fields
 }
 
 // chapter4MechanicsFields silently projects the confirmed first-skill fact
@@ -770,10 +801,24 @@ func chapter4MechanicsFields(context map[string]any) []WorkbookPageField {
 func socioParentageSummary(context map[string]any) string {
 	parents := anySlice(context["socio_parentage_parents"])
 	lines := make([]string, 0, len(parents)+2)
-	if len(parents) == 0 {
-		if roll := titleizeContextValue(context["socio_parentage_roll"]); roll != "" {
-			lines = append(lines, fmt.Sprintf("Roll total: %s", roll))
+	effectiveRoll := catharsisEffectiveParentageRoll(context)
+	effectiveEntry, ok := ParentageChartEntryForRoll(effectiveRoll)
+	if !ok {
+		effectiveEntry = ParentageChartEntry{}
+	}
+	if effectiveRoll > 0 {
+		lines = append(lines, fmt.Sprintf("Effective roll: %d", effectiveRoll))
+		if effectiveEntry.SocialClass != "" {
+			lines = append(lines, fmt.Sprintf("Resolved class: %s", effectiveEntry.SocialClass))
 		}
+		if effectiveEntry.StartingCredit > 0 {
+			lines = append(lines, fmt.Sprintf("Starting credit: %d", effectiveEntry.StartingCredit))
+		}
+	}
+	if combinedRoll := catharsisCombinedParentageRoll(context); combinedRoll > 0 && combinedRoll != effectiveRoll {
+		lines = append(lines, fmt.Sprintf("Combined roll: %d", combinedRoll))
+	}
+	if len(parents) == 0 {
 		if class := titleizeContextValue(context["socio_parentage_class"]); class != "" {
 			lines = append(lines, fmt.Sprintf("Resolved class: %s", class))
 		}
@@ -825,6 +870,23 @@ func socioParentageSummary(context map[string]any) string {
 		return ""
 	}
 	return strings.Join(lines, "\n")
+}
+
+func catharsisEffectiveParentageRoll(context map[string]any) int {
+	if rows := normalizeCatharsisParentageRows(context["socio_parentage_parents"]); len(rows) > 0 {
+		return effectiveParentageRoll(rows)
+	}
+	if roll, ok := parseCatharsisRoll(context["socio_parentage_roll"]); ok {
+		return roll
+	}
+	return 0
+}
+
+func catharsisCombinedParentageRoll(context map[string]any) int {
+	if roll, ok := parseCatharsisRoll(context["socio_parentage_total_roll"]); ok {
+		return roll
+	}
+	return totalParentageRoll(normalizeCatharsisParentageRows(context["socio_parentage_parents"]))
 }
 
 func socioInheritanceSummary(context map[string]any) string {

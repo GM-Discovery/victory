@@ -3,30 +3,37 @@ package characters
 import "testing"
 
 func TestCommitChapter3ArchetypeRequiresAuth(t *testing.T) {
-	_, _, err := CommitChapter3Archetype(nil, nil, "", "card-1", "Builder", false)
+	_, _, err := CommitChapter3Archetype(nil, nil, "", "card-1", "Builder", nil, false)
 	if err == nil || err.Error() != "not_authenticated" {
 		t.Fatalf("err = %v, want not_authenticated", err)
 	}
 }
 
 func TestCommitChapter3ArchetypeRequiresCardID(t *testing.T) {
-	_, _, err := CommitChapter3Archetype(nil, nil, "user-1", "", "Builder", false)
+	_, _, err := CommitChapter3Archetype(nil, nil, "user-1", "", "Builder", nil, false)
 	if err == nil || err.Error() != "character_card_id_required" {
 		t.Fatalf("err = %v, want character_card_id_required", err)
 	}
 }
 
 func TestCommitChapter3ArchetypeRequiresArchetypeKey(t *testing.T) {
-	_, _, err := CommitChapter3Archetype(nil, nil, "user-1", "card-1", "", false)
+	_, _, err := CommitChapter3Archetype(nil, nil, "user-1", "card-1", "", nil, false)
 	if err == nil || err.Error() != "archetype_key_required" {
 		t.Fatalf("err = %v, want archetype_key_required", err)
 	}
 }
 
 func TestCommitChapter3ArchetypeRejectsUnknownKey(t *testing.T) {
-	_, _, err := CommitChapter3Archetype(nil, nil, "user-1", "card-1", "NotARealArchetype", false)
+	_, _, err := CommitChapter3Archetype(nil, nil, "user-1", "card-1", "NotARealArchetype", nil, false)
 	if err == nil || err.Error() != "unknown_archetype_key" {
 		t.Fatalf("err = %v, want unknown_archetype_key", err)
+	}
+}
+
+func TestCommitChapter3CustomArchetypeRequiresCustomFields(t *testing.T) {
+	_, _, err := CommitChapter3Archetype(nil, nil, "user-1", "card-1", "custom", nil, false)
+	if err == nil || err.Error() != "custom_archetype_required" {
+		t.Fatalf("err = %v, want custom_archetype_required", err)
 	}
 }
 

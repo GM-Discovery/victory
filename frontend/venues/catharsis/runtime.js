@@ -371,6 +371,7 @@
     const characterTrayButton = document.getElementById("character-tray-button");
     const characterTrayLabel = document.getElementById("character-tray-label");
     const rightCardEditorButton = document.getElementById("right-card-editor-button");
+    const rightHelpButton = document.getElementById("right-help-button");
     const chatDiceTab = document.getElementById("chat-dice-tab");
     const chatHelpTab = document.getElementById("chat-help-tab");
     const chatDicePanel = document.getElementById("chat-dice-panel");
@@ -3961,11 +3962,11 @@
       window.location.href = target;
     });
     rightCardEditorButton?.addEventListener("click", () => {
-      const activeCharacterId = String(currentIdentity?.active_character?.character_card_id || "").trim();
-      if (activeCharacterId) {
-        window.location.href = `/venues/greenroom/?character_id=${encodeURIComponent(activeCharacterId)}`;
-        return;
-      }
+      const url = new URL(window.location.href);
+      url.searchParams.set("new_character", "1");
+      window.location.href = url.toString();
+    });
+    rightHelpButton?.addEventListener("click", () => {
       window.VictoryCatharsisOnboarding?.begin?.();
     });
     chatDiceTab?.addEventListener("click", () => setChatCompanionTab("dice"));

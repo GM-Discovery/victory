@@ -219,8 +219,18 @@ func attachCanonicalCatharsisParentageRows(ctx context.Context, pool *pgxpool.Po
 	}
 	context["socio_parentage_first_roll"] = eggRoll.RollTotal
 	context["socio_parentage_second_roll"] = spermRoll.RollTotal
-	context["socio_parentage_roll"] = eggRoll.RollTotal + spermRoll.RollTotal
+	context["socio_parentage_roll"] = effectiveParentageRollFromRolls(eggRoll.RollTotal, spermRoll.RollTotal)
 
 	input.WorkbookContext = context
 	return input, nil
+}
+
+func effectiveParentageRollFromRolls(rolls ...int) int {
+	effective := 0
+	for _, roll := range rolls {
+		if roll > effective {
+			effective = roll
+		}
+	}
+	return effective
 }

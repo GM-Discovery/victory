@@ -11,6 +11,37 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-07-03 — Kernel 57 Catharsis Onboarding Repair, Greenroom Polish, and Custom Archetype Fixes
+
+### Backend
+- Fixed the Chapter 2 completion handoff so the last stage now advances into Chapter 3 instead of calling a missing Chapter 3 function.
+- Kept the Catharsis coin-flip and parentage copy aligned with the actual roll data so the UI distinguishes parent roll totals from inherited starting credit.
+- Hardened Chapter 3 custom archetype confirmation so the backend accepts a valid custom archetype payload instead of failing the flow with `unknown_archetype_key`.
+- Added a server-side character account cap with a configurable default limit and enforced it at character creation.
+- Corrected the effective Catharsis parentage roll to use the higher donor roll instead of summing the donor rolls.
+- Updated the workbook face-page summary to derive the effective parentage roll from the parent rows and expose the combined roll separately so stale workbooks no longer present the wrong value as canonical.
+
+### Frontend
+- Tightened the Catharsis onboarding shell, onboarding cards, stage summary, and mobile stacking so the venue reads more like a finished shell and less like a prototype.
+- Improved the Greenroom workbook library with clearer grouping for completed characters and characters in progress, plus cleaner mobile spacing.
+- Reduced some of the densest Catharsis status labels so the live shell chrome reads more like a dashboard and less like a debug panel.
+
+### Tests
+- Re-ran targeted backend coverage for Chapter 3 confirmation from the backend module root:
+  - `cd backend && GOCACHE=/tmp/victory-gocache go test ./internal/characters -run TestCommitChapter3`
+- Re-ran the backend module test suite after the cap and parentage fixes:
+  - `cd backend && GOCACHE=/tmp/victory-gocache go test ./...`
+- Re-verified frontend syntax and diff hygiene on the touched Catharsis onboarding script and the workspace diff:
+  - `node --check frontend/venues/catharsis/onboarding.js`
+  - `git diff --check`
+
+### Notes
+- The Chapter 3 custom archetype fix was intentionally made backend-side so the custom payload path is authoritative instead of relying on frontend key handling alone.
+- The final visual pass was limited to the Catharsis and Greenroom surfaces that were already part of Kernel 57 scope.
+- The repo-wide backend test run still reports unrelated pre-existing failures in `internal/assets`, `internal/identity`, and `internal/network`.
+
+---
+
 ## 2026-06-29 — Kernel 53 Character Workbook Foundation + Socio Parentage v1.1
 
 ### Backend

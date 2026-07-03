@@ -22,18 +22,30 @@
       --utility: #8fb7da;
       --stage-top: #531017;
       --stage-bottom: #050403;
+      --font-body: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
     }
 
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-family: var(--font-body);
       background:
-        radial-gradient(circle at 50% 0%, rgba(228, 185, 108, 0.08), transparent 26%),
-        radial-gradient(circle at 50% 14%, rgba(168, 62, 78, 0.2), transparent 32%),
-        radial-gradient(circle at 15% 12%, rgba(95, 140, 186, 0.08), transparent 24%),
+        radial-gradient(circle at 50% 0%, rgba(228, 185, 108, 0.12), transparent 24%),
+        radial-gradient(circle at 50% 14%, rgba(168, 62, 78, 0.24), transparent 32%),
+        radial-gradient(circle at 15% 12%, rgba(95, 140, 186, 0.1), transparent 24%),
         linear-gradient(180deg, #201014 0%, #11090a 32%, #070606 100%);
       color: var(--text);
+    }
+
+    h1,
+    h2,
+    h3,
+    .hero-copy h1,
+    .catharsis-onboarding__panel h2,
+    .catharsis-build-card h3 {
+      font-family: var(--font-display);
+      letter-spacing: 0.01em;
     }
 
     .shell {
@@ -50,8 +62,10 @@
     }
 
     .panel {
-      background: var(--panel);
-      border: 1px solid var(--line);
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.05), transparent 32%),
+        var(--panel);
+      border: 1px solid rgba(240, 208, 155, 0.12);
       border-radius: 18px;
       box-shadow: 0 20px 64px rgba(0, 0, 0, 0.3);
       box-sizing: border-box;
@@ -148,10 +162,34 @@
       border-radius: 0;
       border: 0;
       background:
-        radial-gradient(circle at 50% 36%, rgba(255, 236, 196, 0.12), transparent 20%),
+        radial-gradient(circle at 50% 36%, rgba(255, 236, 196, 0.16), transparent 18%),
+        radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.08), transparent 28%),
         linear-gradient(180deg, #6a1520 0%, #3d0d14 18%, #140708 42%, #090606 100%);
       box-shadow: none;
       isolation: isolate;
+    }
+
+    .stage-shell::before,
+    .stage-shell::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .stage-shell::before {
+      background:
+        radial-gradient(circle at 50% 12%, rgba(255, 223, 170, 0.24), transparent 18%),
+        radial-gradient(circle at 18% 16%, rgba(111, 164, 255, 0.08), transparent 16%),
+        radial-gradient(circle at 82% 16%, rgba(255, 151, 165, 0.1), transparent 18%);
+      mix-blend-mode: screen;
+      opacity: 0.9;
+    }
+
+    .stage-shell::after {
+      background:
+        linear-gradient(180deg, rgba(6, 5, 5, 0.02), rgba(6, 5, 5, 0.24) 46%, rgba(6, 5, 5, 0.48)),
+        radial-gradient(circle at 50% 48%, transparent 58%, rgba(6, 5, 5, 0.3) 100%);
     }
 
     .shell-chrome {
@@ -186,6 +224,8 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
     }
 
     .stage-empty-state {
@@ -213,8 +253,10 @@
       width: min(100%, 320px);
       padding: 12px 14px 11px;
       border-radius: 999px;
-      background: rgba(12, 14, 19, 0.7);
-      border: 1px solid rgba(240, 208, 155, 0.16);
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 54%),
+        rgba(12, 14, 19, 0.74);
+      border: 1px solid rgba(240, 208, 155, 0.18);
       box-shadow: 0 16px 36px rgba(0, 0, 0, 0.24);
       backdrop-filter: blur(8px);
     }
@@ -254,10 +296,13 @@
       color: #f8eedf;
       font: inherit;
       cursor: pointer;
+      transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
     }
 
     .stage-empty-card button:hover {
       background: rgba(240, 208, 155, 0.18);
+      border-color: rgba(240, 208, 155, 0.3);
+      transform: translateY(-1px);
     }
 
     .catharsis-onboarding {
@@ -351,7 +396,9 @@
         radial-gradient(circle at 20% 18%, rgba(255, 210, 131, 0.22), transparent 28%),
         radial-gradient(circle at 78% 22%, rgba(121, 161, 224, 0.16), transparent 30%),
         linear-gradient(180deg, rgba(35, 19, 16, 0.98), rgba(11, 9, 10, 0.98));
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+        0 24px 60px rgba(0, 0, 0, 0.36);
     }
 
     .catharsis-build-visual::before,
@@ -538,10 +585,14 @@
       font: inherit;
       font-weight: 700;
       cursor: pointer;
+      transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
     }
 
     .catharsis-onboarding__actions button:hover {
       background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 232, 190, 0.34);
+      transform: translateY(-1px);
+      box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2);
     }
 
     .catharsis-roll-prompt {
@@ -689,6 +740,91 @@
       color: inherit;
       padding: 4px 6px;
       font: inherit;
+    }
+
+    .catharsis-chapter2-bonus-choices button,
+    .catharsis-chapter2-traits button {
+      transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+    }
+
+    .catharsis-chapter2-bonus-choices button:hover,
+    .catharsis-chapter2-traits button:hover {
+      background: rgba(255, 255, 255, 0.07);
+      border-color: rgba(240, 208, 155, 0.3);
+      transform: translateX(2px);
+    }
+
+    .catharsis-onboarding__panel h2,
+    .catharsis-onboarding__panel p,
+    .catharsis-build-card,
+    .stage-status,
+    .stage-empty-card,
+    .catharsis-onboarding__actions button,
+    .catharsis-chapter2-bonus-choices button,
+    .catharsis-chapter2-traits button {
+      text-wrap: pretty;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .catharsis-build-visual::before,
+      .catharsis-build-stage__wheel {
+        animation: none;
+      }
+
+      .stage-empty-card button,
+      .catharsis-onboarding__actions button,
+      .catharsis-chapter2-bonus-choices button,
+      .catharsis-chapter2-traits button {
+        transition: none;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .catharsis-onboarding__sheet {
+        width: min(100%, 900px);
+        max-height: calc(100vh - 24px);
+        padding: 18px;
+      }
+
+      .catharsis-onboarding__build {
+        grid-template-columns: 1fr;
+      }
+
+      .catharsis-build-visual,
+      .catharsis-build-stage__frame {
+        min-height: 260px;
+      }
+
+      .catharsis-build-metrics,
+      .catharsis-roll-results {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .catharsis-onboarding__chapter,
+      .catharsis-onboarding__childhood {
+        min-height: 360px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .catharsis-build-metrics,
+      .catharsis-roll-results {
+        grid-template-columns: 1fr;
+      }
+
+      .catharsis-onboarding__actions {
+        width: 100%;
+      }
+
+      .catharsis-onboarding__actions button {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .catharsis-build-card {
+        width: min(100%, 360px);
+        padding: 16px;
+      }
     }
 
     .catharsis-onboarding__coinflip {
@@ -1105,11 +1241,13 @@
     .top-bar,
     .drawer,
     .chat-panel {
-      border: 1px solid rgba(240, 208, 155, 0.12);
-      background: linear-gradient(180deg, rgba(15, 18, 25, 0.86), rgba(8, 10, 15, 0.82));
+      border: 1px solid rgba(240, 208, 155, 0.14);
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.045), transparent 42%),
+        linear-gradient(180deg, rgba(15, 18, 25, 0.88), rgba(8, 10, 15, 0.84));
       border-radius: 18px;
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(14px) saturate(110%);
       pointer-events: auto;
     }
 
@@ -1146,6 +1284,15 @@
       padding: 10px 14px;
       min-height: 58px;
       transform: translateY(0);
+    }
+
+    .top-bar[data-open="true"] .chip,
+    .top-bar[data-open="true"] .header-pill,
+    .top-bar[data-open="true"] .header-settings-button,
+    .drawer[data-open="true"] .drawer-settings-button,
+    .chat-panel[data-open="true"] .chat-tab,
+    .chat-panel[data-open="true"] .chat-row button {
+      transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
     }
 
     .top-bar[data-open="false"] .header-left,
@@ -1393,7 +1540,9 @@
       overflow: visible;
       transition: width 180ms ease, transform 180ms ease, background 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
       --drawer-surface-opacity: 0.9;
-      background: linear-gradient(180deg, rgba(15, 18, 25, var(--drawer-surface-opacity)), rgba(8, 10, 15, calc(var(--drawer-surface-opacity) - 0.06)));
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.04), transparent 38%),
+        linear-gradient(180deg, rgba(15, 18, 25, var(--drawer-surface-opacity)), rgba(8, 10, 15, calc(var(--drawer-surface-opacity) - 0.06)));
     }
 
     .drawer-inner {
@@ -1508,7 +1657,9 @@
     .drawer[data-open="false"] {
       border-color: transparent;
       box-shadow: none;
-      background: linear-gradient(180deg, rgba(15, 18, 25, 0.06), rgba(8, 10, 15, 0.03));
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.02), transparent 42%),
+        linear-gradient(180deg, rgba(15, 18, 25, 0.06), rgba(8, 10, 15, 0.03));
       backdrop-filter: blur(2px);
       overflow: hidden;
       opacity: 0.34;
@@ -1918,7 +2069,9 @@
       --chat-surface-opacity: 0.88;
       --chat-rail-height: 24px;
       opacity: 0.05;
-      background: linear-gradient(180deg, rgba(15, 18, 25, var(--chat-surface-opacity)), rgba(8, 10, 15, calc(var(--chat-surface-opacity) - 0.06)));
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.04), transparent 42%),
+        linear-gradient(180deg, rgba(15, 18, 25, var(--chat-surface-opacity)), rgba(8, 10, 15, calc(var(--chat-surface-opacity) - 0.06)));
     }
 
     .chat-panel.is-open {
@@ -1928,7 +2081,9 @@
     .chat-panel[data-open="false"] {
       border-color: transparent;
       box-shadow: none;
-      background: linear-gradient(180deg, rgba(15, 18, 25, 0.05), rgba(8, 10, 15, 0.02));
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.02), transparent 42%),
+        linear-gradient(180deg, rgba(15, 18, 25, 0.05), rgba(8, 10, 15, 0.02));
       backdrop-filter: blur(2px);
     }
 
@@ -2844,12 +2999,6 @@
         min-height: 100vh;
       }
 
-      .stage-summary {
-        right: 12px;
-        left: 12px;
-        width: auto;
-      }
-
       .overlay-panel {
         left: 12px;
         right: 12px;
@@ -2867,6 +3016,28 @@
 
       .map-editor-body {
         grid-template-columns: 1fr;
+      }
+
+      .stage-summary {
+        right: 12px;
+        left: 12px;
+        top: 12px;
+        width: auto;
+        max-height: min(42vh, 340px);
+        overflow: auto;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .stage-summary-card {
+        padding: 10px 11px;
+      }
+
+      .stage-summary-card strong {
+        font-size: 0.82rem;
+      }
+
+      .stage-summary-line {
+        font-size: 0.86rem;
       }
 
       .drawer {
@@ -2923,32 +3094,32 @@
           <div id="stage-empty-state" class="stage-empty-state" hidden>
             <div class="stage-empty-card">
               <em>Catharsis</em>
-              <strong>Live tools are paused.</strong>
-              <span>Right-click the stage or load the shell tools when you want the full stage.</span>
-              <button id="stage-load-tools" type="button">Load live tools</button>
+              <strong>Stage tools are paused.</strong>
+              <span>Right-click the stage or load the live tools to open the full shell.</span>
+              <button id="stage-load-tools" type="button">Open live tools</button>
             </div>
           </div>
           <div class="stage-summary">
             <div class="stage-summary-card">
-              <strong>Live Feed</strong>
-              <div id="live-feed-line" class="stage-summary-line">No live data yet.</div>
+              <strong>Feed</strong>
+              <div id="live-feed-line" class="stage-summary-line">Waiting for live data.</div>
             </div>
             <div class="stage-summary-card">
-              <strong>Snapshot</strong>
-              <div id="snapshot-summary" class="stage-summary-line">No snapshot summary yet.</div>
+              <strong>Scene</strong>
+              <div id="snapshot-summary" class="stage-summary-line">No scene summary yet.</div>
             </div>
             <div class="stage-summary-card">
-              <strong>Selected</strong>
+              <strong>Focus</strong>
               <div id="selection-line" class="stage-summary-line">None</div>
               <div id="selected-actions" class="selected-actions"></div>
             </div>
             <div class="stage-summary-card">
-              <strong>Pointer</strong>
-              <div id="pointer-line" class="stage-summary-line">Screen n/a | Stage n/a</div>
+              <strong>Cursor</strong>
+              <div id="pointer-line" class="stage-summary-line">Screen n/a · Stage n/a</div>
             </div>
             <div class="stage-summary-card">
-              <strong>Movement</strong>
-              <div id="movement-line" class="stage-summary-line">Idle</div>
+              <strong>Motion</strong>
+              <div id="movement-line" class="stage-summary-line">At rest</div>
             </div>
           </div>
               <div id="pixi-stage-host" class="pixi-stage-host" aria-label="Catharsis stage"></div>
@@ -3406,7 +3577,8 @@
                     <div class="drawer-item">
                       <strong>Selection</strong>
                       <div class="overlay-actions">
-                        <button id="right-card-editor-button" type="button">Open workbook</button>
+                        <button id="right-card-editor-button" type="button">Make a Character</button>
+                        <button id="right-help-button" type="button">Tray Tour</button>
                       </div>
                     </div>
                   </div>
@@ -3447,13 +3619,13 @@
     </div>
   </div>
 
-  <div id="catharsis-onboarding" class="catharsis-onboarding" hidden>
+  <div id="catharsis-onboarding" class="catharsis-onboarding" hidden role="dialog" aria-modal="true" aria-labelledby="catharsis-onboarding-title">
     <div class="catharsis-onboarding__sheet">
       <div id="catharsis-onboarding-intro" class="catharsis-onboarding__panel">
         <p class="eyebrow">Catharsis Welcome</p>
-        <h2>Four trays live in the header.</h2>
+        <h2 id="catharsis-onboarding-title">Four trays live in the header.</h2>
         <p>
-          Chat, presence, tools, and diagnostics stay visible from the shell. Close this once, and the Socio starter prompt will take over so you can step into the character surface first.
+          Chat, presence, tools, and diagnostics stay visible from the shell. Use the tray tour whenever you need a reminder of what lives where. Character creation only starts when you explicitly ask for it.
         </p>
         <div class="catharsis-onboarding__actions">
           <button id="catharsis-onboarding-continue" type="button">Continue</button>

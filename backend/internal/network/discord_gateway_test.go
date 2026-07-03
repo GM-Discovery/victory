@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -578,9 +579,10 @@ func setupDiscordGatewayEditFixture(t *testing.T, pool *pgxpool.Pool) (locationI
 	t.Helper()
 
 	ctx := context.Background()
-	venueSlug := "gateway-thread-fixture"
-	locationSlug := "gateway-thread-location"
-	userHandle := "gateway_thread_editor"
+	suffix := strings.ReplaceAll(strings.ToLower(t.Name()), "/", "_") + "_" + time.Now().UTC().Format("150405.000000")
+	venueSlug := "gateway-thread-fixture-" + suffix
+	locationSlug := "gateway-thread-location-" + suffix
+	userHandle := "gateway_thread_editor_" + suffix
 
 	if err := pool.QueryRow(ctx, `
 		INSERT INTO locations (name, slug)

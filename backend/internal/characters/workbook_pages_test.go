@@ -9,6 +9,7 @@ func TestBuildWorkbookPagesIncludesCatharsisSummaryFields(t *testing.T) {
 			"source":                        "catharsis",
 			"socio_parentage_chart_version": ParentageChartVersionV11,
 			"socio_parentage_roll":          72,
+			"socio_parentage_total_roll":    72,
 			"socio_parentage_parents": []any{
 				map[string]any{
 					"parent_index":       1,
@@ -53,11 +54,25 @@ func TestBuildWorkbookPagesIncludesCatharsisSummaryFields(t *testing.T) {
 
 	foundSummary := false
 	foundWealth := false
+	foundRoll := false
+	foundTotalRoll := false
 	for _, field := range face.Fields {
 		if field.Key == "socio_parentage_summary" {
 			foundSummary = true
 			if field.Value == "" {
 				t.Fatalf("expected parentage summary to be populated")
+			}
+		}
+		if field.Key == "socio_parentage_roll" {
+			foundRoll = true
+			if field.Value != "52" {
+				t.Fatalf("effective parentage roll = %q, want 52", field.Value)
+			}
+		}
+		if field.Key == "socio_parentage_total_roll" {
+			foundTotalRoll = true
+			if field.Value != "72" {
+				t.Fatalf("combined roll = %q, want 72", field.Value)
 			}
 		}
 		if field.Key == "socio_starting_wealth" {
@@ -70,6 +85,12 @@ func TestBuildWorkbookPagesIncludesCatharsisSummaryFields(t *testing.T) {
 
 	if !foundSummary {
 		t.Fatalf("expected socio_parentage_summary field on face page")
+	}
+	if !foundRoll {
+		t.Fatalf("expected socio_parentage_roll field on face page")
+	}
+	if !foundTotalRoll {
+		t.Fatalf("expected socio_parentage_total_roll field on face page")
 	}
 	if !foundWealth {
 		t.Fatalf("expected socio_starting_wealth field on face page")

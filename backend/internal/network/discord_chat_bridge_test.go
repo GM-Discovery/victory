@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"victory/backend/internal/actions"
 	"victory/backend/internal/identity"
@@ -120,6 +121,7 @@ func setupDiscordChatBridgeFixture(t *testing.T, pool *pgxpool.Pool) (locationID
 	t.Helper()
 
 	ctx := context.Background()
+	suffix := strings.ReplaceAll(strings.ToLower(t.Name()), "/", "_") + "_" + time.Now().UTC().Format("150405.000000")
 	if err := ensureDiscordBridgeTestSchema(ctx, pool); err != nil {
 		t.Fatalf("ensure bridge schema: %v", err)
 	}
@@ -148,7 +150,7 @@ func setupDiscordChatBridgeFixture(t *testing.T, pool *pgxpool.Pool) (locationID
 		INSERT INTO users (handle, display_name)
 		VALUES ($1, $2)
 		RETURNING id::text
-	`, "bridge_operator", "Bridge Operator").Scan(&userID); err != nil {
+	`, "bridge_operator_"+suffix, "Bridge Operator").Scan(&userID); err != nil {
 		t.Fatalf("insert user: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `

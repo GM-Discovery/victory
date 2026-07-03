@@ -16,6 +16,9 @@ import (
 type Chapter4GroupResult struct {
 	ArchetypeKey      string          `json:"archetype_key"`
 	ArchetypeTitle    string          `json:"archetype_title"`
+	CustomArchetype   bool            `json:"custom_archetype,omitempty"`
+	ArchetypeSummary  string          `json:"archetype_summary,omitempty"`
+	MechanicalEffect  string          `json:"mechanical_effect,omitempty"`
 	KeySkillID        string          `json:"key_skill_id"`
 	KeySkillName      string          `json:"key_skill_name"`
 	AttributeID       string          `json:"attribute_id"`
@@ -34,6 +37,7 @@ type Chapter4Fact struct {
 	SkillName          string   `json:"skill_name"`
 	AttributeID        string   `json:"attribute_id"`
 	AttributeName      string   `json:"attribute_name"`
+	SkillDescription   string   `json:"skill_description,omitempty"`
 	AcquisitionSource  string   `json:"acquisition_source"`
 	TrainingState      string   `json:"training_state"`
 	DieSize            string   `json:"die_size"`
@@ -129,30 +133,48 @@ func ResolveChapter4Group(ctx context.Context, pool *pgxpool.Pool, actorUserID, 
 		return Chapter4GroupResult{}, errors.New("chapter3_not_complete")
 	}
 
-	keySkill, ok := Chapter4SkillByName(archetypeFact.KeySkill)
-	if !ok {
-		return Chapter4GroupResult{}, fmt.Errorf("key_skill_not_found")
+	customArchetype := strings.EqualFold(archetypeFact.ArchetypeKey, "custom")
+	groupAttributeName := archetypeFact.PrimaryAttribute
+	if !customArchetype {
+		keySkill, ok := Chapter4SkillByName(archetypeFact.KeySkill)
+		if !ok {
+			return Chapter4GroupResult{}, fmt.Errorf("key_skill_not_found")
+		}
+		groupAttributeName = keySkill.AttributeName
 	}
 
-	group := Chapter4SkillsForAttribute(keySkill.AttributeID)
-	if len(group) != 10 {
-		return Chapter4GroupResult{}, errors.New("skill_group_invalid")
-	}
-
-	attribute, ok := Chapter4AttributeByName(keySkill.AttributeName)
+	attribute, ok := Chapter4AttributeByName(groupAttributeName)
 	if !ok {
 		return Chapter4GroupResult{}, errors.New("attribute_not_found")
+	}
+
+	group := Chapter4SkillsForAttribute(attribute.ID)
+	if len(group) != 10 {
+		return Chapter4GroupResult{}, errors.New("skill_group_invalid")
 	}
 
 	attrTotals := loadChapter2Attributes(wbContext)
 	attributeScore := attrTotals[attribute.Name]
 	currentCount := countSelectedSkillsForAttribute(wbContext, attribute.ID)
 
+	keySkillName := archetypeFact.KeySkill
+	keySkillID := ""
+	if !customArchetype {
+		keySkill, _ := Chapter4SkillByName(archetypeFact.KeySkill)
+		keySkillID = keySkill.ID
+		keySkillName = keySkill.Name
+	} else {
+		keySkillName = "Choose the first skill in this group"
+	}
+
 	return Chapter4GroupResult{
 		ArchetypeKey:      archetypeFact.ArchetypeKey,
 		ArchetypeTitle:    archetypeFact.ArchetypeTitle,
-		KeySkillID:        keySkill.ID,
-		KeySkillName:      keySkill.Name,
+		CustomArchetype:   customArchetype,
+		ArchetypeSummary:  archetypeFact.CustomSummary,
+		MechanicalEffect:  archetypeFact.MechanicalEffect,
+		KeySkillID:        keySkillID,
+		KeySkillName:      keySkillName,
 		AttributeID:       attribute.ID,
 		AttributeName:     attribute.Name,
 		AttributeScore:    attributeScore,
@@ -173,6 +195,11 @@ type Chapter4SelectResult struct {
 	Overridden         bool   `json:"overridden"`
 }
 
+type Chapter4CustomSkillInput struct {
+	Name        string
+	Description string
+}
+
 // CommitChapter4FirstSkill validates and records the player's (or an
 // authorized override actor's) confirmed first trained skill. This is the
 // terminal event of onboarding: once confirmed, the character is locked --
@@ -180,7 +207,7 @@ type Chapter4SelectResult struct {
 // must go through a Director/permitted-actor append-only override (the
 // `/override` command surface is defined in a later kernel; this function
 // accepts an `override` flag so that surface has something to call).
-func CommitChapter4FirstSkill(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID, skillID string, override bool) (Chapter4SelectResult, map[string]any, error) {
+func CommitChapter4FirstSkill(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID, skillID string, custom *Chapter4CustomSkillInput, override bool) (Chapter4SelectResult, map[string]any, error) {
 	actorUserID = strings.TrimSpace(actorUserID)
 	cardID = strings.TrimSpace(cardID)
 	skillID = strings.TrimSpace(skillID)
@@ -194,12 +221,23 @@ func CommitChapter4FirstSkill(ctx context.Context, pool *pgxpool.Pool, actorUser
 	if skillID == "" {
 		return Chapter4SelectResult{}, nil, errors.New("skill_id_required")
 	}
-
-	skill, ok := Chapter4SkillByID(skillID)
-	if !ok {
-		return Chapter4SelectResult{}, nil, errors.New("unknown_skill_id")
+	if !strings.EqualFold(skillID, "custom") {
+		if _, ok := Chapter4SkillByID(skillID); !ok {
+			return Chapter4SelectResult{}, nil, errors.New("unknown_skill_id")
+		}
+	} else {
+		if custom == nil {
+			return Chapter4SelectResult{}, nil, errors.New("custom_skill_required")
+		}
+		custom.Name = strings.TrimSpace(custom.Name)
+		custom.Description = strings.TrimSpace(custom.Description)
+		if custom.Name == "" {
+			return Chapter4SelectResult{}, nil, errors.New("custom_skill_name_required")
+		}
+		if custom.Description == "" {
+			return Chapter4SelectResult{}, nil, errors.New("custom_skill_description_required")
+		}
 	}
-
 	allowed, err := CanEditCard(ctx, pool, actorUserID, cardID)
 	if err != nil {
 		return Chapter4SelectResult{}, nil, err
@@ -238,29 +276,50 @@ func CommitChapter4FirstSkill(ctx context.Context, pool *pgxpool.Pool, actorUser
 		}, wbContext, nil
 	}
 
-	keySkill, ok := Chapter4SkillByName(archetypeFact.KeySkill)
-	if !ok {
-		return Chapter4SelectResult{}, nil, errors.New("key_skill_not_found")
-	}
-	group := Chapter4SkillsForAttribute(keySkill.AttributeID)
-	if len(group) != 10 {
-		return Chapter4SelectResult{}, nil, errors.New("skill_group_invalid")
-	}
-	inGroup := false
-	for _, s := range group {
-		if s.ID == skill.ID {
-			inGroup = true
-			break
+	customArchetype := strings.EqualFold(archetypeFact.ArchetypeKey, "custom")
+	groupAttributeName := archetypeFact.PrimaryAttribute
+	if !customArchetype {
+		keySkill, ok := Chapter4SkillByName(archetypeFact.KeySkill)
+		if !ok {
+			return Chapter4SelectResult{}, nil, errors.New("key_skill_not_found")
 		}
+		groupAttributeName = keySkill.AttributeName
 	}
-	if !inGroup {
-		return Chapter4SelectResult{}, nil, errors.New("skill_not_in_group")
-	}
-
-	attribute, ok := Chapter4AttributeByName(skill.AttributeName)
+	attributeGroup, ok := Chapter4AttributeByName(groupAttributeName)
 	if !ok {
 		return Chapter4SelectResult{}, nil, errors.New("attribute_not_found")
 	}
+	group := Chapter4SkillsForAttribute(attributeGroup.ID)
+	if len(group) != 10 {
+		return Chapter4SelectResult{}, nil, errors.New("skill_group_invalid")
+	}
+
+	var skill Chapter4Skill
+	if strings.EqualFold(skillID, "custom") {
+		skill = Chapter4Skill{
+			ID:              customStableID("skill"),
+			Name:            custom.Name,
+			AttributeID:     attributeGroup.ID,
+			AttributeName:   attributeGroup.Name,
+			SourceOrder:     0,
+			CardDescription: custom.Description,
+			Helpers:         []Chapter4SkillHelper{},
+		}
+	} else {
+		skill, _ = Chapter4SkillByID(skillID)
+		inGroup := false
+		for _, s := range group {
+			if s.ID == skill.ID {
+				inGroup = true
+				break
+			}
+		}
+		if !inGroup {
+			return Chapter4SelectResult{}, nil, errors.New("skill_not_in_group")
+		}
+	}
+
+	attribute := attributeGroup
 	attrTotals := loadChapter2Attributes(wbContext)
 	capacity := attrTotals[attribute.Name]
 	currentCount := countSelectedSkillsForAttribute(wbContext, attribute.ID)
@@ -283,6 +342,7 @@ func CommitChapter4FirstSkill(ctx context.Context, pool *pgxpool.Pool, actorUser
 		SkillName:          skill.Name,
 		AttributeID:        attribute.ID,
 		AttributeName:      attribute.Name,
+		SkillDescription:   skill.CardDescription,
 		AcquisitionSource:  "onboarding_first_skill",
 		TrainingState:      "trained",
 		DieSize:            "d6",
@@ -294,6 +354,13 @@ func CommitChapter4FirstSkill(ctx context.Context, pool *pgxpool.Pool, actorUser
 	}
 
 	wbContext["chapter4"] = fact
+	if customArchetype {
+		chapter3, ok := loadChapter3Fact(wbContext)
+		if ok {
+			chapter3.KeySkill = skill.Name
+			wbContext["chapter3"] = chapter3
+		}
+	}
 	wbContext["current_stage"] = 5
 	wbContext["current_event"] = "chapter4_first_skill_confirmed"
 	wbContext["character_onboarding_completed"] = true
@@ -317,8 +384,7 @@ func CommitChapter4FirstSkill(ctx context.Context, pool *pgxpool.Pool, actorUser
 		WHERE character_card_id = $1 AND ruleset_key = 'socio'
 	`, cardID)
 
-	// Equip this character as the user's active persona (existing primitive,
-	// same as used at character-card creation time).
+	// Equip this completed character as the user's active persona.
 	if err := setActiveCharacter(ctx, pool, actorUserID, cardID); err != nil {
 		return Chapter4SelectResult{}, nil, err
 	}

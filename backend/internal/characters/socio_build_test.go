@@ -125,3 +125,28 @@ func TestResolveCatharsisParentageContextRetentionBoundaries(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveCatharsisParentageContextUsesHigherParentRoll(t *testing.T) {
+	got := resolveCatharsisParentageContext(map[string]any{
+		"source": "catharsis",
+		"socio_parentage_parents": []any{
+			map[string]any{
+				"parent_index":    1,
+				"roll_total":      52,
+				"starting_credit": 220,
+			},
+			map[string]any{
+				"parent_index":    2,
+				"roll_total":      31,
+				"starting_credit": 45,
+			},
+		},
+	}, nil)
+
+	if roll, ok := parseCatharsisRoll(got["socio_parentage_roll"]); !ok || roll != 52 {
+		t.Fatalf("socio_parentage_roll = %v, want 52", got["socio_parentage_roll"])
+	}
+	if roll, ok := parseCatharsisRoll(got["socio_parentage_total_roll"]); !ok || roll != 83 {
+		t.Fatalf("socio_parentage_total_roll = %v, want 83", got["socio_parentage_total_roll"])
+	}
+}

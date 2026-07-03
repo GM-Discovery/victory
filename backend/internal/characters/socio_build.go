@@ -84,11 +84,7 @@ func resolveCatharsisParentageContext(context map[string]any, rollD2 func() int)
 	out["socio_parentage_class"] = primaryEntry.SocialClass
 	out["socio_parentage_starting_credit"] = primaryEntry.StartingCredit
 	out["socio_parentage_description"] = primaryEntry.Description
-	if roll, ok := parseCatharsisRoll(out["socio_parentage_roll"]); ok {
-		out["socio_parentage_roll"] = roll
-	} else {
-		out["socio_parentage_roll"] = totalParentageRoll(enrichedRows)
-	}
+	out["socio_parentage_roll"] = effectiveParentageRoll(enrichedRows)
 	if out["socio_parentage_first_roll"] == nil && len(enrichedRows) > 0 {
 		out["socio_parentage_first_roll"] = enrichedRows[0]["roll_total"]
 	}
@@ -103,7 +99,7 @@ func catharsisPrimaryParentageEntry(context map[string]any) ParentageChartEntry 
 	roll, ok := parseCatharsisRoll(context["socio_parentage_roll"])
 	if !ok {
 		if rows := normalizeCatharsisParentageRows(context["socio_parentage_parents"]); len(rows) > 0 {
-			roll, _ = parseCatharsisRoll(rows[0]["roll_total"])
+			roll = effectiveParentageRoll(rows)
 		}
 	}
 	entry, ok := ParentageChartEntryForRoll(roll)
@@ -236,6 +232,16 @@ func totalParentageRoll(rows []map[string]any) int {
 		}
 	}
 	return total
+}
+
+func effectiveParentageRoll(rows []map[string]any) int {
+	effective := 0
+	for _, row := range rows {
+		if roll, ok := parseCatharsisRoll(row["roll_total"]); ok && roll > effective {
+			effective = roll
+		}
+	}
+	return effective
 }
 
 func formatParentageRollRange(entry ParentageChartEntry) string {

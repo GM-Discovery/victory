@@ -17,30 +17,37 @@ func TestResolveChapter4GroupRequiresCardID(t *testing.T) {
 }
 
 func TestCommitChapter4FirstSkillRequiresAuth(t *testing.T) {
-	_, _, err := CommitChapter4FirstSkill(nil, nil, "", "card-1", "SKILL_CRAFT_CONSTRUCTION", false)
+	_, _, err := CommitChapter4FirstSkill(nil, nil, "", "card-1", "SKILL_CRAFT_CONSTRUCTION", nil, false)
 	if err == nil || err.Error() != "not_authenticated" {
 		t.Fatalf("err = %v, want not_authenticated", err)
 	}
 }
 
 func TestCommitChapter4FirstSkillRequiresCardID(t *testing.T) {
-	_, _, err := CommitChapter4FirstSkill(nil, nil, "user-1", "", "SKILL_CRAFT_CONSTRUCTION", false)
+	_, _, err := CommitChapter4FirstSkill(nil, nil, "user-1", "", "SKILL_CRAFT_CONSTRUCTION", nil, false)
 	if err == nil || err.Error() != "character_card_id_required" {
 		t.Fatalf("err = %v, want character_card_id_required", err)
 	}
 }
 
 func TestCommitChapter4FirstSkillRequiresSkillID(t *testing.T) {
-	_, _, err := CommitChapter4FirstSkill(nil, nil, "user-1", "card-1", "", false)
+	_, _, err := CommitChapter4FirstSkill(nil, nil, "user-1", "card-1", "", nil, false)
 	if err == nil || err.Error() != "skill_id_required" {
 		t.Fatalf("err = %v, want skill_id_required", err)
 	}
 }
 
 func TestCommitChapter4FirstSkillRejectsUnknownSkillID(t *testing.T) {
-	_, _, err := CommitChapter4FirstSkill(nil, nil, "user-1", "card-1", "SKILL_NOT_REAL", false)
+	_, _, err := CommitChapter4FirstSkill(nil, nil, "user-1", "card-1", "SKILL_NOT_REAL", nil, false)
 	if err == nil || err.Error() != "unknown_skill_id" {
 		t.Fatalf("err = %v, want unknown_skill_id", err)
+	}
+}
+
+func TestCommitChapter4CustomSkillRequiresFields(t *testing.T) {
+	_, _, err := CommitChapter4FirstSkill(nil, nil, "user-1", "card-1", "custom", nil, false)
+	if err == nil || err.Error() != "custom_skill_required" {
+		t.Fatalf("err = %v, want custom_skill_required", err)
 	}
 }
 

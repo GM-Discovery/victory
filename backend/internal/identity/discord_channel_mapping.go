@@ -724,7 +724,6 @@ func venueCategorySpecs() []discordChannelMappingSpec {
 		{MappingKind: discordChannelMappingKindVenueCategory, VictoryScopeKind: discordChannelScopeKindVenue, VictoryScopeSlug: "audition-hall", ExpectedName: "Audition Hall", ChannelType: discordChannelTypeCategory},
 		{MappingKind: discordChannelMappingKindVenueCategory, VictoryScopeKind: discordChannelScopeKindVenue, VictoryScopeSlug: "greenroom", ExpectedName: "The Greenroom", ChannelType: discordChannelTypeCategory},
 		{MappingKind: discordChannelMappingKindVenueCategory, VictoryScopeKind: discordChannelScopeKindVenue, VictoryScopeSlug: "trailers", ExpectedName: "Trailers", ChannelType: discordChannelTypeCategory},
-		{MappingKind: discordChannelMappingKindVenueCategory, VictoryScopeKind: discordChannelScopeKindVenue, VictoryScopeSlug: "workshop", ExpectedName: "Workshop", ChannelType: discordChannelTypeCategory},
 	}
 }
 
@@ -732,7 +731,6 @@ func venueAudioChannelSpecs() []discordChannelMappingSpec {
 	return []discordChannelMappingSpec{
 		{MappingKind: discordChannelMappingKindVenueAudio, VictoryScopeKind: discordChannelScopeKindVenue, VictoryScopeSlug: "the-cave", ExpectedName: "The Cave Audio", ChannelType: discordChannelTypeVoice},
 		{MappingKind: discordChannelMappingKindVenueAudio, VictoryScopeKind: discordChannelScopeKindVenue, VictoryScopeSlug: "first-theater", ExpectedName: "First Theater Audio", ChannelType: discordChannelTypeVoice},
-		{MappingKind: discordChannelMappingKindVenueAudio, VictoryScopeKind: discordChannelScopeKindVenue, VictoryScopeSlug: "catharsis", ExpectedName: "Catharsis Audio", ChannelType: discordChannelTypeVoice},
 	}
 }
 
@@ -748,7 +746,6 @@ func venueChatChannelSpecs() []discordChannelMappingSpec {
 	return []discordChannelMappingSpec{
 		{MappingKind: discordChannelMappingKindVenueChat, VictoryScopeKind: discordChannelScopeKindVenueChat, VictoryScopeSlug: "the-cave", ExpectedName: "the-cave-chat", ChannelType: discordChannelTypeText},
 		{MappingKind: discordChannelMappingKindVenueChat, VictoryScopeKind: discordChannelScopeKindVenueChat, VictoryScopeSlug: "first-theater", ExpectedName: "first-theater-chat", ChannelType: discordChannelTypeText},
-		{MappingKind: discordChannelMappingKindVenueChat, VictoryScopeKind: discordChannelScopeKindVenueChat, VictoryScopeSlug: "catharsis", ExpectedName: "catharsis-chat", ChannelType: discordChannelTypeText},
 		{MappingKind: discordChannelMappingKindVenueChat, VictoryScopeKind: discordChannelScopeKindVenueChat, VictoryScopeSlug: "middle-school-stage", ExpectedName: "middle-school-stage-chat", ChannelType: discordChannelTypeText},
 	}
 }

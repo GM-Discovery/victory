@@ -37,6 +37,8 @@ func (r fakeRow) Scan(dest ...any) error {
 
 type draftQuerier struct {
 	implicit bool
+	count    int
+	hasCount bool
 	err      error
 }
 
@@ -47,6 +49,8 @@ func (q draftQuerier) QueryRow(ctx context.Context, sql string, args ...any) pgx
 		return fakeRow{err: q.err}
 	}
 	switch {
+	case strings.Contains(sql, "COUNT(*)::int") && strings.Contains(sql, "FROM character_cards"):
+		return fakeRow{values: []any{q.count}}
 	case strings.Contains(sql, "FROM (") && strings.Contains(sql, "location_memberships") && strings.Contains(sql, "producer"):
 		if q.implicit {
 			return fakeRow{values: []any{1}}
@@ -126,5 +130,27 @@ func TestSanitizeInputSheetLinks(t *testing.T) {
 	}
 	if got[0].CreatedAt == "" || got[0].CreatedAt == "not-a-date" {
 		t.Fatalf("expected invalid created_at to be replaced, got %q", got[0].CreatedAt)
+	}
+}
+
+func TestCanCreateCharacterCardEnforcesLimit(t *testing.T) {
+	previous := maxCharacterCardsPerAccount
+	maxCharacterCardsPerAccount = 2
+	defer func() { maxCharacterCardsPerAccount = previous }()
+
+	ok, err := canCreateCharacterCard(context.Background(), draftQuerier{count: 1}, "user-1")
+	if err != nil {
+		t.Fatalf("canCreateCharacterCard returned error: %v", err)
+	}
+	if !ok {
+		t.Fatalf("expected count below limit to be allowed")
+	}
+
+	ok, err = canCreateCharacterCard(context.Background(), draftQuerier{count: 2}, "user-1")
+	if err != nil {
+		t.Fatalf("canCreateCharacterCard returned error: %v", err)
+	}
+	if ok {
+		t.Fatalf("expected count at limit to be denied")
 	}
 }

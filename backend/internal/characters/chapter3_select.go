@@ -23,9 +23,20 @@ type Chapter3Fact struct {
 	PrimaryAttribute        string `json:"primary_attribute"`
 	SecondaryAttribute      string `json:"secondary_attribute"`
 	KeySkill                string `json:"key_skill"`
+	CustomSummary           string `json:"custom_summary,omitempty"`
+	MechanicalEffect        string `json:"mechanical_effect,omitempty"`
+	CustomArchetype         bool   `json:"custom_archetype,omitempty"`
 	Confirmed               bool   `json:"confirmed"`
 	ConfirmedAt             string `json:"confirmed_at"`
 	SelectionCount          int    `json:"selection_count"`
+}
+
+type Chapter3CustomArchetypeInput struct {
+	Name               string
+	Summary            string
+	PrimaryAttribute   string
+	SecondaryAttribute string
+	MechanicalEffect   string
 }
 
 // Chapter3SelectResult is returned to the client after a confirm request.
@@ -70,13 +81,38 @@ func loadChapter3Fact(wbContext map[string]any) (Chapter3Fact, bool) {
 	return fact, fact.Confirmed
 }
 
+func newCustomChapter3StableID(prefix string) string {
+	return customStableID(prefix)
+}
+
+func customArchetypeCode(name string) string {
+	parts := strings.Fields(name)
+	if len(parts) == 0 {
+		return "CUS"
+	}
+	code := ""
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		code += strings.ToUpper(string([]rune(part)[0]))
+		if len(code) == 3 {
+			break
+		}
+	}
+	if code == "" {
+		return "CUS"
+	}
+	return code
+}
+
 // CommitChapter3Archetype validates and records the player's (or an
 // authorized override actor's) final Chapter 3 archetype selection. A
 // normal confirm is idempotent: re-submitting the same already-confirmed
 // archetype returns the existing fact without modification. An override
 // (director/permitted-actor correction) always appends a new selection,
 // which becomes the new effective archetype going forward.
-func CommitChapter3Archetype(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID, archetypeKey string, override bool) (Chapter3SelectResult, map[string]any, error) {
+func CommitChapter3Archetype(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID, archetypeKey string, custom *Chapter3CustomArchetypeInput, override bool) (Chapter3SelectResult, map[string]any, error) {
 	actorUserID = strings.TrimSpace(actorUserID)
 	cardID = strings.TrimSpace(cardID)
 	archetypeKey = strings.TrimSpace(archetypeKey)
@@ -91,9 +127,49 @@ func CommitChapter3Archetype(ctx context.Context, pool *pgxpool.Pool, actorUserI
 		return Chapter3SelectResult{}, nil, errors.New("archetype_key_required")
 	}
 
-	archetype, ok := Chapter3ArchetypeByKey(archetypeKey)
-	if !ok {
-		return Chapter3SelectResult{}, nil, errors.New("unknown_archetype_key")
+	var archetype Chapter3Archetype
+	var ok bool
+	if strings.EqualFold(archetypeKey, "custom") || custom != nil {
+		if custom == nil {
+			return Chapter3SelectResult{}, nil, errors.New("custom_archetype_required")
+		}
+		custom.Name = strings.TrimSpace(custom.Name)
+		custom.Summary = strings.TrimSpace(custom.Summary)
+		custom.PrimaryAttribute = strings.TrimSpace(custom.PrimaryAttribute)
+		custom.SecondaryAttribute = strings.TrimSpace(custom.SecondaryAttribute)
+		custom.MechanicalEffect = strings.TrimSpace(custom.MechanicalEffect)
+		if custom.Name == "" {
+			return Chapter3SelectResult{}, nil, errors.New("custom_archetype_name_required")
+		}
+		if custom.Summary == "" {
+			return Chapter3SelectResult{}, nil, errors.New("custom_archetype_summary_required")
+		}
+		if custom.PrimaryAttribute == "" || custom.SecondaryAttribute == "" {
+			return Chapter3SelectResult{}, nil, errors.New("custom_archetype_attributes_required")
+		}
+		if strings.EqualFold(custom.PrimaryAttribute, custom.SecondaryAttribute) {
+			return Chapter3SelectResult{}, nil, errors.New("custom_archetype_attributes_must_differ")
+		}
+		archetype = Chapter3Archetype{
+			ID:                 newCustomChapter3StableID("archetype"),
+			Key:                "custom",
+			Title:              custom.Name,
+			Code:               customArchetypeCode(custom.Name),
+			ShortDescription:   custom.Summary,
+			Echo:               custom.Summary,
+			PrimaryAttribute:   custom.PrimaryAttribute,
+			SecondaryAttribute: custom.SecondaryAttribute,
+			KeySkill:           "",
+			Motto:              custom.MechanicalEffect,
+		}
+	} else {
+		if archetypeKey == "" {
+			return Chapter3SelectResult{}, nil, errors.New("archetype_key_required")
+		}
+		archetype, ok = Chapter3ArchetypeByKey(archetypeKey)
+		if !ok {
+			return Chapter3SelectResult{}, nil, errors.New("unknown_archetype_key")
+		}
 	}
 
 	allowed, err := CanEditCard(ctx, pool, actorUserID, cardID)
@@ -140,9 +216,16 @@ func CommitChapter3Archetype(ctx context.Context, pool *pgxpool.Pool, actorUserI
 		PrimaryAttribute:        archetype.PrimaryAttribute,
 		SecondaryAttribute:      archetype.SecondaryAttribute,
 		KeySkill:                archetype.KeySkill,
+		CustomSummary:           "",
+		MechanicalEffect:        "",
+		CustomArchetype:         strings.EqualFold(archetypeKey, "custom"),
 		Confirmed:               true,
 		ConfirmedAt:             time.Now().UTC().Format(time.RFC3339),
 		SelectionCount:          selectionCount,
+	}
+	if custom != nil {
+		fact.CustomSummary = custom.Summary
+		fact.MechanicalEffect = custom.MechanicalEffect
 	}
 
 	wbContext["chapter3"] = fact
