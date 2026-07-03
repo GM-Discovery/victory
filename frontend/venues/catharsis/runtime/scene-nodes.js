@@ -189,6 +189,9 @@
       const container = new PIXI.Container();
       container.sortableChildren = true;
       const size = tokenDisplaySizeForModel(model);
+      const legacyColor = String(model.color || model.source?.data?.color || "").trim().toLowerCase();
+      const auraHex = String(model.tokenAura || model.source?.data?.token_aura || "").trim().toLowerCase() || (legacyColor && legacyColor !== "#d9c7a6" ? legacyColor : "");
+      const auraColor = /^#[0-9a-f]{6}$/.test(auraHex) ? PIXI.utils.string2hex(auraHex) : null;
       const assetURL = String(model.assetContentURL || model.source?.data?.asset_content_url || "").trim();
       const thumbnailURL = String(model.assetThumbnailURL || model.source?.data?.asset_thumbnail_url || "").trim();
       const textureSource = assetURL || thumbnailURL || "/assets/construction.png";
@@ -197,6 +200,12 @@
         const rerender = () => renderPixiScene?.();
         texture.baseTexture.once?.("loaded", rerender);
         texture.baseTexture.once?.("error", rerender);
+      }
+      const aura = new PIXI.Graphics();
+      if (auraColor !== null) {
+        aura.beginFill(auraColor, 0.14);
+        aura.drawRoundedRect(-size.width / 2 - 16, -size.height / 2 - 16, size.width + 32, size.height + 32, 24);
+        aura.endFill();
       }
       const sprite = new PIXI.Sprite(texture);
       sprite.anchor.set(0.5);
@@ -240,7 +249,7 @@
       const focus = new PIXI.Graphics();
       focus.lineStyle(0, 0x000000, 0);
       focus.drawRoundedRect(-size.width / 2 - 4, -size.height / 2 - 4, size.width + 8, size.height + 8, 14);
-      container.addChild(sprite, focus);
+      container.addChild(aura, sprite, focus);
       container.eventMode = "static";
       container.cursor = "pointer";
       container.interactive = true;
@@ -262,10 +271,22 @@
         if (selected) {
           focus.lineStyle(3, 0x8fb7da, 0.92);
           focus.drawRoundedRect(-size.width / 2 - 4, -size.height / 2 - 4, size.width + 8, focusHeight, 14);
+          if (auraColor !== null) {
+            aura.clear();
+            aura.beginFill(auraColor, 0.22);
+            aura.drawRoundedRect(-size.width / 2 - 18, -size.height / 2 - 18, size.width + 36, size.height + 36, 26);
+            aura.endFill();
+          }
           container.zIndex = 60;
         } else {
           focus.lineStyle(0, 0x000000, 0);
           focus.drawRoundedRect(-size.width / 2 - 4, -size.height / 2 - 4, size.width + 8, focusHeight, 14);
+          if (auraColor !== null) {
+            aura.clear();
+            aura.beginFill(auraColor, 0.14);
+            aura.drawRoundedRect(-size.width / 2 - 16, -size.height / 2 - 16, size.width + 32, size.height + 32, 24);
+            aura.endFill();
+          }
           container.zIndex = tokenLayerForModel(model) === "director" ? 35 : 25;
         }
       };

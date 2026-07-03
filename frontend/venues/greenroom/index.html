@@ -7,19 +7,19 @@
   <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
   <style>
     :root {
-      color-scheme: dark;
-      --bg-1: #08110d;
-      --bg-2: #121b16;
-      --panel: rgba(17, 25, 20, 0.92);
-      --panel-strong: rgba(10, 15, 12, 0.96);
-      --line: rgba(184, 213, 193, 0.14);
-      --line-strong: rgba(199, 224, 183, 0.22);
-      --text: #eff6eb;
-      --muted: #adc0ac;
-      --accent: #c8e2b7;
-      --accent-strong: #f1f6d0;
-      --gold: #d1bc7d;
-      --shadow: 0 18px 54px rgba(0, 0, 0, 0.28);
+      color-scheme: light;
+      --bg-1: #f3efe7;
+      --bg-2: #e6dece;
+      --panel: rgba(250, 247, 240, 0.92);
+      --panel-strong: rgba(244, 237, 225, 0.96);
+      --line: rgba(55, 41, 28, 0.1);
+      --line-strong: rgba(55, 41, 28, 0.16);
+      --text: #201812;
+      --muted: #5f5449;
+      --accent: #6d7f63;
+      --accent-strong: #251b14;
+      --gold: #8a6d35;
+      --shadow: 0 18px 54px rgba(40, 28, 18, 0.12);
       --font-body: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
       --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
     }
@@ -32,10 +32,10 @@
       font-family: var(--font-body);
       color: var(--text);
       background:
-        radial-gradient(circle at 20% 12%, rgba(71, 113, 82, 0.42), transparent 24%),
-        radial-gradient(circle at 84% 4%, rgba(142, 180, 126, 0.22), transparent 24%),
-        radial-gradient(circle at 50% 100%, rgba(201, 169, 104, 0.12), transparent 24%),
-        linear-gradient(180deg, var(--bg-2) 0%, #08110d 100%);
+        radial-gradient(circle at 20% 10%, rgba(128, 154, 126, 0.62), transparent 26%),
+        radial-gradient(circle at 86% 6%, rgba(155, 177, 132, 0.42), transparent 25%),
+        radial-gradient(circle at 50% 100%, rgba(196, 168, 104, 0.08), transparent 24%),
+        linear-gradient(180deg, #d4dbc5 0%, #dde2cf 18%, var(--bg-1) 100%);
     }
 
     h1,
@@ -67,15 +67,15 @@
 
     .shell::before {
       background:
-        radial-gradient(circle at 18% 8%, rgba(201, 169, 104, 0.18), transparent 14%),
-        radial-gradient(circle at 82% 14%, rgba(120, 167, 118, 0.16), transparent 18%),
-        radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.04), transparent 24%);
-      opacity: 0.9;
+        radial-gradient(circle at 18% 8%, rgba(201, 169, 104, 0.08), transparent 14%),
+        radial-gradient(circle at 82% 14%, rgba(120, 167, 118, 0.22), transparent 18%),
+        radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.16), transparent 24%);
+      opacity: 0.38;
     }
 
     .shell::after {
       background:
-        linear-gradient(180deg, rgba(8, 17, 13, 0.1), rgba(8, 17, 13, 0.32) 55%, rgba(8, 17, 13, 0.56));
+        linear-gradient(180deg, rgba(255, 251, 243, 0.08), rgba(226, 220, 205, 0.04) 55%, rgba(215, 230, 204, 0.08));
     }
 
     .header {
@@ -88,8 +88,9 @@
       gap: 16px;
       position: relative;
       z-index: 1;
-      padding-bottom: 14px;
-      border-bottom: 1px solid rgba(184, 213, 193, 0.12);
+      padding: 10px 0 14px;
+      border-bottom: 1px solid rgba(55, 41, 28, 0.08);
+      background: transparent;
     }
 
     .eyebrow {
@@ -109,7 +110,7 @@
     .subtitle {
       margin: 10px 0 0;
       max-width: 74ch;
-      color: var(--muted);
+      color: #5f5449;
       line-height: 1.5;
       text-wrap: pretty;
     }
@@ -130,7 +131,7 @@
       border-radius: 999px;
       padding: 10px 15px;
       color: var(--accent-strong);
-      background: rgba(255, 255, 255, 0.03);
+      background: rgba(255, 255, 255, 0.6);
       text-decoration: none;
       font: inherit;
       font-weight: 700;
@@ -139,7 +140,7 @@
     }
 
     .button {
-      background: linear-gradient(180deg, #2f4d3d 0%, #223628 100%);
+      background: linear-gradient(180deg, #f4ecd9 0%, #e0d1bb 100%);
     }
 
     .button:hover,
@@ -147,8 +148,8 @@
     .tab:hover,
     .text-button:hover {
       transform: translateY(-1px);
-      border-color: rgba(199, 224, 183, 0.28);
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+      border-color: rgba(109, 127, 99, 0.28);
+      box-shadow: 0 12px 28px rgba(40, 28, 18, 0.12);
     }
 
     .button[disabled],
@@ -163,7 +164,7 @@
       margin: 0 auto;
       display: grid;
       gap: 18px;
-      grid-template-columns: minmax(280px, 360px) minmax(420px, 1fr) minmax(280px, 360px);
+      grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
       align-items: start;
       position: relative;
       z-index: 1;
@@ -345,16 +346,419 @@
     .workbook-page {
       display: grid;
       gap: 14px;
+      color: #1c160f;
+    }
+
+    .workbook-page.card,
+    .card.stack {
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.6), transparent 34%),
+        linear-gradient(180deg, rgba(252, 248, 239, 0.98), rgba(242, 234, 221, 0.98));
+      border-color: rgba(40, 30, 22, 0.12);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.14);
+      color: #1c160f;
+    }
+
+    .workbook-page.card,
+    .card.stack .mini,
+    .card.stack .summary-label,
+    .card.stack .list-item span,
+    .card.stack .list-item p,
+    .card.stack .empty-state,
+    .card.stack .panel-heading h2,
+    .card.stack .panel-heading h3,
+    .card.stack .workbook-list-section strong,
+    .card.stack .summary-title h2,
+    .card.stack .summary-title strong {
+      color: #120d09;
+    }
+
+    .card.stack .field,
+    .card.stack .summary-title,
+    .card.stack .summary-title .mini {
+      color: rgba(35, 27, 21, 0.9);
+    }
+
+    .card.stack .field input,
+    .card.stack .field select,
+    .card.stack .field textarea,
+    .card.stack .summary-title input,
+    .card.stack .summary-title select,
+    .card.stack .summary-title textarea {
+      background: rgba(255, 252, 247, 0.92);
+      border-color: rgba(38, 29, 21, 0.14);
+      color: #16110d;
+    }
+
+    .card.stack .text-button,
+    .card.stack .chip {
+      color: #1b120c;
+      border-color: rgba(38, 29, 21, 0.22);
+      background: rgba(255, 255, 255, 0.66);
+    }
+
+    .workbook-page .mini,
+    .workbook-page .page-summary,
+    .workbook-page .summary-label,
+    .workbook-page .list-item span,
+    .workbook-page .list-item p,
+    .workbook-page .face-section-header p,
+    .workbook-page .bio-rail .bio-rail-note,
+    .workbook-page .bio-focus-header p {
+      color: rgba(35, 27, 21, 0.78);
+    }
+
+    .workbook-page .page-title,
+    .workbook-page .panel-heading h2,
+    .workbook-page .panel-heading h3,
+    .workbook-page .summary-title h2,
+    .workbook-page .face-section h3,
+    .workbook-page .bio-focus-header h2,
+    .workbook-page .face-card strong,
+    .workbook-page .bio-scroll-section h3 {
+      color: #17110d;
+    }
+
+    .workbook-page .field {
+      color: rgba(35, 27, 21, 0.76);
+    }
+
+    .workbook-page .field input,
+    .workbook-page .field select,
+    .workbook-page .field textarea {
+      background: rgba(255, 252, 247, 0.9);
+      border-color: rgba(38, 29, 21, 0.14);
+      color: #16110d;
+    }
+
+    .workbook-page .text-button,
+    .workbook-page .tab,
+    .workbook-page .chip {
+      color: #261b13;
+      border-color: rgba(38, 29, 21, 0.18);
+      background: rgba(255, 255, 255, 0.58);
+    }
+
+    .workbook-page .tab.is-active {
+      color: #f7f4ea;
+      background: linear-gradient(180deg, rgba(77, 95, 66, 0.95) 0%, rgba(54, 71, 49, 0.98) 100%);
+      border-color: rgba(71, 90, 63, 0.42);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
     }
 
     .page-surface {
-      padding: 16px;
-      border-radius: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 18px;
+      border-radius: 28px;
+      border: 1px solid rgba(40, 30, 22, 0.12);
       background:
-        radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.05), transparent 35%),
-        var(--panel-strong);
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02), 0 18px 40px rgba(0, 0, 0, 0.2);
+        radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.5), transparent 32%),
+        radial-gradient(circle at 0% 0%, rgba(201, 169, 104, 0.12), transparent 28%),
+        linear-gradient(180deg, rgba(251, 247, 238, 0.98), rgba(240, 231, 216, 0.98));
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18);
+    }
+
+    .face-sheet {
+      display: grid;
+      gap: 16px;
+      color: #1f1711;
+    }
+
+    .face-hero {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: minmax(240px, 310px) minmax(0, 1fr);
+      padding: 22px;
+      border-radius: 26px;
+      border: 1px solid rgba(38, 29, 21, 0.14);
+      background:
+        radial-gradient(circle at 20% 0%, rgba(201, 169, 104, 0.14), transparent 30%),
+        radial-gradient(circle at 100% 0%, rgba(120, 167, 118, 0.08), transparent 26%),
+        linear-gradient(180deg, rgba(252, 249, 244, 0.99), rgba(238, 229, 214, 0.99));
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.16);
+    }
+
+    .face-portrait-column {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .face-portrait-frame {
+      position: relative;
+      padding: 12px;
+      border-radius: 24px;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.22), transparent 42%),
+        linear-gradient(180deg, rgba(28, 22, 16, 0.96), rgba(16, 12, 9, 0.98));
+      border: 1px solid rgba(24, 19, 14, 0.18);
+      overflow: hidden;
+    }
+
+    .face-portrait-frame::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, transparent 0%, rgba(8, 13, 10, 0.12) 60%, rgba(8, 13, 10, 0.34) 100%);
+      pointer-events: none;
+    }
+
+    .face-portrait-frame img,
+    .face-portrait-frame .workbook-portrait-empty {
+      max-width: none;
+      width: 100%;
+      border-radius: 16px;
+    }
+
+    .face-portrait-caption {
+      display: grid;
+      gap: 8px;
+    }
+
+    .face-portrait-caption .mini {
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .face-hero-main {
+      display: grid;
+      gap: 16px;
+      align-content: start;
+    }
+
+    .face-hero-kicker {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      color: rgba(40, 30, 22, 0.76);
+      font-size: 0.88rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .face-hero-kicker span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .face-hero-title {
+      display: grid;
+      gap: 10px;
+    }
+
+    .face-hero-title h1 {
+      margin: 0;
+      font-size: clamp(2.7rem, 5vw, 5rem);
+      line-height: 0.9;
+      text-wrap: balance;
+    }
+
+    .face-hero-title .face-hero-subtitle {
+      margin: 0;
+      color: #342618;
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-wrap: balance;
+    }
+
+    .face-hero-copy {
+      margin: 0;
+      color: rgba(40, 30, 22, 0.88);
+      line-height: 1.6;
+      max-width: 72ch;
+      text-wrap: pretty;
+    }
+
+    .face-metric-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .face-metric {
+      display: grid;
+      gap: 6px;
+      padding: 14px 15px;
+      border-radius: 16px;
+      border: 1px solid rgba(38, 29, 21, 0.1);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(240, 231, 216, 0.95));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    .face-metric .label {
+      color: rgba(40, 30, 22, 0.72);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 0.72rem;
+      font-weight: 800;
+    }
+
+    .face-metric .value {
+      color: #1d1711;
+      font-size: 1rem;
+      line-height: 1.45;
+      text-wrap: balance;
+    }
+
+    .face-metric.is-accent {
+      border-color: rgba(120, 96, 53, 0.22);
+      background:
+        radial-gradient(circle at 0% 0%, rgba(201, 169, 104, 0.14), transparent 45%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(240, 231, 216, 0.95));
+    }
+
+    .face-metric.is-full {
+      grid-column: 1 / -1;
+    }
+
+    .face-body-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      align-items: start;
+    }
+
+    .face-lower-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      align-items: start;
+    }
+
+    .face-section-block {
+      display: grid;
+      gap: 12px;
+      padding: 16px 18px;
+      border-radius: 22px;
+      border: 1px solid rgba(38, 29, 21, 0.12);
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.5), transparent 36%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(238, 229, 214, 0.96));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
+    }
+
+    .face-section-block.is-full {
+      grid-column: 1 / -1;
+    }
+
+    .face-section-block.is-compact {
+      grid-column: span 6;
+    }
+
+    .face-section-block-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+    }
+
+    .face-section-block-header h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .face-section-block-header p {
+      margin: 0;
+      color: rgba(35, 27, 21, 0.7);
+      font-size: 0.88rem;
+    }
+
+    .face-bio-copy {
+      color: #201911;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      text-wrap: pretty;
+    }
+
+    .face-quote {
+      margin: 0;
+      padding-left: 14px;
+      border-left: 3px solid rgba(120, 96, 53, 0.32);
+      color: #201911;
+      font-size: 1.02rem;
+      line-height: 1.65;
+      text-wrap: pretty;
+    }
+
+    .face-stat-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .face-stat {
+      display: grid;
+      gap: 4px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(38, 29, 21, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(239, 230, 215, 0.95));
+    }
+
+    .face-stat span {
+      color: rgba(35, 27, 21, 0.72);
+      text-transform: uppercase;
+      letter-spacing: 0.11em;
+      font-size: 0.7rem;
+      font-weight: 800;
+    }
+
+    .face-stat strong {
+      color: #1d1711;
+      font-size: 0.98rem;
+      line-height: 1.4;
+    }
+
+    .face-pin-board {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(38, 29, 21, 0.1);
+      background: rgba(255, 255, 255, 0.56);
+    }
+
+    .face-pin-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
+    .face-pin,
+    .face-event {
+      display: grid;
+      gap: 8px;
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(38, 29, 21, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(239, 230, 215, 0.95));
+    }
+
+    .face-pin strong,
+    .face-event strong {
+      color: #1d1711;
+      font-size: 0.98rem;
+    }
+
+    .face-pin p,
+    .face-event p {
+      margin: 0;
+      color: rgba(35, 27, 21, 0.8);
+      line-height: 1.55;
+    }
+
+    .face-event-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .face-events-header {
+      display: grid;
+      gap: 6px;
     }
 
     .page-title {
@@ -365,8 +769,11 @@
 
     .page-summary {
       margin: 0 0 16px;
-      color: var(--muted);
       line-height: 1.5;
+    }
+
+    .workbook-page .page-summary {
+      color: rgba(35, 27, 21, 0.78);
     }
 
     .page-section {
@@ -385,6 +792,237 @@
     .page-section h3 {
       margin: 0;
       font-size: 1.02rem;
+    }
+
+    .face-section {
+      display: grid;
+      gap: 12px;
+      padding: 16px;
+      border-radius: 20px;
+      border: 1px solid rgba(38, 29, 21, 0.12);
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.42), transparent 36%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.66), rgba(238, 229, 214, 0.96));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
+    }
+
+    .face-section[data-region="glance"] {
+      grid-column: span 5;
+    }
+
+    .face-section[data-region="substance"] {
+      grid-column: span 7;
+    }
+
+    .face-section[data-region="additional"] {
+      grid-column: 1 / -1;
+    }
+
+    .face-section[data-region="urgent"] {
+      grid-column: 1 / -1;
+    }
+
+    .face-section-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+    }
+
+    .face-section-header p {
+      margin: 0;
+      font-size: 0.88rem;
+    }
+
+    .face-region-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .face-region-grid[data-region="identity"] {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .face-region-grid[data-region="urgent"] {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .face-card {
+      display: grid;
+      gap: 8px;
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(38, 29, 21, 0.1);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(239, 230, 215, 0.95));
+      min-height: 100%;
+      color: #1f1711;
+    }
+
+    .face-card strong {
+      font-size: 1rem;
+    }
+
+    .face-card .face-card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      color: rgba(40, 30, 22, 0.7);
+      font-size: 0.84rem;
+    }
+
+    .face-card .face-band {
+      border-radius: 999px;
+      padding: 2px 8px;
+      border: 1px solid rgba(120, 96, 53, 0.18);
+      color: #6a4d1c;
+      background: rgba(255, 255, 255, 0.62);
+      text-transform: capitalize;
+    }
+
+    .face-card .face-swatch {
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      border: 1px solid rgba(38, 29, 21, 0.22);
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    .face-card .face-swatch.is-empty {
+      background: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.16) 4px, rgba(255, 255, 255, 0.04) 4px, rgba(255, 255, 255, 0.04) 8px);
+    }
+
+    .face-card.is-summary {
+      border-color: rgba(120, 96, 53, 0.2);
+      background:
+        radial-gradient(circle at 100% 0%, rgba(201, 169, 104, 0.12), transparent 40%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(240, 231, 215, 0.96));
+    }
+
+    .face-card textarea,
+    .face-card input {
+      width: 100%;
+    }
+
+    .bio-sheet {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: minmax(110px, 1fr) minmax(0, 2.2fr) minmax(110px, 1fr);
+      color: #1f1711;
+    }
+
+    .bio-rail {
+      border-radius: 22px;
+      border: 1px solid rgba(38, 29, 21, 0.1);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(239, 230, 215, 0.96));
+      min-height: 100%;
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .bio-rail::before {
+      content: "";
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(38, 29, 21, 0.28), transparent);
+      display: block;
+    }
+
+    .bio-rail .bio-rail-note {
+      color: rgba(32, 25, 20, 0.78);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      text-wrap: pretty;
+    }
+
+    .bio-focus {
+      display: grid;
+      gap: 14px;
+      padding: 22px;
+      border-radius: 26px;
+      border: 1px solid rgba(38, 29, 21, 0.12);
+      background:
+        radial-gradient(circle at 50% 0%, rgba(201, 169, 104, 0.14), transparent 32%),
+        linear-gradient(180deg, rgba(255, 253, 249, 0.98), rgba(238, 229, 214, 0.98));
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.1);
+      max-height: 72vh;
+      overflow: auto;
+    }
+
+    .face-lower-grid .empty-state {
+      margin: 0;
+    }
+
+    .bio-focus-header {
+      display: grid;
+      gap: 6px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(38, 29, 21, 0.1);
+    }
+
+    .bio-focus-header h2 {
+      margin: 0;
+      font-size: clamp(1.8rem, 3vw, 2.8rem);
+      line-height: 1;
+    }
+
+    .bio-focus-header p {
+      margin: 0;
+      color: rgba(32, 25, 20, 0.78);
+      line-height: 1.5;
+    }
+
+    .bio-stats {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .bio-stat {
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(38, 29, 21, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(238, 229, 214, 0.96));
+      display: grid;
+      gap: 6px;
+    }
+
+    .bio-stat .label {
+      color: rgba(32, 25, 20, 0.66);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 800;
+    }
+
+    .bio-stat .value {
+      color: #1f1711;
+      line-height: 1.45;
+    }
+
+    .bio-scroll-section {
+      padding-top: 10px;
+      border-top: 1px solid rgba(38, 29, 21, 0.08);
+      display: grid;
+      gap: 8px;
+    }
+
+    .bio-scroll-section h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .bio-scroll-section p,
+    .bio-scroll-section textarea {
+      margin: 0;
+      color: #211911;
+      line-height: 1.6;
     }
 
     .field-grid {
@@ -416,41 +1054,8 @@
       border: 1px dashed rgba(255,255,255,0.16);
       display: grid;
       place-items: center;
-      color: var(--muted);
-      background: rgba(255,255,255,0.03);
-    }
-
-    .summary-card {
-      display: grid;
-      gap: 12px;
-      position: relative;
-    }
-
-    .summary-card::before {
-      content: "";
-      position: absolute;
-      inset: 12px;
-      border-radius: 14px;
-      border: 1px solid rgba(201, 224, 183, 0.08);
-      pointer-events: none;
-    }
-
-    .summary-title {
-      display: grid;
-      gap: 8px;
-      position: relative;
-      z-index: 1;
-    }
-
-    .summary-title h2 {
-      margin: 0;
-    }
-
-    .summary-meta {
-      display: grid;
-      gap: 10px;
-      position: relative;
-      z-index: 1;
+      color: rgba(35, 27, 21, 0.7);
+      background: rgba(255,255,255,0.18);
     }
 
     .summary-row {
@@ -459,7 +1064,7 @@
       gap: 10px;
       align-items: start;
       padding-top: 10px;
-      border-top: 1px solid rgba(255,255,255,0.08);
+      border-top: 1px solid rgba(38, 29, 21, 0.09);
     }
 
     .summary-row:first-child {
@@ -467,27 +1072,16 @@
       border-top: 0;
     }
 
-    .summary-label {
-      color: var(--muted);
-      flex: 0 0 auto;
-    }
-
-    .summary-value {
-      text-align: right;
-      color: var(--text);
-      white-space: pre-wrap;
-    }
-
     .note {
       margin: 0;
-      color: var(--muted);
+      color: rgba(35, 27, 21, 0.78);
       line-height: 1.55;
       text-wrap: pretty;
     }
 
     .empty-state {
       margin: 0;
-      color: var(--muted);
+      color: rgba(35, 27, 21, 0.72);
       font-style: italic;
     }
 
@@ -508,6 +1102,25 @@
     @media (max-width: 1180px) {
       .stage {
         grid-template-columns: 1fr;
+      }
+
+      .face-hero {
+        grid-template-columns: 1fr;
+      }
+
+      .bio-sheet {
+        grid-template-columns: 1fr;
+      }
+
+      .face-body-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .face-section[data-region="glance"],
+      .face-section[data-region="substance"],
+      .face-section[data-region="additional"],
+      .face-section[data-region="urgent"] {
+        grid-column: 1 / -1;
       }
     }
 
@@ -558,17 +1171,26 @@
         padding: 14px;
       }
 
-      .summary-card::before {
-        inset: 10px;
+      .face-hero {
+        padding: 16px;
+      }
+
+      .face-metric-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .face-region-grid,
+      .face-region-grid[data-region="identity"],
+      .face-region-grid[data-region="urgent"] {
+        grid-template-columns: 1fr;
+      }
+
+      .bio-focus {
+        max-height: none;
       }
     }
 
     @media (min-width: 1181px) {
-      .summary-card {
-        position: sticky;
-        top: 24px;
-      }
-
       .card {
         transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
       }
@@ -661,21 +1283,6 @@
           <div id="page-body"></div>
         </div>
       </section>
-
-      <section class="card summary-card">
-        <div class="summary-title">
-          <div class="panel-heading">
-            <h2>Workbook Summary</h2>
-            <button class="text-button" id="refresh-button" type="button">Refresh</button>
-          </div>
-          <div id="portrait-slot"></div>
-          <h2 id="summary-name">Unknown Participant</h2>
-          <div class="mini" id="summary-role">Workbook awaiting selection</div>
-        </div>
-        <p class="note" id="summary-note">Select a workbook to see the current face, module, and creation progress.</p>
-        <div class="summary-meta" id="right-meta"></div>
-        <div class="status-line" id="character-status"></div>
-      </section>
     </main>
   </div>
 
@@ -693,13 +1300,8 @@
     const pageBody = document.getElementById("page-body");
     const resumeButton = document.getElementById("resume-button");
     const refreshButton = document.getElementById("refresh-button");
-    const summaryName = document.getElementById("summary-name");
-    const summaryRole = document.getElementById("summary-role");
-    const summaryNote = document.getElementById("summary-note");
-    const portraitSlot = document.getElementById("portrait-slot");
     const leftMeta = document.getElementById("left-meta");
     const librarySections = document.getElementById("library-sections");
-    const rightMeta = document.getElementById("right-meta");
     const characterStatus = document.getElementById("character-status");
 
     const state = {
@@ -711,6 +1313,7 @@
       workbook: null,
       selectedPageKey: "face",
       loading: false,
+      pinnedHighlights: [],
     };
 
     function requestedCharacterId() {
@@ -884,41 +1487,11 @@
       const workbook = state.workbook;
       const card = workbook?.character || selectedCard();
       const module = workbook?.module || {};
-      const portraitURL = String(card?.portrait_url || "").trim();
-
-      summaryName.textContent = profileValue(card?.name || "Unknown Participant");
-      summaryRole.textContent = card
-        ? `Workbook ${profileValue(card.workbook_status || "draft")} · ${profileValue(module?.ruleset_key || "no module")}${state.activeCharacterId === card.id ? " · Active persona" : ""}`
-        : "Workbook awaiting selection";
-      summaryNote.textContent = workbook?.resume_hint || "Select a workbook to see the current face, module, and creation progress.";
-
-      portraitSlot.innerHTML = "";
-      if (portraitURL) {
-        const img = document.createElement("img");
-        img.className = "workbook-portrait";
-        img.src = portraitURL;
-        img.alt = card?.name || "Character portrait";
-        portraitSlot.appendChild(img);
-      } else {
-        const empty = document.createElement("div");
-        empty.className = "workbook-portrait-empty";
-        empty.textContent = "No portrait yet";
-        portraitSlot.appendChild(empty);
-      }
 
       renderMetaList(leftMeta, [
         { label: "Workbook", value: profileValue(card?.workbook_status || "draft") },
-        { label: "Ruleset", value: profileValue(module?.ruleset_key || "Pending") },
-        { label: "Module Version", value: profileValue(module?.ruleset_version || "Pending") },
-        { label: "Current Stage", value: profileValue(module?.current_stage || "Pending") },
-        { label: "Current Event", value: profileValue(module?.current_event || "Pending") },
-      ]);
-
-      renderMetaList(rightMeta, [
-        { label: "Active Page", value: profileValue(state.selectedPageKey || "face") },
-        { label: "Journal Entries", value: String((workbookPages().find((page) => page.key === "journal")?.journals || []).length) },
-        { label: "History Entries", value: String((workbookPages().find((page) => page.key === "history")?.entries || []).length) },
-        { label: "Creation Entries", value: String((workbookPages().find((page) => page.key === "creation_progress")?.entries || []).length) },
+        { label: "Token Aura", value: profileValue(card?.token_aura || (String(card?.color || "").toLowerCase() !== "#d9c7a6" ? card?.color : "") || "Not set") },
+        { label: "Ruleset", value: module?.ruleset_key ? `${module.ruleset_key} v${profileValue(module?.ruleset_version || "Pending")}` : "Pending" },
       ]);
 
       updateResumeButton();
@@ -926,7 +1499,7 @@
 
     function renderPageTabs() {
       pageTabs.innerHTML = "";
-      const pages = workbookPages();
+      const pages = workbookPages().filter((page) => page.key !== "creation_progress");
       for (const page of pages) {
         const button = document.createElement("button");
         button.type = "button";
@@ -951,8 +1524,13 @@
       if (field.input_type === "color") {
         const input = document.createElement("input");
         input.type = "color";
-        input.value = field.value || "#d9c7a6";
+        const value = String(field.value || "").trim().toLowerCase();
+        input.value = value || "#000000";
+        input.dataset.unset = value ? "0" : "1";
         input.dataset.key = field.key;
+        input.addEventListener("input", () => {
+          input.dataset.unset = "0";
+        });
         return input;
       }
       const input = document.createElement("input");
@@ -974,11 +1552,666 @@
       return "Saving workbook...";
     }
 
+    function faceRegionTitle(region) {
+      switch (String(region || "").toLowerCase()) {
+        case "identity":
+          return "Identity Banner";
+        case "urgent":
+          return "Urgent Current State";
+        case "glance":
+          return "At a Glance";
+        case "substance":
+          return "Character Substance";
+        default:
+          return "Additional Information";
+      }
+    }
+
+    function faceRegionDescription(region) {
+      switch (String(region || "").toLowerCase()) {
+        case "identity":
+          return "Core facts shown first.";
+        case "urgent":
+          return "Active alerts and critical changes.";
+        case "glance":
+          return "Highest-value details to scan quickly.";
+        case "substance":
+          return "Longer-form character details.";
+        default:
+          return "Lower-scoring and reference facts.";
+      }
+    }
+
+    function facePriorityScore(field) {
+      const score = Number(field?.priority_score);
+      return Number.isFinite(score) ? score : 0;
+    }
+
+    function facePriorityBand(field) {
+      return String(field?.priority_band || "").trim() || "normal";
+    }
+
+    function faceFieldsByKey(fields) {
+      const map = new Map();
+      for (const field of fields || []) {
+        map.set(String(field?.key || ""), field);
+      }
+      return map;
+    }
+
+    function faceFieldValue(field, fallback = "") {
+      const value = String(field?.value || "").trim();
+      return value || fallback;
+    }
+
+    function historySortScore(entry) {
+      const raw = String(entry?.created_at || "").trim();
+      const parsed = raw ? Date.parse(raw) : Number.NaN;
+      if (Number.isFinite(parsed)) return parsed;
+      const fallback = Number(entry?.sort_index);
+      return Number.isFinite(fallback) ? fallback : 0;
+    }
+
+    function sortHistoryEntries(entries) {
+      return [...(entries || [])].sort((a, b) => {
+        const delta = historySortScore(b) - historySortScore(a);
+        if (delta) return delta;
+        const titleDelta = String(a?.title || a?.entry_type || "").localeCompare(String(b?.title || b?.entry_type || ""));
+        if (titleDelta) return titleDelta;
+        return String(a?.body || "").localeCompare(String(b?.body || ""));
+      });
+    }
+
+    function pinStorageKey(characterId) {
+      return `greenroom:pins:${String(characterId || "").trim()}`;
+    }
+
+    function loadPinnedHighlights(characterId) {
+      if (!characterId || typeof window.localStorage === "undefined") return [];
+      try {
+        const raw = window.localStorage.getItem(pinStorageKey(characterId));
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function savePinnedHighlights(characterId, items) {
+      if (!characterId || typeof window.localStorage === "undefined") return;
+      try {
+        window.localStorage.setItem(pinStorageKey(characterId), JSON.stringify(items.slice(0, 12)));
+      } catch {
+        // Ignore storage failures. Pinning is a progressive enhancement.
+      }
+    }
+
+    function entryPinKey(entry) {
+      return [
+        String(entry?.entry_type || "").trim(),
+        String(entry?.created_at || "").trim(),
+        String(entry?.title || "").trim(),
+        String(entry?.body || "").trim(),
+      ].join("|");
+    }
+
+    function normalizePinnedHighlights(items) {
+      const seen = new Set();
+      const out = [];
+      for (const item of items || []) {
+        const normalized = {
+          key: String(item?.key || "").trim(),
+          title: String(item?.title || "").trim(),
+          body: String(item?.body || "").trim(),
+          meta: String(item?.meta || "").trim(),
+        };
+        if (!normalized.key || seen.has(normalized.key)) continue;
+        seen.add(normalized.key);
+        out.push(normalized);
+      }
+      return out;
+    }
+
+    function updatePinnedHighlights(nextHighlights) {
+      const characterId = state.selectedCharacterId;
+      state.pinnedHighlights = normalizePinnedHighlights(nextHighlights);
+      savePinnedHighlights(characterId, state.pinnedHighlights);
+      renderWorkbook();
+    }
+
+    function recentWorkbookEntries(workbook) {
+      const historyPage = workbookPages().find((page) => page.key === "history");
+      return sortHistoryEntries(historyPage?.entries || []).slice(0, 6);
+    }
+
+    function pinnedHighlightFromEntry(entry) {
+      return {
+        key: entryPinKey(entry),
+        title: String(entry?.title || entry?.entry_type || "Pinned item"),
+        body: String(entry?.body || "").trim(),
+        meta: [entry?.entry_type, entry?.created_at, entry?.stage_number ? `Stage ${entry.stage_number}` : ""].filter(Boolean).join(" · "),
+      };
+    }
+
+    function togglePinnedHighlight(entry) {
+      const item = pinnedHighlightFromEntry(entry);
+      const exists = state.pinnedHighlights.some((highlight) => highlight.key === item.key);
+      if (exists) {
+        updatePinnedHighlights(state.pinnedHighlights.filter((highlight) => highlight.key !== item.key));
+        return;
+      }
+      updatePinnedHighlights([item, ...state.pinnedHighlights]);
+    }
+
+    function hexToRgba(hex, alpha) {
+      const value = String(hex || "").trim();
+      const normalized = value.startsWith("#") ? value.slice(1) : value;
+      if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return "";
+      const red = Number.parseInt(normalized.slice(0, 2), 16);
+      const green = Number.parseInt(normalized.slice(2, 4), 16);
+      const blue = Number.parseInt(normalized.slice(4, 6), 16);
+      return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+    }
+
+    function sortFaceFields(fields) {
+      return [...fields].sort((a, b) => {
+        const scoreDelta = facePriorityScore(b) - facePriorityScore(a);
+        if (scoreDelta) return scoreDelta;
+        const labelDelta = String(a.label || "").localeCompare(String(b.label || ""));
+        if (labelDelta) return labelDelta;
+        return String(a.key || "").localeCompare(String(b.key || ""));
+      });
+    }
+
+    function renderFaceMetric(label, value, options = {}) {
+      const item = document.createElement("div");
+      item.className = `face-metric${options.accent ? " is-accent" : ""}${options.full ? " is-full" : ""}`;
+      const key = document.createElement("span");
+      key.className = "label";
+      key.textContent = label;
+      const body = document.createElement("div");
+      body.className = "value";
+      body.textContent = value || "Not set";
+      item.appendChild(key);
+      item.appendChild(body);
+      return item;
+    }
+
+    function renderFaceSection(title, description, options = {}) {
+      const section = document.createElement("section");
+      section.className = `face-section-block${options.full ? " is-full" : ""}${options.compact ? " is-compact" : ""}`;
+      const header = document.createElement("div");
+      header.className = "face-section-block-header";
+      const heading = document.createElement("div");
+      const h3 = document.createElement("h3");
+      h3.textContent = title;
+      heading.appendChild(h3);
+      if (description) {
+        const desc = document.createElement("p");
+        desc.textContent = description;
+        heading.appendChild(desc);
+      }
+      header.appendChild(heading);
+      section.appendChild(header);
+      return section;
+    }
+
+    function renderStatChip(label, value) {
+      const chip = document.createElement("div");
+      chip.className = "face-stat";
+      const key = document.createElement("span");
+      key.textContent = label;
+      const body = document.createElement("strong");
+      body.textContent = value || "Not set";
+      chip.appendChild(key);
+      chip.appendChild(body);
+      return chip;
+    }
+
+    function renderFaceHero(fields) {
+      const fieldMap = faceFieldsByKey(fields);
+      const card = selectedCard();
+      const workbook = state.workbook || {};
+      const module = workbook?.module || {};
+      const name = faceFieldValue(fieldMap.get("name"), card?.name || "Unknown Character");
+      const pronouns = faceFieldValue(fieldMap.get("pronouns"), "Pronouns not set");
+      const archetype = faceFieldValue(fieldMap.get("chapter3_archetype"), "Archetype pending");
+      const firstSkill = faceFieldValue(fieldMap.get("chapter4_first_skill"), "First skill pending");
+      const tagline = faceFieldValue(fieldMap.get("tagline"), "");
+      const description = faceFieldValue(fieldMap.get("public_description"), "");
+      const aura = faceFieldValue(fieldMap.get("token_aura"), "");
+      const auraColor = aura || "#d9c7a6";
+      const auraGlow = hexToRgba(auraColor, 0.34) || "rgba(201, 169, 104, 0.34)";
+      const portraitURL = faceFieldValue(fieldMap.get("portrait_url"), "");
+      const rulesetKey = profileValue(module?.ruleset_key || "Pending");
+      const rulesetVersion = profileValue(module?.ruleset_version || "Pending");
+      const rulesetLabel = rulesetKey === "Pending" ? rulesetKey : `${rulesetKey} v${rulesetVersion}`;
+
+      const sheet = document.createElement("section");
+      sheet.className = "face-sheet";
+
+      const hero = document.createElement("section");
+      hero.className = "face-hero";
+      hero.style.borderColor = auraGlow;
+      hero.style.boxShadow = `0 18px 42px rgba(0, 0, 0, 0.24), 0 0 0 1px rgba(255, 255, 255, 0.03), 0 0 42px ${auraGlow}`;
+      hero.style.background = `radial-gradient(circle at 20% 0%, ${auraGlow}, transparent 32%), radial-gradient(circle at 100% 0%, rgba(120, 167, 118, 0.13), transparent 28%), linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.025))`;
+
+      const portraitColumn = document.createElement("div");
+      portraitColumn.className = "face-portrait-column";
+      const portraitFrame = document.createElement("div");
+      portraitFrame.className = "face-portrait-frame";
+      portraitFrame.style.boxShadow = `0 20px 44px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(255,255,255,0.05), 0 0 40px ${auraGlow}`;
+      if (portraitURL) {
+        const img = document.createElement("img");
+        img.className = "workbook-portrait";
+        img.src = portraitURL;
+        img.alt = `${name} portrait`;
+        portraitFrame.appendChild(img);
+      } else {
+        const empty = document.createElement("div");
+        empty.className = "workbook-portrait-empty";
+        empty.textContent = "No portrait set";
+        portraitFrame.appendChild(empty);
+      }
+      portraitColumn.appendChild(portraitFrame);
+
+      const portraitCaption = document.createElement("div");
+      portraitCaption.className = "face-portrait-caption";
+      const portraitLabel = document.createElement("div");
+      portraitLabel.className = "mini";
+      portraitLabel.textContent = rulesetLabel;
+      const auraRow = document.createElement("div");
+      auraRow.className = "face-card-meta";
+      const swatch = document.createElement("span");
+      swatch.className = `face-swatch${aura ? "" : " is-empty"}`;
+      if (aura) swatch.style.background = aura;
+      auraRow.appendChild(swatch);
+      const auraText = document.createElement("span");
+      auraText.textContent = aura ? `Token Aura ${aura.toUpperCase()}` : "Token Aura not set";
+      auraRow.appendChild(auraText);
+      portraitCaption.appendChild(portraitLabel);
+      portraitCaption.appendChild(auraRow);
+      portraitColumn.appendChild(portraitCaption);
+
+      const main = document.createElement("div");
+      main.className = "face-hero-main";
+
+      const kicker = document.createElement("div");
+      kicker.className = "face-hero-kicker";
+      const kickerItems = [
+        profileValue(card?.workbook_status || "draft"),
+        profileValue(module?.ruleset_key || "no module"),
+      ];
+      if (card?.id && state.activeCharacterId === card.id) {
+        kickerItems.push("Active persona");
+      }
+      for (const item of kickerItems) {
+        const span = document.createElement("span");
+        span.textContent = item;
+        kicker.appendChild(span);
+      }
+      main.appendChild(kicker);
+
+      const title = document.createElement("div");
+      title.className = "face-hero-title";
+      const nameEl = document.createElement("h1");
+      nameEl.textContent = name;
+      const sub = document.createElement("p");
+      sub.className = "face-hero-subtitle";
+      sub.textContent = `${pronouns} · ${archetype} · ${firstSkill}`;
+      title.appendChild(nameEl);
+      title.appendChild(sub);
+      main.appendChild(title);
+
+      if (tagline) {
+        const copy = document.createElement("p");
+        copy.className = "face-hero-copy";
+        copy.textContent = tagline;
+        main.appendChild(copy);
+      }
+
+      const metrics = document.createElement("div");
+      metrics.className = "face-metric-grid";
+      metrics.appendChild(renderFaceMetric("Token Aura", aura ? aura.toUpperCase() : "Not set", { accent: true }));
+      metrics.appendChild(renderFaceMetric("Archetype", archetype, { accent: true }));
+      metrics.appendChild(renderFaceMetric("First Skill", firstSkill));
+      metrics.appendChild(renderFaceMetric("Status", profileValue(card?.workbook_status || "draft")));
+      main.appendChild(metrics);
+
+      hero.appendChild(portraitColumn);
+      hero.appendChild(main);
+      sheet.appendChild(hero);
+
+      const lower = document.createElement("div");
+      lower.className = "face-lower-grid";
+
+      const bioSection = renderFaceSection("Bio", "A short on-sheet summary. The fuller biography stays on the Bio page.", { full: true });
+      const bioBody = document.createElement("div");
+      bioBody.className = "face-bio-copy";
+      bioBody.textContent = description || "No public biography has been written yet.";
+      bioSection.appendChild(bioBody);
+      lower.appendChild(bioSection);
+
+      const quoteSection = renderFaceSection("Quote", "A memorable line that can be pinned and surfaced on the face.", { compact: true });
+      const quoteBody = document.createElement("blockquote");
+      quoteBody.className = "face-quote";
+      quoteBody.textContent = tagline || "No featured quote set yet.";
+      quoteSection.appendChild(quoteBody);
+      lower.appendChild(quoteSection);
+
+      const statsSection = renderFaceSection("Vital Stats", "Quick facts worth seeing at a glance.", { compact: true });
+      const statGrid = document.createElement("div");
+      statGrid.className = "face-stat-grid";
+      statGrid.appendChild(renderStatChip("Pronouns", pronouns));
+      statGrid.appendChild(renderStatChip("Token Aura", aura ? aura.toUpperCase() : "Not set"));
+      statGrid.appendChild(renderStatChip("Archetype", archetype));
+      statGrid.appendChild(renderStatChip("First Skill", firstSkill));
+      statsSection.appendChild(statGrid);
+      lower.appendChild(statsSection);
+
+      const eventsSection = renderFaceSection("Recent Events", "Newest workbook entries first. Pin anything worth keeping on the face.", { full: true });
+      const eventsHeader = document.createElement("div");
+      eventsHeader.className = "face-events-header";
+      const eventsNote = document.createElement("p");
+      eventsNote.className = "mini";
+      eventsNote.textContent = "Tap Pin to keep a note in the face board.";
+      eventsHeader.appendChild(eventsNote);
+      eventsSection.appendChild(eventsHeader);
+
+      const pinned = normalizePinnedHighlights(loadPinnedHighlights(card?.id || state.selectedCharacterId));
+      state.pinnedHighlights = pinned;
+
+      const pinBoard = document.createElement("div");
+      pinBoard.className = "face-pin-board";
+      const pinBoardTitle = document.createElement("div");
+      pinBoardTitle.className = "mini";
+      pinBoardTitle.textContent = "Pinned Highlights";
+      pinBoard.appendChild(pinBoardTitle);
+      if (!pinned.length) {
+        const emptyPins = document.createElement("p");
+        emptyPins.className = "empty-state";
+        emptyPins.textContent = "Nothing pinned yet.";
+        pinBoard.appendChild(emptyPins);
+      } else {
+        const pinGrid = document.createElement("div");
+        pinGrid.className = "face-pin-grid";
+        for (const item of pinned) {
+          const chip = document.createElement("article");
+          chip.className = "face-pin";
+          const title = document.createElement("strong");
+          title.textContent = item.title || "Pinned item";
+          const body = document.createElement("p");
+          body.textContent = item.body || item.meta || "";
+          chip.appendChild(title);
+          chip.appendChild(body);
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "text-button";
+          remove.textContent = "Unpin";
+          remove.addEventListener("click", () => {
+            updatePinnedHighlights(state.pinnedHighlights.filter((highlight) => highlight.key !== item.key));
+          });
+          chip.appendChild(remove);
+          pinGrid.appendChild(chip);
+        }
+        pinBoard.appendChild(pinGrid);
+      }
+      eventsSection.appendChild(pinBoard);
+
+      const eventsList = document.createElement("div");
+      eventsList.className = "face-event-list";
+      const recentEntries = recentWorkbookEntries(state.workbook);
+      if (!recentEntries.length) {
+        const empty = document.createElement("p");
+        empty.className = "empty-state";
+        empty.textContent = "No recent workbook events yet.";
+        eventsList.appendChild(empty);
+      } else {
+        for (const entry of recentEntries) {
+          const item = document.createElement("article");
+          item.className = "face-event";
+          const title = document.createElement("strong");
+          title.textContent = entry.title || entry.entry_type || "Entry";
+          const meta = document.createElement("span");
+          meta.textContent = [entry.entry_type, entry.created_at, entry.stage_number ? `Stage ${entry.stage_number}` : ""].filter(Boolean).join(" · ");
+          const body = document.createElement("p");
+          body.textContent = entry.body || "";
+          const actions = document.createElement("div");
+          actions.className = "action-row";
+          const pin = document.createElement("button");
+          pin.type = "button";
+          pin.className = "text-button";
+          pin.textContent = state.pinnedHighlights.some((highlight) => highlight.key === entryPinKey(entry)) ? "Pinned" : "Pin";
+          pin.addEventListener("click", () => togglePinnedHighlight(entry));
+          actions.appendChild(pin);
+          item.appendChild(title);
+          item.appendChild(meta);
+          item.appendChild(body);
+          item.appendChild(actions);
+          eventsList.appendChild(item);
+        }
+      }
+      eventsSection.appendChild(eventsList);
+      lower.appendChild(eventsSection);
+
+      sheet.appendChild(lower);
+      return sheet;
+    }
+
+    function renderFaceCard(field) {
+      const item = document.createElement("div");
+      item.className = "face-card";
+      if (field.editable === false) {
+        item.classList.add("is-summary");
+        const meta = document.createElement("div");
+        meta.className = "face-card-meta";
+        const band = document.createElement("span");
+        band.className = "face-band";
+        band.textContent = facePriorityBand(field);
+        meta.appendChild(band);
+        const source = document.createElement("span");
+        source.textContent = field.source_kind || "system";
+        meta.appendChild(source);
+        item.appendChild(meta);
+        const title = document.createElement("strong");
+        title.textContent = field.label;
+        item.appendChild(title);
+        const body = document.createElement("p");
+        body.textContent = field.value || "Not set";
+        item.appendChild(body);
+        return item;
+      }
+
+      const label = document.createElement("span");
+      label.textContent = field.label;
+      item.appendChild(label);
+      const control = fieldInput(field);
+      item.appendChild(control);
+      if (field.input_type === "color" && !String(field.value || "").trim()) {
+        const helper = document.createElement("div");
+        helper.className = "mini";
+        helper.textContent = "Not set";
+        item.appendChild(helper);
+      }
+      return item;
+    }
+
+    function renderFacePage(page) {
+      const fields = sortFaceFields(page.fields || []);
+      const heroKeys = new Set(["name", "portrait_url", "pronouns", "token_aura", "chapter3_archetype", "chapter4_first_skill", "tagline"]);
+      const sheet = renderFaceHero(fields);
+      const groups = new Map();
+      for (const field of fields) {
+        if (heroKeys.has(String(field.key || ""))) continue;
+        const region = String(field.region || "additional").trim().toLowerCase() || "additional";
+        if (!groups.has(region)) groups.set(region, []);
+        groups.get(region).push(field);
+      }
+
+      const bodyGrid = document.createElement("div");
+      bodyGrid.className = "face-body-grid";
+      const order = ["identity", "urgent", "glance", "substance", "additional"];
+      for (const region of order) {
+        const regionFields = groups.get(region) || [];
+        if (!regionFields.length) continue;
+        const section = document.createElement("section");
+        section.className = "face-section";
+        section.dataset.region = region;
+        const header = document.createElement("div");
+        header.className = "face-section-header";
+        const titleBlock = document.createElement("div");
+        const title = document.createElement("h3");
+        title.textContent = faceRegionTitle(region);
+        const desc = document.createElement("p");
+        desc.textContent = faceRegionDescription(region);
+        titleBlock.appendChild(title);
+        titleBlock.appendChild(desc);
+        const count = document.createElement("div");
+        count.className = "mini";
+        count.textContent = `${regionFields.length} item${regionFields.length === 1 ? "" : "s"}`;
+        header.appendChild(titleBlock);
+        header.appendChild(count);
+        section.appendChild(header);
+
+        const grid = document.createElement("div");
+        grid.className = "face-region-grid";
+        grid.dataset.region = region;
+        for (const field of regionFields) {
+          const card = renderFaceCard(field);
+          if (field.key === "portrait_url") {
+            card.style.gridColumn = "span 1";
+          }
+          grid.appendChild(card);
+        }
+        section.appendChild(grid);
+        bodyGrid.appendChild(section);
+      }
+
+      sheet.appendChild(bodyGrid);
+      pageBody.appendChild(sheet);
+
+      const actions = document.createElement("div");
+      actions.className = "action-row";
+      const save = document.createElement("button");
+      save.className = "text-button";
+      save.type = "button";
+      save.textContent = "Save Face";
+      save.addEventListener("click", async () => {
+        try {
+          await saveFacePage(page);
+        } catch (error) {
+          setCharacterStatus(error.message || String(error));
+        }
+      });
+      actions.appendChild(save);
+      pageBody.appendChild(actions);
+    }
+
+    function renderBioPage(page) {
+      const fields = sortFaceFields(page.fields || []);
+      const fieldMap = faceFieldsByKey(fields);
+      const summaryField = fieldMap.get("socio_parentage_summary");
+      const biographyField = fieldMap.get("public_description");
+      const rollField = fieldMap.get("socio_parentage_roll");
+      const versionField = fieldMap.get("socio_parentage_chart_version");
+      const sheet = document.createElement("section");
+      sheet.className = "bio-sheet";
+
+      const left = document.createElement("aside");
+      left.className = "bio-rail";
+      const leftHeading = document.createElement("div");
+      leftHeading.className = "mini";
+      leftHeading.textContent = "Lineage";
+      const leftNote = document.createElement("div");
+      leftNote.className = "bio-rail-note";
+      leftNote.textContent = "Parentage details are kept here so Face can stay focused on visible identity.";
+      left.appendChild(leftHeading);
+      left.appendChild(leftNote);
+
+      const center = document.createElement("article");
+      center.className = "bio-focus";
+      const header = document.createElement("div");
+      header.className = "bio-focus-header";
+      const title = document.createElement("h2");
+      title.textContent = "Bio";
+      const subtitle = document.createElement("p");
+      subtitle.textContent = "Parentage summary, public backstory, and other longer-form character notes.";
+      header.appendChild(title);
+      header.appendChild(subtitle);
+      center.appendChild(header);
+
+      const stats = document.createElement("div");
+      stats.className = "bio-stats";
+      stats.appendChild(renderFaceMetric("Parentage Roll", faceFieldValue(rollField, "Not set"), { accent: true }));
+      stats.appendChild(renderFaceMetric("Ruleset", faceFieldValue(versionField, "Not set"), { accent: true }));
+      center.appendChild(stats);
+
+      const summarySection = document.createElement("section");
+      summarySection.className = "bio-scroll-section";
+      const summaryTitle = document.createElement("h3");
+      summaryTitle.textContent = "Parentage Summary";
+      summarySection.appendChild(summaryTitle);
+      if (summaryField && String(summaryField.value || "").trim()) {
+        const summaryBody = document.createElement("p");
+        summaryBody.textContent = summaryField.value;
+        summarySection.appendChild(summaryBody);
+      } else {
+        const empty = document.createElement("p");
+        empty.className = "mini";
+        empty.textContent = "No parentage summary is available yet.";
+        summarySection.appendChild(empty);
+      }
+      center.appendChild(summarySection);
+
+      const bioSection = document.createElement("section");
+      bioSection.className = "bio-scroll-section";
+      const bioTitle = document.createElement("h3");
+      bioTitle.textContent = "Biography";
+      bioSection.appendChild(bioTitle);
+      const bioInput = fieldInput(biographyField || { input_type: "textarea", value: "", placeholder: "What the public should know", key: "public_description" });
+      bioInput.style.minHeight = "220px";
+      bioSection.appendChild(bioInput);
+      center.appendChild(bioSection);
+
+      const right = document.createElement("aside");
+      right.className = "bio-rail";
+      const rightHeading = document.createElement("div");
+      rightHeading.className = "mini";
+      rightHeading.textContent = "Working Notes";
+      const rightNote = document.createElement("div");
+      rightNote.className = "bio-rail-note";
+      rightNote.textContent = "This page will later hold quote-driven and slash-command-authored records as the sheet grows.";
+      right.appendChild(rightHeading);
+      right.appendChild(rightNote);
+
+      sheet.appendChild(left);
+      sheet.appendChild(center);
+      sheet.appendChild(right);
+      pageBody.appendChild(sheet);
+
+      const actions = document.createElement("div");
+      actions.className = "action-row";
+      const save = document.createElement("button");
+      save.className = "text-button";
+      save.type = "button";
+      save.textContent = "Save Bio";
+      save.addEventListener("click", async () => {
+        try {
+          await saveBioPage(page);
+        } catch (error) {
+          setCharacterStatus(error.message || String(error));
+        }
+      });
+      actions.appendChild(save);
+      pageBody.appendChild(actions);
+    }
+
     async function saveFacePage(page) {
       const fields = [...pageBody.querySelectorAll("[data-key]")];
       const draft = {};
       for (const input of fields) {
-        draft[input.dataset.key] = input.value;
+        const value = input.type === "color" && input.dataset.unset === "1" && input.value === "#000000" ? "" : input.value;
+        draft[input.dataset.key] = value;
       }
       if (!draft.name.trim()) {
         setCharacterStatus("Name is required.");
@@ -993,8 +2226,10 @@
           name: draft.name,
           pronouns: draft.pronouns,
           portrait_url: draft.portrait_url,
-          aura: draft.color,
-          Quote: draft.tagline,
+          token_aura: draft.token_aura || "",
+          aura: draft.token_aura || "",
+          color: state.workbook.character?.color || "",
+          tagline: draft.tagline,
           public_description: draft.public_description,
           private_notes: draft.private_notes || "",
         }),
@@ -1006,6 +2241,41 @@
       state.workbook.character = payload.data;
       await loadWorkbook(state.selectedCharacterId, { retainPage: true });
       setCharacterStatus("Face page saved.");
+    }
+
+    async function saveBioPage(page) {
+      const fields = [...pageBody.querySelectorAll("[data-key]")];
+      const draft = {};
+      for (const input of fields) {
+        const value = input.type === "color" && input.dataset.unset === "1" && input.value === "#000000" ? "" : input.value;
+        draft[input.dataset.key] = value;
+      }
+
+      setCharacterStatus(saveStatusForPage(page.key));
+      const response = await fetch(`/api/character-cards/${encodeURIComponent(state.selectedCharacterId)}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: state.workbook.character.name,
+          pronouns: state.workbook.character.pronouns,
+          portrait_url: state.workbook.character.portrait_url,
+          token_aura: state.workbook.character.token_aura || "",
+          aura: state.workbook.character.token_aura || "",
+          color: state.workbook.character.color || "",
+          tagline: state.workbook.character.tagline,
+          public_description: draft.public_description,
+          private_notes: state.workbook.character.private_notes || "",
+          workbook_context: state.workbook.character.workbook_context || {},
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.data?.error || payload?.error || `HTTP ${response.status}`);
+      }
+      state.workbook.character = payload.data;
+      await loadWorkbook(state.selectedCharacterId, { retainPage: true });
+      setCharacterStatus("Bio page saved.");
     }
 
     async function saveMechanicsPage() {
@@ -1025,8 +2295,10 @@
           name: state.workbook.character.name,
           pronouns: state.workbook.character.pronouns,
           portrait_url: state.workbook.character.portrait_url,
-          aura: state.workbook.character.color,
-          Quote: state.workbook.character.tagline,
+          token_aura: state.workbook.character.token_aura || "",
+          aura: state.workbook.character.token_aura || "",
+          color: state.workbook.character.color || "",
+          tagline: state.workbook.character.tagline,
           public_description: state.workbook.character.public_description,
           private_notes: state.workbook.character.private_notes,
           workbook_status: workbookStatus,
@@ -1081,54 +2353,17 @@
       }
 
       if (page.key === "face") {
-        const section = document.createElement("div");
-        section.className = "page-section";
-        const grid = document.createElement("div");
-        grid.className = "field-grid";
-        for (const field of page.fields || []) {
-          if (field.editable === false) {
-            const item = document.createElement("div");
-            item.className = "list-item";
-            const title = document.createElement("strong");
-            title.textContent = field.label;
-            const body = document.createElement("p");
-            body.textContent = field.value || "Not set";
-            item.appendChild(title);
-            item.appendChild(body);
-            grid.appendChild(item);
-            continue;
-          }
+        renderFacePage(page);
+        return;
+      }
 
-          const label = document.createElement("label");
-          label.className = `field${field.input_type === "textarea" ? " full" : ""}`;
-          const labelText = document.createElement("span");
-          labelText.textContent = field.label;
-          label.appendChild(labelText);
-          label.appendChild(fieldInput(field));
-          grid.appendChild(label);
-        }
-        section.appendChild(grid);
-        const actions = document.createElement("div");
-        actions.className = "action-row";
-        const save = document.createElement("button");
-        save.className = "text-button";
-        save.type = "button";
-        save.textContent = "Save Face";
-        save.addEventListener("click", async () => {
-          try {
-            await saveFacePage(page);
-          } catch (error) {
-            setCharacterStatus(error.message || String(error));
-          }
-        });
-        actions.appendChild(save);
-        section.appendChild(actions);
-        pageBody.appendChild(section);
+      if (page.key === "bio") {
+        renderBioPage(page);
         return;
       }
 
       if (page.key === "history" || page.key === "creation_progress") {
-        const entries = Array.isArray(page.entries) ? page.entries : [];
+        const entries = sortHistoryEntries(Array.isArray(page.entries) ? page.entries : []);
         if (!entries.length) {
           const empty = document.createElement("p");
           empty.className = "empty-state";
@@ -1300,8 +2535,15 @@
       }
 
       const pages = workbookPages();
+      if (state.selectedPageKey === "creation_progress") {
+        state.selectedPageKey = "history";
+      }
+      const activePage = workbook.active_page === "creation_progress" ? "history" : workbook.active_page;
       if (!pages.some((page) => page.key === state.selectedPageKey)) {
-        state.selectedPageKey = workbook.active_page || pages[0]?.key || "face";
+        state.selectedPageKey = activePage || pages[0]?.key || "face";
+      }
+      if (state.selectedPageKey === "creation_progress") {
+        state.selectedPageKey = "history";
       }
 
       const page = currentPage();
@@ -1438,18 +2680,20 @@
       }
     });
 
-    refreshButton.addEventListener("click", async () => {
-      try {
-        if (state.selectedCharacterId) {
-          await loadWorkbook(state.selectedCharacterId, { retainPage: true });
-        } else {
-          await loadCharacterCards();
-          renderWorkbook();
+    if (refreshButton) {
+      refreshButton.addEventListener("click", async () => {
+        try {
+          if (state.selectedCharacterId) {
+            await loadWorkbook(state.selectedCharacterId, { retainPage: true });
+          } else {
+            await loadCharacterCards();
+            renderWorkbook();
+          }
+        } catch (error) {
+          setCharacterStatus(error.message || String(error));
         }
-      } catch (error) {
-        setCharacterStatus(error.message || String(error));
-      }
-    });
+      });
+    }
 
     bootstrap();
   </script>

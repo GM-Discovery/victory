@@ -11,6 +11,99 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-07-03 — Kernel 58 Greenroom Summary Panel Removal and Sidebar Contrast Pass
+
+### Frontend
+- Removed the visible Workbook Summary side panel so the Face sheet can occupy the primary workbook focus area.
+- Expanded the workbook into a two-column layout with the left workbook reference panel and a wider central sheet.
+- Hid the `Creation Progress` page from the visible tabs and routed any lingering selection back to `History`.
+- Darkened the left-panel typography so labels and list text remain legible against the light workbook surfaces.
+
+### Deployment
+- Rebuilt and restarted the live backend container so the updated Greenroom layout is active.
+
+### Validation
+- Rechecked the Greenroom inline script with `node --check`.
+- Rechecked the workspace diff with `git diff --check`.
+- Verified the backend health endpoint from inside the restarted container.
+
+---
+
+## 2026-07-03 — Kernel 58 Greenroom Contrast Tuning
+
+### Frontend
+- Tuned the Greenroom parchment palette after the main visual refresh so contrast, label color, and surface brightness better support the new hierarchy.
+- Darkened workbook text, metadata, and tab/button treatments slightly so the page stays readable without flattening the sheet into a washed-out cream panel.
+
+### Deployment
+- Rebuilt and restarted the live backend container again so the updated Greenroom color tuning is active.
+
+### Validation
+- Rechecked the Greenroom inline script with `node --check`.
+- Rechecked the workspace diff with `git diff --check`.
+- Verified the backend health endpoint from inside the restarted container.
+
+---
+
+## 2026-07-03 — Kernel 58 Greenroom Visual Refinement Pass
+
+### Frontend
+- Rebalanced the Greenroom workbook into a lighter parchment-and-ink presentation so the page reads more like a premium character dossier than a dark admin panel.
+- Normalized the workbook container cards, summary panel, and face/bio surfaces to share a single visual language instead of mixing dark shell chrome with bright interior sheets.
+- Improved typographic contrast inside the workbook so labels, metadata, and empty states stay readable after the surface treatment change.
+
+### Deployment
+- Rebuilt and restarted the live backend container so the updated Greenroom styling is active in the running image.
+
+### Validation
+- Rechecked the Greenroom inline script with `node --check`.
+- Rechecked the workspace diff with `git diff --check`.
+- Verified the backend health endpoint from inside the restarted container.
+
+---
+
+## 2026-07-03 — Kernel 58 Face Noise Cleanup and Bio Sheet Split
+
+### Backend
+- Removed stage and event noise from the visible workbook sheets so the Face and Mechanics pages no longer surface arbitrary internal checkpoints.
+- Split the Catharsis lineage summary into a dedicated Bio page and kept the Face page focused on identity, ruleset, portrait, aura, archetype, skill, and quote.
+- Preserved the parentage roll projection on Bio while dropping the combined roll and resolved starting credit from the visible sheet.
+
+### Frontend
+- Reworked the Greenroom Face page into a lighter report-style hero with a stronger hierarchy, ruleset version labeling, and less clutter.
+- Added a dedicated Bio page with a scrollable centerpiece for lineage and biography notes, plus decorative side rails to keep the long-form text visually anchored.
+- Shifted the workbook summary to show the ruleset key and version together instead of separate stage/event metadata.
+
+### Deployment
+- Rebuilt and restarted the live backend container again after the Face/Bio split so the running environment matches the repository state.
+- Verified the backend health endpoint from inside the container after the final rebuild.
+
+### Validation
+- Re-ran `gofmt` on the updated workbook page files.
+- Re-ran `node --check` on the Greenroom inline script.
+- Re-ran `git diff --check`.
+- Re-ran targeted Go tests from the backend module root:
+  - `GOCACHE=/tmp/victory-gocache go test ./internal/characters ./cmd/victory`
+
+---
+
+## 2026-07-03 — Kernel 58 Character Sheet Face Projection and AAA Workbook Hero Pass
+
+### Frontend
+- Reworked the Greenroom face page into a report-style hero with a larger character-name header, identity strip, aura presentation, and supporting metric grid.
+- Separated the main identity block from the rest of the workbook fields so portrait, name, pronouns, archetype, first skill, and token aura read as the primary sheet surface.
+- Kept the remaining face fields in secondary sections so the workbook looks and behaves like a premium character sheet instead of a flat form grid.
+
+### Deployment
+- Rebuilt and restarted the live backend container so the shipped workbook assets picked up the updated Greenroom presentation.
+- Verified the backend health endpoint from inside the container after the rebuild.
+
+### Validation
+- Rechecked the Greenroom inline script with `node --check` after the layout update.
+- Rechecked the workspace diff with `git diff --check`.
+
+---
+
 ## 2026-07-03 — Kernel 57 Catharsis Onboarding Repair, Greenroom Polish, and Custom Archetype Fixes
 
 ### Backend
@@ -1218,6 +1311,26 @@ Implemented "Chapter 3: Character Archetypes" per the Kernel 55 spec and canonic
 - **Face**: workbook pages API includes `chapter3_archetype` and `chapter3_archetype_summary` fields on the Face page for confirmed characters ✓
 - No console errors during either path. The pre-existing director-console/session-join 403s noted in prior test runs remain present and are out of scope
 - All test character cards soft-deleted, test sessions revoked after each pass
+
+## Kernel 58 — Face Projection, Token Aura, and Live Backend Refresh
+
+Updated the character workbook Face projection to surface canonical `token_aura` data, add region/priority metadata to Face fields, and keep legacy `color` reads as a migration alias. Also updated the Greenroom Face editor to use the new field name, fixed the tagline save path, and refreshed the live backend container so the running service picked up the rebuilt code.
+
+### Backend
+- `backend/internal/characters/characters.go` and `workbook.go` now read and write `token_aura` alongside legacy `color`, with default Aura treated as unset instead of a hard default swatch.
+- `backend/internal/characters/workbook_pages.go` now projects Face fields with region/priority metadata and a canonical `Token Aura` field.
+- Added focused tests for Aura migration and Face projection metadata.
+
+### Frontend
+- `frontend/venues/greenroom/index.html` now renders the Face page as grouped regions instead of a single flat list, and the Face save path now posts `token_aura` plus the corrected tagline field.
+- `frontend/venues/catharsis/runtime.js` and `frontend/venues/catharsis/runtime/scene-nodes.js` now carry token aura through local models and render a localized glow/halo when one is present.
+
+### Validation
+- `go test ./internal/characters ./internal/profiles ./internal/access`
+- `node --check` on the Catharsis runtime files
+- `node --check` on the Greenroom inline script
+- `git diff --check`
+- rebuilt and restarted `victory-backend`, then verified `GET /health` inside the container returned `ok`
 
 ## Kernel 56 — Chapter 4: First Skill and Courtyard Entry
 

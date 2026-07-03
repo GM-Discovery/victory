@@ -52,48 +52,56 @@ func TestBuildWorkbookPagesIncludesCatharsisSummaryFields(t *testing.T) {
 		t.Fatalf("face page not found")
 	}
 
-	foundSummary := false
-	foundWealth := false
-	foundRoll := false
-	foundTotalRoll := false
+	foundBio := false
+	foundTokenAura := false
 	for _, field := range face.Fields {
-		if field.Key == "socio_parentage_summary" {
-			foundSummary = true
-			if field.Value == "" {
-				t.Fatalf("expected parentage summary to be populated")
-			}
-		}
-		if field.Key == "socio_parentage_roll" {
-			foundRoll = true
-			if field.Value != "52" {
-				t.Fatalf("effective parentage roll = %q, want 52", field.Value)
-			}
-		}
-		if field.Key == "socio_parentage_total_roll" {
-			foundTotalRoll = true
-			if field.Value != "72" {
-				t.Fatalf("combined roll = %q, want 72", field.Value)
-			}
-		}
-		if field.Key == "socio_starting_wealth" {
-			foundWealth = true
-			if field.Value != "260" {
-				t.Fatalf("starting wealth = %q, want 260", field.Value)
+		if field.Key == "token_aura" {
+			foundTokenAura = true
+			if field.Label != "Token Aura" {
+				t.Fatalf("token aura label = %q, want Token Aura", field.Label)
 			}
 		}
 	}
 
-	if !foundSummary {
-		t.Fatalf("expected socio_parentage_summary field on face page")
+	for _, page := range pages {
+		if page.Key == "bio" {
+			foundBio = true
+			foundSummary := false
+			foundRoll := false
+			foundVersion := false
+			for _, field := range page.Fields {
+				if field.Key == "socio_parentage_summary" {
+					foundSummary = true
+					if field.Value == "" {
+						t.Fatalf("expected parentage summary to be populated")
+					}
+				}
+				if field.Key == "socio_parentage_roll" {
+					foundRoll = true
+					if field.Value != "52" {
+						t.Fatalf("effective parentage roll = %q, want 52", field.Value)
+					}
+				}
+				if field.Key == "socio_parentage_chart_version" {
+					foundVersion = true
+				}
+			}
+			if !foundSummary {
+				t.Fatalf("expected socio_parentage_summary field on bio page")
+			}
+			if !foundRoll {
+				t.Fatalf("expected socio_parentage_roll field on bio page")
+			}
+			if !foundVersion {
+				t.Fatalf("expected socio_parentage_chart_version field on bio page")
+			}
+		}
 	}
-	if !foundRoll {
-		t.Fatalf("expected socio_parentage_roll field on face page")
+	if !foundBio {
+		t.Fatalf("expected bio page to be present")
 	}
-	if !foundTotalRoll {
-		t.Fatalf("expected socio_parentage_total_roll field on face page")
-	}
-	if !foundWealth {
-		t.Fatalf("expected socio_starting_wealth field on face page")
+	if !foundTokenAura {
+		t.Fatalf("expected token_aura field on face page")
 	}
 }
 
@@ -150,5 +158,14 @@ func TestBuildWorkbookPagesIncludesChapter4SkillFields(t *testing.T) {
 	}
 	if !mechanicsHasDie {
 		t.Fatalf("expected chapter4_die_size=d6 on mechanics page, got fields %+v", mechanics.Fields)
+	}
+}
+
+func TestResolveFaceTokenAuraMigration(t *testing.T) {
+	if got := resolveFaceTokenAura("", "#d9c7a6"); got != "" {
+		t.Fatalf("default legacy color resolved to %q, want unset", got)
+	}
+	if got := resolveFaceTokenAura("#112233", ""); got != "#112233" {
+		t.Fatalf("token aura resolved to %q, want #112233", got)
 	}
 }

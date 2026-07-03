@@ -52,7 +52,8 @@ type CharacterCard struct {
 	Name              string         `json:"name"`
 	Pronouns          string         `json:"pronouns"`
 	PortraitURL       string         `json:"portrait_url"`
-	Color             string         `json:"color"`
+	TokenAura         string         `json:"token_aura,omitempty"`
+	Color             string         `json:"color,omitempty"`
 	Tagline           string         `json:"tagline"`
 	PublicDescription string         `json:"public_description"`
 	PrivateNotes      string         `json:"private_notes,omitempty"`
@@ -65,7 +66,9 @@ type CharacterCardInput struct {
 	Name              string         `json:"name"`
 	Pronouns          string         `json:"pronouns"`
 	PortraitURL       string         `json:"portrait_url"`
-	Color             string         `json:"color"`
+	TokenAura         string         `json:"token_aura,omitempty"`
+	Aura              string         `json:"aura,omitempty"`
+	Color             string         `json:"color,omitempty"`
 	Tagline           string         `json:"tagline"`
 	PublicDescription string         `json:"public_description"`
 	PrivateNotes      string         `json:"private_notes"`
@@ -119,6 +122,7 @@ func EnsureKernel23CharacterSurface(ctx context.Context, pool *pgxpool.Pool) err
 		  name TEXT NOT NULL,
 		  pronouns TEXT NOT NULL DEFAULT '',
 		  portrait_url TEXT NOT NULL DEFAULT '',
+		  token_aura TEXT,
 		  color TEXT NOT NULL DEFAULT '#d9c7a6',
 		  tagline TEXT NOT NULL DEFAULT '',
 		  public_description TEXT NOT NULL DEFAULT '',
@@ -135,6 +139,14 @@ func EnsureKernel23CharacterSurface(ctx context.Context, pool *pgxpool.Pool) err
 		  ADD COLUMN IF NOT EXISTS workbook_status TEXT NOT NULL DEFAULT 'draft';
 		ALTER TABLE character_cards
 		  ADD COLUMN IF NOT EXISTS workbook_context JSONB NOT NULL DEFAULT '{}'::jsonb;
+		ALTER TABLE character_cards
+		  ADD COLUMN IF NOT EXISTS token_aura TEXT;
+		UPDATE character_cards
+		   SET token_aura = color
+		 WHERE token_aura IS NULL
+		   AND color IS NOT NULL
+		   AND color <> ''
+		   AND lower(color) <> '#d9c7a6';
 
 		CREATE INDEX IF NOT EXISTS idx_character_cards_owner
 		  ON character_cards(owner_user_id);
@@ -861,6 +873,9 @@ func CreateCard(ctx context.Context, pool *pgxpool.Pool, ownerUserID string, inp
 	}
 
 	input = sanitizeInput(input)
+	if input.TokenAura == "__invalid__" {
+		return CharacterCard{}, errors.New("invalid_token_aura")
+	}
 	if strings.ToLower(strings.TrimSpace(stringValue(input.WorkbookContext["source"]))) == "catharsis" {
 		resolved, err := attachCanonicalCatharsisParentageRows(ctx, pool, ownerUserID, input)
 		if err != nil {
@@ -925,16 +940,17 @@ func CreateCard(ctx context.Context, pool *pgxpool.Pool, ownerUserID string, inp
 			name,
 			pronouns,
 			portrait_url,
+			token_aura,
 			color,
 			tagline,
 			public_description,
 			private_notes,
 			sheet_links
 		)
-		VALUES ($1, $2, NULLIF($3, '')::uuid, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)
-		RETURNING id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), workbook_status, workbook_context, name, pronouns, portrait_url, color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
-	`, ownerUserID, locationID, productionID, workbookStatus, string(workbookContextJSON), input.Name, input.Pronouns, input.PortraitURL, input.Color, input.Tagline, input.PublicDescription, input.PrivateNotes, string(sheetLinksJSON)).
-		Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
+		VALUES ($1, $2, NULLIF($3, '')::uuid, $4, $5::jsonb, $6, $7, $8, NULLIF($9, ''), $10, $11, $12, $13, $14::jsonb)
+		RETURNING id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), workbook_status, workbook_context, name, pronouns, portrait_url, COALESCE(token_aura, ''), color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
+	`, ownerUserID, locationID, productionID, workbookStatus, string(workbookContextJSON), input.Name, input.Pronouns, input.PortraitURL, input.TokenAura, input.Color, input.Tagline, input.PublicDescription, input.PrivateNotes, string(sheetLinksJSON)).
+		Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.TokenAura, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
 	if err != nil {
 		return CharacterCard{}, err
 	}
@@ -960,6 +976,9 @@ func UpdateCard(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID str
 	}
 
 	input = sanitizeInput(input)
+	if input.TokenAura == "__invalid__" {
+		return CharacterCard{}, errors.New("invalid_token_aura")
+	}
 	if input.Name == "" {
 		return CharacterCard{}, errors.New("character_name_required")
 	}
@@ -1004,19 +1023,20 @@ func UpdateCard(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID str
 		SET name = $2,
 		    pronouns = $3,
 		    portrait_url = $4,
-		    color = $5,
-		    tagline = $6,
-		    public_description = $7,
-		    private_notes = $8,
-		    sheet_links = COALESCE($9::jsonb, sheet_links),
-		    workbook_status = COALESCE($10, workbook_status),
-		    workbook_context = COALESCE($11::jsonb, workbook_context),
+		    token_aura = NULLIF($5, ''),
+		    color = $6,
+		    tagline = $7,
+		    public_description = $8,
+		    private_notes = $9,
+		    sheet_links = COALESCE($10::jsonb, sheet_links),
+		    workbook_status = COALESCE($11, workbook_status),
+		    workbook_context = COALESCE($12::jsonb, workbook_context),
 		    updated_at = NOW()
 		WHERE id = $1
 		  AND is_deleted = FALSE
-		RETURNING id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), workbook_status, workbook_context, name, pronouns, portrait_url, color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
-	`, cardID, input.Name, input.Pronouns, input.PortraitURL, input.Color, input.Tagline, input.PublicDescription, input.PrivateNotes, sheetLinksParam, workbookStatusParam, workbookContextParam).
-		Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
+		RETURNING id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), workbook_status, workbook_context, name, pronouns, portrait_url, COALESCE(token_aura, ''), color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
+	`, cardID, input.Name, input.Pronouns, input.PortraitURL, input.TokenAura, input.Color, input.Tagline, input.PublicDescription, input.PrivateNotes, sheetLinksParam, workbookStatusParam, workbookContextParam).
+		Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.TokenAura, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return CharacterCard{}, errors.New("character_card_not_found")
@@ -1053,7 +1073,7 @@ func CanEditCard(ctx context.Context, q characterQuerier, actorUserID, cardID st
 
 func ListOwnedCards(ctx context.Context, pool *pgxpool.Pool, userID string) ([]CharacterCard, error) {
 	rows, err := pool.Query(ctx, `
-		SELECT id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), workbook_status, workbook_context, name, pronouns, portrait_url, color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
+		SELECT id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), workbook_status, workbook_context, name, pronouns, portrait_url, COALESCE(token_aura, ''), color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
 		FROM character_cards
 		WHERE owner_user_id = $1
 		  AND is_deleted = FALSE
@@ -1070,7 +1090,7 @@ func ListOwnedCards(ctx context.Context, pool *pgxpool.Pool, userID string) ([]C
 		var createdAt, updatedAt time.Time
 		var sheetLinksRaw []byte
 		var workbookContextRaw []byte
-		if err := rows.Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.TokenAura, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt); err != nil {
 			return nil, err
 		}
 		card.WorkbookContext = decodeJSONMap(workbookContextRaw)
@@ -1114,14 +1134,14 @@ func canCreateCharacterCard(ctx context.Context, q characterQuerier, userID stri
 }
 
 func PersonaForCard(ctx context.Context, q characterQuerier, userID, cardID string) (map[string]any, error) {
-	var ownerUserID, id, name, pronouns, portraitURL, color, tagline string
+	var ownerUserID, id, name, pronouns, portraitURL, tokenAura, color, tagline string
 	err := q.QueryRow(ctx, `
-		SELECT owner_user_id::text, id::text, name, pronouns, portrait_url, color, tagline
+		SELECT owner_user_id::text, id::text, name, pronouns, portrait_url, COALESCE(token_aura, ''), color, tagline
 		FROM character_cards
 		WHERE id = $1
 		  AND is_deleted = FALSE
 		LIMIT 1
-	`, cardID).Scan(&ownerUserID, &id, &name, &pronouns, &portraitURL, &color, &tagline)
+	`, cardID).Scan(&ownerUserID, &id, &name, &pronouns, &portraitURL, &tokenAura, &color, &tagline)
 	if err != nil {
 		return nil, err
 	}
@@ -1135,6 +1155,7 @@ func PersonaForCard(ctx context.Context, q characterQuerier, userID, cardID stri
 		"display_name":      name,
 		"pronouns":          pronouns,
 		"portrait_url":      portraitURL,
+		"token_aura":        tokenAura,
 		"color":             color,
 		"tagline":           tagline,
 	}, nil
@@ -1160,16 +1181,16 @@ func ActivePersonaForLatestCaveSession(ctx context.Context, q characterQuerier, 
 }
 
 func ActivePersonaForSession(ctx context.Context, q characterQuerier, sessionID, userID string) (map[string]any, error) {
-	var id, name, pronouns, portraitURL, color, tagline string
+	var id, name, pronouns, portraitURL, tokenAura, color, tagline string
 	err := q.QueryRow(ctx, `
-		SELECT cc.id::text, cc.name, cc.pronouns, cc.portrait_url, cc.color, cc.tagline
+		SELECT cc.id::text, cc.name, cc.pronouns, cc.portrait_url, COALESCE(cc.token_aura, ''), cc.color, cc.tagline
 		FROM current_session_personas csp
 		JOIN character_cards cc ON cc.id = csp.character_card_id
 		WHERE csp.session_id = $1
 		  AND csp.user_id = $2
 		  AND cc.is_deleted = FALSE
 		LIMIT 1
-	`, sessionID, userID).Scan(&id, &name, &pronouns, &portraitURL, &color, &tagline)
+	`, sessionID, userID).Scan(&id, &name, &pronouns, &portraitURL, &tokenAura, &color, &tagline)
 	if err != nil {
 		return nil, err
 	}
@@ -1180,6 +1201,7 @@ func ActivePersonaForSession(ctx context.Context, q characterQuerier, sessionID,
 		"display_name":      name,
 		"pronouns":          pronouns,
 		"portrait_url":      portraitURL,
+		"token_aura":        tokenAura,
 		"color":             color,
 		"tagline":           tagline,
 	}, nil
@@ -1259,6 +1281,40 @@ func sanitizeInput(input CharacterCardInput) CharacterCardInput {
 	input.Name = truncate(strings.TrimSpace(input.Name), 80)
 	input.Pronouns = truncate(strings.TrimSpace(input.Pronouns), 80)
 	input.PortraitURL = truncate(strings.TrimSpace(input.PortraitURL), 500)
+	input.TokenAura = strings.TrimSpace(input.TokenAura)
+	input.Aura = strings.TrimSpace(input.Aura)
+	input.Color = strings.TrimSpace(input.Color)
+	switch {
+	case input.TokenAura != "":
+		aura, err := normalizeTokenAura(input.TokenAura)
+		if err != nil {
+			input.TokenAura = "__invalid__"
+			return input
+		}
+		input.TokenAura = aura
+	case input.Aura != "":
+		aura, err := normalizeTokenAura(input.Aura)
+		if err != nil {
+			input.TokenAura = "__invalid__"
+			return input
+		}
+		input.TokenAura = aura
+	case input.Color != "":
+		aura, err := normalizeTokenAura(input.Color)
+		if err != nil {
+			input.TokenAura = "__invalid__"
+			return input
+		}
+		if aura != "" && aura != "#d9c7a6" {
+			input.TokenAura = aura
+		}
+	}
+	if input.TokenAura == "" && input.Color == "" {
+		input.Color = "#d9c7a6"
+	}
+	if input.Color == "" {
+		input.Color = input.TokenAura
+	}
 	input.Color = normalizeColor(input.Color)
 	input.Tagline = truncate(strings.TrimSpace(input.Tagline), 160)
 	input.PublicDescription = truncate(strings.TrimSpace(input.PublicDescription), 1000)
@@ -1365,6 +1421,22 @@ func normalizeColor(value string) string {
 		}
 	}
 	return "#d9c7a6"
+}
+
+func normalizeTokenAura(value string) (string, error) {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return "", nil
+	}
+	if len(value) != 7 || !strings.HasPrefix(value, "#") {
+		return "", errors.New("invalid_token_aura")
+	}
+	for _, r := range value[1:] {
+		if !(r >= '0' && r <= '9' || r >= 'a' && r <= 'f') {
+			return "", errors.New("invalid_token_aura")
+		}
+	}
+	return value, nil
 }
 
 func truncate(value string, max int) string {

@@ -1430,6 +1430,7 @@
           item.source.data.front_text = item.frontText ?? item.source.data.front_text;
           item.source.data.back_text = item.backText ?? item.source.data.back_text;
           item.source.data.color = item.color ?? item.source.data.color;
+          item.source.data.token_aura = item.tokenAura ?? item.source.data.token_aura;
           if (item.kind === "token") {
             item.source.data.asset_id = item.assetID ?? item.source.data.asset_id;
             item.source.data.asset_name = item.assetName ?? item.source.data.asset_name;
@@ -2659,7 +2660,9 @@
       } else if (isTokenObject(model)) {
         const footprint = tokenFootprintForModel(model);
         const displaySize = tokenDisplaySizeForModel(model);
+        const tokenAura = model.tokenAura || model.source?.data?.token_aura || "";
         lines.push(`Asset: ${model.assetName || model.source?.data?.asset_name || "(unknown)"}`);
+        lines.push(`Token Aura: ${tokenAura || "unset"}`);
         lines.push(`Shape: ${model.assetShape || model.source?.data?.asset_shape || "circle"}`);
         lines.push(`Footprint: ${footprint.width} x ${footprint.height}`);
         lines.push(`Scale: ${tokenScaleForModel(model)}%`);
@@ -2704,6 +2707,8 @@
       const kind = String(element?.context_class || data.context_class || element?.element_type || "").trim().toLowerCase();
       const inferredKind = (kind === "token" || String(data.asset_id || "").trim() || String(data.asset_content_url || "").trim() || String(data.asset_thumbnail_url || "").trim()) ? "token" : "card";
       const assetID = String(data.asset_id || "");
+      const legacyColor = String(data.color || "").trim().toLowerCase();
+      const tokenAura = String(data.token_aura || data.aura || "").trim().toLowerCase() || ((inferredKind === "token" && legacyColor && legacyColor !== "#d9c7a6") ? legacyColor : "");
       return {
         key: `live:${String(element?.element_id || element?.slug || index)}`,
         kind: inferredKind,
@@ -2715,6 +2720,7 @@
         label: String(element?.name || data.asset_name || data.front_text || element?.slug || (inferredKind === "token" ? "Token" : "Index card")),
         frontText: String(data.front_text || element?.name || "").trim(),
         backText: String(data.back_text || "").trim(),
+        tokenAura,
         color: String(data.color || "#d9c7a6").trim() || "#d9c7a6",
         position: element?.position || data.position || {},
         state,

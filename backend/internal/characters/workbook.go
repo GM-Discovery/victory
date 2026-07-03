@@ -57,7 +57,7 @@ func findDraftCharacterForContext(ctx context.Context, pool *pgxpool.Pool, owner
 	var createdAt, updatedAt time.Time
 	var sheetLinksRaw, workbookContextRaw []byte
 	err := pool.QueryRow(ctx, `
-		SELECT id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), workbook_status, workbook_context, name, pronouns, portrait_url, color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
+		SELECT id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), workbook_status, workbook_context, name, pronouns, portrait_url, COALESCE(token_aura, ''), color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
 		FROM character_cards
 		WHERE owner_user_id = $1
 		  AND is_deleted = FALSE
@@ -65,7 +65,7 @@ func findDraftCharacterForContext(ctx context.Context, pool *pgxpool.Pool, owner
 		  AND workbook_context ->> 'draft_token' = $2
 		ORDER BY updated_at DESC, created_at DESC
 		LIMIT 1
-	`, ownerUserID, draftToken).Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
+	`, ownerUserID, draftToken).Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.TokenAura, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return CharacterCard{}, false, nil
@@ -134,16 +134,16 @@ func ActiveCharacterForUser(ctx context.Context, q characterQuerier, userID stri
 		return nil, nil
 	}
 
-	var cardID, name, pronouns, portraitURL, color, tagline, status string
+	var cardID, name, pronouns, portraitURL, tokenAura, color, tagline, status string
 	var contextRaw []byte
 	err := q.QueryRow(ctx, `
-		SELECT cc.id::text, cc.name, cc.pronouns, cc.portrait_url, cc.color, cc.tagline, cc.workbook_status, cc.workbook_context
+		SELECT cc.id::text, cc.name, cc.pronouns, cc.portrait_url, COALESCE(cc.token_aura, ''), cc.color, cc.tagline, cc.workbook_status, cc.workbook_context
 		FROM active_user_characters auc
 		JOIN character_cards cc ON cc.id = auc.character_card_id
 		WHERE auc.user_id = $1
 		  AND cc.is_deleted = FALSE
 		LIMIT 1
-	`, userID).Scan(&cardID, &name, &pronouns, &portraitURL, &color, &tagline, &status, &contextRaw)
+	`, userID).Scan(&cardID, &name, &pronouns, &portraitURL, &tokenAura, &color, &tagline, &status, &contextRaw)
 	if err == nil {
 		return map[string]any{
 			"character_card_id": cardID,
@@ -151,6 +151,7 @@ func ActiveCharacterForUser(ctx context.Context, q characterQuerier, userID stri
 			"display_name":      name,
 			"pronouns":          pronouns,
 			"portrait_url":      portraitURL,
+			"token_aura":        tokenAura,
 			"color":             color,
 			"tagline":           tagline,
 			"workbook_status":   status,

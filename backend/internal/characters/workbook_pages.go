@@ -15,12 +15,19 @@ import (
 )
 
 type WorkbookPageField struct {
-	Key         string `json:"key"`
-	Label       string `json:"label"`
-	Value       string `json:"value"`
-	InputType   string `json:"input_type"`
-	Placeholder string `json:"placeholder,omitempty"`
-	Editable    bool   `json:"editable"`
+	Key            string `json:"key"`
+	Label          string `json:"label"`
+	Value          string `json:"value"`
+	InputType      string `json:"input_type"`
+	Placeholder    string `json:"placeholder,omitempty"`
+	Editable       bool   `json:"editable"`
+	Region         string `json:"region,omitempty"`
+	PriorityMode   string `json:"priority_mode,omitempty"`
+	PriorityScore  int    `json:"priority_score,omitempty"`
+	PriorityLocked bool   `json:"priority_locked,omitempty"`
+	PriorityBand   string `json:"priority_band,omitempty"`
+	SourceKind     string `json:"source_kind,omitempty"`
+	ValueLocked    bool   `json:"value_locked,omitempty"`
 }
 
 type CharacterWorkbookEntry struct {
@@ -181,12 +188,12 @@ func loadWorkbookState(ctx context.Context, pool *pgxpool.Pool, actorUserID, car
 	var createdAt, updatedAt time.Time
 	var workbookContextRaw, sheetLinksRaw []byte
 	err := pool.QueryRow(ctx, `
-		SELECT id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), workbook_status, workbook_context, name, pronouns, portrait_url, color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
+		SELECT id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), workbook_status, workbook_context, name, pronouns, portrait_url, COALESCE(token_aura, ''), color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
 		FROM character_cards
 		WHERE id = $1
 		  AND is_deleted = FALSE
 		LIMIT 1
-	`, cardID).Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
+	`, cardID).Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.TokenAura, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return CharacterCard{}, nil, nil, nil, errors.New("character_card_not_found")
@@ -254,7 +261,7 @@ func loadWorkbookEntries(ctx context.Context, pool *pgxpool.Pool, cardID string)
 		SELECT id::text, character_card_id::text, COALESCE(module_instance_id::text, ''), author_user_id::text, page_key, entry_type, title, body, payload, COALESCE(stage_number, 0), sort_order, created_at, updated_at
 		FROM character_workbook_entries
 		WHERE character_card_id = $1
-		ORDER BY sort_order ASC, created_at ASC
+		ORDER BY created_at DESC, sort_order DESC
 	`, cardID)
 	if err != nil {
 		return nil, err
@@ -319,24 +326,31 @@ func loadWorkbookJournals(ctx context.Context, pool *pgxpool.Pool, actorUserID, 
 
 func buildWorkbookPages(card CharacterCard, module map[string]any, entries []CharacterWorkbookEntry, journals []CharacterJournalEntry) []CharacterWorkbookPage {
 	faceFields := []WorkbookPageField{
-		{Key: "name", Label: "Name", Value: card.Name, InputType: "text", Placeholder: "Enter a name", Editable: true},
-		{Key: "pronouns", Label: "Pronouns", Value: card.Pronouns, InputType: "text", Placeholder: "they/them", Editable: true},
-		{Key: "portrait_url", Label: "Portrait URL", Value: card.PortraitURL, InputType: "url", Placeholder: "https://", Editable: true},
-		{Key: "color", Label: "Color", Value: card.Color, InputType: "color", Editable: true},
-		{Key: "tagline", Label: "Tagline", Value: card.Tagline, InputType: "text", Placeholder: "A short line about the character", Editable: true},
-		{Key: "public_description", Label: "Public Description", Value: card.PublicDescription, InputType: "textarea", Placeholder: "What the public should know", Editable: true},
-		{Key: "private_notes", Label: "Private Notes", Value: card.PrivateNotes, InputType: "textarea", Placeholder: "Private notes for the player", Editable: true},
+		{Key: "name", Label: "Name", Value: card.Name, InputType: "text", Placeholder: "Enter a name", Editable: true, Region: "identity", PriorityMode: "inferred", PriorityScore: 110, PriorityBand: priorityBandForScore(110), SourceKind: "owner_explicit"},
+		{Key: "portrait_url", Label: "Portrait URL", Value: card.PortraitURL, InputType: "url", Placeholder: "https://", Editable: true, Region: "identity", PriorityMode: "inferred", PriorityScore: 105, PriorityBand: priorityBandForScore(105), SourceKind: "owner_explicit"},
+		{Key: "pronouns", Label: "Pronouns", Value: card.Pronouns, InputType: "text", Placeholder: "they/them", Editable: true, Region: "identity", PriorityMode: "inferred", PriorityScore: 95, PriorityBand: priorityBandForScore(95), SourceKind: "owner_explicit"},
+		{Key: "token_aura", Label: "Token Aura", Value: resolveFaceTokenAura(card.TokenAura, card.Color), InputType: "color", Editable: true, Region: "identity", PriorityMode: "inferred", PriorityScore: 100, PriorityBand: priorityBandForScore(100), SourceKind: "owner_explicit"},
+		{Key: "chapter3_archetype", Label: "Archetype", Value: chapter3FaceArchetypeValue(card.WorkbookContext), InputType: "text", Editable: false, Region: "identity", PriorityMode: "inferred", PriorityScore: 100, PriorityBand: priorityBandForScore(100), SourceKind: "rules_canonical"},
+		{Key: "chapter4_first_skill", Label: "First Trained Skill", Value: chapter4FaceSkillValue(card.WorkbookContext), InputType: "text", Editable: false, Region: "identity", PriorityMode: "inferred", PriorityScore: 90, PriorityBand: priorityBandForScore(90), SourceKind: "rules_canonical"},
+		{Key: "tagline", Label: "Featured Quote", Value: card.Tagline, InputType: "text", Placeholder: "A short line about the character", Editable: true, Region: "glance", PriorityMode: "inferred", PriorityScore: 70, PriorityBand: priorityBandForScore(70), SourceKind: "owner_explicit"},
 	}
-	faceFields = append(faceFields, workbookRootSummaryFields(card)...)
 
 	return []CharacterWorkbookPage{
 		{
 			Key:      "face",
 			Title:    "Face",
 			Kind:     "face",
-			Summary:  "Identity fields and the workbook root.",
+			Summary:  "Identity fields, quote, and display face.",
 			Editable: true,
 			Fields:   faceFields,
+		},
+		{
+			Key:      "bio",
+			Title:    "Bio",
+			Kind:     "bio",
+			Summary:  "Parentage summary and public backstory.",
+			Editable: true,
+			Fields:   workbookBioSummaryFields(card),
 		},
 		{
 			Key:      "history",
@@ -356,8 +370,6 @@ func buildWorkbookPages(card CharacterCard, module map[string]any, entries []Cha
 				{Key: "workbook_status", Label: "Workbook Status", Value: card.WorkbookStatus, InputType: "text", Placeholder: "draft", Editable: true},
 				{Key: "ruleset_key", Label: "Ruleset", Value: stringValue(module["ruleset_key"]), InputType: "text", Editable: false},
 				{Key: "ruleset_version", Label: "Ruleset Version", Value: stringValue(module["ruleset_version"]), InputType: "text", Editable: false},
-				{Key: "current_stage", Label: "Current Stage", Value: intValueString(module["current_stage"]), InputType: "text", Editable: false},
-				{Key: "current_event", Label: "Current Event", Value: stringValue(module["current_event"]), InputType: "text", Editable: false},
 			}, append(chapter3MechanicsFields(card.WorkbookContext), chapter4MechanicsFields(card.WorkbookContext)...)...),
 		},
 		{
@@ -377,9 +389,7 @@ func buildWorkbookPages(card CharacterCard, module map[string]any, entries []Cha
 			Fields: []WorkbookPageField{
 				{Key: "module_status", Label: "Module Status", Value: stringValue(module["module_status"]), InputType: "text", Editable: false},
 				{Key: "creation_flow_version", Label: "Creation Flow", Value: stringValue(module["creation_flow_version"]), InputType: "text", Editable: false},
-				{Key: "parentage_chart_version", Label: "Parentage Chart", Value: stringValue(module["parentage_chart_version"]), InputType: "text", Editable: false},
-				{Key: "current_stage", Label: "Current Stage", Value: intValueString(module["current_stage"]), InputType: "text", Editable: false},
-				{Key: "current_event", Label: "Current Event", Value: stringValue(module["current_event"]), InputType: "text", Editable: false},
+				{Key: "parentage_chart_version", Label: "Ruleset Version", Value: stringValue(module["parentage_chart_version"]), InputType: "text", Editable: false},
 				{Key: "module_context", Label: "Module Context", Value: jsonStringify(module["module_context"]), InputType: "textarea", Editable: false},
 			},
 		},
@@ -654,7 +664,7 @@ func updateWorkbookContextAfterEvents(ctx context.Context, pool *pgxpool.Pool, c
 	return err
 }
 
-func workbookRootSummaryFields(card CharacterCard) []WorkbookPageField {
+func workbookBioSummaryFields(card CharacterCard) []WorkbookPageField {
 	context := card.WorkbookContext
 	if len(context) == 0 {
 		return nil
@@ -664,35 +674,14 @@ func workbookRootSummaryFields(card CharacterCard) []WorkbookPageField {
 	}
 
 	effectiveRoll := catharsisEffectiveParentageRoll(context)
-	combinedRoll := catharsisCombinedParentageRoll(context)
-	effectiveEntry, ok := ParentageChartEntryForRoll(effectiveRoll)
-	if !ok {
-		effectiveEntry, _ = ParentageChartEntryForRoll(3)
-	}
-	startingCredit := titleizeContextValue(effectiveEntry.StartingCredit)
-	if effectiveRoll == 0 {
-		startingCredit = titleizeContextValue(context["socio_parentage_starting_credit"])
-	}
 
 	fields := []WorkbookPageField{
-		{Key: "workbook_source", Label: "Workbook Source", Value: titleizeContextValue(context["source"]), InputType: "text", Editable: false},
-		{Key: "socio_parentage_chart_version", Label: "Parentage Chart", Value: titleizeContextValue(context["socio_parentage_chart_version"]), InputType: "text", Editable: false},
-		{Key: "socio_parentage_roll", Label: "Parentage Roll", Value: titleizeContextValue(effectiveRoll), InputType: "text", Editable: false},
-		{Key: "socio_parentage_total_roll", Label: "Combined Roll", Value: titleizeContextValue(combinedRoll), InputType: "text", Editable: false},
-		{Key: "socio_parentage_summary", Label: "Parentage Summary", Value: socioParentageSummary(context), InputType: "textarea", Editable: false},
-		{Key: "socio_starting_wealth", Label: "Starting Wealth", Value: titleizeContextValue(context["socio_starting_wealth"]), InputType: "text", Editable: false},
-		{Key: "socio_parentage_starting_credit", Label: "Resolved Starting Credit", Value: startingCredit, InputType: "text", Editable: false},
-		{Key: "socio_wealth_inheritance", Label: "Wealth Inheritance", Value: socioInheritanceSummary(context), InputType: "textarea", Editable: false},
+		{Key: "socio_parentage_roll", Label: "Parentage Roll", Value: titleizeContextValue(effectiveRoll), InputType: "text", Editable: false, Region: "glance", PriorityMode: "inferred", PriorityScore: 80, PriorityBand: priorityBandForScore(80), SourceKind: "rules_canonical"},
+		{Key: "socio_parentage_summary", Label: "Parentage Summary", Value: socioParentageSummary(context), InputType: "textarea", Editable: false, Region: "substance", PriorityMode: "inferred", PriorityScore: 90, PriorityBand: priorityBandForScore(90), SourceKind: "system_derived"},
+		{Key: "public_description", Label: "Biography", Value: card.PublicDescription, InputType: "textarea", Placeholder: "What the public should know", Editable: true, Region: "substance", PriorityMode: "inferred", PriorityScore: 60, PriorityBand: priorityBandForScore(60), SourceKind: "owner_explicit"},
+		{Key: "socio_parentage_chart_version", Label: "Ruleset Version", Value: titleizeContextValue(context["socio_parentage_chart_version"]), InputType: "text", Editable: false, Region: "additional", PriorityMode: "inferred", PriorityScore: 10, PriorityBand: priorityBandForScore(10), SourceKind: "rules_canonical"},
 	}
 
-	if stage := intValueString(context["current_stage"]); stage != "" {
-		fields = append(fields, WorkbookPageField{Key: "current_stage_summary", Label: "Current Stage", Value: stage, InputType: "text", Editable: false})
-	}
-	if event := stringValue(context["current_event"]); strings.TrimSpace(event) != "" {
-		fields = append(fields, WorkbookPageField{Key: "current_event_summary", Label: "Current Event", Value: event, InputType: "text", Editable: false})
-	}
-	fields = append(fields, chapter3FaceWidgetFields(context)...)
-	fields = append(fields, chapter4FaceWidgetFields(context)...)
 	return fields
 }
 
@@ -717,11 +706,11 @@ func chapter3FaceWidgetFields(context map[string]any) []WorkbookPageField {
 		}
 	}
 	fields := []WorkbookPageField{
-		{Key: "chapter3_archetype", Label: "Archetype", Value: stringValue(raw["archetype_title"]), InputType: "text", Editable: false},
-		{Key: "chapter3_archetype_summary", Label: "Archetype Summary", Value: summary, InputType: "textarea", Editable: false},
+		{Key: "chapter3_archetype", Label: "Archetype", Value: stringValue(raw["archetype_title"]), InputType: "text", Editable: false, Region: "identity", PriorityMode: "inferred", PriorityScore: 100, PriorityBand: priorityBandForScore(100), SourceKind: "rules_canonical"},
+		{Key: "chapter3_archetype_summary", Label: "Archetype Summary", Value: summary, InputType: "textarea", Editable: false, Region: "substance", PriorityMode: "inferred", PriorityScore: 85, PriorityBand: priorityBandForScore(85), SourceKind: "rules_canonical"},
 	}
 	if effect := stringValue(raw["mechanical_effect"]); strings.TrimSpace(effect) != "" {
-		fields = append(fields, WorkbookPageField{Key: "chapter3_mechanical_effect", Label: "Mechanical Effect", Value: effect, InputType: "textarea", Editable: false})
+		fields = append(fields, WorkbookPageField{Key: "chapter3_mechanical_effect", Label: "Mechanical Effect", Value: effect, InputType: "textarea", Editable: false, Region: "additional", PriorityMode: "inferred", PriorityScore: 75, PriorityBand: priorityBandForScore(75), SourceKind: "rules_canonical"})
 	}
 	return fields
 }
@@ -739,15 +728,15 @@ func chapter3MechanicsFields(context map[string]any) []WorkbookPageField {
 		return nil
 	}
 	fields := []WorkbookPageField{
-		{Key: "chapter3_archetype_stable_id", Label: "Archetype ID", Value: stringValue(raw["archetype_stable_id"]), InputType: "text", Editable: false},
-		{Key: "chapter3_primary_attribute", Label: "Archetype Primary Attribute", Value: stringValue(raw["primary_attribute"]), InputType: "text", Editable: false},
-		{Key: "chapter3_secondary_attribute", Label: "Archetype Secondary Attribute", Value: stringValue(raw["secondary_attribute"]), InputType: "text", Editable: false},
-		{Key: "chapter3_key_skill", Label: "Archetype Key Skill", Value: stringValue(raw["key_skill"]), InputType: "text", Editable: false},
+		{Key: "chapter3_archetype_stable_id", Label: "Archetype ID", Value: stringValue(raw["archetype_stable_id"]), InputType: "text", Editable: false, Region: "additional", PriorityMode: "inferred", PriorityScore: -50, PriorityBand: priorityBandForScore(-50), SourceKind: "rules_canonical"},
+		{Key: "chapter3_primary_attribute", Label: "Archetype Primary Attribute", Value: stringValue(raw["primary_attribute"]), InputType: "text", Editable: false, Region: "identity", PriorityMode: "inferred", PriorityScore: 85, PriorityBand: priorityBandForScore(85), SourceKind: "rules_canonical"},
+		{Key: "chapter3_secondary_attribute", Label: "Archetype Secondary Attribute", Value: stringValue(raw["secondary_attribute"]), InputType: "text", Editable: false, Region: "identity", PriorityMode: "inferred", PriorityScore: 85, PriorityBand: priorityBandForScore(85), SourceKind: "rules_canonical"},
+		{Key: "chapter3_key_skill", Label: "Archetype Key Skill", Value: stringValue(raw["key_skill"]), InputType: "text", Editable: false, Region: "glance", PriorityMode: "inferred", PriorityScore: 90, PriorityBand: priorityBandForScore(90), SourceKind: "rules_canonical"},
 	}
 	if strings.EqualFold(stringValue(raw["archetype_key"]), "custom") {
 		fields = append(fields,
-			WorkbookPageField{Key: "chapter3_custom_summary", Label: "Custom Summary", Value: stringValue(raw["custom_summary"]), InputType: "textarea", Editable: false},
-			WorkbookPageField{Key: "chapter3_mechanical_effect", Label: "Mechanical Effect", Value: stringValue(raw["mechanical_effect"]), InputType: "textarea", Editable: false},
+			WorkbookPageField{Key: "chapter3_custom_summary", Label: "Custom Summary", Value: stringValue(raw["custom_summary"]), InputType: "textarea", Editable: false, Region: "substance", PriorityMode: "inferred", PriorityScore: 30, PriorityBand: priorityBandForScore(30), SourceKind: "owner_explicit"},
+			WorkbookPageField{Key: "chapter3_mechanical_effect", Label: "Mechanical Effect", Value: stringValue(raw["mechanical_effect"]), InputType: "textarea", Editable: false, Region: "additional", PriorityMode: "inferred", PriorityScore: 75, PriorityBand: priorityBandForScore(75), SourceKind: "owner_explicit"},
 		)
 	}
 	return fields
@@ -768,11 +757,11 @@ func chapter4FaceWidgetFields(context map[string]any) []WorkbookPageField {
 		return nil
 	}
 	fields := []WorkbookPageField{
-		{Key: "chapter4_first_skill", Label: "First Trained Skill", Value: stringValue(raw["skill_name"]), InputType: "text", Editable: false},
-		{Key: "chapter4_first_skill_die", Label: "Training Die", Value: stringValue(raw["die_size"]), InputType: "text", Editable: false},
+		{Key: "chapter4_first_skill", Label: "First Trained Skill", Value: stringValue(raw["skill_name"]), InputType: "text", Editable: false, Region: "identity", PriorityMode: "inferred", PriorityScore: 90, PriorityBand: priorityBandForScore(90), SourceKind: "rules_canonical"},
+		{Key: "chapter4_first_skill_die", Label: "Training Die", Value: stringValue(raw["die_size"]), InputType: "text", Editable: false, Region: "glance", PriorityMode: "inferred", PriorityScore: 50, PriorityBand: priorityBandForScore(50), SourceKind: "rules_canonical"},
 	}
 	if desc := stringValue(raw["skill_description"]); strings.TrimSpace(desc) != "" {
-		fields = append(fields, WorkbookPageField{Key: "chapter4_first_skill_description", Label: "Skill Description", Value: desc, InputType: "textarea", Editable: false})
+		fields = append(fields, WorkbookPageField{Key: "chapter4_first_skill_description", Label: "Skill Description", Value: desc, InputType: "textarea", Editable: false, Region: "substance", PriorityMode: "inferred", PriorityScore: 50, PriorityBand: priorityBandForScore(50), SourceKind: "rules_canonical"})
 	}
 	return fields
 }
@@ -790,11 +779,60 @@ func chapter4MechanicsFields(context map[string]any) []WorkbookPageField {
 		return nil
 	}
 	return []WorkbookPageField{
-		{Key: "chapter4_skill_stable_id", Label: "First Skill ID", Value: stringValue(raw["skill_stable_id"]), InputType: "text", Editable: false},
-		{Key: "chapter4_skill_name", Label: "First Skill", Value: stringValue(raw["skill_name"]), InputType: "text", Editable: false},
-		{Key: "chapter4_skill_attribute", Label: "First Skill Attribute", Value: stringValue(raw["attribute_name"]), InputType: "text", Editable: false},
-		{Key: "chapter4_training_state", Label: "Training State", Value: stringValue(raw["training_state"]), InputType: "text", Editable: false},
-		{Key: "chapter4_die_size", Label: "Training Die", Value: stringValue(raw["die_size"]), InputType: "text", Editable: false},
+		{Key: "chapter4_skill_stable_id", Label: "First Skill ID", Value: stringValue(raw["skill_stable_id"]), InputType: "text", Editable: false, Region: "additional", PriorityMode: "inferred", PriorityScore: -50, PriorityBand: priorityBandForScore(-50), SourceKind: "rules_canonical"},
+		{Key: "chapter4_skill_name", Label: "First Skill", Value: stringValue(raw["skill_name"]), InputType: "text", Editable: false, Region: "glance", PriorityMode: "inferred", PriorityScore: 90, PriorityBand: priorityBandForScore(90), SourceKind: "rules_canonical"},
+		{Key: "chapter4_skill_attribute", Label: "First Skill Attribute", Value: stringValue(raw["attribute_name"]), InputType: "text", Editable: false, Region: "identity", PriorityMode: "inferred", PriorityScore: 85, PriorityBand: priorityBandForScore(85), SourceKind: "rules_canonical"},
+		{Key: "chapter4_training_state", Label: "Training State", Value: stringValue(raw["training_state"]), InputType: "text", Editable: false, Region: "additional", PriorityMode: "inferred", PriorityScore: -50, PriorityBand: priorityBandForScore(-50), SourceKind: "system_derived"},
+		{Key: "chapter4_die_size", Label: "Training Die", Value: stringValue(raw["die_size"]), InputType: "text", Editable: false, Region: "glance", PriorityMode: "inferred", PriorityScore: 50, PriorityBand: priorityBandForScore(50), SourceKind: "rules_canonical"},
+	}
+}
+
+func resolveFaceTokenAura(tokenAura, legacyColor string) string {
+	if aura, err := normalizeTokenAura(tokenAura); err == nil && aura != "" {
+		return aura
+	}
+	legacyColor = strings.ToLower(strings.TrimSpace(legacyColor))
+	if legacyColor == "" || legacyColor == "#d9c7a6" {
+		return ""
+	}
+	if aura, err := normalizeTokenAura(legacyColor); err == nil {
+		return aura
+	}
+	return ""
+}
+
+func chapter3FaceArchetypeValue(context map[string]any) string {
+	raw, ok := context["chapter3"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	if confirmed, _ := raw["confirmed"].(bool); !confirmed {
+		return ""
+	}
+	return stringValue(raw["archetype_title"])
+}
+
+func chapter4FaceSkillValue(context map[string]any) string {
+	raw, ok := context["chapter4"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	if confirmed, _ := raw["confirmed"].(bool); !confirmed {
+		return ""
+	}
+	return stringValue(raw["skill_name"])
+}
+
+func priorityBandForScore(score int) string {
+	switch {
+	case score < 0:
+		return "background"
+	case score < 50:
+		return "normal"
+	case score < 100:
+		return "prominent"
+	default:
+		return "critical"
 	}
 }
 

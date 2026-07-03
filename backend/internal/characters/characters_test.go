@@ -154,3 +154,26 @@ func TestCanCreateCharacterCardEnforcesLimit(t *testing.T) {
 		t.Fatalf("expected count at limit to be denied")
 	}
 }
+
+func TestSanitizeInputTokenAuraMigration(t *testing.T) {
+	generated := sanitizeInput(CharacterCardInput{})
+	if generated.TokenAura != "" {
+		t.Fatalf("empty input token aura = %q, want unset", generated.TokenAura)
+	}
+	if generated.Color != "#d9c7a6" {
+		t.Fatalf("empty input legacy color = %q, want #d9c7a6", generated.Color)
+	}
+
+	legacy := sanitizeInput(CharacterCardInput{Color: "#112233"})
+	if legacy.TokenAura != "#112233" {
+		t.Fatalf("legacy color token aura = %q, want #112233", legacy.TokenAura)
+	}
+	if legacy.Color != "#112233" {
+		t.Fatalf("legacy color preserved as %q, want #112233", legacy.Color)
+	}
+
+	current := sanitizeInput(CharacterCardInput{TokenAura: "#334455"})
+	if current.TokenAura != "#334455" {
+		t.Fatalf("current token aura = %q, want #334455", current.TokenAura)
+	}
+}
