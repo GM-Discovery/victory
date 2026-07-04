@@ -15,6 +15,7 @@ const (
 	MaxExpressionLength = 64
 	MinDiceCount        = 1
 	MaxBaseDiceCount    = 100
+	MaxDiceGroups       = 10
 	MinSides            = 2
 	MaxSides            = 1000000
 	MaxAbsModifier      = 1000000
@@ -22,17 +23,25 @@ const (
 	RollVersion         = 1
 )
 
-var expressionPattern = regexp.MustCompile(`^\s*(\d*)\s*[dD]\s*(\d+)\s*(!?)\s*(?:([+-])\s*(\d+))?\s*$`)
+var dieTermPattern = regexp.MustCompile(`^(\d*)[dD](\d+)(!?)$`)
 
-type Spec struct {
+// DieGroup is one NdS[!] term in an expression. Compound pools like
+// "2d20+d12!" carry several groups; each group explodes independently on its
+// own max face.
+type DieGroup struct {
 	Count        int  `json:"count"`
 	Sides        int  `json:"sides"`
 	ExplodeOnMax bool `json:"explode_on_max"`
-	Modifier     int  `json:"modifier"`
+}
+
+type Spec struct {
+	Groups   []DieGroup `json:"groups"`
+	Modifier int        `json:"modifier"`
 }
 
 type DieResult struct {
 	Index    int   `json:"index"`
+	Sides    int   `json:"sides"`
 	Chain    []int `json:"chain"`
 	Subtotal int   `json:"subtotal"`
 }
@@ -66,10 +75,17 @@ func (CryptoSource) Intn(maxExclusive int) (int, error) {
 	return int(n.Int64()), nil
 }
 
-type parsedExpression struct {
-	Spec Spec
+// SingleGroup builds a one-group Spec, the common case for tray-driven rolls.
+func SingleGroup(count, sides int, explodeOnMax bool, modifier int) Spec {
+	return Spec{
+		Groups:   []DieGroup{{Count: count, Sides: sides, ExplodeOnMax: explodeOnMax}},
+		Modifier: modifier,
+	}
 }
 
+// ParseExpression accepts compound pools: one or more NdS[!] terms joined by
+// "+", plus optional signed integer constants that sum into the modifier.
+// Examples: "d20", "2d6+3", "d10!", "2d20+d12", "d10+d4!-1".
 func ParseExpression(raw string) (Spec, string, error) {
 	expression := strings.TrimSpace(raw)
 	if expression == "" {
@@ -79,42 +95,80 @@ func ParseExpression(raw string) (Spec, string, error) {
 		return Spec{}, "", errors.New("expression_too_long")
 	}
 
-	match := expressionPattern.FindStringSubmatch(expression)
-	if match == nil {
-		return Spec{}, "", errors.New("invalid_expression")
+	compact := strings.Map(func(r rune) rune {
+		if r == ' ' || r == '\t' {
+			return -1
+		}
+		return r
+	}, expression)
+	if compact == "" {
+		return Spec{}, "", errors.New("expression_required")
 	}
 
-	count := 1
-	if strings.TrimSpace(match[1]) != "" {
-		parsedCount, err := strconv.Atoi(match[1])
+	type term struct {
+		sign int
+		body string
+	}
+	terms := []term{}
+	var current strings.Builder
+	sign := 1
+	for i, r := range compact {
+		if r == '+' || r == '-' {
+			if i == 0 || current.Len() == 0 {
+				return Spec{}, "", errors.New("invalid_expression")
+			}
+			terms = append(terms, term{sign: sign, body: current.String()})
+			current.Reset()
+			sign = 1
+			if r == '-' {
+				sign = -1
+			}
+			continue
+		}
+		current.WriteRune(r)
+	}
+	if current.Len() == 0 {
+		return Spec{}, "", errors.New("invalid_expression")
+	}
+	terms = append(terms, term{sign: sign, body: current.String()})
+
+	spec := Spec{}
+	for _, t := range terms {
+		if match := dieTermPattern.FindStringSubmatch(t.body); match != nil {
+			if t.sign < 0 {
+				// Subtracting a die group is not a supported operation.
+				return Spec{}, "", errors.New("invalid_expression")
+			}
+			count := 1
+			if strings.TrimSpace(match[1]) != "" {
+				parsedCount, err := strconv.Atoi(match[1])
+				if err != nil {
+					return Spec{}, "", errors.New("invalid_expression")
+				}
+				count = parsedCount
+			}
+			sides, err := strconv.Atoi(match[2])
+			if err != nil {
+				return Spec{}, "", errors.New("invalid_expression")
+			}
+			spec.Groups = append(spec.Groups, DieGroup{
+				Count:        count,
+				Sides:        sides,
+				ExplodeOnMax: match[3] == "!",
+			})
+			continue
+		}
+
+		value, err := strconv.Atoi(t.body)
 		if err != nil {
 			return Spec{}, "", errors.New("invalid_expression")
 		}
-		count = parsedCount
-	}
-	sides, err := strconv.Atoi(match[2])
-	if err != nil {
-		return Spec{}, "", errors.New("invalid_expression")
+		if value > MaxAbsModifier {
+			return Spec{}, "", errors.New("modifier_too_large")
+		}
+		spec.Modifier += t.sign * value
 	}
 
-	modifier := 0
-	if strings.TrimSpace(match[4]) != "" {
-		parsedModifier, err := strconv.Atoi(match[5])
-		if err != nil {
-			return Spec{}, "", errors.New("invalid_expression")
-		}
-		if match[4] == "-" {
-			parsedModifier = -parsedModifier
-		}
-		modifier = parsedModifier
-	}
-
-	spec := Spec{
-		Count:        count,
-		Sides:        sides,
-		ExplodeOnMax: strings.TrimSpace(match[3]) == "!",
-		Modifier:     modifier,
-	}
 	if err := ValidateSpec(spec); err != nil {
 		return Spec{}, "", err
 	}
@@ -123,17 +177,27 @@ func ParseExpression(raw string) (Spec, string, error) {
 }
 
 func ValidateSpec(spec Spec) error {
-	if spec.Count < MinDiceCount {
-		return errors.New("invalid_dice_count")
+	if len(spec.Groups) == 0 {
+		return errors.New("invalid_expression")
 	}
-	if spec.Count > MaxBaseDiceCount {
+	if len(spec.Groups) > MaxDiceGroups {
 		return errors.New("dice_count_too_large")
 	}
-	if spec.Sides < MinSides {
-		return errors.New("invalid_sides")
+	totalDice := 0
+	for _, group := range spec.Groups {
+		if group.Count < MinDiceCount {
+			return errors.New("invalid_dice_count")
+		}
+		if group.Sides < MinSides {
+			return errors.New("invalid_sides")
+		}
+		if group.Sides > MaxSides {
+			return errors.New("sides_too_large")
+		}
+		totalDice += group.Count
 	}
-	if spec.Sides > MaxSides {
-		return errors.New("sides_too_large")
+	if totalDice > MaxBaseDiceCount {
+		return errors.New("dice_count_too_large")
 	}
 	if spec.Modifier < -MaxAbsModifier || spec.Modifier > MaxAbsModifier {
 		return errors.New("modifier_too_large")
@@ -142,18 +206,23 @@ func ValidateSpec(spec Spec) error {
 }
 
 func NormalizeExpression(spec Spec) string {
-	if spec.Count < 1 {
+	if len(spec.Groups) == 0 {
 		return ""
 	}
 
 	var b strings.Builder
-	if spec.Count != 1 {
-		b.WriteString(strconv.Itoa(spec.Count))
-	}
-	b.WriteByte('d')
-	b.WriteString(strconv.Itoa(spec.Sides))
-	if spec.ExplodeOnMax {
-		b.WriteByte('!')
+	for i, group := range spec.Groups {
+		if i > 0 {
+			b.WriteByte('+')
+		}
+		if group.Count != 1 {
+			b.WriteString(strconv.Itoa(group.Count))
+		}
+		b.WriteByte('d')
+		b.WriteString(strconv.Itoa(group.Sides))
+		if group.ExplodeOnMax {
+			b.WriteByte('!')
+		}
 	}
 	if spec.Modifier != 0 {
 		if spec.Modifier > 0 {
@@ -178,44 +247,49 @@ func Roll(ctx context.Context, spec Spec, source RandomSource) (Result, error) {
 		ctx = context.Background()
 	}
 
-	dice := make([]DieResult, 0, spec.Count)
+	dice := []DieResult{}
 	explosionCount := 0
 	totalThrows := 0
 	total := 0
+	dieIndex := 0
 
-	for index := 0; index < spec.Count; index++ {
-		chain := make([]int, 0, 2)
-		subtotal := 0
+	for _, group := range spec.Groups {
+		for i := 0; i < group.Count; i++ {
+			chain := make([]int, 0, 2)
+			subtotal := 0
 
-		for {
-			if err := ctx.Err(); err != nil {
-				return Result{}, err
-			}
-			if totalThrows >= MaxAtomicThrows {
-				return Result{}, errors.New("atomic_roll_cap_exceeded")
+			for {
+				if err := ctx.Err(); err != nil {
+					return Result{}, err
+				}
+				if totalThrows >= MaxAtomicThrows {
+					return Result{}, errors.New("atomic_roll_cap_exceeded")
+				}
+
+				raw, err := source.Intn(group.Sides)
+				if err != nil {
+					return Result{}, err
+				}
+				value := raw + 1
+				totalThrows++
+				chain = append(chain, value)
+				subtotal += value
+
+				if !group.ExplodeOnMax || value != group.Sides {
+					break
+				}
+				explosionCount++
 			}
 
-			raw, err := source.Intn(spec.Sides)
-			if err != nil {
-				return Result{}, err
-			}
-			value := raw + 1
-			totalThrows++
-			chain = append(chain, value)
-			subtotal += value
-
-			if !spec.ExplodeOnMax || value != spec.Sides {
-				break
-			}
-			explosionCount++
+			dice = append(dice, DieResult{
+				Index:    dieIndex,
+				Sides:    group.Sides,
+				Chain:    chain,
+				Subtotal: subtotal,
+			})
+			total += subtotal
+			dieIndex++
 		}
-
-		dice = append(dice, DieResult{
-			Index:    index,
-			Chain:    chain,
-			Subtotal: subtotal,
-		})
-		total += subtotal
 	}
 
 	total += spec.Modifier

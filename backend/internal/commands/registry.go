@@ -56,6 +56,18 @@ func AllCommands() []Command {
 			LegacyEndpoint: "/api/session/control",
 		},
 		{
+			// Rolls execute through the venue dice tray/websocket, not the
+			// generic command executor -- registered here so the palette,
+			// /help, and the Guide tab list it.
+			Path:        "roll",
+			Aliases:     []string{"r"},
+			Title:       "Roll dice",
+			Description: "Roll dice publicly. Add ! for exploding dice (each max face rolls a bonus die).",
+			Usage:       "/roll XdY[!][+Z]",
+			Category:    "dice",
+			Legacy:      true,
+		},
+		{
 			Path:           "char",
 			Title:          "Character",
 			Description:    "Edit your active character's name, pronouns, or Token Aura, or jump to a workbook page.",

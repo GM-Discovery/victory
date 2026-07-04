@@ -3,6 +3,7 @@ package dice
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 )
 
@@ -35,16 +36,57 @@ func TestParseExpression(t *testing.T) {
 		wantExpr  string
 		wantError string
 	}{
-		{name: "d20", raw: "d20", wantSpec: Spec{Count: 1, Sides: 20}, wantExpr: "d20"},
-		{name: "two d6", raw: "2d6", wantSpec: Spec{Count: 2, Sides: 6}, wantExpr: "2d6"},
-		{name: "modifier", raw: "2d6+3", wantSpec: Spec{Count: 2, Sides: 6, Modifier: 3}, wantExpr: "2d6+3"},
-		{name: "negative modifier", raw: "4d8-2", wantSpec: Spec{Count: 4, Sides: 8, Modifier: -2}, wantExpr: "4d8-2"},
-		{name: "explode", raw: "1d10!", wantSpec: Spec{Count: 1, Sides: 10, ExplodeOnMax: true}, wantExpr: "d10!"},
-		{name: "uppercase and whitespace", raw: "  2 D 13  ", wantSpec: Spec{Count: 2, Sides: 13}, wantExpr: "2d13"},
-		{name: "d100", raw: "d100", wantSpec: Spec{Count: 1, Sides: 100}, wantExpr: "d100"},
+		{name: "d20", raw: "d20", wantSpec: SingleGroup(1, 20, false, 0), wantExpr: "d20"},
+		{name: "two d6", raw: "2d6", wantSpec: SingleGroup(2, 6, false, 0), wantExpr: "2d6"},
+		{name: "modifier", raw: "2d6+3", wantSpec: SingleGroup(2, 6, false, 3), wantExpr: "2d6+3"},
+		{name: "negative modifier", raw: "4d8-2", wantSpec: SingleGroup(4, 8, false, -2), wantExpr: "4d8-2"},
+		{name: "explode", raw: "1d10!", wantSpec: SingleGroup(1, 10, true, 0), wantExpr: "d10!"},
+		{name: "uppercase and whitespace", raw: "  2 D 13  ", wantSpec: SingleGroup(2, 13, false, 0), wantExpr: "2d13"},
+		{name: "d100", raw: "d100", wantSpec: SingleGroup(1, 100, false, 0), wantExpr: "d100"},
+		{
+			name: "compound pool",
+			raw:  "2d20+d12",
+			wantSpec: Spec{Groups: []DieGroup{
+				{Count: 2, Sides: 20},
+				{Count: 1, Sides: 12},
+			}},
+			wantExpr: "2d20+d12",
+		},
+		{
+			name: "compound pool with explode and modifier",
+			raw:  "d10+d4!-1",
+			wantSpec: Spec{Groups: []DieGroup{
+				{Count: 1, Sides: 10},
+				{Count: 1, Sides: 4, ExplodeOnMax: true},
+			}, Modifier: -1},
+			wantExpr: "d10+d4!-1",
+		},
+		{
+			name: "five d20 socio ladder cap",
+			raw:  "5d20",
+			wantSpec: Spec{Groups: []DieGroup{
+				{Count: 5, Sides: 20},
+			}},
+			wantExpr: "5d20",
+		},
+		{
+			name: "multiple constants merge into modifier",
+			raw:  "d6+2+3",
+			wantSpec: Spec{Groups: []DieGroup{
+				{Count: 1, Sides: 6},
+			}, Modifier: 5},
+			wantExpr: "d6+5",
+		},
 		{name: "invalid", raw: "2d6kh1", wantError: "invalid_expression"},
+		{name: "no dice at all", raw: "5+3", wantError: "invalid_expression"},
+		{name: "subtracted die group", raw: "d20-d6", wantError: "invalid_expression"},
+		{name: "leading sign", raw: "+d6", wantError: "invalid_expression"},
+		{name: "dangling operator", raw: "d6+", wantError: "invalid_expression"},
 		{name: "too many dice", raw: "101d6", wantError: "dice_count_too_large"},
+		{name: "too many dice across groups", raw: "60d6+60d6", wantError: "dice_count_too_large"},
+		{name: "too many groups", raw: "d2+d2+d2+d2+d2+d2+d2+d2+d2+d2+d2", wantError: "dice_count_too_large"},
 		{name: "too many sides", raw: "d1000001", wantError: "sides_too_large"},
+		{name: "zero count", raw: "0d6", wantError: "invalid_dice_count"},
 	}
 
 	for _, tt := range tests {
@@ -60,7 +102,7 @@ func TestParseExpression(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ParseExpression(%q) unexpected error: %v", tt.raw, err)
 			}
-			if spec != tt.wantSpec {
+			if !reflect.DeepEqual(spec, tt.wantSpec) {
 				t.Fatalf("ParseExpression(%q) spec = %+v, want %+v", tt.raw, spec, tt.wantSpec)
 			}
 			if expr != tt.wantExpr {
@@ -79,45 +121,64 @@ func TestRoll(t *testing.T) {
 	}{
 		{
 			name: "ordinary result",
-			spec: Spec{Count: 1, Sides: 20},
+			spec: SingleGroup(1, 20, false, 0),
 			src:  &fakeSource{values: []int{9}},
-			want: Result{Expression: "d20", Spec: Spec{Count: 1, Sides: 20}, Dice: []DieResult{{Index: 0, Chain: []int{10}, Subtotal: 10}}, ExplosionCount: 0, Modifier: 0, Total: 10, RollVersion: 1},
+			want: Result{Expression: "d20", Dice: []DieResult{{Index: 0, Sides: 20, Chain: []int{10}, Subtotal: 10}}, ExplosionCount: 0, Modifier: 0, Total: 10, RollVersion: 1},
 		},
 		{
 			name: "multiple dice",
-			spec: Spec{Count: 2, Sides: 6},
+			spec: SingleGroup(2, 6, false, 0),
 			src:  &fakeSource{values: []int{3, 5}},
-			want: Result{Expression: "2d6", Spec: Spec{Count: 2, Sides: 6}, Dice: []DieResult{{Index: 0, Chain: []int{4}, Subtotal: 4}, {Index: 1, Chain: []int{6}, Subtotal: 6}}, ExplosionCount: 0, Modifier: 0, Total: 10, RollVersion: 1},
+			want: Result{Expression: "2d6", Dice: []DieResult{{Index: 0, Sides: 6, Chain: []int{4}, Subtotal: 4}, {Index: 1, Sides: 6, Chain: []int{6}, Subtotal: 6}}, ExplosionCount: 0, Modifier: 0, Total: 10, RollVersion: 1},
 		},
 		{
 			name: "odd sided die",
-			spec: Spec{Count: 1, Sides: 13},
+			spec: SingleGroup(1, 13, false, 0),
 			src:  &fakeSource{values: []int{10}},
-			want: Result{Expression: "d13", Spec: Spec{Count: 1, Sides: 13}, Dice: []DieResult{{Index: 0, Chain: []int{11}, Subtotal: 11}}, ExplosionCount: 0, Modifier: 0, Total: 11, RollVersion: 1},
+			want: Result{Expression: "d13", Dice: []DieResult{{Index: 0, Sides: 13, Chain: []int{11}, Subtotal: 11}}, ExplosionCount: 0, Modifier: 0, Total: 11, RollVersion: 1},
 		},
 		{
 			name: "positive modifier",
-			spec: Spec{Count: 1, Sides: 6, Modifier: 3},
+			spec: SingleGroup(1, 6, false, 3),
 			src:  &fakeSource{values: []int{1}},
-			want: Result{Expression: "d6+3", Spec: Spec{Count: 1, Sides: 6, Modifier: 3}, Dice: []DieResult{{Index: 0, Chain: []int{2}, Subtotal: 2}}, ExplosionCount: 0, Modifier: 3, Total: 5, RollVersion: 1},
+			want: Result{Expression: "d6+3", Dice: []DieResult{{Index: 0, Sides: 6, Chain: []int{2}, Subtotal: 2}}, ExplosionCount: 0, Modifier: 3, Total: 5, RollVersion: 1},
 		},
 		{
 			name: "negative modifier",
-			spec: Spec{Count: 1, Sides: 6, Modifier: -2},
+			spec: SingleGroup(1, 6, false, -2),
 			src:  &fakeSource{values: []int{4}},
-			want: Result{Expression: "d6-2", Spec: Spec{Count: 1, Sides: 6, Modifier: -2}, Dice: []DieResult{{Index: 0, Chain: []int{5}, Subtotal: 5}}, ExplosionCount: 0, Modifier: -2, Total: 3, RollVersion: 1},
+			want: Result{Expression: "d6-2", Dice: []DieResult{{Index: 0, Sides: 6, Chain: []int{5}, Subtotal: 5}}, ExplosionCount: 0, Modifier: -2, Total: 3, RollVersion: 1},
 		},
 		{
 			name: "one explosion",
-			spec: Spec{Count: 1, Sides: 10, ExplodeOnMax: true},
+			spec: SingleGroup(1, 10, true, 0),
 			src:  &fakeSource{values: []int{9, 9, 3}},
-			want: Result{Expression: "d10!", Spec: Spec{Count: 1, Sides: 10, ExplodeOnMax: true}, Dice: []DieResult{{Index: 0, Chain: []int{10, 10, 4}, Subtotal: 24}}, ExplosionCount: 2, Modifier: 0, Total: 24, RollVersion: 1},
+			want: Result{Expression: "d10!", Dice: []DieResult{{Index: 0, Sides: 10, Chain: []int{10, 10, 4}, Subtotal: 24}}, ExplosionCount: 2, Modifier: 0, Total: 24, RollVersion: 1},
 		},
 		{
 			name: "independent explosion chains",
-			spec: Spec{Count: 2, Sides: 6, ExplodeOnMax: true},
+			spec: SingleGroup(2, 6, true, 0),
 			src:  &fakeSource{values: []int{5, 2, 3}},
-			want: Result{Expression: "2d6!", Spec: Spec{Count: 2, Sides: 6, ExplodeOnMax: true}, Dice: []DieResult{{Index: 0, Chain: []int{6, 3}, Subtotal: 9}, {Index: 1, Chain: []int{4}, Subtotal: 4}}, ExplosionCount: 1, Modifier: 0, Total: 13, RollVersion: 1},
+			want: Result{Expression: "2d6!", Dice: []DieResult{{Index: 0, Sides: 6, Chain: []int{6, 3}, Subtotal: 9}, {Index: 1, Sides: 6, Chain: []int{4}, Subtotal: 4}}, ExplosionCount: 1, Modifier: 0, Total: 13, RollVersion: 1},
+		},
+		{
+			name: "compound pool rolls each group with its own sides",
+			spec: Spec{Groups: []DieGroup{{Count: 2, Sides: 20}, {Count: 1, Sides: 12}}},
+			src:  &fakeSource{values: []int{19, 4, 11}},
+			want: Result{Expression: "2d20+d12", Dice: []DieResult{
+				{Index: 0, Sides: 20, Chain: []int{20}, Subtotal: 20},
+				{Index: 1, Sides: 20, Chain: []int{5}, Subtotal: 5},
+				{Index: 2, Sides: 12, Chain: []int{12}, Subtotal: 12},
+			}, ExplosionCount: 0, Modifier: 0, Total: 37, RollVersion: 1},
+		},
+		{
+			name: "explosion scoped to its own group",
+			spec: Spec{Groups: []DieGroup{{Count: 1, Sides: 10}, {Count: 1, Sides: 4, ExplodeOnMax: true}}},
+			src:  &fakeSource{values: []int{9, 3, 1}},
+			want: Result{Expression: "d10+d4!", Dice: []DieResult{
+				{Index: 0, Sides: 10, Chain: []int{10}, Subtotal: 10},
+				{Index: 1, Sides: 4, Chain: []int{4, 2}, Subtotal: 6},
+			}, ExplosionCount: 1, Modifier: 0, Total: 16, RollVersion: 1},
 		},
 	}
 
@@ -127,14 +188,17 @@ func TestRoll(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Roll returned error: %v", err)
 			}
-			if got.Expression != tt.want.Expression || got.Spec != tt.want.Spec || got.ExplosionCount != tt.want.ExplosionCount || got.Modifier != tt.want.Modifier || got.Total != tt.want.Total || got.RollVersion != tt.want.RollVersion {
+			if got.Expression != tt.want.Expression || got.ExplosionCount != tt.want.ExplosionCount || got.Modifier != tt.want.Modifier || got.Total != tt.want.Total || got.RollVersion != tt.want.RollVersion {
 				t.Fatalf("Roll summary = %+v, want %+v", got, tt.want)
+			}
+			if !reflect.DeepEqual(got.Spec, tt.spec) {
+				t.Fatalf("Roll spec = %+v, want %+v", got.Spec, tt.spec)
 			}
 			if len(got.Dice) != len(tt.want.Dice) {
 				t.Fatalf("Roll dice len = %d, want %d", len(got.Dice), len(tt.want.Dice))
 			}
 			for i := range got.Dice {
-				if got.Dice[i].Index != tt.want.Dice[i].Index || got.Dice[i].Subtotal != tt.want.Dice[i].Subtotal {
+				if got.Dice[i].Index != tt.want.Dice[i].Index || got.Dice[i].Sides != tt.want.Dice[i].Sides || got.Dice[i].Subtotal != tt.want.Dice[i].Subtotal {
 					t.Fatalf("die %d mismatch: got %+v want %+v", i, got.Dice[i], tt.want.Dice[i])
 				}
 				if len(got.Dice[i].Chain) != len(tt.want.Dice[i].Chain) {
@@ -155,12 +219,12 @@ func TestRollAtomicCapAndSourceError(t *testing.T) {
 	for i := range values {
 		values[i] = 1
 	}
-	_, err := Roll(context.Background(), Spec{Count: 1, Sides: 2, ExplodeOnMax: true}, &fakeSource{values: values})
+	_, err := Roll(context.Background(), SingleGroup(1, 2, true, 0), &fakeSource{values: values})
 	if err == nil || err.Error() != "atomic_roll_cap_exceeded" {
 		t.Fatalf("expected atomic roll cap error, got %v", err)
 	}
 
-	_, err = Roll(context.Background(), Spec{Count: 1, Sides: 6}, &fakeSource{err: errors.New("entropy failed")})
+	_, err = Roll(context.Background(), SingleGroup(1, 6, false, 0), &fakeSource{err: errors.New("entropy failed")})
 	if err == nil || err.Error() != "entropy failed" {
 		t.Fatalf("expected source error, got %v", err)
 	}

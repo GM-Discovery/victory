@@ -371,10 +371,15 @@
     const characterTrayButton = document.getElementById("character-tray-button");
     const characterTrayLabel = document.getElementById("character-tray-label");
     const rightCardEditorButton = document.getElementById("right-card-editor-button");
+    const chatLogTab = document.getElementById("chat-log-tab");
+    const chatOOCTab = document.getElementById("chat-ooc-tab");
     const chatDiceTab = document.getElementById("chat-dice-tab");
     const chatHelpTab = document.getElementById("chat-help-tab");
+    const chatLogPanel = document.getElementById("chat-log-panel");
+    const chatOOCPanel = document.getElementById("chat-ooc-panel");
     const chatDicePanel = document.getElementById("chat-dice-panel");
     const chatHelpPanel = document.getElementById("chat-help-panel");
+    const chatOOCLog = document.getElementById("chat-ooc-log");
     const chatPanel = document.getElementById("chat-panel");
     const chatHead = document.getElementById("chat-head");
     const chatBadge = document.getElementById("chat-badge");
@@ -1054,7 +1059,7 @@
       chatPanel.classList.toggle("is-open", open);
       chatPanel.classList.toggle("is-chat-open", chatOpen);
       chatPanel.classList.toggle("is-closed", !chatOpen);
-      chatPanel.style.setProperty("--chat-panel-width", open ? "min(50vw, 720px)" : "clamp(140px, 18vw, 220px)");
+      chatPanel.style.setProperty("--chat-panel-width", open ? "min(75vw, 1080px)" : "clamp(140px, 18vw, 220px)");
       if (chatInput) {
         chatInput.placeholder = chatOpen ? "Start typing here..." : chatClosedMessage();
       }
@@ -1111,8 +1116,8 @@
       updateChatPresentation();
     }
 
-    function appendChatEntry(author, text) {
-      if (!chatLog) return;
+    function appendChatEntry(author, text, targetLog = chatLog) {
+      if (!targetLog) return;
       const entry = document.createElement("div");
       entry.className = "chat-entry";
       const title = document.createElement("strong");
@@ -1120,8 +1125,8 @@
       const body = document.createElement("span");
       body.textContent = text;
       entry.append(title, body);
-      chatLog.appendChild(entry);
-      chatLog.scrollTop = chatLog.scrollHeight;
+      targetLog.appendChild(entry);
+      targetLog.scrollTop = targetLog.scrollHeight;
       unreadChatCount += 1;
       updateChatPresentation();
     }
@@ -1134,11 +1139,12 @@
       const edited = Boolean(action?.payload?.edited || action?.edited);
       const isOOC = String(action?.type || "").trim() === "chat/ooc";
       const label = source === "discord" ? `${author} via Discord Bridge${edited ? " (edited)" : ""}` : `${author}${isOOC ? " (OOC)" : ""}`;
-      appendChatEntry(label, text);
+      appendChatEntry(label, text, isOOC ? chatOOCLog : chatLog);
     }
 
     const commandErrorMessages = {
       no_active_character: "No active character. Select one in Greenroom first.",
+      use_legacy_endpoint: "That command isn't available in this venue yet.",
       protected_fact: "That field can't be changed with /char set.",
       character_card_not_found: "Character not found.",
       forbidden: "You don't have access to that character.",
@@ -1184,14 +1190,45 @@
       }
     }
 
-    function setChatCompanionTab(mode) {
-      const showDice = String(mode || "dice") !== "help";
-      if (chatDicePanel) chatDicePanel.hidden = !showDice;
-      if (chatHelpPanel) chatHelpPanel.hidden = showDice;
-      chatDiceTab?.classList.toggle("is-active", showDice);
-      chatHelpTab?.classList.toggle("is-active", !showDice);
-      chatDiceTab?.setAttribute("aria-selected", showDice ? "true" : "false");
-      chatHelpTab?.setAttribute("aria-selected", showDice ? "false" : "true");
+    const chatTabEntries = [
+      { name: "chat", tab: chatLogTab, panel: chatLogPanel },
+      { name: "ooc", tab: chatOOCTab, panel: chatOOCPanel },
+      { name: "dice", tab: chatDiceTab, panel: chatDicePanel },
+      { name: "help", tab: chatHelpTab, panel: chatHelpPanel },
+    ];
+
+    function setChatTab(name) {
+      const target = String(name || "chat");
+      for (const entry of chatTabEntries) {
+        const active = entry.name === target;
+        if (entry.panel) entry.panel.hidden = !active;
+        entry.tab?.classList.toggle("is-active", active);
+        entry.tab?.setAttribute("aria-selected", active ? "true" : "false");
+      }
+      if (target === "help") {
+        renderCommandGuide();
+      }
+    }
+
+    async function renderCommandGuide() {
+      if (!chatHelpPanel) return;
+      const catalogue = await window.VictoryCommandPalette?.fetchCatalogue?.("first-theater", currentSessionId);
+      const commands = catalogue?.commands;
+      if (!Array.isArray(commands) || commands.length === 0) return;
+      chatHelpPanel.innerHTML = "";
+      const list = document.createElement("div");
+      list.className = "chat-command-guide";
+      for (const cmd of commands) {
+        const row = document.createElement("p");
+        row.className = "chat-sidebar-copy";
+        const usage = document.createElement("strong");
+        usage.textContent = cmd.usage || `/${cmd.path}`;
+        const desc = document.createElement("span");
+        desc.textContent = ` — ${cmd.description || ""}`;
+        row.append(usage, desc);
+        list.appendChild(row);
+      }
+      chatHelpPanel.appendChild(list);
     }
 
     async function sendChatDraft() {
@@ -1210,7 +1247,7 @@
 
       const text = rawText;
 
-      const rollMatch = text.match(/^\/roll(?:\s+(.+))?$/i);
+      const rollMatch = text.match(/^\/r(?:oll)?(?:\s+(.+))?$/i);
       if (rollMatch) {
         const expression = String(rollMatch[1] || "").trim();
         if (!expression) {
@@ -4037,9 +4074,11 @@
       const target = activeCharacterId ? `/venues/greenroom/?character_id=${encodeURIComponent(activeCharacterId)}` : "/venues/greenroom/";
       window.location.href = target;
     });
-    chatDiceTab?.addEventListener("click", () => setChatCompanionTab("dice"));
-    chatHelpTab?.addEventListener("click", () => setChatCompanionTab("help"));
-    setChatCompanionTab("dice");
+    chatLogTab?.addEventListener("click", () => setChatTab("chat"));
+    chatOOCTab?.addEventListener("click", () => setChatTab("ooc"));
+    chatDiceTab?.addEventListener("click", () => setChatTab("dice"));
+    chatHelpTab?.addEventListener("click", () => setChatTab("help"));
+    setChatTab("chat");
 
     cameraZoomOutButton?.addEventListener("click", () => {
       if (!stageCamera) return;

@@ -2058,16 +2058,16 @@
       position: fixed;
       left: 50%;
       bottom: -4px;
-      z-index: 82;
+      z-index: 87;
       overflow: hidden;
       transition: opacity 180ms ease, transform 180ms ease, box-shadow 180ms ease, background 180ms ease, border-color 180ms ease;
-      transform: translateX(-50%) translateY(calc(100% - var(--chat-rail-height, 24px)));
+      transform: translateX(-50%) translateY(calc(100% - var(--chat-rail-height, 64px)));
       border-radius: 18px;
       box-shadow: 0 16px 42px rgba(0, 0, 0, 0.34);
-      width: var(--chat-panel-width, min(32vw, 420px));
+      width: var(--chat-panel-width, min(75vw, 1080px));
       max-width: calc(100vw - 32px);
       --chat-surface-opacity: 0.88;
-      --chat-rail-height: 24px;
+      --chat-rail-height: 64px;
       opacity: 0.05;
       background:
         radial-gradient(circle at top, rgba(255, 255, 255, 0.04), transparent 42%),
@@ -2088,7 +2088,7 @@
     }
 
     .chat-panel[data-open="true"] {
-      --chat-panel-width: min(32vw, 420px);
+      --chat-panel-width: min(75vw, 1080px);
       opacity: 1;
     }
 
@@ -2143,7 +2143,7 @@
       opacity: 1;
       transition: opacity 180ms ease;
       background: rgba(8, 10, 15, 0.96);
-      height: min(13vh, 128px);
+      height: min(38vh, 360px);
       min-height: 0;
       overflow: hidden;
       width: 100%;
@@ -2185,22 +2185,15 @@
 
     .chat-body {
       display: grid;
-      grid-template-columns: minmax(220px, 290px) minmax(0, 1fr);
       gap: 12px;
-      align-items: start;
       min-height: 0;
     }
 
-    .chat-sidebar,
-    .chat-main {
+    .chat-tab-panels {
       min-width: 0;
       min-height: 0;
       display: grid;
-      gap: 10px;
-    }
-
-    .chat-sidebar {
-      align-content: start;
+      overflow: auto;
     }
 
     .chat-tabs {
@@ -2223,9 +2216,15 @@
       color: #e7f7e1;
     }
 
-    .chat-sidebar-panel {
+    .chat-tab-panel {
+      min-width: 0;
+      min-height: 0;
       display: grid;
       gap: 10px;
+    }
+
+    .chat-tab-panel[hidden] {
+      display: none;
     }
 
     .chat-sidebar-copy {
@@ -3590,26 +3589,31 @@
                   <div class="chat-head__label">Chat <span id="chat-badge" class="badge" hidden>0</span></div>
                 </div>
                 <div class="chat-body">
-                  <aside class="chat-sidebar" aria-label="Chat companion">
-                    <div class="chat-tabs" role="tablist" aria-label="Chat companion tabs">
-                      <button id="chat-dice-tab" class="chat-tab is-active" type="button" role="tab" aria-selected="true">Dice</button>
-                      <button id="chat-help-tab" class="chat-tab" type="button" role="tab" aria-selected="false">Guide</button>
+                  <div class="chat-tabs" role="tablist" aria-label="Chat tabs">
+                    <button id="chat-log-tab" class="chat-tab is-active" type="button" role="tab" aria-selected="true">Chat</button>
+                    <button id="chat-ooc-tab" class="chat-tab" type="button" role="tab" aria-selected="false">OOC</button>
+                    <button id="chat-dice-tab" class="chat-tab" type="button" role="tab" aria-selected="false">Dice</button>
+                    <button id="chat-help-tab" class="chat-tab" type="button" role="tab" aria-selected="false">Guide</button>
+                  </div>
+                  <div class="chat-tab-panels">
+                    <div id="chat-log-panel" class="chat-tab-panel">
+                      <div class="chat-log" id="chat-log"></div>
                     </div>
-                    <div id="chat-dice-panel" class="chat-sidebar-panel">
+                    <div id="chat-ooc-panel" class="chat-tab-panel" hidden>
+                      <div class="chat-log" id="chat-ooc-log"></div>
+                    </div>
+                    <div id="chat-dice-panel" class="chat-tab-panel" hidden>
                       <div id="catharsis-dice-tray" class="chat-dice-tray"></div>
                     </div>
-                    <div id="chat-help-panel" class="chat-sidebar-panel" hidden>
+                    <div id="chat-help-panel" class="chat-tab-panel" hidden>
                       <p class="chat-sidebar-copy">
                         Use <strong>/roll XdY</strong> for dice. Journal notes route through <strong>/journal</strong>.
                       </p>
                     </div>
-                  </aside>
-                  <div class="chat-main">
-                    <div class="chat-log" id="chat-log"></div>
-                    <div class="chat-row">
-                      <input id="chat-input" type="text" placeholder="Start typing here..." />
-                      <button id="chat-send" type="button">Send</button>
-                    </div>
+                  </div>
+                  <div class="chat-row">
+                    <input id="chat-input" type="text" placeholder="Start typing here..." />
+                    <button id="chat-send" type="button">Send</button>
                   </div>
                 </div>
               </section>
@@ -3623,9 +3627,12 @@
     <div class="catharsis-onboarding__sheet">
       <div id="catharsis-onboarding-intro" class="catharsis-onboarding__panel">
         <p class="eyebrow">Catharsis Welcome</p>
-        <h2 id="catharsis-onboarding-title">Four trays live in the header.</h2>
+        <h2 id="catharsis-onboarding-title">This venue has four trays.</h2>
         <p>
-          Chat, presence, tools, and diagnostics stay visible from the shell. Use the tray tour whenever you need a reminder of what lives where. Character creation only starts when you explicitly ask for it.
+          The header up top is one of them. The left tray holds presence and diagnostics, the chat tray lives along the bottom, and the right tray holds your character tools. Use the tray tour whenever you need a reminder of what lives where.
+        </p>
+        <p>
+          New here? Push your mouse to the right edge of the screen to open the right tray &mdash; the <strong>Make a Character</strong> button is waiting there. Character creation only starts when you explicitly ask for it.
         </p>
         <div class="catharsis-onboarding__actions">
           <button id="catharsis-onboarding-continue" type="button">Continue</button>
