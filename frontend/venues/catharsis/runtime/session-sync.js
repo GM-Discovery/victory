@@ -395,7 +395,7 @@
           handleDiceTrayAction(msg.action);
           return msg;
         }
-        if (actionType === "chat/message") {
+        if (actionType === "chat/message" || actionType === "chat/ooc") {
           deps.appendChatActionLine?.(msg.action);
           return msg;
         }

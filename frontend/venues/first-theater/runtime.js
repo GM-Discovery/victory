@@ -381,6 +381,10 @@
     const chatLog = document.getElementById("chat-log");
     const chatInput = document.getElementById("chat-input");
     const chatSend = document.getElementById("chat-send");
+    window.VictoryCommandPalette?.attach(chatInput, {
+      venueSlug: "first-theater",
+      getSessionId: () => currentSessionId,
+    });
     const sessionStatus = document.getElementById("session-status");
     const shellRefreshWorldButton = document.getElementById("shell-refresh-world");
     const shellClearSelectionButton = document.getElementById("shell-clear-selection");
@@ -1128,8 +1132,56 @@
       const author = String(action?.actor_display_name || action?.actor?.display_name || action?.actor_handle || "Unknown").trim() || "Unknown";
       const source = String(action?.payload?.source || action?.source || "").trim().toLowerCase();
       const edited = Boolean(action?.payload?.edited || action?.edited);
-      const label = source === "discord" ? `${author} via Discord Bridge${edited ? " (edited)" : ""}` : author;
+      const isOOC = String(action?.type || "").trim() === "chat/ooc";
+      const label = source === "discord" ? `${author} via Discord Bridge${edited ? " (edited)" : ""}` : `${author}${isOOC ? " (OOC)" : ""}`;
       appendChatEntry(label, text);
+    }
+
+    const commandErrorMessages = {
+      no_active_character: "No active character. Select one in Greenroom first.",
+      protected_fact: "That field can't be changed with /char set.",
+      character_card_not_found: "Character not found.",
+      forbidden: "You don't have access to that character.",
+      invalid_token_aura: "That Token Aura isn't valid. Use a swatch or #rrggbb hex.",
+      journal_body_required: "Journal entries can't be empty.",
+      invalid_command_arguments: "Missing or invalid arguments for that command.",
+      unknown_command: "Unknown command. Type / to see what's available.",
+      message_too_long: "That message is too long.",
+      not_session_participant: "You're not part of this session.",
+      policy_denied: "That's disabled in this venue right now.",
+      insufficient_role: "You don't have permission to do that here.",
+      showing_closed: "This showing is closed.",
+      showing_not_found: "No showing found for this session.",
+    };
+
+    function describeCommandExecution(parsed, response) {
+      if (!response.ok) {
+        const err = String(response.error || response.data?.error || "").trim() || `HTTP ${response.status}`;
+        return commandErrorMessages[err] || `Command failed: ${err}`;
+      }
+      const data = response.data || {};
+      switch (parsed.path) {
+        case "char":
+          if (data.result_kind === "navigate") return "";
+          return `Character updated${data.character?.name ? `: ${data.character.name}` : ""}.`;
+        case "bio":
+          return "Biography updated.";
+        case "quote":
+          return "Featured quote updated.";
+        case "journal":
+          if ((parsed.args || [])[0] === "recent") {
+            return `${(data.entries || []).length} recent journal entries. Open the character workbook to read them.`;
+          }
+          return "Journal entry added privately.";
+        case "ooc":
+          return "";
+        case "help": {
+          const entries = data.entries || [];
+          return entries.map((e) => `${e.usage} — ${e.description}`).join("\n") || "No commands available.";
+        }
+        default:
+          return "Done.";
+      }
     }
 
     function setChatCompanionTab(mode) {
@@ -1144,8 +1196,19 @@
 
     async function sendChatDraft() {
       if (!chatInput) return;
-      const text = chatInput.value.trim();
-      if (!text) return;
+      const rawText = chatInput.value.trim();
+      if (!rawText) return;
+
+      if (window.VictoryCommandPalette?.isLiteralEscape(rawText)) {
+        const literalText = rawText.replace(/^\//, "");
+        chatInput.value = "";
+        if (!literalText) return;
+        const sent = sendAction("chat/message", { text: literalText });
+        if (!sent) appendSystemChatNotice("Chat could not be sent right now.");
+        return;
+      }
+
+      const text = rawText;
 
       const rollMatch = text.match(/^\/roll(?:\s+(.+))?$/i);
       if (rollMatch) {
@@ -1173,59 +1236,68 @@
         return;
       }
 
-      try {
-        const sessionResult = await window.VictoryMicChat?.sendSessionCommand?.("first-theater", text);
-        if (sessionResult?.handled) {
-          const message = String(sessionResult.message || "").replace(/\n+/g, " · ").trim();
-          if (message) {
-            appendSystemChatNotice(message);
+      const parsed = window.VictoryCommandPalette?.parseSlashCommand?.(text);
+
+      if (parsed?.path === "session") {
+        try {
+          const sessionResult = await window.VictoryMicChat?.sendSessionCommand?.("first-theater", text);
+          if (sessionResult?.handled) {
+            const message = String(sessionResult.message || "").replace(/\n+/g, " · ").trim();
+            if (message) appendSystemChatNotice(message);
+            chatInput.value = "";
+            return;
           }
+        } catch (error) {
+          appendSystemChatNotice(String(error?.message || error || "Session command failed"));
           chatInput.value = "";
           return;
         }
-      } catch (error) {
-        appendSystemChatNotice(String(error?.message || error || "Session command failed"));
-        chatInput.value = "";
-        return;
+      }
+
+      if (parsed && parsed.path !== "session") {
+        if (!currentShowingIsOpen()) {
+          chatInput.value = "";
+          appendSystemChatNotice(chatClosedMessage());
+          return;
+        }
+
+        if (parsed.path === "mic") {
+          try {
+            const micResult = await window.VictoryMicChat?.sendMicCommand?.("first-theater", text);
+            if (micResult?.handled) {
+              const message = String(micResult.message || "").replace(/\n+/g, " · ").trim();
+              if (message) appendSystemChatNotice(message);
+              chatInput.value = "";
+              return;
+            }
+          } catch (error) {
+            appendSystemChatNotice(String(error?.message || error || "Mic command failed"));
+            chatInput.value = "";
+            return;
+          }
+        } else if (window.VictoryCommandPalette?.execute) {
+          try {
+            const response = await window.VictoryCommandPalette.execute({
+              path: parsed.path,
+              args: parsed.args,
+              venueSlug: "first-theater",
+              sessionId: currentSessionId,
+            });
+            const message = describeCommandExecution(parsed, response);
+            if (message) appendSystemChatNotice(message);
+            chatInput.value = "";
+            return;
+          } catch (error) {
+            appendSystemChatNotice(String(error?.message || error || "Command failed"));
+            chatInput.value = "";
+            return;
+          }
+        }
       }
 
       if (!currentShowingIsOpen()) {
         chatInput.value = "";
         appendSystemChatNotice(chatClosedMessage());
-        return;
-      }
-
-      try {
-        const micResult = await window.VictoryMicChat?.sendMicCommand?.("first-theater", text);
-        if (micResult?.handled) {
-          const message = String(micResult.message || "").replace(/\n+/g, " · ").trim();
-          if (message) {
-            appendSystemChatNotice(message);
-          }
-          chatInput.value = "";
-          return;
-        }
-      } catch (error) {
-        appendSystemChatNotice(String(error?.message || error || "Mic command failed"));
-        chatInput.value = "";
-        return;
-      }
-
-      try {
-        const journalResult = await window.VictoryMicChat?.sendJournalCommand?.(text, { visibility: "private" });
-        if (journalResult?.handled) {
-          const message = String(journalResult.message || "").replace(/\n+/g, " · ").trim();
-          if (journalResult.ok) {
-            appendSystemChatNotice(message || "Journal entry saved privately.");
-          } else if (message) {
-            appendSystemChatNotice(message);
-          }
-          chatInput.value = "";
-          return;
-        }
-      } catch (error) {
-        appendSystemChatNotice(String(error?.message || error || "Journal save failed"));
-        chatInput.value = "";
         return;
       }
 

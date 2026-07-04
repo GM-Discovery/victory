@@ -115,6 +115,7 @@ migrations=(
   "$ROOT/database/migrations/029_kernel49_warehouse_storage.sql"
   "$ROOT/database/migrations/030_kernel51_capacity_guardrails.sql"
   "$ROOT/database/migrations/031_kernel53_character_workbook_foundation.sql"
+  "$ROOT/database/migrations/032_kernel59_command_registry.sql"
 )
 
 for migration in "${migrations[@]}"; do

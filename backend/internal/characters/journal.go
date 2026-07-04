@@ -59,7 +59,7 @@ func HandleCharacterJournals(pool *pgxpool.Pool) http.HandlerFunc {
 				writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "invalid_json"}})
 				return
 			}
-			entry, err := SaveCharacterJournal(ctx, pool, userID, input.Body, input.Visibility)
+			entry, err := SaveCharacterJournal(ctx, pool, userID, input.Body, input.Visibility, "", "")
 			if err != nil {
 				writeCharacterError(w, err)
 				return
@@ -94,10 +94,12 @@ func HandleCharacterJournals(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func SaveCharacterJournal(ctx context.Context, pool *pgxpool.Pool, authorUserID, body, visibility string) (CharacterJournalEntry, error) {
+func SaveCharacterJournal(ctx context.Context, pool *pgxpool.Pool, authorUserID, body, visibility, venueID, sessionID string) (CharacterJournalEntry, error) {
 	authorUserID = strings.TrimSpace(authorUserID)
 	body = strings.TrimSpace(body)
 	visibility = strings.TrimSpace(visibility)
+	venueID = strings.TrimSpace(venueID)
+	sessionID = strings.TrimSpace(sessionID)
 	if authorUserID == "" {
 		return CharacterJournalEntry{}, errors.New("not_authenticated")
 	}
@@ -132,11 +134,13 @@ func SaveCharacterJournal(ctx context.Context, pool *pgxpool.Pool, authorUserID,
 			module_instance_id,
 			author_user_id,
 			visibility,
-			body
+			body,
+			venue_id,
+			session_id
 		)
-		VALUES ($1, NULLIF($2, '')::uuid, $3, $4, $5)
+		VALUES ($1, NULLIF($2, '')::uuid, $3, $4, $5, NULLIF($6, '')::uuid, NULLIF($7, '')::uuid)
 		RETURNING id::text, character_card_id::text, COALESCE(module_instance_id::text, ''), author_user_id::text, visibility, body, COALESCE(venue_id::text, ''), COALESCE(session_id::text, ''), COALESCE(showing_id::text, ''), archived_at, deleted_at, created_at, updated_at
-	`, characterID, moduleID, authorUserID, visibility, body).Scan(&entry.ID, &entry.CharacterCardID, &entry.ModuleInstanceID, &entry.AuthorUserID, &entry.Visibility, &entry.Body, &entry.VenueID, &entry.SessionID, &entry.ShowingID, &archivedAt, &deletedAt, &createdAt, &updatedAt)
+	`, characterID, moduleID, authorUserID, visibility, body, venueID, sessionID).Scan(&entry.ID, &entry.CharacterCardID, &entry.ModuleInstanceID, &entry.AuthorUserID, &entry.Visibility, &entry.Body, &entry.VenueID, &entry.SessionID, &entry.ShowingID, &archivedAt, &deletedAt, &createdAt, &updatedAt)
 	if err != nil {
 		return CharacterJournalEntry{}, err
 	}

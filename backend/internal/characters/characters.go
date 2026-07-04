@@ -1051,6 +1051,52 @@ func UpdateCard(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID str
 	return card, nil
 }
 
+// LoadCardForActor loads a character card for actorUserID, enforcing the same
+// edit authority as UpdateCard. UpdateCard has no partial-patch path (it always
+// overwrites every column), so callers that want to change a single field must
+// load the current card first, patch just that field, and pass every other
+// field back through unchanged.
+func LoadCardForActor(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID string) (CharacterCard, error) {
+	actorUserID = strings.TrimSpace(actorUserID)
+	cardID = strings.TrimSpace(cardID)
+	if actorUserID == "" {
+		return CharacterCard{}, errors.New("not_authenticated")
+	}
+	if cardID == "" {
+		return CharacterCard{}, errors.New("character_card_id_required")
+	}
+
+	allowed, err := CanEditCard(ctx, pool, actorUserID, cardID)
+	if err != nil {
+		return CharacterCard{}, err
+	}
+	if !allowed {
+		return CharacterCard{}, errors.New("forbidden")
+	}
+
+	var card CharacterCard
+	var createdAt, updatedAt time.Time
+	var workbookContextRaw, sheetLinksRaw []byte
+	err = pool.QueryRow(ctx, `
+		SELECT id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), workbook_status, workbook_context, name, pronouns, portrait_url, COALESCE(token_aura, ''), color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
+		FROM character_cards
+		WHERE id = $1
+		  AND is_deleted = FALSE
+		LIMIT 1
+	`, cardID).Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.TokenAura, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return CharacterCard{}, errors.New("character_card_not_found")
+		}
+		return CharacterCard{}, err
+	}
+	card.WorkbookContext = decodeJSONMap(workbookContextRaw)
+	if err := finishCharacterCard(&card, sheetLinksRaw, createdAt, updatedAt); err != nil {
+		return CharacterCard{}, err
+	}
+	return card, nil
+}
+
 func CanEditCard(ctx context.Context, q characterQuerier, actorUserID, cardID string) (bool, error) {
 	var ownerUserID, locationID string
 	err := q.QueryRow(ctx, `

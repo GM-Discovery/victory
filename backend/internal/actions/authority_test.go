@@ -46,13 +46,15 @@ func (r fakeRow) Scan(dest ...any) error {
 }
 
 type fakeQuerier struct {
-	role          string
-	handle        string
-	venueSlug     string
-	venueEnabled  bool
-	showingStatus string
-	layoutFound   bool
-	locked        bool
+	role           string
+	handle         string
+	venueSlug      string
+	venueEnabled   bool
+	showingStatus  string
+	layoutFound    bool
+	locked         bool
+	chatEnabled    bool
+	talkingEnabled bool
 }
 
 func (q fakeQuerier) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
@@ -65,6 +67,8 @@ func (q fakeQuerier) QueryRow(ctx context.Context, sql string, args ...any) pgx.
 			status = "live"
 		}
 		return fakeRow{values: []any{status}}
+	case strings.Contains(sql, "chat_enabled"):
+		return fakeRow{values: []any{q.role, q.chatEnabled, q.talkingEnabled}}
 	case strings.Contains(sql, "FROM users") && strings.Contains(sql, "lower(COALESCE(NULLIF(handle, ''), ''))"):
 		return fakeRow{values: []any{strings.ToLower(strings.TrimSpace(q.handle))}}
 	case strings.Contains(sql, "JOIN venue_layout_elements"):

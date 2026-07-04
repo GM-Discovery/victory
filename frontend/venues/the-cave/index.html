@@ -501,6 +501,28 @@
       font-size: 0.88rem;
     }
 
+    .chat-filter-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .chat-filter-tab {
+      border: 0;
+      border-radius: 999px;
+      padding: 4px 10px;
+      background: rgba(255, 255, 255, 0.06);
+      color: #cfc6b0;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.78rem;
+    }
+
+    .chat-filter-tab.is-active {
+      background: rgba(255, 255, 255, 0.18);
+      color: #f5efe4;
+    }
+
     .chat-panel-toggle:hover {
       background: rgba(255, 255, 255, 0.12);
     }
@@ -1723,6 +1745,12 @@
         <button id="chat-toggle" type="button" class="chat-panel-toggle" aria-expanded="true">Collapse</button>
       </div>
       <p class="chat-panel-note">Venue conversation lives here. Performance speech stays on the stage and does not share this input.</p>
+      <div class="chat-filter-tabs" id="chat-filter-tabs" role="tablist">
+        <button type="button" class="chat-filter-tab is-active" data-chat-filter="all" role="tab" aria-selected="true">All</button>
+        <button type="button" class="chat-filter-tab" data-chat-filter="roleplay" role="tab" aria-selected="false">Roleplay</button>
+        <button type="button" class="chat-filter-tab" data-chat-filter="game_events" role="tab" aria-selected="false">Game Events</button>
+        <button type="button" class="chat-filter-tab" data-chat-filter="ooc" role="tab" aria-selected="false">OOC</button>
+      </div>
       <div class="chat-panel-body" id="chat-panel-body">
         <div id="chat-log"></div>
 
@@ -1785,6 +1813,7 @@
 <script src="/lib/discord-mic.js?v=kernel40-1"></script>
 <script src="/lib/discord-audio.js?v=kernel43-2"></script>
 <script src="/lib/victory-mic-chat.js?v=kernel40-1"></script>
+<script src="/lib/victory-command-palette.js?v=kernel59-1"></script>
 <script>
   window.VictoryDiscordAudio?.mount({
     venueSlug: "the-cave",
@@ -1794,6 +1823,10 @@
 <script>
   const chatLog = document.getElementById("chat-log");
   const chatInput = document.getElementById("chat-input");
+  window.VictoryCommandPalette?.attach(chatInput, {
+    venueSlug: "the-cave",
+    getSessionId: () => currentSessionId || "",
+  });
   const chatSend = document.getElementById("chat-send");
   const chatPanel = document.getElementById("chat-panel");
   const chatPanelBody = document.getElementById("chat-panel-body");
@@ -1912,6 +1945,7 @@
   let activePersona = null;
   let latestSnapshotElements = [];
   let latestSnapshotActions = [];
+  let activeChatFilter = "all";
   let latestSnapshotOverlay = null;
   let latestSnapshotShowing = null;
   let latestSnapshotVenueConfig = {};
@@ -4461,11 +4495,55 @@
       `;
     }
 
+    if (type === "chat/ooc") {
+      const text = escapeHtml(action?.payload?.text || action?.text || "");
+      return `
+        <span class="chat-time">[${time}]</span>
+        <span class="chat-actor">${escapeHtml(actorLabel)}</span>
+        ${handle ? `<span class="chat-handle">@${escapeHtml(handle)}</span>` : ""}
+        ${badge}
+        <span class="chat-ooc-badge"> (OOC)</span>
+        <span class="chat-action-text">: ${text}</span>
+      `;
+    }
+
     return "";
+  }
+
+  // chatActionMatchesFilter is the client-side presentation filter for the
+  // All/Roleplay/Game Events/OOC tabs. It filters over the canonical ordered
+  // action list -- it never reorders, drops, or mutates the underlying
+  // actions. "game/event"-prefixed types have no producer yet in this pass
+  // (see Kernel 59 plan), so the Game Events tab is expected to render empty
+  // until a future kernel adds one.
+  function chatActionMatchesFilter(action, filter) {
+    const type = action?.type || "";
+    switch (filter) {
+      case "roleplay":
+        return type === "chat/message" || type === "perform/speak";
+      case "ooc":
+        return type === "chat/ooc";
+      case "game_events":
+        return type.startsWith("game/event");
+      case "all":
+      default:
+        return type === "chat/message" || type === "perform/speak" || type === "chat/ooc" || type.startsWith("game/event");
+    }
+  }
+
+  function setChatFilter(filter) {
+    activeChatFilter = filter;
+    document.querySelectorAll(".chat-filter-tab").forEach((tab) => {
+      const isActive = tab.dataset.chatFilter === filter;
+      tab.classList.toggle("is-active", isActive);
+      tab.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+    renderChatHistory(latestSnapshotActions);
   }
 
   function appendChatLine(action) {
     if (!action) return;
+    if (!chatActionMatchesFilter(action, activeChatFilter)) return;
 
     const body = renderActionLine(action);
     if (!body) return;
@@ -4555,15 +4633,17 @@
 
     const ordered = Array.isArray(actions) ? [...actions].reverse() : [];
     for (const action of ordered) {
-      if (!action || action.type !== "chat/message") {
-        continue;
-      }
-
+      if (!action) continue;
       appendChatLine(action);
     }
 
     if (chatLog.childElementCount === 0) {
-      addChatMessage("No venue chat yet.", formatTime(), "system");
+      const emptyMessages = {
+        roleplay: "No roleplay messages yet.",
+        ooc: "No OOC messages yet.",
+        game_events: "No game events yet.",
+      };
+      addChatMessage(emptyMessages[activeChatFilter] || "No venue chat yet.", formatTime(), "system");
     } else {
       chatLog.scrollTop = chatLog.scrollHeight;
     }
@@ -4940,7 +5020,7 @@
           return;
         }
 
-        if (actionType === "chat/message") {
+        if (actionType === "chat/message" || actionType === "chat/ooc") {
           appendChatLine(action);
           markChatActivity();
           return;
@@ -5073,47 +5153,119 @@
     });
   }
 
+  const commandErrorMessages = {
+    no_active_character: "No active character. Select one in Greenroom first.",
+    protected_fact: "That field can't be changed with /char set.",
+    character_card_not_found: "Character not found.",
+    forbidden: "You don't have access to that character.",
+    invalid_token_aura: "That Token Aura isn't valid. Use a swatch or #rrggbb hex.",
+    journal_body_required: "Journal entries can't be empty.",
+    invalid_command_arguments: "Missing or invalid arguments for that command.",
+    unknown_command: "Unknown command. Type / to see what's available.",
+    message_too_long: "That message is too long.",
+    not_session_participant: "You're not part of this session.",
+    policy_denied: "That's disabled in this venue right now.",
+    insufficient_role: "You don't have permission to do that here.",
+    showing_closed: "This showing is closed.",
+    showing_not_found: "No showing found for this session.",
+  };
+
+  function describeCommandExecution(parsed, response) {
+    if (!response.ok) {
+      const err = String(response.error || response.data?.error || "").trim() || `HTTP ${response.status}`;
+      return commandErrorMessages[err] || `Command failed: ${err}`;
+    }
+    const data = response.data || {};
+    switch (parsed.path) {
+      case "char":
+        if (data.result_kind === "navigate") return "";
+        return `Character updated${data.character?.name ? `: ${data.character.name}` : ""}.`;
+      case "bio":
+        return "Biography updated.";
+      case "quote":
+        return "Featured quote updated.";
+      case "journal":
+        if ((parsed.args || [])[0] === "recent") {
+          return `${(data.entries || []).length} recent journal entries. Open the character workbook to read them.`;
+        }
+        return "Journal entry added privately.";
+      case "ooc":
+        return "";
+      case "help": {
+        const entries = data.entries || [];
+        return entries.map((e) => `${e.usage} — ${e.description}`).join("\n") || "No commands available.";
+      }
+      default:
+        return "Done.";
+    }
+  }
+
   async function sendChat() {
-    const text = chatInput.value.trim();
-    if (!text) return;
+    const rawText = chatInput.value.trim();
+    if (!rawText) return;
+
+    if (window.VictoryCommandPalette?.isLiteralEscape(rawText)) {
+      const literalText = rawText.replace(/^\//, "");
+      chatInput.value = "";
+      if (!literalText) return;
+      if (literalText.length > 250) {
+        addChatMessage("(chat too long: max 250 characters)", formatTime(), "system");
+        return;
+      }
+      if (!canSendVenueChat(currentRole)) {
+        addChatMessage("(chat is not enabled for your role)", formatTime(), "system");
+        return;
+      }
+      const sent = sendAction("chat/message", { text: literalText });
+      if (sent) chatInput.focus();
+      return;
+    }
+
+    const text = rawText;
+    const parsed = window.VictoryCommandPalette?.parseSlashCommand?.(text);
 
     try {
-      const sessionResult = await window.VictoryMicChat?.sendSessionCommand?.("the-cave", text);
-      if (sessionResult?.handled) {
-        const message = String(sessionResult.message || "").replace(/\n+/g, " · ").trim();
-        if (message) {
-          addChatMessage(message, formatTime(), "system");
+      if (parsed?.path === "session") {
+        const sessionResult = await window.VictoryMicChat?.sendSessionCommand?.("the-cave", text);
+        if (sessionResult?.handled) {
+          const message = String(sessionResult.message || "").replace(/\n+/g, " · ").trim();
+          if (message) {
+            addChatMessage(message, formatTime(), "system");
+          }
+          chatInput.value = "";
+          chatInput.focus();
+          return;
         }
-        chatInput.value = "";
-        chatInput.focus();
-        return;
       }
 
-      const micResult = await window.VictoryMicChat?.sendMicCommand?.("the-cave", text);
-      if (micResult?.handled) {
-        const message = String(micResult.message || "").replace(/\n+/g, " · ").trim();
-        if (message) {
-          addChatMessage(message, formatTime(), "system");
+      if (parsed?.path === "mic") {
+        const micResult = await window.VictoryMicChat?.sendMicCommand?.("the-cave", text);
+        if (micResult?.handled) {
+          const message = String(micResult.message || "").replace(/\n+/g, " · ").trim();
+          if (message) {
+            addChatMessage(message, formatTime(), "system");
+          }
+          chatInput.value = "";
+          chatInput.focus();
+          return;
         }
-        chatInput.value = "";
-        chatInput.focus();
-        return;
       }
 
-      const journalResult = await window.VictoryMicChat?.sendJournalCommand?.(text, { visibility: "private" });
-      if (journalResult?.handled) {
-        const message = String(journalResult.message || "").replace(/\n+/g, " · ").trim();
-        if (journalResult.ok) {
-          addChatMessage(message || "Journal entry saved privately.", formatTime(), "system");
-        } else if (message) {
-          addChatMessage(message, formatTime(), "system");
-        }
+      if (parsed && parsed.path !== "session" && parsed.path !== "mic" && window.VictoryCommandPalette?.execute) {
+        const response = await window.VictoryCommandPalette.execute({
+          path: parsed.path,
+          args: parsed.args,
+          venueSlug: "the-cave",
+          sessionId: currentSessionId || "",
+        });
+        const message = describeCommandExecution(parsed, response);
+        if (message) addChatMessage(message, formatTime(), "system");
         chatInput.value = "";
         chatInput.focus();
         return;
       }
     } catch (error) {
-      addChatMessage(String(error?.message || error || "Mic command failed"), formatTime(), "system");
+      addChatMessage(String(error?.message || error || "Command failed"), formatTime(), "system");
       chatInput.focus();
       return;
     }
@@ -5352,6 +5504,9 @@
   }
 
   chatSend.addEventListener("click", sendChat);
+  document.querySelectorAll(".chat-filter-tab").forEach((tab) => {
+    tab.addEventListener("click", () => setChatFilter(tab.dataset.chatFilter));
+  });
   chatToggle?.addEventListener("click", () => {
     setChatPanelExpanded(!chatPanelExpanded);
     if (chatPanelExpanded) {
