@@ -250,11 +250,15 @@ func readPump(hub *Hub, pool *pgxpool.Pool, c *Client, venueSlug string) {
 			continue
 		}
 
-		handleCavePayload(hub, pool, c, payload, venueSlug)
+		handleVenuePayload(hub, pool, c, payload, venueSlug)
 	}
 }
 
-func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[string]any, venueSlug string) {
+func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[string]any) {
+	handleVenuePayload(hub, pool, c, payload, "the-cave")
+}
+
+func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[string]any, venueSlug string) {
 	switch payload["type"] {
 	case "ping":
 		_ = c.Conn.WriteJSON(map[string]any{

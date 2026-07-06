@@ -147,7 +147,6 @@ func StoreChatMessage(ctx context.Context, pool *pgxpool.Pool, req ChatMessageRe
 func canActChatMessage(ctx context.Context, q actionQuerier, userID, sessionID string) (Decision, error) {
 	var (
 		participantRole string
-		chatEnabled     bool
 		talkingEnabled  bool
 	)
 
@@ -162,16 +161,12 @@ func canActChatMessage(ctx context.Context, q actionQuerier, userID, sessionID s
 		WHERE s.id = $1
 		  AND sp.user_id = $2
 		LIMIT 1
-	`, sessionID, userID).Scan(&participantRole, &chatEnabled, &talkingEnabled)
+	`, sessionID, userID).Scan(&participantRole, new(bool), &talkingEnabled)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Decision{Allowed: false, Reason: "not_session_participant"}, nil
 		}
 		return Decision{}, err
-	}
-
-	if !chatEnabled {
-		return Decision{Allowed: false, Reason: "policy_denied"}, nil
 	}
 
 	if talkingEnabled {

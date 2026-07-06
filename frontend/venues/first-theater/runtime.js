@@ -1540,6 +1540,23 @@
       }
 
       const text = rawText;
+      if (text === "/") {
+        const parsedHelp = { path: "help", args: [] };
+        try {
+          const response = await window.VictoryCommandPalette.execute({
+            path: "help",
+            args: [],
+            venueSlug: "first-theater",
+            sessionId: currentSessionId,
+          });
+          const message = describeCommandExecution(parsedHelp, response);
+          if (message) appendSystemChatNotice(message);
+        } catch (error) {
+          appendSystemChatNotice(String(error?.message || error || "Command help failed"));
+        }
+        chatInput.value = "";
+        return;
+      }
 
       const rollMatch = text.match(/^\/r(?:oll)?(?:\s+(.+))?$/i);
       if (rollMatch) {

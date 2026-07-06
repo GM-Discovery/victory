@@ -1379,6 +1379,29 @@ Verification:
   - `venue_audio_channel | catharsis | Catharsis Audio | 1523545738611658792`
   - `venue_chat_channel | catharsis | catharsis-chat | 1523545739752374312`
 
+### Kernel 59A Follow-up — Catharsis Session Route Repair
+
+Fixed the remaining Catharsis live-session mismatch after the Discord bridge came online. The Catharsis frontend had inherited The Cave routing for world snapshots, session join, websocket connection, and stage action payloads, while the backend only exposed The Cave world/join/ws routes. This made Catharsis show `Idle` and keep chat closed even after `/session start`, because the shell was not reading the Catharsis session snapshot.
+
+Changes:
+- Added venue-aware backend helpers for world snapshots, session join, active-session lookup, session identity, and websocket serving.
+- Added live backend routes:
+  - `GET /api/world/catharsis`;
+  - `POST /api/session/catharsis/join`;
+  - `GET /ws/catharsis`.
+- Updated Catharsis runtime modules to use `catharsis` instead of `the-cave` for world/session/ws/action routing.
+- Wired `setCurrentSnapshot` and refreshed chat presentation after snapshot apply so the Session chip and chat gate update immediately.
+
+Verification:
+- `node --check` for Catharsis runtime files.
+- `cd backend && GOCACHE=/tmp/victory-gocache go test ./internal/identity ./internal/network ./internal/world`
+- `cd backend && GOCACHE=/tmp/victory-gocache go build ./...`
+- `cd backend && GOCACHE=/tmp/victory-gocache go vet ./...`
+- Rebuilt/restarted `victory-backend`; health passed from both `victory-backend` and `bread-caddy`.
+- Live `POST /api/session/catharsis/join` returned Catharsis session `359e4492-0cdd-4f3f-928f-4cf672ae5187`.
+- Live `GET /api/world/catharsis` returned venue slug `catharsis` and showing status `rehearsal`.
+- Browser smoke with a producer session loaded Catharsis and verified `Session Ready`, chat placeholder `Start typing here...`, and no failed requests.
+
 ## Kernel 58 — Face Projection, Token Aura, and Live Backend Refresh
 
 Updated the character workbook Face projection to surface canonical `token_aura` data, add region/priority metadata to Face fields, and keep legacy `color` reads as a migration alias. Also updated the Greenroom Face editor to use the new field name, fixed the tagline save path, and refreshed the live backend container so the running service picked up the rebuilt code.

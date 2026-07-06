@@ -245,7 +245,7 @@
       <img src="/assets/redirect.png" alt="Security redirect" />
       <h1>Error: Forbidden Access Entry</h1>
       <p>Security redirects you to the pathway.</p>
-      <a href="/" class="back-map-button">← Back to Map</a>
+      <a href="/venues/trailers/" class="back-map-button">Open Trailers</a>
     </div>
   </div>
 
@@ -253,12 +253,10 @@
     <section class="card">
       <p class="eyebrow">Account / Identity</p>
       <h1>Your Account</h1>
-      <p class="subtitle">This is your account hub. Use it to get back to your profile, open the Greenroom, or edit your public trailer.</p>
+      <p class="subtitle">This is your account hub. Use Trailers to edit your public profile and reach your character spaces.</p>
 
       <div class="toolbar">
         <a class="button" href="/venues/trailers/">Open Trailers</a>
-        <a class="chip" href="/venues/greenroom/">Open Greenroom</a>
-        <a class="chip" href="/">Back to Map</a>
         <button id="logout-button" class="chip" type="button">Logout</button>
       </div>
 
@@ -272,7 +270,6 @@
         <p class="note">Reset the Catharsis first-appearance flags in this browser, then reopen Catharsis to replay the onboarding and Socio build flow.</p>
         <div class="toolbar" style="margin-top: 0;">
           <button id="reset-catharsis-appearance" class="button" type="button">Reset Catharsis First Appearance</button>
-          <a class="chip" href="/venues/catharsis/">Open Catharsis</a>
         </div>
         <p id="test-harness-status" class="note"></p>
       </section>
@@ -294,7 +291,6 @@
           <div class="meta" id="discord-meta"></div>
           <div class="toolbar" style="margin-top: 12px;">
             <a class="button" id="discord-link-button" href="/auth/discord/start">Link Discord</a>
-            <a class="chip" href="/login/">Back to login</a>
           </div>
         </section>
 
@@ -315,10 +311,9 @@
 
       <section id="recovery" class="recovery">
         <h2>Need to sign in again?</h2>
-        <p class="note">Your browser session is not reaching the server. Logging in again usually fixes Greenroom, Trailers, and this account hub.</p>
+        <p class="note">Your browser session is not reaching the server. Logging in again usually fixes Trailers and this account hub.</p>
         <div class="toolbar">
           <a class="button" href="/login/">Log in again</a>
-          <a class="chip" href="/">Back to map</a>
         </div>
       </section>
     </section>
@@ -542,7 +537,6 @@
             profileHeading.textContent = "Profile unavailable";
             renderMeta(document.getElementById("profile-meta"), [
               { label: "Trailers", value: "Open Trailers to edit" },
-              { label: "Greenroom", value: "Open Greenroom to view" },
               { label: "Persona", value: "Still null" },
             ]);
             return;
@@ -551,7 +545,7 @@
           const profile = profilePayload.data?.profile || {};
           const publicProfile = profile.public || {};
           profileHeading.textContent = profileValue(publicProfile.stage_name) !== "Not set" ? profileValue(publicProfile.stage_name) : "Profile ready";
-          profileNote.textContent = profile.is_published ? "Published profile is live in the Greenroom." : "Draft profile exists. Publish it from Trailers when ready.";
+          profileNote.textContent = profile.is_published ? "Published profile is live." : "Draft profile exists. Publish it from Trailers when ready.";
 
           renderMeta(document.getElementById("profile-meta"), [
             { label: "Stage Name", value: profileValue(publicProfile.stage_name) },

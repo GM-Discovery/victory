@@ -133,6 +133,7 @@
         : "closed";
       const overlayState = overlay ? `${overlay.overlay_type || "text"} overlay active` : "no overlay";
       setSnapshotSummary(`Showing is ${showingState}; ${overlayState}; fire ${latestFire ? "is present" : "not present"}; staged cards ${stageCards.length}; staged tokens ${stageTokens.length}.`);
+      updateChatPresentation();
 
       if (!getCurrentSelection()) {
         setSelectionLine("None");
@@ -180,7 +181,7 @@
     }
 
     async function joinCaveOnce() {
-      setStageStatus("Joining the live Cave session...");
+      setStageStatus("Joining the live Catharsis session...");
 
       let sessionHandle = String(currentIdentity?.handle || "web").trim() || "web";
       let sessionDisplayName = String(currentIdentity?.display_name || "Friend").trim() || "Friend";

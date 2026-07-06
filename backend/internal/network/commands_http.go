@@ -431,11 +431,11 @@ func handleCharAdvanceExecute(ctx context.Context, w http.ResponseWriter, hub *H
 // character the same way, and require the same "set <text...>" argument
 // shape (subcommand + free-text tail).
 func handleFieldSetExecute(ctx context.Context, w http.ResponseWriter, hub *Hub, pool *pgxpool.Pool, userID, sessionID, commandPath string, args []string, idempotencyKey string, changedDimensions []string, exec func(context.Context, *pgxpool.Pool, string, string, string) (characters.CharacterCard, error)) {
-	if len(args) < 2 || strings.ToLower(strings.TrimSpace(args[0])) != "set" {
+	text, ok := fieldSetTextFromArgs(args)
+	if !ok {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid_command_arguments"})
 		return
 	}
-	text := strings.TrimSpace(strings.Join(args[1:], " "))
 
 	cardID, noActive := resolveCardIDOrWriteError(ctx, w, pool, userID, sessionID)
 	if noActive {
@@ -457,6 +457,21 @@ func handleFieldSetExecute(ctx context.Context, w http.ResponseWriter, hub *Hub,
 		BroadcastCharacterProjectionInvalidation(ctx, hub, pool, cardID, changedDimensions, "")
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": result})
+}
+
+func fieldSetTextFromArgs(args []string) (string, bool) {
+	if len(args) == 0 {
+		return "", false
+	}
+	if strings.EqualFold(strings.TrimSpace(args[0]), "set") {
+		if len(args) < 2 {
+			return "", false
+		}
+		text := strings.TrimSpace(strings.Join(args[1:], " "))
+		return text, text != ""
+	}
+	text := strings.TrimSpace(strings.Join(args, " "))
+	return text, text != ""
 }
 
 func handleJournalExecute(ctx context.Context, w http.ResponseWriter, pool *pgxpool.Pool, userID string, args []string, idempotencyKey string) {

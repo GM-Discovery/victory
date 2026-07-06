@@ -63,8 +63,9 @@
       case "bio":
       case "quote": {
         const [sub, tail] = splitFirstWord(rest);
-        if (sub.toLowerCase() !== "set") return { path, args: [] };
-        return { path, args: ["set", tail] };
+        if (sub.toLowerCase() === "set") return { path, args: ["set", tail] };
+        const body = rest.trim();
+        return body ? { path, args: ["set", body] } : { path, args: [] };
       }
       case "journal": {
         const [sub, tail] = splitFirstWord(rest);
@@ -342,6 +343,10 @@
         event.stopImmediatePropagation();
         close();
       } else if (event.key === "Enter" || event.key === "Tab") {
+        if (event.key === "Enter" && inputEl.value.trim() === "/") {
+          close();
+          return;
+        }
         if (selectedIndex >= 0 && items[selectedIndex]) {
           event.preventDefault();
           event.stopImmediatePropagation();

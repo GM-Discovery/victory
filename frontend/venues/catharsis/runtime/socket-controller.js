@@ -145,7 +145,7 @@
 
       ws.addEventListener("open", () => {
         socketReconnectDelay = 1000;
-        setStageStatus("Connected to the Cave WebSocket.");
+        setStageStatus("Connected to the Catharsis WebSocket.");
         updateShellMetaPresentation();
         flushPendingSocketActions();
         onConnect();

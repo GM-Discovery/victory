@@ -8,6 +8,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/showings"
@@ -147,8 +148,44 @@ func StoreOOCMessage(ctx context.Context, pool *pgxpool.Pool, req OOCMessageRequ
 	return &out, nil
 }
 
-// canActOOCMessage reuses the same chat_enabled/talking_enabled/role gate as
-// canActChatMessage (chat.go) -- OOC is a chat lane, not a separate policy.
 func canActOOCMessage(ctx context.Context, q actionQuerier, userID, sessionID string) (Decision, error) {
-	return canActChatMessage(ctx, q, userID, sessionID)
+	var (
+		participantRole string
+		chatEnabled     bool
+		talkingEnabled  bool
+	)
+
+	err := q.QueryRow(ctx, `
+		SELECT
+			sp.role::text,
+			COALESCE((v.config ->> 'chat_enabled')::boolean, FALSE),
+			COALESCE((v.config ->> 'talking_enabled')::boolean, FALSE)
+		FROM sessions s
+		JOIN venues v ON v.id = s.venue_id
+		JOIN session_participants sp ON sp.session_id = s.id
+		WHERE s.id = $1
+		  AND sp.user_id = $2
+		LIMIT 1
+	`, sessionID, userID).Scan(&participantRole, &chatEnabled, &talkingEnabled)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Decision{Allowed: false, Reason: "not_session_participant"}, nil
+		}
+		return Decision{}, err
+	}
+
+	if !chatEnabled {
+		return Decision{Allowed: false, Reason: "policy_denied"}, nil
+	}
+
+	if talkingEnabled {
+		return Decision{Allowed: true, Reason: "allowed"}, nil
+	}
+
+	switch normalizeActionRole(participantRole) {
+	case "producer", "director", "cast", "crew":
+		return Decision{Allowed: true, Reason: "allowed"}, nil
+	default:
+		return Decision{Allowed: false, Reason: "insufficient_role"}, nil
+	}
 }

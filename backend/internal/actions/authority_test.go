@@ -265,6 +265,16 @@ func TestCanActDiceRoll(t *testing.T) {
 	}
 }
 
+func TestCanActChatMessageAllowsParticipantWhenChatPolicyDisabled(t *testing.T) {
+	decision, err := CanAct(context.Background(), fakeQuerier{role: "cast", chatEnabled: false, talkingEnabled: false}, "user-1", "chat/message", "session-1", ActionTarget{Kind: "session"})
+	if err != nil {
+		t.Fatalf("CanAct chat/message returned error: %v", err)
+	}
+	if !decision.Allowed || decision.Reason != "allowed" {
+		t.Fatalf("CanAct chat/message = %+v, want allowed", decision)
+	}
+}
+
 func TestCanActBlockedWhenShowingClosed(t *testing.T) {
 	decision, err := CanAct(context.Background(), fakeQuerier{role: "producer", venueSlug: "the-cave", venueEnabled: true, showingStatus: "closed"}, "user-1", "chat/message", "session-1", ActionTarget{Kind: "session"})
 	if err != nil {
