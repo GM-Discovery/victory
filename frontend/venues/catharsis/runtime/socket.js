@@ -78,6 +78,16 @@
         return { kind: "venue_update", message: msg };
       }
 
+      if (msg.type === "character/projection_updated") {
+        return {
+          kind: "character_projection_updated",
+          characterId: String(msg.character_id || ""),
+          projectionVersion: String(msg.projection_version || ""),
+          changedDimensions: Array.isArray(msg.changed_dimensions) ? msg.changed_dimensions : [],
+          message: msg,
+        };
+      }
+
       if (msg.type === "error") {
         handlers.onError(String(msg.error || "action_denied"), msg);
         return { kind: "error", error: String(msg.error || "action_denied"), message: msg };

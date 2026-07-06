@@ -86,8 +86,8 @@ func TestDiscordChannelMappingRepairCreatesAndReusesSkeleton(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM auth.discord_channel_mappings WHERE location_id = $1`, locationID).Scan(&count); err != nil {
 		t.Fatalf("count mappings: %v", err)
 	}
-	if count != 19 {
-		t.Fatalf("expected 19 mappings, got %d", count)
+	if count != 21 {
+		t.Fatalf("expected 21 mappings, got %d", count)
 	}
 
 	repeatReq := httptest.NewRequest(http.MethodPost, "/api/discord/channel-mapping/repair", nil)
@@ -108,7 +108,7 @@ func TestDiscordChannelMappingRepairCreatesAndReusesSkeleton(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM auth.discord_channel_mappings WHERE location_id = $1`, locationID).Scan(&count); err != nil {
 		t.Fatalf("count mappings after repeat: %v", err)
 	}
-	if count != 17 {
+	if count != 19 {
 		t.Fatalf("repeat repair changed mapping count to %d", count)
 	}
 
@@ -142,11 +142,17 @@ func TestDiscordChannelMappingRepairCreatesAndReusesSkeleton(t *testing.T) {
 	if statusPayload.Data.Core.Category.Status != "found" {
 		t.Fatalf("unexpected core category status: %+v", statusPayload.Data.Core.Category)
 	}
-	if len(statusPayload.Data.Core.Channels) != 4 || len(statusPayload.Data.Venues) != 9 || len(statusPayload.Data.Audio) != 2 || len(statusPayload.Data.ChatParents) != 3 {
+	if len(statusPayload.Data.Core.Channels) != 4 || len(statusPayload.Data.Venues) != 9 || len(statusPayload.Data.Audio) != 3 || len(statusPayload.Data.ChatParents) != 4 {
 		t.Fatalf("unexpected mapping counts: %+v", statusPayload.Data)
 	}
 	if statusPayload.Data.Audio[0].ExpectedName == "" {
 		t.Fatalf("expected audio mapping details: %+v", statusPayload.Data.Audio)
+	}
+	if !mappingItemsContain(statusPayload.Data.Audio, "catharsis", "Catharsis Audio") {
+		t.Fatalf("expected Catharsis audio mapping: %+v", statusPayload.Data.Audio)
+	}
+	if !mappingItemsContain(statusPayload.Data.ChatParents, "catharsis", "catharsis-chat") {
+		t.Fatalf("expected Catharsis chat mapping: %+v", statusPayload.Data.ChatParents)
 	}
 }
 
@@ -201,4 +207,13 @@ func (t *discordMappingTransport) RoundTrip(req *http.Request) (*http.Response, 
 func mustJSON(v any) string {
 	raw, _ := json.Marshal(v)
 	return string(raw)
+}
+
+func mappingItemsContain(items []DiscordChannelMappingItem, slug, expectedName string) bool {
+	for _, item := range items {
+		if item.VictoryScopeSlug == slug && item.ExpectedName == expectedName {
+			return true
+		}
+	}
+	return false
 }

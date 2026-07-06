@@ -54,11 +54,25 @@ func TestBuildWorkbookPagesIncludesCatharsisSummaryFields(t *testing.T) {
 
 	foundBio := false
 	foundTokenAura := false
+	foundFaceBiography := false
+	foundFaceQuote := false
 	for _, field := range face.Fields {
 		if field.Key == "token_aura" {
 			foundTokenAura = true
 			if field.Label != "Token Aura" {
 				t.Fatalf("token aura label = %q, want Token Aura", field.Label)
+			}
+		}
+		if field.Key == "public_description" {
+			foundFaceBiography = true
+			if field.Region != "glance" {
+				t.Fatalf("face biography region = %q, want glance", field.Region)
+			}
+		}
+		if field.Key == "tagline" {
+			foundFaceQuote = true
+			if field.Region != "glance" {
+				t.Fatalf("face quote region = %q, want glance", field.Region)
 			}
 		}
 	}
@@ -102,6 +116,12 @@ func TestBuildWorkbookPagesIncludesCatharsisSummaryFields(t *testing.T) {
 	}
 	if !foundTokenAura {
 		t.Fatalf("expected token_aura field on face page")
+	}
+	if !foundFaceBiography {
+		t.Fatalf("expected public_description field on face page")
+	}
+	if !foundFaceQuote {
+		t.Fatalf("expected tagline field on face page")
 	}
 }
 

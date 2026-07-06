@@ -1909,6 +1909,30 @@
       border-color: rgba(240, 201, 107, 0.28);
     }
 
+    .dice-tray__body {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: minmax(0, 1.05fr) minmax(210px, 0.95fr);
+      align-items: start;
+    }
+
+    .dice-tray__controls-pane,
+    .dice-tray__history-pane {
+      min-width: 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .dice-tray__history-pane {
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      padding-left: 12px;
+    }
+
+    .dice-tray__history-title {
+      color: #f4e3c1;
+      font-size: 0.88rem;
+    }
+
     .dice-tray__controls {
       display: grid;
       gap: 8px;
@@ -1916,7 +1940,7 @@
     }
 
     .dice-tray__controls label,
-    .dice-tray > label {
+    .dice-tray__controls-pane > label {
       display: grid;
       gap: 6px;
       color: #b5c5de;
@@ -1924,7 +1948,7 @@
     }
 
     .dice-tray__controls input,
-    .dice-tray > label input {
+    .dice-tray__controls-pane > label input {
       width: 100%;
       box-sizing: border-box;
       border-radius: 12px;
@@ -1966,7 +1990,7 @@
     .dice-tray__history {
       display: grid;
       gap: 8px;
-      max-height: 190px;
+      max-height: 300px;
       overflow: auto;
       padding-right: 4px;
     }
@@ -2007,6 +2031,19 @@
     .dice-roll__value {
       min-width: 0;
       overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 720px) {
+      .dice-tray__body {
+        grid-template-columns: 1fr;
+      }
+
+      .dice-tray__history-pane {
+        border-left: 0;
+        padding-left: 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding-top: 10px;
+      }
     }
 
     .dice-roll-empty {
@@ -2225,6 +2262,168 @@
 
     .chat-tab-panel[hidden] {
       display: none;
+    }
+
+    .venue-sheet {
+      display: grid;
+      gap: 12px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      max-height: 46vh;
+      overflow-y: auto;
+    }
+
+    .venue-sheet[hidden] {
+      display: none;
+    }
+
+    .venue-sheet__identity {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .venue-sheet__portrait {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      object-fit: cover;
+      border: 1px solid rgba(255,255,255,0.14);
+    }
+
+    .venue-sheet__name {
+      font-weight: 600;
+      color: #eef4ff;
+    }
+
+    .venue-sheet__pronouns {
+      font-size: 12px;
+      color: rgba(238,244,255,0.6);
+    }
+
+    .venue-sheet__section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: rgba(238,244,255,0.5);
+      margin-bottom: 6px;
+    }
+
+    .venue-sheet__tabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .venue-sheet__tab {
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 7px;
+      background: rgba(255,255,255,0.04);
+      color: rgba(238,244,255,0.72);
+      font-size: 12px;
+      padding: 6px 8px;
+      cursor: pointer;
+    }
+
+    .venue-sheet__tab.is-active {
+      background: rgba(133, 201, 121, 0.16);
+      border-color: rgba(133, 201, 121, 0.38);
+      color: #eef4ff;
+    }
+
+    .venue-sheet__tab:focus-visible {
+      outline: 2px solid rgba(240, 201, 107, 0.85);
+      outline-offset: 2px;
+    }
+
+    .venue-sheet__status {
+      min-height: 14px;
+      font-size: 11px;
+      color: rgba(238,244,255,0.52);
+    }
+
+    .venue-sheet__facts {
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .venue-sheet__fact {
+      display: grid;
+      gap: 2px;
+      padding: 7px 8px;
+      border-radius: 7px;
+      background: rgba(255,255,255,0.04);
+      color: #eef4ff;
+    }
+
+    .venue-sheet__fact span {
+      color: rgba(238,244,255,0.58);
+      font-size: 11px;
+    }
+
+    .venue-sheet__fact.is-quote blockquote {
+      margin: 0;
+      color: #fff8df;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .venue-sheet__attributes {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .venue-sheet__attribute {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.04);
+      color: #eef4ff;
+    }
+
+    .venue-sheet__skills {
+      display: grid;
+      gap: 4px;
+    }
+
+    .venue-sheet__skill {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+      color: #eef4ff;
+      font-size: 12px;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .venue-sheet__skill:hover {
+      background: rgba(133, 201, 121, 0.14);
+      border-color: rgba(133, 201, 121, 0.28);
+    }
+
+    .venue-sheet__skill-name {
+      font-weight: 500;
+    }
+
+    .venue-sheet__skill-dice {
+      color: rgba(238,244,255,0.6);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .venue-sheet__empty {
+      font-size: 12px;
+      color: rgba(238,244,255,0.5);
     }
 
     .chat-sidebar-copy {
@@ -3580,6 +3779,29 @@
                         <button id="right-help-button" type="button">Tray Tour</button>
                       </div>
                     </div>
+                    <div id="venue-sheet" class="venue-sheet" hidden>
+                      <div class="venue-sheet__identity">
+                        <img id="venue-sheet-portrait" class="venue-sheet__portrait" alt="" hidden />
+                        <div class="venue-sheet__identity-text">
+                          <div id="venue-sheet-name" class="venue-sheet__name"></div>
+                          <div id="venue-sheet-pronouns" class="venue-sheet__pronouns"></div>
+                        </div>
+                      </div>
+                      <div id="venue-sheet-tabs" class="venue-sheet__tabs" role="tablist" aria-label="Character sheet views">
+                        <button id="venue-sheet-face-tab" class="venue-sheet__tab is-active" type="button" role="tab" aria-selected="true" aria-controls="venue-sheet-face-panel" data-sheet-tab="face">Face</button>
+                        <button id="venue-sheet-mechanics-tab" class="venue-sheet__tab" type="button" role="tab" aria-selected="false" aria-controls="venue-sheet-mechanics-panel" data-sheet-tab="mechanics">Mechanics</button>
+                      </div>
+                      <div id="venue-sheet-status" class="venue-sheet__status" aria-live="polite"></div>
+                      <div id="venue-sheet-face-panel" class="venue-sheet__section" role="tabpanel" aria-labelledby="venue-sheet-face-tab">
+                        <div id="venue-sheet-facts" class="venue-sheet__facts"></div>
+                      </div>
+                      <div id="venue-sheet-mechanics-panel" class="venue-sheet__section" role="tabpanel" aria-labelledby="venue-sheet-mechanics-tab" hidden>
+                        <div class="venue-sheet__section-title">Attributes</div>
+                        <div id="venue-sheet-attributes" class="venue-sheet__attributes"></div>
+                        <div class="venue-sheet__section-title">Skills</div>
+                        <div id="venue-sheet-skills" class="venue-sheet__skills"></div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </aside>
@@ -3593,6 +3815,7 @@
                     <button id="chat-log-tab" class="chat-tab is-active" type="button" role="tab" aria-selected="true">Chat</button>
                     <button id="chat-ooc-tab" class="chat-tab" type="button" role="tab" aria-selected="false">OOC</button>
                     <button id="chat-dice-tab" class="chat-tab" type="button" role="tab" aria-selected="false">Dice</button>
+                    <button id="chat-game-events-tab" class="chat-tab" type="button" role="tab" aria-selected="false">Game Events</button>
                     <button id="chat-help-tab" class="chat-tab" type="button" role="tab" aria-selected="false">Guide</button>
                   </div>
                   <div class="chat-tab-panels">
@@ -3605,9 +3828,12 @@
                     <div id="chat-dice-panel" class="chat-tab-panel" hidden>
                       <div id="catharsis-dice-tray" class="chat-dice-tray"></div>
                     </div>
+                    <div id="chat-game-events-panel" class="chat-tab-panel" hidden>
+                      <div class="chat-log" id="chat-game-events-log"></div>
+                    </div>
                     <div id="chat-help-panel" class="chat-tab-panel" hidden>
                       <p class="chat-sidebar-copy">
-                        Use <strong>/roll XdY</strong> for dice. Journal notes route through <strong>/journal</strong>.
+                        Use <strong>/roll XdY</strong> for dice. Journal notes route through <strong>/journal</strong>. Skill additions and advancement rolls post to <strong>Game Events</strong>.
                       </p>
                     </div>
                   </div>

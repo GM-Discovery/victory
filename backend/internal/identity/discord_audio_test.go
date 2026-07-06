@@ -89,7 +89,7 @@ func TestDiscordAudioStatusTracksMappedVoiceChannels(t *testing.T) {
 		t.Fatalf("load audio channel id: %v", err)
 	}
 
-	for _, venueSlug := range []string{"first-theater", "the-cave"} {
+	for _, venueSlug := range []string{"first-theater", "the-cave", "catharsis"} {
 		req := httptest.NewRequest(http.MethodGet, "/api/discord/audio/status?venue_slug="+venueSlug, nil)
 		req.AddCookie(&http.Cookie{Name: sessions.CookieName, Value: rawSession})
 		rec := httptest.NewRecorder()

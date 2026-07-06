@@ -21,6 +21,7 @@ type DiceRollRequest struct {
 	Expression string `json:"expression"`
 	Visibility string `json:"visibility"`
 	Label      string `json:"label"`
+	SkillID    string `json:"skill_id"`
 }
 
 type diceRollLimiter struct {
@@ -63,6 +64,31 @@ func (l *diceRollLimiter) Allow(key string, now time.Time) bool {
 
 var rollDiceLimiter = newDiceRollLimiter(10*time.Second, 8)
 
+// SkillRolledThisSession reports whether actorID has a roll/dice action in
+// sessionID whose payload carries this skillID (Kernel 60 §7: "untagged
+// rolls do not count -- only the skill-tagged paths... count as verifiable
+// use").
+func SkillRolledThisSession(ctx context.Context, pool *pgxpool.Pool, sessionID, actorID, skillID string) (bool, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	actorID = strings.TrimSpace(actorID)
+	skillID = strings.TrimSpace(skillID)
+	if sessionID == "" || actorID == "" || skillID == "" {
+		return false, nil
+	}
+
+	var exists bool
+	err := pool.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM actions
+			WHERE session_id = $1
+			  AND actor_id = $2
+			  AND type = 'roll/dice'
+			  AND payload ->> 'skill_id' = $3
+		)
+	`, sessionID, actorID, skillID).Scan(&exists)
+	return exists, err
+}
+
 func normalizeDiceVisibilityMode(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "", "public":
@@ -79,6 +105,7 @@ func StoreDiceRoll(ctx context.Context, pool *pgxpool.Pool, req DiceRollRequest)
 	req.Expression = strings.TrimSpace(req.Expression)
 	req.Visibility = normalizeDiceVisibilityMode(req.Visibility)
 	req.Label = strings.TrimSpace(req.Label)
+	req.SkillID = strings.TrimSpace(req.SkillID)
 
 	if req.SessionID == "" {
 		return nil, errors.New("session_id is required")
@@ -97,6 +124,9 @@ func StoreDiceRoll(ctx context.Context, pool *pgxpool.Pool, req DiceRollRequest)
 	}
 	if req.Label != "" && len(req.Label) > 120 {
 		return nil, errors.New("label_too_long")
+	}
+	if len(req.SkillID) > 120 {
+		return nil, errors.New("skill_id_too_long")
 	}
 	if req.Visibility == "" {
 		return nil, errors.New("unsupported_visibility_mode")
@@ -167,6 +197,9 @@ func StoreDiceRoll(ctx context.Context, pool *pgxpool.Pool, req DiceRollRequest)
 		"visibility_mode": req.Visibility,
 		"label":           req.Label,
 		"actor_persona":   persona,
+	}
+	if req.SkillID != "" {
+		payload["skill_id"] = req.SkillID
 	}
 	scope := map[string]any{
 		"surfaces":         []string{"dice"},

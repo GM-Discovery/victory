@@ -1,0 +1,712 @@
+{
+  "marker": "K59A_BROWSER_1783300112138",
+  "card_id": "0eea7529-f7c9-47a2-a538-e8da960b1723",
+  "screenshots": [
+    "01-initial-venue-face.png",
+    "01b-first-theater-initial-face.png",
+    "02-quote-hidden-live.png",
+    "02b-first-theater-quote-hidden-live.png",
+    "03-quote-shown-live.png",
+    "03b-first-theater-quote-shown-live.png",
+    "04-priority-bio-first.png",
+    "05-director-override-visible.png",
+    "06-unlocked-owner-edit.png",
+    "07-late-join-latest-projection.png",
+    "08-mechanics-tab-skills.png",
+    "09-first-theater-mechanics-tab-skills.png"
+  ],
+  "assertions": [
+    "Initial Catharsis and First Theater sheets rendered active character IV.",
+    "Owner hide of Featured Quote removed it from open Catharsis and First Theater trays without focus/reload.",
+    "Owner show of Featured Quote restored it in both open venue trays.",
+    "Manual priority moved Bio to the first venue Face fact: BiographyBookkeeping, inventory management",
+    "Director value override projected to venue tray and the private reason was not rendered.",
+    "Director value lock blocked an owner PATCH with face_value_locked.",
+    "Unlocked value dimension allowed owner edit and projected the new quote.",
+    "Private journal marker did not enter the venue projection.",
+    "Observed 8 server projection invalidation websocket frame(s), with no private reason/journal text.",
+    "Late join/reconnect loaded the latest projected quote from the canonical venue-sheet endpoint.",
+    "Mechanics tab rendered 1 clickable skill button(s).",
+    "First Theater Mechanics tab rendered 1 clickable skill button(s)."
+  ],
+  "websocket_messages": [
+    "{\"changed_dimensions\":[\"face\",\"visibility\"],\"character_id\":\"0eea7529-f7c9-47a2-a538-e8da960b1723\",\"projection_version\":\"2026-07-06T01:09:03.415804Z\",\"source_event_id\":\"\",\"ts\":\"2026-07-06T01:09:03.423302338Z\",\"type\":\"character/projection_updated\"}",
+    "{\"changed_dimensions\":[\"face\",\"visibility\"],\"character_id\":\"0eea7529-f7c9-47a2-a538-e8da960b1723\",\"projection_version\":\"2026-07-06T01:09:23.067952Z\",\"source_event_id\":\"\",\"ts\":\"2026-07-06T01:09:23.076416159Z\",\"type\":\"character/projection_updated\"}",
+    "{\"changed_dimensions\":[\"face\",\"priority\"],\"character_id\":\"0eea7529-f7c9-47a2-a538-e8da960b1723\",\"projection_version\":\"2026-07-06T01:09:50.42796Z\",\"source_event_id\":\"\",\"ts\":\"2026-07-06T01:09:50.433464699Z\",\"type\":\"character/projection_updated\"}",
+    "{\"changed_dimensions\":[\"face\",\"value\"],\"character_id\":\"0eea7529-f7c9-47a2-a538-e8da960b1723\",\"projection_version\":\"2026-07-06T01:09:59.435065Z\",\"source_event_id\":\"\",\"ts\":\"2026-07-06T01:09:59.438944997Z\",\"type\":\"character/projection_updated\"}",
+    "{\"changed_dimensions\":[\"face\",\"lock\"],\"character_id\":\"0eea7529-f7c9-47a2-a538-e8da960b1723\",\"projection_version\":\"2026-07-06T01:10:15.294982Z\",\"source_event_id\":\"\",\"ts\":\"2026-07-06T01:10:15.299845407Z\",\"type\":\"character/projection_updated\"}",
+    "{\"changed_dimensions\":[\"face\",\"lock\"],\"character_id\":\"0eea7529-f7c9-47a2-a538-e8da960b1723\",\"projection_version\":\"2026-07-06T01:10:15.370383Z\",\"source_event_id\":\"\",\"ts\":\"2026-07-06T01:10:15.373275485Z\",\"type\":\"character/projection_updated\"}",
+    "{\"changed_dimensions\":[\"face\",\"value\"],\"character_id\":\"0eea7529-f7c9-47a2-a538-e8da960b1723\",\"projection_version\":\"2026-07-06T01:10:15.410387Z\",\"source_event_id\":\"\",\"ts\":\"2026-07-06T01:10:15.414939234Z\",\"type\":\"character/projection_updated\"}",
+    "{\"changed_dimensions\":[\"face\",\"identity\"],\"character_id\":\"0eea7529-f7c9-47a2-a538-e8da960b1723\",\"projection_version\":\"2026-07-06T01:10:15.445414Z\",\"source_event_id\":\"\",\"ts\":\"2026-07-06T01:10:15.448745284Z\",\"type\":\"character/projection_updated\"}"
+  ],
+  "api_results": {
+    "hide_quote": {
+      "ok": true,
+      "status": 200,
+      "body": {
+        "ok": true,
+        "data": {
+          "override": {
+            "fact_key": "tagline",
+            "visibility_mode": "hidden",
+            "visibility_locked": false,
+            "priority_mode": "inferred",
+            "priority_score": 0,
+            "priority_locked": false,
+            "value_locked": false,
+            "value_override_active": false
+          },
+          "projection_version": "2026-07-06T01:09:03.415804Z"
+        }
+      }
+    },
+    "show_quote": {
+      "ok": true,
+      "status": 200,
+      "body": {
+        "ok": true,
+        "data": {
+          "override": {
+            "fact_key": "tagline",
+            "visibility_mode": "shown",
+            "visibility_locked": false,
+            "priority_mode": "inferred",
+            "priority_score": 0,
+            "priority_locked": false,
+            "value_locked": false,
+            "value_override_active": false
+          },
+          "projection_version": "2026-07-06T01:09:23.067952Z"
+        }
+      }
+    },
+    "priority_bio": {
+      "ok": true,
+      "status": 200,
+      "body": {
+        "ok": true,
+        "data": {
+          "override": {
+            "fact_key": "public_description",
+            "visibility_mode": "inferred",
+            "visibility_locked": false,
+            "priority_mode": "manual",
+            "priority_score": 999,
+            "priority_locked": false,
+            "value_locked": false,
+            "value_override_active": false
+          },
+          "projection_version": "2026-07-06T01:09:50.42796Z"
+        }
+      }
+    },
+    "value_override": {
+      "ok": true,
+      "status": 200,
+      "body": {
+        "ok": true,
+        "data": {
+          "override": {
+            "fact_key": "tagline",
+            "visibility_mode": "shown",
+            "visibility_locked": false,
+            "priority_mode": "inferred",
+            "priority_score": 0,
+            "priority_locked": false,
+            "value_locked": false,
+            "value_override_active": true,
+            "value_override": "K59A_BROWSER_1783300112138 quote override"
+          },
+          "projection_version": "2026-07-06T01:09:59.435065Z"
+        }
+      }
+    },
+    "lock_value": {
+      "ok": true,
+      "status": 200,
+      "body": {
+        "ok": true,
+        "data": {
+          "override": {
+            "fact_key": "tagline",
+            "visibility_mode": "shown",
+            "visibility_locked": false,
+            "priority_mode": "inferred",
+            "priority_score": 0,
+            "priority_locked": false,
+            "value_locked": true,
+            "value_override_active": true,
+            "value_override": "K59A_BROWSER_1783300112138 quote override"
+          },
+          "projection_version": "2026-07-06T01:10:15.294982Z"
+        }
+      }
+    },
+    "locked_owner_patch": {
+      "ok": false,
+      "status": 400,
+      "body": {
+        "ok": false,
+        "data": {
+          "error": "face_value_locked"
+        }
+      }
+    },
+    "unlock_value": {
+      "ok": true,
+      "status": 200,
+      "body": {
+        "ok": true,
+        "data": {
+          "override": {
+            "fact_key": "tagline",
+            "visibility_mode": "shown",
+            "visibility_locked": false,
+            "priority_mode": "inferred",
+            "priority_score": 0,
+            "priority_locked": false,
+            "value_locked": false,
+            "value_override_active": true,
+            "value_override": "K59A_BROWSER_1783300112138 quote override"
+          },
+          "projection_version": "2026-07-06T01:10:15.370383Z"
+        }
+      }
+    },
+    "clear_value": {
+      "ok": true,
+      "status": 200,
+      "body": {
+        "ok": true,
+        "data": {
+          "override": {
+            "fact_key": "tagline",
+            "visibility_mode": "shown",
+            "visibility_locked": false,
+            "priority_mode": "inferred",
+            "priority_score": 0,
+            "priority_locked": false,
+            "value_locked": false,
+            "value_override_active": false
+          },
+          "projection_version": "2026-07-06T01:10:15.410387Z"
+        }
+      }
+    },
+    "unlocked_owner_patch": {
+      "ok": true,
+      "status": 200,
+      "body": {
+        "ok": true,
+        "data": {
+          "id": "0eea7529-f7c9-47a2-a538-e8da960b1723",
+          "owner_user_id": "9a51d20c-8646-4a54-ada1-4f7a9340dec6",
+          "location_id": "fab66b74-7b61-4df8-8f68-b031e109aecc",
+          "production_id": "275c9f6d-12cd-4610-b49a-b3471eb0b534",
+          "workbook_status": "complete",
+          "workbook_context": {
+            "active_module_key": "socio",
+            "active_page": "face",
+            "chapter2": {
+              "attributes": {
+                "Awareness": 4,
+                "Craft": 4,
+                "Empathy": 7,
+                "Grace": 2,
+                "Intellect": 3,
+                "Lore": 2,
+                "Might": 2,
+                "Presence": 2,
+                "Resolve": 5,
+                "Spirit": 2
+              },
+              "current_stage": 11,
+              "fp_balance": 0,
+              "stages": {
+                "1": {
+                  "bonus_choice_id": "BONUS_S01_A",
+                  "companion_purchased": false,
+                  "completed": true,
+                  "enhancement_used": false,
+                  "final_roll": 1,
+                  "fp_spent": 0,
+                  "trait_ids": []
+                },
+                "2": {
+                  "bonus_choice_id": "BONUS_S02_A",
+                  "companion_purchased": false,
+                  "completed": true,
+                  "enhancement_used": false,
+                  "final_roll": 1,
+                  "fp_spent": 0,
+                  "trait_ids": []
+                },
+                "3": {
+                  "bonus_choice_id": "BONUS_S03_A",
+                  "companion_purchased": false,
+                  "completed": true,
+                  "enhancement_used": false,
+                  "final_roll": 1,
+                  "fp_spent": 0,
+                  "trait_ids": []
+                },
+                "4": {
+                  "bonus_choice_id": "BONUS_S04_A",
+                  "companion_purchased": false,
+                  "completed": true,
+                  "enhancement_used": false,
+                  "final_roll": 1,
+                  "fp_spent": 0,
+                  "trait_ids": []
+                },
+                "5": {
+                  "bonus_choice_id": "BONUS_S05_C",
+                  "companion_purchased": false,
+                  "completed": true,
+                  "enhancement_used": false,
+                  "final_roll": 4,
+                  "fp_spent": 0,
+                  "trait_ids": []
+                },
+                "6": {
+                  "bonus_choice_id": "BONUS_S06_C",
+                  "companion_purchased": false,
+                  "completed": true,
+                  "enhancement_used": false,
+                  "final_roll": 3,
+                  "fp_spent": 0,
+                  "trait_ids": []
+                },
+                "7": {
+                  "bonus_choice_id": "BONUS_S07_B",
+                  "companion_purchased": false,
+                  "completed": true,
+                  "enhancement_used": false,
+                  "final_roll": 2,
+                  "fp_spent": 0,
+                  "trait_ids": []
+                },
+                "8": {
+                  "bonus_choice_id": "BONUS_S08_C",
+                  "companion_purchased": false,
+                  "completed": true,
+                  "enhancement_used": false,
+                  "final_roll": 2,
+                  "fp_spent": 0,
+                  "trait_ids": []
+                },
+                "9": {
+                  "allocation": {
+                    "Craft": 1,
+                    "Empathy": 3,
+                    "Might": 0,
+                    "Spirit": 0
+                  },
+                  "bonus_choice_id": "BONUS_S09_B",
+                  "companion_purchased": false,
+                  "completed": true,
+                  "enhancement_used": true,
+                  "final_roll": 4,
+                  "fp_spent": 3,
+                  "trait_ids": []
+                },
+                "10": {
+                  "bonus_choice_id": "BONUS_S10_A",
+                  "companion_purchased": false,
+                  "completed": true,
+                  "enhancement_used": false,
+                  "final_roll": 4,
+                  "fp_spent": 9,
+                  "trait_ids": [
+                    "TRAIT_S10_01_UNBREAKABLE_WILL",
+                    "TRAIT_S10_02_PHOENIX_SPIRIT"
+                  ]
+                }
+              },
+              "starting_fp": 12,
+              "version": "0.3"
+            },
+            "chapter3": {
+              "archetype_code": "WAT",
+              "archetype_dataset_version": "1.0.0",
+              "archetype_key": "Watcher",
+              "archetype_stable_id": "ARCHETYPE_WATCHER",
+              "archetype_title": "The Watcher",
+              "confirmed": true,
+              "confirmed_at": "2026-07-05T07:38:19Z",
+              "key_skill": "Insight",
+              "primary_attribute": "Awareness",
+              "ruleset_id": "socio",
+              "ruleset_version": "1.1",
+              "secondary_attribute": "Spirit",
+              "selection_count": 1
+            },
+            "chapter4": {
+              "acquisition_source": "onboarding_first_skill",
+              "attribute_id": "ATTR_AWARENESS",
+              "attribute_name": "Awareness",
+              "catalogue_version": "0.9-draft",
+              "confirmed": true,
+              "confirmed_at": "2026-07-05T07:38:46Z",
+              "die_size": "d6",
+              "helper_ids": [
+                "HELPER_AWARENESS_INSIGHT_1",
+                "HELPER_AWARENESS_INSIGHT_2"
+              ],
+              "onboarding_complete": true,
+              "selection_count": 1,
+              "skill_description": "Reading intentions, emotions, hidden motives",
+              "skill_name": "Insight",
+              "skill_stable_id": "SKILL_AWARENESS_INSIGHT",
+              "training_state": "trained"
+            },
+            "character_onboarding_completed": true,
+            "creation_key": "catharsis:onboarding",
+            "current_event": "chapter4_first_skill_confirmed",
+            "current_stage": 5,
+            "draft_token": "b676fdcf-f3e3-47dd-8fa4-912139730f55",
+            "last_workbook_entry": {
+              "created_at": "2026-07-06T01:00:56Z",
+              "entry_type": "character_fact_director_override_cleared",
+              "page_key": "history",
+              "stage_number": 0,
+              "title": "Character fact override cleared"
+            },
+            "module_status": "complete",
+            "onboarding_completed_at": "2026-07-05T07:38:46Z",
+            "ruleset_key": "socio",
+            "ruleset_version": "1.1",
+            "socio_parentage_chart_version": "1.1",
+            "socio_parentage_class": "Merchant's Clerk",
+            "socio_parentage_coin_flips": [
+              {
+                "coin_flip_result": "pending",
+                "coin_flip_roll": 0,
+                "inheritance_passed": false,
+                "inherited_wealth": 0,
+                "parent_index": 2,
+                "roll_total": 36
+              }
+            ],
+            "socio_parentage_description": "Bookkeeping, inventory management",
+            "socio_parentage_first_roll": 25,
+            "socio_parentage_history": [
+              {
+                "body": "Parent 1 · roll 25 · Mill Worker · credit 28 · coin flip not eligible · inheritance 0",
+                "entry_type": "parentage_roll",
+                "page_key": "history",
+                "payload": {
+                  "coin_flip_eligible": false,
+                  "coin_flip_result": "not eligible",
+                  "coin_flip_roll": 0,
+                  "description": "Factory labor, regular but low wages",
+                  "dice": [
+                    {
+                      "chain": [
+                        10
+                      ],
+                      "index": 0,
+                      "subtotal": 10
+                    },
+                    {
+                      "chain": [
+                        13
+                      ],
+                      "index": 1,
+                      "subtotal": 13
+                    },
+                    {
+                      "chain": [
+                        2
+                      ],
+                      "index": 2,
+                      "subtotal": 2
+                    }
+                  ],
+                  "event_key": "egg_donor",
+                  "inheritance_passed": false,
+                  "inherited_wealth": 0,
+                  "parent_index": 1,
+                  "roll_range": "25",
+                  "roll_total": 25,
+                  "ruleset_key": "socio",
+                  "ruleset_version": "1.1",
+                  "social_class": "Mill Worker",
+                  "source": "catharsis",
+                  "starting_credit": 28,
+                  "wealth_kind": "personal"
+                },
+                "sort_order": 1,
+                "stage_number": 1,
+                "title": "Parent 1 roll"
+              },
+              {
+                "body": "Parent 2 · roll 36 · Merchant's Clerk · credit 60 · coin flip pending · inheritance 0",
+                "entry_type": "parentage_roll",
+                "page_key": "history",
+                "payload": {
+                  "coin_flip_eligible": true,
+                  "coin_flip_result": "pending",
+                  "coin_flip_roll": 0,
+                  "description": "Bookkeeping, inventory management",
+                  "dice": [
+                    {
+                      "chain": [
+                        17
+                      ],
+                      "index": 0,
+                      "subtotal": 17
+                    },
+                    {
+                      "chain": [
+                        9
+                      ],
+                      "index": 1,
+                      "subtotal": 9
+                    },
+                    {
+                      "chain": [
+                        10
+                      ],
+                      "index": 2,
+                      "subtotal": 10
+                    }
+                  ],
+                  "event_key": "sperm_donor",
+                  "inheritance_passed": false,
+                  "inherited_wealth": 0,
+                  "parent_index": 2,
+                  "roll_range": "36",
+                  "roll_total": 36,
+                  "ruleset_key": "socio",
+                  "ruleset_version": "1.1",
+                  "social_class": "Merchant's Clerk",
+                  "source": "catharsis",
+                  "starting_credit": 60,
+                  "wealth_kind": "personal"
+                },
+                "sort_order": 2,
+                "stage_number": 1,
+                "title": "Parent 2 roll"
+              },
+              {
+                "body": "Socio parentage is bound to the workbook. Total roll 61. Starting wealth 0.",
+                "entry_type": "workbook_seed",
+                "page_key": "creation_progress",
+                "payload": {
+                  "parentage_first_roll": 25,
+                  "parentage_rows": [
+                    {
+                      "coin_flip_eligible": false,
+                      "coin_flip_result": "not eligible",
+                      "coin_flip_roll": 0,
+                      "description": "Factory labor, regular but low wages",
+                      "dice": [
+                        {
+                          "chain": [
+                            10
+                          ],
+                          "index": 0,
+                          "subtotal": 10
+                        },
+                        {
+                          "chain": [
+                            13
+                          ],
+                          "index": 1,
+                          "subtotal": 13
+                        },
+                        {
+                          "chain": [
+                            2
+                          ],
+                          "index": 2,
+                          "subtotal": 2
+                        }
+                      ],
+                      "event_key": "egg_donor",
+                      "inheritance_passed": false,
+                      "inherited_wealth": 0,
+                      "parent_index": 1,
+                      "roll_range": "25",
+                      "roll_total": 25,
+                      "social_class": "Mill Worker",
+                      "starting_credit": 28,
+                      "wealth_kind": "personal"
+                    },
+                    {
+                      "coin_flip_eligible": true,
+                      "coin_flip_result": "pending",
+                      "coin_flip_roll": 0,
+                      "description": "Bookkeeping, inventory management",
+                      "dice": [
+                        {
+                          "chain": [
+                            17
+                          ],
+                          "index": 0,
+                          "subtotal": 17
+                        },
+                        {
+                          "chain": [
+                            9
+                          ],
+                          "index": 1,
+                          "subtotal": 9
+                        },
+                        {
+                          "chain": [
+                            10
+                          ],
+                          "index": 2,
+                          "subtotal": 10
+                        }
+                      ],
+                      "event_key": "sperm_donor",
+                      "inheritance_passed": false,
+                      "inherited_wealth": 0,
+                      "parent_index": 2,
+                      "roll_range": "36",
+                      "roll_total": 36,
+                      "social_class": "Merchant's Clerk",
+                      "starting_credit": 60,
+                      "wealth_kind": "personal"
+                    }
+                  ],
+                  "parentage_second_roll": 36,
+                  "ruleset_key": "socio",
+                  "ruleset_version": "1.1",
+                  "source": "catharsis",
+                  "starting_wealth": 0,
+                  "total_roll": 61
+                },
+                "sort_order": 3,
+                "stage_number": 1,
+                "title": "Workbook initialized"
+              }
+            ],
+            "socio_parentage_parents": [
+              {
+                "coin_flip_eligible": false,
+                "coin_flip_result": "not eligible",
+                "coin_flip_roll": 0,
+                "description": "Factory labor, regular but low wages",
+                "dice": [
+                  {
+                    "chain": [
+                      10
+                    ],
+                    "index": 0,
+                    "subtotal": 10
+                  },
+                  {
+                    "chain": [
+                      13
+                    ],
+                    "index": 1,
+                    "subtotal": 13
+                  },
+                  {
+                    "chain": [
+                      2
+                    ],
+                    "index": 2,
+                    "subtotal": 2
+                  }
+                ],
+                "event_key": "egg_donor",
+                "inheritance_passed": false,
+                "inherited_wealth": 0,
+                "parent_index": 1,
+                "roll_range": "25",
+                "roll_total": 25,
+                "social_class": "Mill Worker",
+                "starting_credit": 28,
+                "wealth_kind": "personal"
+              },
+              {
+                "coin_flip_eligible": true,
+                "coin_flip_result": "lose",
+                "coin_flip_roll": 1,
+                "description": "Bookkeeping, inventory management",
+                "dice": [
+                  {
+                    "chain": [
+                      17
+                    ],
+                    "index": 0,
+                    "subtotal": 17
+                  },
+                  {
+                    "chain": [
+                      9
+                    ],
+                    "index": 1,
+                    "subtotal": 9
+                  },
+                  {
+                    "chain": [
+                      10
+                    ],
+                    "index": 2,
+                    "subtotal": 10
+                  }
+                ],
+                "event_key": "sperm_donor",
+                "inheritance_passed": false,
+                "inherited_wealth": 0,
+                "parent_index": 2,
+                "roll_range": "36",
+                "roll_total": 36,
+                "social_class": "Merchant's Clerk",
+                "starting_credit": 60,
+                "wealth_kind": "personal"
+              }
+            ],
+            "socio_parentage_passes": 2,
+            "socio_parentage_roll": 36,
+            "socio_parentage_second_roll": 36,
+            "socio_parentage_starting_credit": 60,
+            "socio_parentage_total_roll": 61,
+            "socio_starting_wealth": 0,
+            "socio_starting_wealth_source_class": null,
+            "socio_starting_wealth_source_parent_index": null,
+            "socio_starting_wealth_source_roll": null,
+            "socio_wealth_eligible_parents": [
+              2
+            ],
+            "source": "catharsis",
+            "workbook_status": "draft"
+          },
+          "name": "IV",
+          "pronouns": "",
+          "portrait_url": "",
+          "color": "#d9c7a6",
+          "tagline": "K59A_BROWSER_1783300112138 direct owner quote",
+          "public_description": "Bookkeeping, inventory management",
+          "sheet_links": [],
+          "created_at": "2026-07-05T07:35:58Z",
+          "updated_at": "2026-07-06T01:10:15Z"
+        }
+      }
+    },
+    "private_journal": {
+      "ok": true,
+      "status": 200,
+      "body": {
+        "ok": true,
+        "data": {
+          "id": "5781ab4f-6396-47c0-917d-de3e7eacb944",
+          "character_card_id": "0eea7529-f7c9-47a2-a538-e8da960b1723",
+          "module_instance_id": "b7c40308-fd4a-48c2-b8fd-d6464ef32d5c",
+          "author_user_id": "9a51d20c-8646-4a54-ada1-4f7a9340dec6",
+          "visibility": "private",
+          "body": "K59A_BROWSER_1783300112138 PRIVATE JOURNAL SHOULD NOT PROJECT",
+          "created_at": "2026-07-06T01:10:33Z",
+          "updated_at": "2026-07-06T01:10:33Z"
+        }
+      }
+    }
+  },
+  "status": "PASS"
+}

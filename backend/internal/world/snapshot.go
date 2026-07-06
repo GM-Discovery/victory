@@ -87,6 +87,15 @@ type Action struct {
 }
 
 func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string) (*Snapshot, error) {
+	return LoadVenueSnapshot(ctx, pool, viewerRole, "the-cave")
+}
+
+func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, venueSlug string) (*Snapshot, error) {
+	venueSlug = strings.ToLower(strings.TrimSpace(venueSlug))
+	if venueSlug == "" {
+		return nil, errors.New("venue slug is required")
+	}
+
 	var snap Snapshot
 	snap.Elements = []PlacedElement{}
 	snap.Actions = []Action{}
@@ -121,10 +130,10 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 		JOIN locations l ON l.id = lo.location_id
 		LEFT JOIN sessions s ON s.venue_id = v.id AND s.status IN ('rehearsal', 'live')
 		LEFT JOIN showings sh ON sh.session_id = s.id
-		WHERE v.slug = 'the-cave'
+		WHERE v.slug = $1
 		ORDER BY s.started_at DESC NULLS LAST
 		LIMIT 1
-	`).Scan(
+	`, venueSlug).Scan(
 		&snap.Location,
 		&snap.Lot,
 		&snap.Venue.ID,
@@ -170,9 +179,9 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 		FROM venue_layout_elements vle
 		JOIN elements e ON e.id = vle.element_id
 		JOIN venues v ON v.id = vle.venue_id
-		WHERE v.slug = 'the-cave'
+		WHERE v.slug = $1
 		ORDER BY e.name ASC
-	`)
+	`, venueSlug)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +243,7 @@ func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string
 	snap.Elements = compactElements
 
 	if snap.Session.ID == "" {
-		return nil, errors.New("no active session found for the-cave")
+		return nil, fmt.Errorf("no active session found for %s", venueSlug)
 	}
 
 	actionRows, err := pool.Query(ctx, `

@@ -61,6 +61,7 @@
     const setRendererFallback = typeof deps.setRendererFallback === "function" ? deps.setRendererFallback : () => {};
     const setMovementReport = typeof deps.setMovementReport === "function" ? deps.setMovementReport : () => {};
     const appendSystemChatNotice = typeof deps.appendSystemChatNotice === "function" ? deps.appendSystemChatNotice : () => {};
+    const handleCharacterProjectionInvalidation = typeof deps.handleCharacterProjectionInvalidation === "function" ? deps.handleCharacterProjectionInvalidation : () => {};
     const chatClosedMessage = typeof deps.chatClosedMessage === "function" ? deps.chatClosedMessage : () => "Chat closed.";
     const getCurrentVenueMapState = typeof deps.getCurrentVenueMapState === "function" ? deps.getCurrentVenueMapState : () => null;
     const getCurrentVenueMapAssetID = typeof deps.getCurrentVenueMapAssetID === "function" ? deps.getCurrentVenueMapAssetID : () => "";
@@ -160,7 +161,7 @@
         if (!currentSessionId) {
           await ensureJoinedCave();
         }
-        const response = await fetchFn("/api/world/the-cave", {
+        const response = await fetchFn("/api/world/catharsis", {
           method: "GET",
           credentials: "include",
           cache: "no-store",
@@ -197,7 +198,7 @@
         }
       }
 
-      const response = await fetchFn("/api/session/the-cave/join", {
+      const response = await fetchFn("/api/session/catharsis/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -351,7 +352,7 @@
       const ok = deps.sendAction?.("act/place_element", {
         element_id: elementId,
         element_slug: elementSlug,
-        venue_slug: "the-cave",
+        venue_slug: "catharsis",
         layer: "stage",
         x: pendingStageCardPlacement.x,
         y: pendingStageCardPlacement.y,
@@ -389,6 +390,11 @@
         return msg;
       }
 
+      if (msg.kind === "character_projection_updated") {
+        await handleCharacterProjectionInvalidation(msg);
+        return msg;
+      }
+
       if (msg.kind === "action" && msg.action) {
         const actionType = msg.action.type || "";
         if (actionType === "roll/dice") {
@@ -397,6 +403,10 @@
         }
         if (actionType === "chat/message" || actionType === "chat/ooc") {
           deps.appendChatActionLine?.(msg.action);
+          return msg;
+        }
+        if (actionType === "game/event") {
+          deps.appendGameEventLine?.(msg.action);
           return msg;
         }
         if (

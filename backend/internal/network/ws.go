@@ -55,7 +55,15 @@ var storePersonaUnequipFunc = actions.StorePersonaUnequip
 var discordBridgeConfig identity.DiscordServerLinkConfig
 
 func ServeCaveWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordServerLinkConfig) http.HandlerFunc {
+	return ServeVenueWS(hub, pool, discordLinkCfg, "the-cave")
+}
+
+func ServeVenueWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordServerLinkConfig, venueSlug string) http.HandlerFunc {
 	discordBridgeConfig = discordLinkCfg
+	venueSlug = strings.ToLower(strings.TrimSpace(venueSlug))
+	if venueSlug == "" {
+		venueSlug = "the-cave"
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -82,7 +90,7 @@ func ServeCaveWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordSe
 			return
 		}
 
-		allowed, err := access.UserCanAccessVenueSlug(ctx, pool, userID, "the-cave")
+		allowed, err := access.UserCanAccessVenueSlug(ctx, pool, userID, venueSlug)
 		if err != nil {
 			log.Printf("ws venue access check failed: %v", err)
 			_ = conn.WriteJSON(map[string]any{
@@ -102,7 +110,7 @@ func ServeCaveWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordSe
 			return
 		}
 
-		sessionID, err := identity.ResolveActiveCaveSessionID(ctx, pool, userID)
+		sessionID, err := identity.ResolveActiveVenueSessionID(ctx, pool, userID, venueSlug)
 		if err != nil {
 			log.Printf("ws active session lookup failed: %v", err)
 			_ = conn.WriteJSON(map[string]any{
@@ -113,7 +121,7 @@ func ServeCaveWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordSe
 			return
 		}
 
-		sessionIdentity, err := identity.ResolveSessionIdentity(ctx, pool, sessionID, userID)
+		sessionIdentity, err := identity.ResolveSessionIdentityForVenue(ctx, pool, sessionID, userID, venueSlug)
 		if err != nil {
 			log.Printf("ws identity lookup failed: %v", err)
 			_ = conn.WriteJSON(map[string]any{
@@ -142,7 +150,7 @@ func ServeCaveWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordSe
 
 		presenceSnapshot, joined := hub.Presence().Connect(sessionIdentity.SessionID, client.Presence)
 
-		snapshot, err := world.LoadCaveSnapshot(ctx, pool, sessionIdentity.Role)
+		snapshot, err := world.LoadVenueSnapshot(ctx, pool, sessionIdentity.Role, venueSlug)
 		if err != nil {
 			log.Printf("ws snapshot failed: %v", err)
 			hub.Presence().Disconnect(sessionIdentity.SessionID, client.UserID)
@@ -183,7 +191,7 @@ func ServeCaveWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordSe
 			broadcastPresenceEvent(hub, sessionIdentity.SessionID, "presence/join", client.Presence)
 		}
 
-		readPump(hub, pool, client)
+		readPump(hub, pool, client, venueSlug)
 	}
 }
 
@@ -215,7 +223,7 @@ func writePump(c *Client) {
 	}
 }
 
-func readPump(hub *Hub, pool *pgxpool.Pool, c *Client) {
+func readPump(hub *Hub, pool *pgxpool.Pool, c *Client, venueSlug string) {
 	defer func() {
 		hub.Remove(c)
 
@@ -242,16 +250,22 @@ func readPump(hub *Hub, pool *pgxpool.Pool, c *Client) {
 			continue
 		}
 
-		handleCavePayload(hub, pool, c, payload)
+		handleCavePayload(hub, pool, c, payload, venueSlug)
 	}
 }
 
-func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[string]any) {
+func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[string]any, venueSlug string) {
 	switch payload["type"] {
 	case "ping":
 		_ = c.Conn.WriteJSON(map[string]any{
 			"type": "pong",
 			"ts":   time.Now().UTC().Format(time.RFC3339),
+		})
+
+	case "character/projection_updated":
+		_ = c.Conn.WriteJSON(map[string]any{
+			"type":  "error",
+			"error": "server_authored_event_only",
 		})
 
 	case "venue/focus_ping":
@@ -283,7 +297,10 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 				return
 			}
 
-			venueSlug := "the-cave"
+			venueSlug = strings.ToLower(strings.TrimSpace(venueSlug))
+			if venueSlug == "" {
+				venueSlug = "the-cave"
+			}
 
 			focusX := 0.0
 			if raw, ok := payload["focus_x"].(float64); ok {
@@ -420,6 +437,7 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 			expression, _ := payload["expression"].(string)
 			visibility, _ := payload["visibility"].(string)
 			label, _ := payload["label"].(string)
+			skillID, _ := payload["skill_id"].(string)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			storedAction, err := storeDiceRollFunc(ctx, pool, actions.DiceRollRequest{
@@ -429,6 +447,7 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 				Expression: expression,
 				Visibility: visibility,
 				Label:      label,
+				SkillID:    skillID,
 			})
 			cancel()
 

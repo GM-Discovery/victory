@@ -41,11 +41,24 @@
       case "char": {
         const [sub, tail] = splitFirstWord(rest);
         if (!sub) return { path, args: [] };
-        if (sub.toLowerCase() === "set") {
+        const subLower = sub.toLowerCase();
+        if (subLower === "set") {
           const [field, value] = splitFirstWord(tail);
           return { path, args: ["set", field.toLowerCase(), value] };
         }
-        return { path, args: [sub.toLowerCase()] };
+        if (subLower === "add") {
+          // "/char add skill <name>" or
+          // "/char add skill --custom --name <n> --description <d> --attribute <a>" --
+          // each word stays a separate arg so the server can split --flags apart.
+          const [addSub, addTail] = splitFirstWord(tail);
+          if (addSub.toLowerCase() !== "skill") return { path, args: ["add"] };
+          const skillArgs = addTail ? addTail.split(/\s+/).filter(Boolean) : [];
+          return { path, args: ["add", "skill", ...skillArgs] };
+        }
+        if (subLower === "advance") {
+          return { path, args: ["advance", tail] };
+        }
+        return { path, args: [subLower] };
       }
       case "bio":
       case "quote": {

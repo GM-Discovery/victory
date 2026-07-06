@@ -15,19 +15,22 @@ import (
 )
 
 type WorkbookPageField struct {
-	Key            string `json:"key"`
-	Label          string `json:"label"`
-	Value          string `json:"value"`
-	InputType      string `json:"input_type"`
-	Placeholder    string `json:"placeholder,omitempty"`
-	Editable       bool   `json:"editable"`
-	Region         string `json:"region,omitempty"`
-	PriorityMode   string `json:"priority_mode,omitempty"`
-	PriorityScore  int    `json:"priority_score,omitempty"`
-	PriorityLocked bool   `json:"priority_locked,omitempty"`
-	PriorityBand   string `json:"priority_band,omitempty"`
-	SourceKind     string `json:"source_kind,omitempty"`
-	ValueLocked    bool   `json:"value_locked,omitempty"`
+	Key                string `json:"key"`
+	Label              string `json:"label"`
+	Value              string `json:"value"`
+	InputType          string `json:"input_type"`
+	Placeholder        string `json:"placeholder,omitempty"`
+	Editable           bool   `json:"editable"`
+	Region             string `json:"region,omitempty"`
+	FaceVisibilityMode string `json:"face_visibility_mode,omitempty"`
+	FaceVisible        bool   `json:"face_visible"`
+	VisibilityLocked   bool   `json:"visibility_locked,omitempty"`
+	PriorityMode       string `json:"priority_mode,omitempty"`
+	PriorityScore      int    `json:"priority_score,omitempty"`
+	PriorityLocked     bool   `json:"priority_locked,omitempty"`
+	PriorityBand       string `json:"priority_band,omitempty"`
+	SourceKind         string `json:"source_kind,omitempty"`
+	ValueLocked        bool   `json:"value_locked,omitempty"`
 }
 
 type CharacterWorkbookEntry struct {
@@ -55,6 +58,7 @@ type CharacterWorkbookPage struct {
 	Fields   []WorkbookPageField      `json:"fields,omitempty"`
 	Entries  []CharacterWorkbookEntry `json:"entries,omitempty"`
 	Journals []CharacterJournalEntry  `json:"journals,omitempty"`
+	Skills   []CharacterSkill         `json:"skills,omitempty"`
 }
 
 type CharacterWorkbookView struct {
@@ -87,7 +91,38 @@ type WorkbookEventRequest struct {
 	Entries         []WorkbookEventInput `json:"entries"`
 }
 
-func HandleCharacterWorkbookByID(pool *pgxpool.Pool) http.HandlerFunc {
+type faceVisibilityRequest struct {
+	FactKey string `json:"fact_key"`
+	Mode    string `json:"mode"`
+}
+
+type facePriorityRequest struct {
+	FactKey string `json:"fact_key"`
+	Mode    string `json:"mode"`
+	Score   int    `json:"score"`
+}
+
+type faceLockRequest struct {
+	FactKey   string `json:"fact_key"`
+	Dimension string `json:"dimension"`
+	Locked    bool   `json:"locked"`
+	Reason    string `json:"reason"`
+}
+
+type faceValueRequest struct {
+	FactKey string `json:"fact_key"`
+	Value   string `json:"value"`
+	Clear   bool   `json:"clear"`
+	Reason  string `json:"reason"`
+}
+
+type ProjectionChangeNotifier func(ctx context.Context, cardID string, changedDimensions []string, sourceEventID string)
+
+func HandleCharacterWorkbookByID(pool *pgxpool.Pool, notifiers ...ProjectionChangeNotifier) http.HandlerFunc {
+	var notify ProjectionChangeNotifier
+	if len(notifiers) > 0 {
+		notify = notifiers[0]
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
@@ -99,6 +134,119 @@ func HandleCharacterWorkbookByID(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		path := strings.TrimPrefix(r.URL.Path, "/api/character-workbooks/")
+		if strings.HasSuffix(path, "/face-visibility") || strings.HasSuffix(path, "/face-priority") || strings.HasSuffix(path, "/face-lock") || strings.HasSuffix(path, "/face-value") {
+			if r.Method != http.MethodPost {
+				writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
+				return
+			}
+			action := "face-visibility"
+			cardID := strings.TrimSpace(strings.TrimSuffix(path, "/face-visibility"))
+			if strings.HasSuffix(path, "/face-priority") {
+				action = "face-priority"
+				cardID = strings.TrimSpace(strings.TrimSuffix(path, "/face-priority"))
+			} else if strings.HasSuffix(path, "/face-lock") {
+				action = "face-lock"
+				cardID = strings.TrimSpace(strings.TrimSuffix(path, "/face-lock"))
+			} else if strings.HasSuffix(path, "/face-value") {
+				action = "face-value"
+				cardID = strings.TrimSpace(strings.TrimSuffix(path, "/face-value"))
+			}
+			cardID = strings.TrimSuffix(cardID, "/")
+			if cardID == "" {
+				writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "character_card_id_required"}})
+				return
+			}
+
+			switch action {
+			case "face-visibility":
+				var input faceVisibilityRequest
+				if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+					writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "invalid_json"}})
+					return
+				}
+				var out FaceOverride
+				var err error
+				if strings.EqualFold(strings.TrimSpace(input.Mode), faceVisibilityInferred) {
+					out, err = ReturnCharacterFactFaceVisibilityToInferred(ctx, pool, userID, cardID, input.FactKey)
+				} else {
+					out, err = SetCharacterFactFaceVisibility(ctx, pool, userID, cardID, input.FactKey, input.Mode)
+				}
+				if err != nil {
+					writeCharacterError(w, err)
+					return
+				}
+				projectionVersion, _ := CharacterProjectionVersion(ctx, pool, cardID)
+				if notify != nil {
+					notify(ctx, cardID, []string{"face", "visibility"}, "")
+				}
+				writeJSON(w, http.StatusOK, response{Ok: true, Data: map[string]any{"override": out, "projection_version": projectionVersion}})
+				return
+			case "face-priority":
+				var input facePriorityRequest
+				if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+					writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "invalid_json"}})
+					return
+				}
+				var out FaceOverride
+				var err error
+				if strings.EqualFold(strings.TrimSpace(input.Mode), facePriorityInferred) {
+					out, err = ReturnCharacterFactPriorityToInferred(ctx, pool, userID, cardID, input.FactKey)
+				} else {
+					out, err = SetCharacterFactPriority(ctx, pool, userID, cardID, input.FactKey, input.Score)
+				}
+				if err != nil {
+					writeCharacterError(w, err)
+					return
+				}
+				projectionVersion, _ := CharacterProjectionVersion(ctx, pool, cardID)
+				if notify != nil {
+					notify(ctx, cardID, []string{"face", "priority"}, "")
+				}
+				writeJSON(w, http.StatusOK, response{Ok: true, Data: map[string]any{"override": out, "projection_version": projectionVersion}})
+				return
+			case "face-lock":
+				var input faceLockRequest
+				if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+					writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "invalid_json"}})
+					return
+				}
+				out, err := SetDirectorCharacterFactLock(ctx, pool, userID, cardID, input.FactKey, input.Dimension, input.Locked, input.Reason)
+				if err != nil {
+					writeCharacterError(w, err)
+					return
+				}
+				projectionVersion, _ := CharacterProjectionVersion(ctx, pool, cardID)
+				if notify != nil {
+					notify(ctx, cardID, []string{"face", "lock"}, "")
+				}
+				writeJSON(w, http.StatusOK, response{Ok: true, Data: map[string]any{"override": out, "projection_version": projectionVersion}})
+				return
+			case "face-value":
+				var input faceValueRequest
+				if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+					writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "invalid_json"}})
+					return
+				}
+				var out FaceOverride
+				var err error
+				if input.Clear {
+					out, err = ClearDirectorCharacterFactValueOverride(ctx, pool, userID, cardID, input.FactKey, input.Reason)
+				} else {
+					out, err = SetDirectorCharacterFactValueOverride(ctx, pool, userID, cardID, input.FactKey, input.Value, input.Reason)
+				}
+				if err != nil {
+					writeCharacterError(w, err)
+					return
+				}
+				projectionVersion, _ := CharacterProjectionVersion(ctx, pool, cardID)
+				if notify != nil {
+					notify(ctx, cardID, []string{"face", "value"}, "")
+				}
+				writeJSON(w, http.StatusOK, response{Ok: true, Data: map[string]any{"override": out, "projection_version": projectionVersion}})
+				return
+			}
+		}
+
 		if strings.HasSuffix(path, "/events") {
 			if r.Method != http.MethodPost {
 				writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
@@ -168,6 +316,29 @@ func LoadCharacterWorkbookView(ctx context.Context, pool *pgxpool.Pool, actorUse
 	}
 
 	pages := buildWorkbookPages(card, module, entries, journals)
+	overrides, err := loadFaceOverrides(ctx, pool, cardID)
+	if err != nil {
+		return CharacterWorkbookView{}, err
+	}
+	skills, err := ListCharacterSkills(ctx, pool, actorUserID, cardID)
+	if err != nil {
+		return CharacterWorkbookView{}, err
+	}
+	for i, page := range pages {
+		switch page.Key {
+		case "face":
+			pages[i].Fields = applyFaceOverrides(page.Fields, overrides)
+			sortFaceFields(pages[i].Fields)
+		case "mechanics":
+			// Kernel 60 added character_skills after Mechanics was first built,
+			// and no call site ever joined the two -- Greenroom's Mechanics page
+			// showed ruleset/attribute facts but never the character's actual
+			// skill list, while the venue right tray did. Kernel 59A's shared
+			// projector requires both to agree.
+			pages[i].Skills = skills
+		}
+	}
+
 	resumeHint := "Open Face to edit identity, History for event logs, Mechanics for the module, and Journal for private notes."
 	if len(entries) > 0 {
 		resumeHint = strings.TrimSpace(entries[len(entries)-1].Title)
@@ -282,11 +453,94 @@ func loadWorkbookEntries(ctx context.Context, pool *pgxpool.Pool, cardID string)
 		if entry.Payload == nil {
 			entry.Payload = map[string]any{}
 		}
+		entry.Body = readableWorkbookEntryBody(entry)
 		entry.CreatedAt = createdAt.UTC().Format(time.RFC3339)
 		entry.UpdatedAt = updatedAt.UTC().Format(time.RFC3339)
 		out = append(out, entry)
 	}
 	return out, rows.Err()
+}
+
+func readableWorkbookEntryBody(entry CharacterWorkbookEntry) string {
+	body := strings.TrimSpace(entry.Body)
+	if strings.TrimSpace(entry.EntryType) != "chapter2_stage" {
+		return replaceChapter2BonusIDs(body)
+	}
+	result, ok := entry.Payload["chapter2_result"].(map[string]any)
+	if !ok || len(result) == 0 {
+		return replaceChapter2BonusIDs(body)
+	}
+	lines := []string{}
+	if finalRoll, ok := numberLike(result["final_roll"]); ok {
+		lines = append(lines, fmt.Sprintf("Final roll %d.", finalRoll))
+	}
+	if bonusID := strings.TrimSpace(fmt.Sprint(result["bonus_choice_id"])); bonusID != "" {
+		if bonus, ok := Chapter2BonusChoiceByID(bonusID); ok {
+			lines = append(lines, fmt.Sprintf("Selected %s (+%d %s).", bonus.Name, bonus.Modifier, bonus.TargetAttribute))
+		}
+	}
+	if deltas, ok := result["attribute_deltas"].(map[string]any); ok && len(deltas) > 0 {
+		parts := []string{}
+		for _, attr := range AllChapter2Attributes {
+			if delta, ok := numberLike(deltas[attr]); ok && delta != 0 {
+				sign := "+"
+				if delta < 0 {
+					sign = ""
+				}
+				parts = append(parts, fmt.Sprintf("%s %s%d", attr, sign, delta))
+			}
+		}
+		if len(parts) > 0 {
+			lines = append(lines, "Attribute changes: "+strings.Join(parts, ", ")+".")
+		}
+	}
+	if fpSpent, ok := numberLike(result["fp_spent"]); ok && fpSpent > 0 {
+		suffix := "s"
+		if fpSpent == 1 {
+			suffix = ""
+		}
+		lines = append(lines, fmt.Sprintf("Spent %d Fate Point%s.", fpSpent, suffix))
+	}
+	if fpBalance, ok := numberLike(result["fp_balance"]); ok {
+		suffix := "s"
+		if fpBalance == 1 {
+			suffix = ""
+		}
+		lines = append(lines, fmt.Sprintf("%d Fate Point%s remaining.", fpBalance, suffix))
+	}
+	if len(lines) == 0 {
+		return replaceChapter2BonusIDs(body)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func replaceChapter2BonusIDs(body string) string {
+	out := body
+	for _, stage := range Chapter2Rules {
+		for _, bonus := range stage.BonusChoices {
+			out = strings.ReplaceAll(out, bonus.ID, bonus.Name)
+		}
+	}
+	return out
+}
+
+func numberLike(value any) (int, bool) {
+	switch v := value.(type) {
+	case int:
+		return v, true
+	case int64:
+		return int(v), true
+	case float64:
+		return int(v), true
+	case json.Number:
+		n, err := v.Int64()
+		if err != nil {
+			return 0, false
+		}
+		return int(n), true
+	default:
+		return 0, false
+	}
 }
 
 func loadWorkbookJournals(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID string) ([]CharacterJournalEntry, error) {
@@ -332,7 +586,8 @@ func buildWorkbookPages(card CharacterCard, module map[string]any, entries []Cha
 		{Key: "token_aura", Label: "Token Aura", Value: resolveFaceTokenAura(card.TokenAura, card.Color), InputType: "color", Editable: true, Region: "identity", PriorityMode: "inferred", PriorityScore: 100, PriorityBand: priorityBandForScore(100), SourceKind: "owner_explicit"},
 		{Key: "chapter3_archetype", Label: "Archetype", Value: chapter3FaceArchetypeValue(card.WorkbookContext), InputType: "text", Editable: false, Region: "identity", PriorityMode: "inferred", PriorityScore: 100, PriorityBand: priorityBandForScore(100), SourceKind: "rules_canonical"},
 		{Key: "chapter4_first_skill", Label: "First Trained Skill", Value: chapter4FaceSkillValue(card.WorkbookContext), InputType: "text", Editable: false, Region: "identity", PriorityMode: "inferred", PriorityScore: 90, PriorityBand: priorityBandForScore(90), SourceKind: "rules_canonical"},
-		{Key: "tagline", Label: "Featured Quote", Value: card.Tagline, InputType: "text", Placeholder: "A short line about the character", Editable: true, Region: "glance", PriorityMode: "inferred", PriorityScore: 70, PriorityBand: priorityBandForScore(70), SourceKind: "owner_explicit"},
+		{Key: "public_description", Label: "Biography", Value: card.PublicDescription, InputType: "textarea", Placeholder: "What the public should know", Editable: true, Region: "glance", PriorityMode: "inferred", PriorityScore: 85, PriorityBand: priorityBandForScore(85), SourceKind: "owner_explicit"},
+		{Key: "tagline", Label: "Featured Quote", Value: card.Tagline, InputType: "text", Placeholder: "A short line about the character", Editable: true, Region: "glance", PriorityMode: "inferred", PriorityScore: 80, PriorityBand: priorityBandForScore(80), SourceKind: "owner_explicit"},
 	}
 
 	return []CharacterWorkbookPage{

@@ -374,12 +374,28 @@
     const chatLogTab = document.getElementById("chat-log-tab");
     const chatOOCTab = document.getElementById("chat-ooc-tab");
     const chatDiceTab = document.getElementById("chat-dice-tab");
+    const chatGameEventsTab = document.getElementById("chat-game-events-tab");
     const chatHelpTab = document.getElementById("chat-help-tab");
     const chatLogPanel = document.getElementById("chat-log-panel");
     const chatOOCPanel = document.getElementById("chat-ooc-panel");
     const chatDicePanel = document.getElementById("chat-dice-panel");
+    const chatGameEventsPanel = document.getElementById("chat-game-events-panel");
     const chatHelpPanel = document.getElementById("chat-help-panel");
     const chatOOCLog = document.getElementById("chat-ooc-log");
+    const chatGameEventsLog = document.getElementById("chat-game-events-log");
+    const venueSheetRoot = document.getElementById("venue-sheet");
+    const venueSheetPortrait = document.getElementById("venue-sheet-portrait");
+    const venueSheetName = document.getElementById("venue-sheet-name");
+    const venueSheetPronouns = document.getElementById("venue-sheet-pronouns");
+    const venueSheetTabs = document.getElementById("venue-sheet-tabs");
+    const venueSheetFaceTab = document.getElementById("venue-sheet-face-tab");
+    const venueSheetMechanicsTab = document.getElementById("venue-sheet-mechanics-tab");
+    const venueSheetFacePanel = document.getElementById("venue-sheet-face-panel");
+    const venueSheetMechanicsPanel = document.getElementById("venue-sheet-mechanics-panel");
+    const venueSheetStatus = document.getElementById("venue-sheet-status");
+    const venueSheetFacts = document.getElementById("venue-sheet-facts");
+    const venueSheetAttributes = document.getElementById("venue-sheet-attributes");
+    const venueSheetSkills = document.getElementById("venue-sheet-skills");
     const chatPanel = document.getElementById("chat-panel");
     const chatHead = document.getElementById("chat-head");
     const chatBadge = document.getElementById("chat-badge");
@@ -760,7 +776,238 @@
         accountLabel.textContent = identityLabel === "Unknown User" ? "Account" : identityLabel;
       }
       updateConnectionPresentation();
+      void refreshCharacterSheet();
     }
+
+    async function refreshSessionIdentity() {
+      try {
+        const startedAt = performance.now();
+        const response = await fetch("/api/session/me", { credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.signed_in) return false;
+        lastPingMs = Math.max(0, Math.round(performance.now() - startedAt));
+        currentIdentity = payload.data || null;
+        initializeShellChrome(currentIdentity);
+        lastSheetFetchKey = "";
+        updateShellMetaPresentation();
+        return true;
+      } catch (error) {
+        console.warn("failed to refresh session identity", error);
+        return false;
+      }
+    }
+
+    let lastSheetFetchKey = "";
+    let venueSheetProjectionVersion = "";
+    let activeVenueSheetTab = "face";
+    let sheetFetchInFlight = false;
+    let sheetFocusRefreshTimer = 0;
+
+    function venueSheetCacheKey() {
+      const cardId = String(currentIdentity?.active_character?.character_card_id || "").trim();
+      return `${currentSessionId}::${cardId}`;
+    }
+
+    async function refreshCharacterSheet({ force = false } = {}) {
+      if (!venueSheetRoot) return;
+      const cardId = String(currentIdentity?.active_character?.character_card_id || "").trim();
+      if (!cardId || !currentSessionId) {
+        venueSheetRoot.hidden = true;
+        lastSheetFetchKey = "";
+        return;
+      }
+      const key = venueSheetCacheKey();
+      if (!force && key === lastSheetFetchKey) return;
+      if (sheetFetchInFlight) return;
+      sheetFetchInFlight = true;
+      try {
+        const response = await fetch(`/api/characters/venue-sheet?session_id=${encodeURIComponent(currentSessionId)}`, { credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) return;
+        lastSheetFetchKey = key;
+        renderVenueSheet(payload.data?.sheet || null);
+        if (force && venueSheetStatus) venueSheetStatus.textContent = "Character sheet updated.";
+      } catch (error) {
+        console.warn("failed to load venue character sheet", error);
+      } finally {
+        sheetFetchInFlight = false;
+      }
+    }
+
+    function scheduleCharacterSheetRefresh() {
+      if (!venueSheetRoot) return;
+      if (sheetFocusRefreshTimer) window.clearTimeout(sheetFocusRefreshTimer);
+      sheetFocusRefreshTimer = window.setTimeout(() => {
+        sheetFocusRefreshTimer = 0;
+        void refreshCharacterSheet({ force: true });
+      }, 250);
+    }
+
+    function renderVenueSheet(sheet) {
+      if (!venueSheetRoot) return;
+      if (!sheet) {
+        venueSheetRoot.hidden = true;
+        return;
+      }
+      venueSheetRoot.hidden = false;
+      venueSheetProjectionVersion = String(sheet.projection_version || "");
+
+      if (venueSheetPortrait) {
+        const portraitUrl = String(sheet.portrait_url || "").trim();
+        if (portraitUrl) {
+          venueSheetPortrait.src = portraitUrl;
+          venueSheetPortrait.hidden = false;
+        } else {
+          venueSheetPortrait.hidden = true;
+        }
+      }
+      if (venueSheetName) venueSheetName.textContent = sheet.name || "Unnamed";
+      if (venueSheetPronouns) venueSheetPronouns.textContent = sheet.pronouns || "";
+
+      if (venueSheetFacts) {
+        venueSheetFacts.innerHTML = "";
+        const facts = Array.isArray(sheet.at_a_glance) ? sheet.at_a_glance : [];
+        if (facts.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "venue-sheet__empty";
+          empty.textContent = "No Face facts shown.";
+          venueSheetFacts.appendChild(empty);
+        } else {
+          for (const fact of facts) {
+            const row = document.createElement("div");
+            const key = String(fact.key || "").toLowerCase();
+            const isQuote = key.includes("quote") || key.includes("tagline");
+            row.className = `venue-sheet__fact${isQuote ? " is-quote" : ""}`;
+            const label = document.createElement("span");
+            label.textContent = fact.label || fact.key || "Fact";
+            const value = document.createElement(isQuote ? "blockquote" : "strong");
+            value.textContent = fact.value || "Not set";
+            row.append(label, value);
+            venueSheetFacts.appendChild(row);
+          }
+        }
+      }
+
+      if (venueSheetAttributes) {
+        venueSheetAttributes.innerHTML = "";
+        const attrs = sheet.attributes && typeof sheet.attributes === "object" ? sheet.attributes : {};
+        const names = Object.keys(attrs).sort();
+        if (names.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "venue-sheet__empty";
+          empty.textContent = "No attributes yet.";
+          venueSheetAttributes.appendChild(empty);
+        } else {
+          for (const name of names) {
+            const row = document.createElement("div");
+            row.className = "venue-sheet__attribute";
+            const label = document.createElement("span");
+            label.textContent = name;
+            const value = document.createElement("span");
+            value.textContent = String(attrs[name]);
+            row.append(label, value);
+            venueSheetAttributes.appendChild(row);
+          }
+        }
+      }
+
+      if (venueSheetSkills) {
+        venueSheetSkills.innerHTML = "";
+        const skills = Array.isArray(sheet.skills) ? sheet.skills : [];
+        if (skills.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "venue-sheet__empty";
+          empty.textContent = "No skills yet. Try /char add skill <name>.";
+          venueSheetSkills.appendChild(empty);
+        } else {
+          for (const skill of skills) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "venue-sheet__skill";
+            button.dataset.skillId = skill.skill_id || "";
+            button.dataset.expression = skill.expression || "";
+            button.dataset.skillName = skill.skill_name || "";
+            const name = document.createElement("span");
+            name.className = "venue-sheet__skill-name";
+            name.textContent = skill.skill_name || "";
+            const dice = document.createElement("span");
+            dice.className = "venue-sheet__skill-dice";
+            dice.textContent = skill.expression || "";
+            button.append(name, dice);
+            venueSheetSkills.appendChild(button);
+          }
+        }
+      }
+      syncVenueSheetTabs();
+    }
+
+    function projectionVersionIsNewer(nextVersion) {
+      const next = Date.parse(String(nextVersion || ""));
+      const current = Date.parse(String(venueSheetProjectionVersion || ""));
+      if (!Number.isFinite(next)) return false;
+      if (!Number.isFinite(current)) return true;
+      return next > current;
+    }
+
+    async function handleCharacterProjectionInvalidation(msg) {
+      const currentCardId = String(currentIdentity?.active_character?.character_card_id || "").trim();
+      const incomingCardId = String(msg?.characterId || msg?.message?.character_id || "").trim();
+      const changedDimensions = Array.isArray(msg?.changedDimensions) ? msg.changedDimensions : [];
+      if (changedDimensions.includes("active_character")) {
+        await refreshSessionIdentity();
+        await refreshCharacterSheet({ force: true });
+        return;
+      }
+      if (!currentCardId || incomingCardId !== currentCardId) return;
+      const incomingVersion = String(msg?.projectionVersion || msg?.message?.projection_version || "").trim();
+      if (!projectionVersionIsNewer(incomingVersion)) return;
+      await refreshCharacterSheet({ force: true });
+    }
+
+    function syncVenueSheetTabs() {
+      const faceActive = activeVenueSheetTab !== "mechanics";
+      if (venueSheetFaceTab) {
+        venueSheetFaceTab.classList.toggle("is-active", faceActive);
+        venueSheetFaceTab.setAttribute("aria-selected", String(faceActive));
+      }
+      if (venueSheetMechanicsTab) {
+        venueSheetMechanicsTab.classList.toggle("is-active", !faceActive);
+        venueSheetMechanicsTab.setAttribute("aria-selected", String(!faceActive));
+      }
+      if (venueSheetFacePanel) venueSheetFacePanel.hidden = !faceActive;
+      if (venueSheetMechanicsPanel) venueSheetMechanicsPanel.hidden = faceActive;
+    }
+
+    function setVenueSheetTab(tab) {
+      activeVenueSheetTab = tab === "mechanics" ? "mechanics" : "face";
+      syncVenueSheetTabs();
+    }
+
+    venueSheetTabs?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-sheet-tab]");
+      if (!button) return;
+      setVenueSheetTab(button.dataset.sheetTab);
+    });
+
+    venueSheetTabs?.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      event.preventDefault();
+      const next = activeVenueSheetTab === "face" ? "mechanics" : "face";
+      setVenueSheetTab(next);
+      (next === "face" ? venueSheetFaceTab : venueSheetMechanicsTab)?.focus();
+    });
+
+    venueSheetSkills?.addEventListener("click", (event) => {
+      const button = event.target.closest(".venue-sheet__skill");
+      if (!button) return;
+      const expression = String(button.dataset.expression || "").trim();
+      const skillId = String(button.dataset.skillId || "").trim();
+      const skillName = String(button.dataset.skillName || "").trim();
+      if (!expression) return;
+      diceTray?.roll?.({ expression, label: skillName, skillId }).catch((error) => {
+        appendSystemChatNotice(`Roll failed: ${error?.message || error}`);
+      });
+    });
 
     function updateShellTargetPresentation() {
       const targetLabel = currentSelection?.label || "No Target";
@@ -1142,6 +1389,23 @@
       appendChatEntry(label, text, isOOC ? chatOOCLog : chatLog);
     }
 
+    const gameEventKindMessages = {
+      character_skill_added: (detail) => `${detail.character_name || "The character"} trained ${detail.skill_name || "a skill"}.`,
+      character_skill_advanced: (detail) => `${detail.skill_name || "Skill"} improved after rolling ${detail.total} on ${detail.expression}!`,
+      character_skill_advance_failed: (detail) => `Tried to advance ${detail.skill_name || "a skill"} (rolled ${detail.total} on ${detail.expression}) — no improvement.`,
+    };
+
+    function appendGameEventLine(action) {
+      if (!chatGameEventsLog) return;
+      const eventKind = String(action?.payload?.event_kind || "").trim();
+      const detail = action?.payload?.detail && typeof action.payload.detail === "object" ? action.payload.detail : {};
+      const characterName = String(action?.payload?.character_name || "").trim();
+      const describe = gameEventKindMessages[eventKind];
+      const text = describe ? describe({ ...detail, character_name: characterName }) : eventKind || "Game event.";
+      const author = String(action?.actor_display_name || action?.actor?.display_name || "Table").trim() || "Table";
+      appendChatEntry(author, text, chatGameEventsLog);
+    }
+
     const commandErrorMessages = {
       no_active_character: "No active character. Select one in Greenroom first.",
       use_legacy_endpoint: "That command isn't available in this venue yet.",
@@ -1158,6 +1422,16 @@
       insufficient_role: "You don't have permission to do that here.",
       showing_closed: "This showing is closed.",
       showing_not_found: "No showing found for this session.",
+      unknown_skill: "No skill matched that name.",
+      ambiguous_skill_name: "That matched more than one skill — be more specific.",
+      skill_already_known: "Your character already has that skill.",
+      skill_capacity_reached: "No room left for that skill under this attribute.",
+      skill_not_used_this_session: "Roll this skill first (click it on the sheet), then advance.",
+      skill_at_ladder_cap: "That skill is already at the top of the ladder.",
+      custom_skill_name_required: "Custom skills need a --name.",
+      custom_skill_description_required: "Custom skills need a --description.",
+      attribute_required: "Custom skills need an --attribute.",
+      attribute_not_found: "That attribute name isn't recognized.",
     };
 
     function describeCommandExecution(parsed, response) {
@@ -1167,9 +1441,28 @@
       }
       const data = response.data || {};
       switch (parsed.path) {
-        case "char":
+        case "char": {
+          const sub = String((parsed.args || [])[0] || "").toLowerCase();
+          if (sub === "add") {
+            refreshCharacterSheet({ force: true });
+            return `${data.skill?.skill_name || "Skill"} added at d4.`;
+          }
+          if (sub === "skills") {
+            const skills = Array.isArray(data.skills) ? data.skills : [];
+            return skills.length
+              ? skills.map((s) => `${s.skill_name} — step ${s.ladder_step}`).join("\n")
+              : "No skills yet.";
+          }
+          if (sub === "advance") {
+            refreshCharacterSheet({ force: true });
+            const outcome = data.outcome || {};
+            return outcome.improved
+              ? `Rolled ${outcome.total} on ${outcome.expression} — ${outcome.skill_name} improves!`
+              : `Rolled ${outcome.total} on ${outcome.expression} — no improvement.`;
+          }
           if (data.result_kind === "navigate") return "";
           return `Character updated${data.character?.name ? `: ${data.character.name}` : ""}.`;
+        }
         case "bio":
           return "Biography updated.";
         case "quote":
@@ -1194,6 +1487,7 @@
       { name: "chat", tab: chatLogTab, panel: chatLogPanel },
       { name: "ooc", tab: chatOOCTab, panel: chatOOCPanel },
       { name: "dice", tab: chatDiceTab, panel: chatDicePanel },
+      { name: "game_events", tab: chatGameEventsTab, panel: chatGameEventsPanel },
       { name: "help", tab: chatHelpTab, panel: chatHelpPanel },
     ];
 
@@ -1291,28 +1585,30 @@
         }
       }
 
-      if (parsed && parsed.path !== "session") {
+      if (parsed?.path === "mic") {
+        try {
+          const micResult = await window.VictoryMicChat?.sendMicCommand?.("first-theater", text);
+          if (micResult?.handled) {
+            const message = String(micResult.message || "").replace(/\n+/g, " · ").trim();
+            if (message) appendSystemChatNotice(message);
+            chatInput.value = "";
+            return;
+          }
+        } catch (error) {
+          appendSystemChatNotice(String(error?.message || error || "Mic command failed"));
+          chatInput.value = "";
+          return;
+        }
+      }
+
+      if (parsed && parsed.path !== "session" && parsed.path !== "mic") {
         if (!currentShowingIsOpen()) {
           chatInput.value = "";
           appendSystemChatNotice(chatClosedMessage());
           return;
         }
 
-        if (parsed.path === "mic") {
-          try {
-            const micResult = await window.VictoryMicChat?.sendMicCommand?.("first-theater", text);
-            if (micResult?.handled) {
-              const message = String(micResult.message || "").replace(/\n+/g, " · ").trim();
-              if (message) appendSystemChatNotice(message);
-              chatInput.value = "";
-              return;
-            }
-          } catch (error) {
-            appendSystemChatNotice(String(error?.message || error || "Mic command failed"));
-            chatInput.value = "";
-            return;
-          }
-        } else if (window.VictoryCommandPalette?.execute) {
+        if (window.VictoryCommandPalette?.execute) {
           try {
             const response = await window.VictoryCommandPalette.execute({
               path: parsed.path,
@@ -1773,7 +2069,7 @@
       onAction: () => updateChatPresentation(),
       onPendingChange: () => updateShellMetaPresentation(),
       onHistoryChange: () => updateShellMetaPresentation(),
-      historyLimit: 2,
+      historyLimit: 8,
       timeoutMs: 15000,
     }) || null;
 
@@ -1831,7 +2127,9 @@
       updateHeaderPresentation: () => updateHeaderPresentation(),
       setRendererFallback: (...args) => setRendererFallback(...args),
       appendSystemChatNotice: (...args) => appendSystemChatNotice(...args),
+      handleCharacterProjectionInvalidation: (...args) => handleCharacterProjectionInvalidation(...args),
       appendChatActionLine: (...args) => appendChatActionLine(...args),
+      appendGameEventLine: (...args) => appendGameEventLine(...args),
       chatClosedMessage: () => chatClosedMessage(),
       getCurrentVenueMapState: () => currentVenueMapState,
       getCurrentVenueMapAssetID: () => currentVenueMapAssetID,
@@ -4077,6 +4375,7 @@
     chatLogTab?.addEventListener("click", () => setChatTab("chat"));
     chatOOCTab?.addEventListener("click", () => setChatTab("ooc"));
     chatDiceTab?.addEventListener("click", () => setChatTab("dice"));
+    chatGameEventsTab?.addEventListener("click", () => setChatTab("game_events"));
     chatHelpTab?.addEventListener("click", () => setChatTab("help"));
     setChatTab("chat");
 
@@ -4552,6 +4851,11 @@
       if (!isStageEvent) return;
       handleNativeStageContextMenu(event);
     }, true);
+
+    runtimeLifecycle.listen(window, "focus", scheduleCharacterSheetRefresh);
+    runtimeLifecycle.listen(document, "visibilitychange", () => {
+      if (document.visibilityState === "visible") scheduleCharacterSheetRefresh();
+    });
 
     stageShell?.addEventListener("contextmenu", handleNativeStageContextMenu, true);
     stageShell?.addEventListener("mousedown", handleNativeStageContextMenu, true);

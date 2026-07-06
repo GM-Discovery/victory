@@ -70,10 +70,10 @@ func AllCommands() []Command {
 		{
 			Path:           "char",
 			Title:          "Character",
-			Description:    "Edit your active character's name, pronouns, or Token Aura, or jump to a workbook page.",
-			Usage:          "/char set name|pronouns|aura <value>",
+			Description:    "Edit your active character's name, pronouns, or Token Aura; manage skills; or jump to a workbook page.",
+			Usage:          "/char set name|pronouns|aura <value> | add skill <name> | skills | advance <skill>",
 			Category:       "character",
-			Subcommands:    []string{"set name", "set pronouns", "set aura", "face", "mechanics", "history", "journal"},
+			Subcommands:    []string{"set name", "set pronouns", "set aura", "add skill", "skills", "advance", "face", "mechanics", "history", "journal"},
 			RequiresActive: true,
 		},
 		{

@@ -1312,6 +1312,73 @@ Implemented "Chapter 3: Character Archetypes" per the Kernel 55 spec and canonic
 - No console errors during either path. The pre-existing director-console/session-join 403s noted in prior test runs remain present and are out of scope
 - All test character cards soft-deleted, test sessions revoked after each pass
 
+## Kernel 59A Phase 3 — Projection Synchronization and Browser Acceptance Gate
+
+Implemented and browser-verified the Phase 3 closure gate; Kernel 59A is now PASS.
+
+- Added timestamp-derived `projection_version` to shared and venue character-sheet projections.
+- Added server-authored `character/projection_updated` websocket invalidations after Face curation, Director locks/value overrides, character field saves, `/bio`, `/quote`, `/char set`, `/char add skill`, and `/char advance`.
+- Added authorized websocket delivery filtering so clients receive projection invalidations only when their active session/persona or edit authority legitimately reaches the affected character.
+- Added explicit websocket rejection for forged client-submitted `character/projection_updated`.
+- Added First Theater and Catharsis Face/Mechanics tray tabs, version-aware matching-character refetch, same/older-version suppression, selected-tab preservation, and a restrained live-region update notice.
+- Added server-side `face_value_locked` rejection for direct card-field edits when a Director value lock is active; aligned visibility/priority lock errors to `face_visibility_locked` and `face_priority_locked`.
+- Rebuilt and restarted `victory-backend`; verified health from both `victory-backend` and `bread-caddy`.
+- Checks passed: scoped `node --check`, `go test ./internal/characters`, `go test ./internal/network`, `go test ./internal/actions ./internal/commands`, `go build ./...`, `go vet ./...`, scoped `git diff --check`.
+- Added and ran `scripts/smoke/kernel59a-phase3-browser.js` against live Caddy/backend with owner, venue, and producer-authorized Director contexts.
+- Browser evidence is attached under `Construction/OperatorLogs/evidence/kernel-59A-phase3/`: 12 screenshots plus `acceptance-evidence.json`.
+- Browser run proved: Catharsis and First Theater live quote hide/show without focus/reload, manual Bio priority, Director value override, Director value lock rejection (`face_value_locked`), unlock/edit projection, private Journal non-projection, 8 projection websocket frames without private reason/journal text, late join latest projection, and Mechanics tab skill rendering in both venues.
+- Fixed Chapter II History body projection so old raw `BONUS_*` entry bodies render as readable bonus names; live workbook check returned `has_raw_bonus_in_body: false`.
+- Final backend rebuild after the History projection fix was healthy from both `victory-backend` and `bread-caddy` at 2026-07-06T01:15Z.
+- Full `go test ./...` still fails only on unrelated existing `internal/assets` UUID fixture and `internal/identity` Discord mapping/bootstrap tests.
+- Remaining non-Kernel-59A backlog: `/quote add` / multi-quote collection, and optional persisted integer projection revisions if timestamp-derived versions become operationally insufficient.
+
+### Kernel 59A Follow-up — Greenroom Make Active Repair
+
+Fixed a post-PASS activation bug where Greenroom could snap back to the `?character_id=` URL parameter after clicking **Make Active**, making it look like activation failed. Greenroom now updates its selected card and URL to the activated card, and the completed-character library click path loads the selected workbook instead of only re-rendering stale state.
+
+Also wired active-character activation through the existing projection websocket path with `changed_dimensions: ["active_character"]`; Catharsis and First Theater now refresh `/api/session/me` before refetching the venue sheet when that notice arrives, so open right trays switch to the newly active character.
+
+Verification:
+- Rebuilt and restarted `victory-backend`; health passed from `victory-backend` and `bread-caddy` at 2026-07-06T04:00Z.
+- Browser proof: opened Catharsis on active `I`, opened Greenroom pinned to `?character_id=IV`, selected `III`, clicked **Make Active**, verified Greenroom stayed on `III` with `Active Character`, URL changed to `character_id=III`, and Catharsis tray changed to `III` without manual refresh. Then restored active back to `I` and verified Catharsis changed back.
+- Final DB check: `straturli` active character is `I`.
+- Checks passed: Greenroom inline `node --check`, `node --check` for Catharsis/First Theater runtime files, `go test ./internal/characters ./internal/network`, `go build ./...`, `go vet ./...`, scoped `git diff --check`.
+
+### Kernel 59A Follow-up — Mic Command Rehearsal Gate Repair
+
+Fixed a venue chat routing bug where Catharsis and First Theater handled `/mic` commands after the closed-chat gate. In rehearsal, this made `/mic status`, `/mic hot`, and related mic commands show `Chat is closed until the showing opens.` and never call `/api/discord/mic/control`, which could look like starting the mic had closed the session. Both venues now route `/mic` before normal chat/open-showing gating, matching The Cave's existing command path.
+
+Verification:
+- `node --check frontend/venues/catharsis/runtime.js`
+- `node --check frontend/venues/first-theater/runtime.js`
+- Scoped `git diff --check` for both runtime files.
+- Headless browser smoke with `/api/discord/mic/control` mocked while the showing placeholder still read `Chat is closed until the showing opens.`:
+  - Catharsis sent `{ "venue_slug": "catharsis", "command": "status" }` and rendered `Mock mic accepted`.
+  - First Theater sent `{ "venue_slug": "first-theater", "command": "status" }` and rendered `Mock mic accepted`.
+- Backend inspection confirmed `HandleDiscordMicControl` updates mic thread state only; session/showing close logic lives in session-control paths, not the mic control endpoint.
+
+### Kernel 59A Follow-up — Catharsis Discord Channel Repair
+
+Fixed Producer Office Discord channel repair so Catharsis receives the same venue support channels as the active stage venues. The repair spec already created a `Catharsis` category, but omitted both `Catharsis Audio` and `catharsis-chat`, so sync could appear successful while Catharsis still had no usable Discord channels for audio/mic/chat routing.
+
+Changes:
+- Added Catharsis to `venueAudioChannelSpecs()` as `Catharsis Audio`.
+- Added Catharsis to `venueChatChannelSpecs()` as `catharsis-chat`.
+- Updated Producer Office presence readiness to show Catharsis alongside First Theater and The Cave.
+- Added Catharsis to the Producer Office venue invite dropdown.
+
+Verification:
+- `cd backend && GOCACHE=/tmp/victory-gocache go test ./internal/identity`
+- `cd backend && GOCACHE=/tmp/victory-gocache go build ./...`
+- `cd backend && GOCACHE=/tmp/victory-gocache go vet ./...`
+- Producer Office inline script syntax check via extracted `<script>` body and `node --check`.
+- Scoped `git diff --check` for the touched backend and Producer Office files.
+- Rebuilt/restarted `victory-backend`; health passed from both `victory-backend` and `bread-caddy`.
+- Ran `/api/discord/channel-mapping/repair` through the Docker network with a temporary producer session; response reported `Catharsis Audio` and `catharsis-chat` as found.
+- Live DB now has:
+  - `venue_audio_channel | catharsis | Catharsis Audio | 1523545738611658792`
+  - `venue_chat_channel | catharsis | catharsis-chat | 1523545739752374312`
+
 ## Kernel 58 — Face Projection, Token Aura, and Live Backend Refresh
 
 Updated the character workbook Face projection to surface canonical `token_aura` data, add region/priority metadata to Face fields, and keep legacy `color` reads as a migration alias. Also updated the Greenroom Face editor to use the new field name, fixed the tagline save path, and refreshed the live backend container so the running service picked up the rebuilt code.

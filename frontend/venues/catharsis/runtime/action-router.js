@@ -82,7 +82,7 @@
           ? deps.sendAction("update/token", {
               element_id: objectModel.elementId || "",
               element_slug: objectModel.elementSlug || "",
-              venue_slug: "the-cave",
+              venue_slug: "catharsis",
               layer: "stage",
               x: point.x,
               y: point.y,
@@ -108,7 +108,7 @@
           : deps.sendAction("act/place_element", {
               element_id: objectModel.elementId || "",
               element_slug: objectModel.elementSlug || "",
-              venue_slug: "the-cave",
+              venue_slug: "catharsis",
               layer: "stage",
               x: point.x,
               y: point.y,
@@ -293,7 +293,7 @@
         const sent = deps.sendAction("update/token", {
           element_id: objectModel.elementId || "",
           element_slug: objectModel.elementSlug || "",
-          venue_slug: "the-cave",
+          venue_slug: "catharsis",
           layer: "stage",
           x: Number(snappedPoint?.x ?? objectModel.position?.x ?? 0),
           y: Number(snappedPoint?.y ?? objectModel.position?.y ?? 0),
@@ -316,7 +316,7 @@
         const sent = deps.sendAction("update/token", {
           element_id: objectModel.elementId || "",
           element_slug: objectModel.elementSlug || "",
-          venue_slug: "the-cave",
+          venue_slug: "catharsis",
           layer: "stage",
           x: Number(objectModel.position?.x ?? 0),
           y: Number(objectModel.position?.y ?? 0),
@@ -345,7 +345,7 @@
         const sent = deps.sendAction("act/duplicate_element", {
           element_id: objectModel.elementId || "",
           element_slug: objectModel.elementSlug || "",
-          venue_slug: "the-cave",
+          venue_slug: "catharsis",
           layer: "stage",
           x: duplicatePlacement.x,
           y: duplicatePlacement.y,
@@ -364,7 +364,7 @@
         const sent = deps.sendAction("act/remove_element", {
           element_id: objectModel.elementId || "",
           element_slug: objectModel.elementSlug || "",
-          venue_slug: "the-cave",
+          venue_slug: "catharsis",
           layer: "stage",
         });
         if (sent) {

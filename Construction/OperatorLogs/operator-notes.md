@@ -7,6 +7,15 @@ Current system truth now lives in:
 
 This file remains useful for longer-form modeling notes and historical reasoning, but some older status sections below are now historical/superseded snapshots rather than the live canonical state.
 
+## Kernel 59A Phase 3 Projection Sync
+
+- Character tray projection invalidation is server-authored only. Clients must not send `character/projection_updated`; the websocket handler returns `server_authored_event_only`.
+- The invalidation payload is deliberately small: `character_id`, `projection_version`, `changed_dimensions`, optional `source_event_id`, and timestamp. It is a refetch signal, not character truth.
+- `projection_version` is currently derived from durable `updated_at` values on `character_cards`, `character_face_overrides`, and `character_skills`. There is no revision-counter migration yet.
+- Venue runtimes compare projection versions and refetch `/api/characters/venue-sheet` only for the currently displayed character and only when the incoming version is newer.
+- First Theater and Catharsis character trays now have Face and Mechanics tabs. Face is default; Mechanics preserves skill click-to-roll.
+- Backend Docker images contain a baked Go binary. Rebuild with `docker compose up -d --build backend`; a plain restart is not enough after projection code changes.
+
 ## Purpose of this file
 This file exists to keep future builders from re-arguing settled concepts, repeating solved mistakes, or building against the wrong model.
 

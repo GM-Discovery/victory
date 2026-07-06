@@ -761,6 +761,113 @@
       gap: 6px;
     }
 
+    .face-arrange {
+      display: grid;
+      gap: 14px;
+    }
+
+    .face-arrange-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: end;
+      flex-wrap: wrap;
+    }
+
+    .face-fact-group {
+      display: grid;
+      gap: 10px;
+    }
+
+    .face-fact-row {
+      display: grid;
+      gap: 10px;
+      padding: 13px;
+      border-radius: 16px;
+      border: 1px solid rgba(38, 29, 21, 0.11);
+      background: rgba(255, 255, 255, 0.6);
+    }
+
+    .face-fact-main {
+      display: grid;
+      gap: 4px;
+    }
+
+    .face-fact-main strong {
+      color: #1d1711;
+    }
+
+    .face-fact-main span,
+    .face-fact-main p {
+      margin: 0;
+      color: rgba(35, 27, 21, 0.78);
+      line-height: 1.45;
+    }
+
+    .face-fact-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .face-director-controls {
+      display: grid;
+      gap: 8px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(38, 29, 21, 0.1);
+    }
+
+    .face-director-controls label {
+      display: grid;
+      gap: 5px;
+      color: rgba(35, 27, 21, 0.78);
+      font-size: 0.84rem;
+      font-weight: 800;
+    }
+
+    .face-director-controls input {
+      width: 100%;
+      border: 1px solid rgba(38, 29, 21, 0.14);
+      border-radius: 12px;
+      padding: 9px 10px;
+      color: #1d1711;
+      background: rgba(255, 255, 255, 0.72);
+      font: inherit;
+      font-weight: 500;
+    }
+
+    .face-priority-control {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px;
+      border-radius: 999px;
+      border: 1px solid rgba(38, 29, 21, 0.12);
+      background: rgba(255, 255, 255, 0.62);
+    }
+
+    .face-priority-control input {
+      width: 74px;
+      border: 1px solid rgba(38, 29, 21, 0.14);
+      border-radius: 999px;
+      padding: 8px 10px;
+      color: #1d1711;
+      background: rgba(255, 255, 255, 0.72);
+      font: inherit;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .face-fact-row.is-hidden {
+      border-style: dashed;
+      background: rgba(239, 230, 215, 0.72);
+    }
+
+    .face-fact-row.is-locked {
+      border-color: rgba(138, 109, 53, 0.32);
+    }
+
     .page-title {
       margin: 0 0 6px;
       font-size: 1.55rem;
@@ -1464,7 +1571,9 @@
           item.appendChild(body);
           item.addEventListener("click", () => {
             state.selectedCharacterId = card.id;
-            renderWorkbook();
+            void loadWorkbook(state.selectedCharacterId).catch((error) => {
+              setCharacterStatus(error.message || String(error));
+            });
           });
           list.appendChild(item);
         }
@@ -1604,6 +1713,61 @@
       return value || fallback;
     }
 
+    function isFaceVisible(field) {
+      return field?.face_visible !== false && String(field?.face_visibility_mode || "").toLowerCase() !== "hidden";
+    }
+
+    function visibleFaceFields(fields) {
+      return sortFaceFields((fields || []).filter(isFaceVisible));
+    }
+
+    function faceVisibilityLabel(field) {
+      const mode = String(field?.face_visibility_mode || "inferred").trim().toLowerCase();
+      if (field?.visibility_locked) return `${mode} · locked`;
+      return mode;
+    }
+
+    function facePriorityLabel(field) {
+      const mode = String(field?.priority_mode || "inferred").trim().toLowerCase();
+      const score = facePriorityScore(field);
+      const lock = field?.priority_locked ? " · locked" : "";
+      return mode === "manual" ? `manual ${score}${lock}` : `inferred ${score}${lock}`;
+    }
+
+    function semanticFaceRegion(field) {
+      const key = String(field?.key || "").toLowerCase();
+      const region = String(field?.region || "").toLowerCase();
+      if (!isFaceVisible(field)) return "hidden";
+      if (region === "identity") return "identity";
+      if (region === "urgent") return "current";
+      if (key.includes("attribute") || key.includes("craft") || key.includes("grace") || key.includes("might")) return "attributes";
+      if (key.includes("skill")) return "skills";
+      if (key.includes("trait")) return "traits";
+      if (key.includes("relationship") || key.includes("parentage")) return "relationships";
+      if (key.includes("quote") || key.includes("tagline")) return "quotes";
+      if (key.includes("bio") || key.includes("description")) return "biography";
+      return "custom";
+    }
+
+    function semanticFaceRegionTitle(region) {
+      switch (region) {
+        case "identity": return "Identity";
+        case "current": return "Current State";
+        case "attributes": return "Attributes";
+        case "skills": return "Skills";
+        case "traits": return "Traits";
+        case "relationships": return "Relationships";
+        case "quotes": return "Quotes";
+        case "biography": return "Biography";
+        case "hidden": return "Hidden from Face";
+        default: return "Custom Information";
+      }
+    }
+
+    function canUseDirectorFaceControls() {
+      return state.role === "producer" || state.role === "director";
+    }
+
     function historySortScore(entry) {
       const raw = String(entry?.created_at || "").trim();
       const parsed = raw ? Date.parse(raw) : Number.NaN;
@@ -1620,6 +1784,129 @@
         if (titleDelta) return titleDelta;
         return String(a?.body || "").localeCompare(String(b?.body || ""));
       });
+    }
+
+    const workbookEntryTypeLabels = {
+      archetype_override: "Archetype override",
+      archetype_selection: "Archetype",
+      character_skill_added: "Skill trained",
+      character_skill_advanced: "Skill advanced",
+      character_skill_advance_failed: "Skill attempt",
+      chapter2_stage: "Life stage",
+      chapter_handoff: "Chapter handoff",
+      coin_flip: "Coin flip",
+      face_field_hidden: "Face hidden",
+      face_field_shown: "Face shown",
+      face_field_inferred: "Face reset",
+      first_skill_override: "First skill override",
+      first_skill_selection: "First skill",
+      parentage_roll: "Parentage",
+      workbook_seed: "Workbook started",
+    };
+
+    const chapter2BonusLabels = {
+      BONUS_S01_A: "Early Spiritual Awakening (+1 Spirit)",
+      BONUS_S01_B: "Destined Purpose (+1 Resolve)",
+      BONUS_S01_C: "Divine Favor (+1 Presence)",
+      BONUS_S01_D: "Mystical Insight (+1 Intellect)",
+      BONUS_S02_A: "Warrior Heritage (+1 Might)",
+      BONUS_S02_B: "Graceful Bearing (+1 Grace)",
+      BONUS_S02_C: "Keen Senses (+1 Awareness)",
+      BONUS_S02_D: "Family Wisdom (+1 Lore)",
+      BONUS_S03_A: "Beloved Child (+1 Empathy)",
+      BONUS_S03_B: "Alert Baby (+1 Awareness)",
+      BONUS_S03_C: "Healthy Constitution (+1 Might)",
+      BONUS_S03_D: "Peaceful Presence (+1 Spirit)",
+      BONUS_S04_A: "Natural Dancer (+1 Grace)",
+      BONUS_S04_B: "Fearless Explorer (+1 Awareness)",
+      BONUS_S04_C: "Strong Toddler (+1 Might)",
+      BONUS_S04_D: "Charming Child (+1 Presence)",
+      BONUS_S05_A: "Eagle Eyed (+1 Awareness)",
+      BONUS_S05_B: "Quick Learner (+1 Intellect)",
+      BONUS_S05_C: "Helper (+1 Craft)",
+      BONUS_S05_D: "Physically Aware (+1 Grace)",
+      BONUS_S06_A: "Star Pupil (+1 Intellect)",
+      BONUS_S06_B: "Outcast (+1 Resolve)",
+      BONUS_S06_C: "Helper (+1 Empathy)",
+      BONUS_S06_D: "Leader (+1 Presence)",
+      BONUS_S07_A: "Living Library (+1 Lore)",
+      BONUS_S07_B: "Master Craftsman (+1 Craft)",
+      BONUS_S07_C: "Natural Philosopher (+1 Intellect)",
+      BONUS_S07_D: "Naturally Graceful (+1 Grace)",
+      BONUS_S08_A: "Extreme Training (+1 Might)",
+      BONUS_S08_B: "Spiritual Awakening (+1 Spirit)",
+      BONUS_S08_C: "Crafting Away (+1 Craft)",
+      BONUS_S08_D: "Steady Heart (+1 Resolve)",
+      BONUS_S09_A: "Master Student (+1 Craft)",
+      BONUS_S09_B: "Caring Mentor (+1 Empathy)",
+      BONUS_S09_C: "Renaissance Student (+1 Lore)",
+      BONUS_S09_D: "Project Leader (+1 Presence)",
+      BONUS_S10_A: "Iron Will (+1 Resolve)",
+      BONUS_S10_B: "Shared Experience (+1 Empathy)",
+      BONUS_S10_C: "Life Experience (+1 Lore)",
+      BONUS_S10_D: "Inner Peace (+1 Spirit)",
+    };
+
+    function workbookEntryTypeLabel(entryType) {
+      const key = String(entryType || "").trim();
+      if (!key) return "";
+      if (workbookEntryTypeLabels[key]) return workbookEntryTypeLabels[key];
+      return key
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    }
+
+    function formatWorkbookEntryDate(value) {
+      const raw = String(value || "").trim();
+      if (!raw) return "";
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) return "";
+      return new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(parsed);
+    }
+
+    function workbookEntryTitle(entry, fallback = "Entry") {
+      return String(entry?.title || "").trim() || workbookEntryTypeLabel(entry?.entry_type) || fallback;
+    }
+
+    function workbookEntryMeta(entry, options = {}) {
+      const parts = [];
+      if (options.includeType) {
+        const typeLabel = workbookEntryTypeLabel(entry?.entry_type);
+        if (typeLabel && typeLabel !== workbookEntryTitle(entry, "")) parts.push(typeLabel);
+      }
+      const dateLabel = formatWorkbookEntryDate(entry?.created_at);
+      if (dateLabel) parts.push(dateLabel);
+      if (entry?.stage_number) parts.push(`Stage ${entry.stage_number}`);
+      return parts.join(" · ");
+    }
+
+    function workbookEntryBody(entry) {
+      const body = String(entry?.body || "").trim();
+      const result = entry?.payload?.chapter2_result;
+      if (String(entry?.entry_type || "") === "chapter2_stage" && result && typeof result === "object") {
+        const lines = [];
+        if (Number.isFinite(Number(result.final_roll))) lines.push(`Final roll ${result.final_roll}.`);
+        const bonus = chapter2BonusLabels[String(result.bonus_choice_id || "")];
+        if (bonus) lines.push(`Selected ${bonus}.`);
+        const deltas = result.attribute_deltas && typeof result.attribute_deltas === "object"
+          ? Object.entries(result.attribute_deltas).filter(([, value]) => Number(value))
+          : [];
+        if (deltas.length) {
+          lines.push(`Attribute changes: ${deltas.map(([name, value]) => `${name} ${Number(value) > 0 ? "+" : ""}${value}`).join(", ")}.`);
+        }
+        if (Number.isFinite(Number(result.fp_spent)) && Number(result.fp_spent) > 0) lines.push(`Spent ${result.fp_spent} Fate Point${Number(result.fp_spent) === 1 ? "" : "s"}.`);
+        if (Number.isFinite(Number(result.fp_balance))) lines.push(`${result.fp_balance} Fate Point${Number(result.fp_balance) === 1 ? "" : "s"} remaining.`);
+        if (lines.length) return lines.join("\n");
+      }
+      return body.replace(/\bBONUS_S\d{2}_[A-D]\b/g, (id) => chapter2BonusLabels[id] || "a recorded Socio stage bonus");
     }
 
     function pinStorageKey(characterId) {
@@ -1687,9 +1974,9 @@
     function pinnedHighlightFromEntry(entry) {
       return {
         key: entryPinKey(entry),
-        title: String(entry?.title || entry?.entry_type || "Pinned item"),
+        title: workbookEntryTitle(entry, "Pinned item"),
         body: String(entry?.body || "").trim(),
-        meta: [entry?.entry_type, entry?.created_at, entry?.stage_number ? `Stage ${entry.stage_number}` : ""].filter(Boolean).join(" · "),
+        meta: workbookEntryMeta(entry, { includeType: true }),
       };
     }
 
@@ -1701,6 +1988,71 @@
         return;
       }
       updatePinnedHighlights([item, ...state.pinnedHighlights]);
+    }
+
+    async function postFaceCuration(endpoint, body) {
+      if (!state.selectedCharacterId) throw new Error("Select a workbook first.");
+      setCharacterStatus("Updating Face...");
+      const response = await fetch(`/api/character-workbooks/${encodeURIComponent(state.selectedCharacterId)}/${endpoint}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.data?.error || payload?.error || `HTTP ${response.status}`);
+      }
+      await loadWorkbook(state.selectedCharacterId, { retainPage: true });
+      setCharacterStatus("Face updated.");
+      return payload.data;
+    }
+
+    function setFaceVisibility(field, mode) {
+      return postFaceCuration("face-visibility", {
+        fact_key: field?.key || "",
+        mode,
+      });
+    }
+
+    function setFacePriority(field, score) {
+      return postFaceCuration("face-priority", {
+        fact_key: field?.key || "",
+        mode: "manual",
+        score,
+      });
+    }
+
+    function returnFacePriorityToInferred(field) {
+      return postFaceCuration("face-priority", {
+        fact_key: field?.key || "",
+        mode: "inferred",
+      });
+    }
+
+    function setFaceLock(field, dimension, locked, reason) {
+      return postFaceCuration("face-lock", {
+        fact_key: field?.key || "",
+        dimension,
+        locked,
+        reason,
+      });
+    }
+
+    function setFaceValueOverride(field, value, reason) {
+      return postFaceCuration("face-value", {
+        fact_key: field?.key || "",
+        value,
+        reason,
+      });
+    }
+
+    function clearFaceValueOverride(field, reason) {
+      return postFaceCuration("face-value", {
+        fact_key: field?.key || "",
+        clear: true,
+        reason,
+      });
     }
 
     function hexToRgba(hex, alpha) {
@@ -1768,18 +2120,46 @@
       return chip;
     }
 
+    function facePresentField(fieldMap, key) {
+      const field = fieldMap.get(key);
+      if (!field || !isFaceVisible(field)) return null;
+      return faceFieldValue(field, "") ? field : null;
+    }
+
+    function faceQuoteFields(fields) {
+      return sortFaceFields((fields || []).filter((field) => {
+        if (!isFaceVisible(field)) return false;
+        if (!faceFieldValue(field, "")) return false;
+        const key = String(field?.key || "").toLowerCase();
+        return key.includes("quote") || key.includes("tagline");
+      }));
+    }
+
+    function faceQuoteLimit(quotes) {
+      const longest = Math.max(0, ...quotes.map((field) => faceFieldValue(field, "").length));
+      if (longest > 180) return 1;
+      if (longest > 100) return 2;
+      return 3;
+    }
+
     function renderFaceHero(fields) {
       const fieldMap = faceFieldsByKey(fields);
       const card = selectedCard();
       const workbook = state.workbook || {};
       const module = workbook?.module || {};
       const name = faceFieldValue(fieldMap.get("name"), card?.name || "Unknown Character");
-      const pronouns = faceFieldValue(fieldMap.get("pronouns"), "Pronouns not set");
-      const archetype = faceFieldValue(fieldMap.get("chapter3_archetype"), "Archetype pending");
-      const firstSkill = faceFieldValue(fieldMap.get("chapter4_first_skill"), "First skill pending");
-      const tagline = faceFieldValue(fieldMap.get("tagline"), "");
-      const description = faceFieldValue(fieldMap.get("public_description"), "");
-      const aura = faceFieldValue(fieldMap.get("token_aura"), "");
+      const pronounsField = facePresentField(fieldMap, "pronouns");
+      const archetypeField = facePresentField(fieldMap, "chapter3_archetype");
+      const firstSkillField = facePresentField(fieldMap, "chapter4_first_skill");
+      const bioField = facePresentField(fieldMap, "public_description");
+      const taglineField = facePresentField(fieldMap, "tagline");
+      const auraField = facePresentField(fieldMap, "token_aura");
+      const pronouns = faceFieldValue(pronounsField, "");
+      const archetype = faceFieldValue(archetypeField, "");
+      const firstSkill = faceFieldValue(firstSkillField, "");
+      const tagline = faceFieldValue(taglineField, "");
+      const description = faceFieldValue(bioField, "");
+      const aura = faceFieldValue(auraField, "");
       const auraColor = aura || "#d9c7a6";
       const auraGlow = hexToRgba(auraColor, 0.34) || "rgba(201, 169, 104, 0.34)";
       const portraitURL = faceFieldValue(fieldMap.get("portrait_url"), "");
@@ -1858,7 +2238,8 @@
       nameEl.textContent = name;
       const sub = document.createElement("p");
       sub.className = "face-hero-subtitle";
-      sub.textContent = `${pronouns} · ${archetype} · ${firstSkill}`;
+      const subtitleParts = [pronouns, archetype, firstSkill].filter(Boolean);
+      sub.textContent = subtitleParts.length ? subtitleParts.join(" · ") : "Face details curated below";
       title.appendChild(nameEl);
       title.appendChild(sub);
       main.appendChild(title);
@@ -1872,9 +2253,9 @@
 
       const metrics = document.createElement("div");
       metrics.className = "face-metric-grid";
-      metrics.appendChild(renderFaceMetric("Token Aura", aura ? aura.toUpperCase() : "Not set", { accent: true }));
-      metrics.appendChild(renderFaceMetric("Archetype", archetype, { accent: true }));
-      metrics.appendChild(renderFaceMetric("First Skill", firstSkill));
+      if (auraField) metrics.appendChild(renderFaceMetric("Token Aura", aura ? aura.toUpperCase() : "Not set", { accent: true }));
+      if (archetypeField) metrics.appendChild(renderFaceMetric("Archetype", archetype, { accent: true }));
+      if (firstSkillField) metrics.appendChild(renderFaceMetric("First Skill", firstSkill));
       metrics.appendChild(renderFaceMetric("Status", profileValue(card?.workbook_status || "draft")));
       main.appendChild(metrics);
 
@@ -1885,117 +2266,216 @@
       const lower = document.createElement("div");
       lower.className = "face-lower-grid";
 
-      const bioSection = renderFaceSection("Bio", "A short on-sheet summary. The fuller biography stays on the Bio page.", { full: true });
-      const bioBody = document.createElement("div");
-      bioBody.className = "face-bio-copy";
-      bioBody.textContent = description || "No public biography has been written yet.";
-      bioSection.appendChild(bioBody);
-      lower.appendChild(bioSection);
-
-      const quoteSection = renderFaceSection("Quote", "A memorable line that can be pinned and surfaced on the face.", { compact: true });
-      const quoteBody = document.createElement("blockquote");
-      quoteBody.className = "face-quote";
-      quoteBody.textContent = tagline || "No featured quote set yet.";
-      quoteSection.appendChild(quoteBody);
-      lower.appendChild(quoteSection);
-
-      const statsSection = renderFaceSection("Vital Stats", "Quick facts worth seeing at a glance.", { compact: true });
-      const statGrid = document.createElement("div");
-      statGrid.className = "face-stat-grid";
-      statGrid.appendChild(renderStatChip("Pronouns", pronouns));
-      statGrid.appendChild(renderStatChip("Token Aura", aura ? aura.toUpperCase() : "Not set"));
-      statGrid.appendChild(renderStatChip("Archetype", archetype));
-      statGrid.appendChild(renderStatChip("First Skill", firstSkill));
-      statsSection.appendChild(statGrid);
-      lower.appendChild(statsSection);
-
-      const eventsSection = renderFaceSection("Recent Events", "Newest workbook entries first. Pin anything worth keeping on the face.", { full: true });
-      const eventsHeader = document.createElement("div");
-      eventsHeader.className = "face-events-header";
-      const eventsNote = document.createElement("p");
-      eventsNote.className = "mini";
-      eventsNote.textContent = "Tap Pin to keep a note in the face board.";
-      eventsHeader.appendChild(eventsNote);
-      eventsSection.appendChild(eventsHeader);
-
-      const pinned = normalizePinnedHighlights(loadPinnedHighlights(card?.id || state.selectedCharacterId));
-      state.pinnedHighlights = pinned;
-
-      const pinBoard = document.createElement("div");
-      pinBoard.className = "face-pin-board";
-      const pinBoardTitle = document.createElement("div");
-      pinBoardTitle.className = "mini";
-      pinBoardTitle.textContent = "Pinned Highlights";
-      pinBoard.appendChild(pinBoardTitle);
-      if (!pinned.length) {
-        const emptyPins = document.createElement("p");
-        emptyPins.className = "empty-state";
-        emptyPins.textContent = "Nothing pinned yet.";
-        pinBoard.appendChild(emptyPins);
-      } else {
-        const pinGrid = document.createElement("div");
-        pinGrid.className = "face-pin-grid";
-        for (const item of pinned) {
-          const chip = document.createElement("article");
-          chip.className = "face-pin";
-          const title = document.createElement("strong");
-          title.textContent = item.title || "Pinned item";
-          const body = document.createElement("p");
-          body.textContent = item.body || item.meta || "";
-          chip.appendChild(title);
-          chip.appendChild(body);
-          const remove = document.createElement("button");
-          remove.type = "button";
-          remove.className = "text-button";
-          remove.textContent = "Unpin";
-          remove.addEventListener("click", () => {
-            updatePinnedHighlights(state.pinnedHighlights.filter((highlight) => highlight.key !== item.key));
-          });
-          chip.appendChild(remove);
-          pinGrid.appendChild(chip);
-        }
-        pinBoard.appendChild(pinGrid);
+      if (bioField) {
+        const bioSection = renderFaceSection("Bio", "A short on-sheet summary. The fuller biography stays on the Bio page.", { full: true });
+        const bioBody = document.createElement("div");
+        bioBody.className = "face-bio-copy";
+        bioBody.textContent = description;
+        bioSection.appendChild(bioBody);
+        lower.appendChild(bioSection);
       }
-      eventsSection.appendChild(pinBoard);
 
-      const eventsList = document.createElement("div");
-      eventsList.className = "face-event-list";
-      const recentEntries = recentWorkbookEntries(state.workbook);
-      if (!recentEntries.length) {
-        const empty = document.createElement("p");
-        empty.className = "empty-state";
-        empty.textContent = "No recent workbook events yet.";
-        eventsList.appendChild(empty);
-      } else {
-        for (const entry of recentEntries) {
-          const item = document.createElement("article");
-          item.className = "face-event";
-          const title = document.createElement("strong");
-          title.textContent = entry.title || entry.entry_type || "Entry";
-          const meta = document.createElement("span");
-          meta.textContent = [entry.entry_type, entry.created_at, entry.stage_number ? `Stage ${entry.stage_number}` : ""].filter(Boolean).join(" · ");
-          const body = document.createElement("p");
-          body.textContent = entry.body || "";
-          const actions = document.createElement("div");
-          actions.className = "action-row";
-          const pin = document.createElement("button");
-          pin.type = "button";
-          pin.className = "text-button";
-          pin.textContent = state.pinnedHighlights.some((highlight) => highlight.key === entryPinKey(entry)) ? "Pinned" : "Pin";
-          pin.addEventListener("click", () => togglePinnedHighlight(entry));
-          actions.appendChild(pin);
-          item.appendChild(title);
-          item.appendChild(meta);
-          item.appendChild(body);
-          item.appendChild(actions);
-          eventsList.appendChild(item);
+      const allQuotes = faceQuoteFields(fields);
+      const quotes = allQuotes.slice(0, faceQuoteLimit(allQuotes));
+      if (quotes.length) {
+        const quoteSection = renderFaceSection("Quotes", "Memorable lines surfaced on the face.", { compact: true });
+        for (const quote of quotes) {
+          const quoteBody = document.createElement("blockquote");
+          quoteBody.className = "face-quote";
+          quoteBody.textContent = faceFieldValue(quote, "");
+          quoteSection.appendChild(quoteBody);
         }
+        lower.appendChild(quoteSection);
       }
-      eventsSection.appendChild(eventsList);
-      lower.appendChild(eventsSection);
+
+      const stats = [
+        ["Pronouns", pronounsField, pronouns],
+        ["Token Aura", auraField, aura ? aura.toUpperCase() : ""],
+        ["Archetype", archetypeField, archetype],
+        ["First Skill", firstSkillField, firstSkill],
+      ].filter(([, field]) => field);
+      if (stats.length) {
+        const statsSection = renderFaceSection("Vital Stats", "Quick facts worth seeing at a glance.", { compact: true });
+        const statGrid = document.createElement("div");
+        statGrid.className = "face-stat-grid";
+        for (const [label, , value] of stats) {
+          statGrid.appendChild(renderStatChip(label, value));
+        }
+        statsSection.appendChild(statGrid);
+        lower.appendChild(statsSection);
+      }
 
       sheet.appendChild(lower);
       return sheet;
+    }
+
+    function curationButton(label, handler, disabled = false) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "text-button";
+      button.textContent = label;
+      button.disabled = disabled;
+      button.addEventListener("click", async () => {
+        try {
+          await handler();
+        } catch (error) {
+          setCharacterStatus(error.message || String(error));
+        }
+      });
+      return button;
+    }
+
+    function renderFaceFactRow(field) {
+      const row = document.createElement("article");
+      row.className = `face-fact-row${isFaceVisible(field) ? "" : " is-hidden"}${field.visibility_locked || field.priority_locked || field.value_locked ? " is-locked" : ""}`;
+
+      const main = document.createElement("div");
+      main.className = "face-fact-main";
+      const title = document.createElement("strong");
+      title.textContent = field.label || field.key || "Fact";
+      const value = document.createElement("p");
+      value.textContent = field.value || "Not set";
+      const meta = document.createElement("span");
+      meta.textContent = `${semanticFaceRegionTitle(semanticFaceRegion(field))} · ${faceVisibilityLabel(field)} · ${facePriorityLabel(field)} · ${field.source_kind || "system"}`;
+      main.append(title, value, meta);
+      row.appendChild(main);
+
+      const controls = document.createElement("div");
+      controls.className = "face-fact-controls";
+      controls.appendChild(curationButton("Show", () => setFaceVisibility(field, "shown"), field.visibility_locked || String(field.face_visibility_mode || "").toLowerCase() === "shown"));
+      controls.appendChild(curationButton("Hide", () => setFaceVisibility(field, "hidden"), field.visibility_locked || String(field.face_visibility_mode || "").toLowerCase() === "hidden"));
+      controls.appendChild(curationButton("Use inferred visibility", () => setFaceVisibility(field, "inferred"), field.visibility_locked || String(field.face_visibility_mode || "inferred").toLowerCase() === "inferred"));
+
+      const priority = document.createElement("label");
+      priority.className = "face-priority-control";
+      priority.setAttribute("aria-label", `${field.label || field.key} priority`);
+      const decrement = curationButton("-", () => setFacePriority(field, facePriorityScore(field) - 1), field.priority_locked);
+      const input = document.createElement("input");
+      input.type = "number";
+      input.step = "1";
+      input.value = String(facePriorityScore(field));
+      input.disabled = !!field.priority_locked;
+      input.addEventListener("change", async () => {
+        const score = Number.parseInt(input.value, 10);
+        if (!Number.isFinite(score)) return;
+        try {
+          await setFacePriority(field, score);
+        } catch (error) {
+          setCharacterStatus(error.message || String(error));
+        }
+      });
+      const increment = curationButton("+", () => setFacePriority(field, facePriorityScore(field) + 1), field.priority_locked);
+      priority.append(decrement, input, increment);
+      controls.appendChild(priority);
+      controls.appendChild(curationButton("Use inferred priority", () => returnFacePriorityToInferred(field), field.priority_locked || String(field.priority_mode || "inferred").toLowerCase() === "inferred"));
+      row.appendChild(controls);
+
+      if (canUseDirectorFaceControls()) {
+        const director = document.createElement("div");
+        director.className = "face-director-controls";
+        const label = document.createElement("label");
+        const labelText = document.createElement("span");
+        labelText.textContent = "Director reason";
+        const reasonInput = document.createElement("input");
+        reasonInput.type = "text";
+        reasonInput.placeholder = "Required for overrides and locks";
+        label.append(labelText, reasonInput);
+        director.appendChild(label);
+
+        const valueLabel = document.createElement("label");
+        const valueLabelText = document.createElement("span");
+        valueLabelText.textContent = "Director value override";
+        const valueInput = document.createElement("input");
+        valueInput.type = "text";
+        valueInput.placeholder = "Override displayed value";
+        valueInput.value = field.source_kind === "director_override" ? String(field.value || "") : "";
+        valueLabel.append(valueLabelText, valueInput);
+        director.appendChild(valueLabel);
+
+        const lockRow = document.createElement("div");
+        lockRow.className = "face-fact-controls";
+        const lockHandler = (dimension, locked) => async () => {
+          const reason = String(reasonInput.value || "").trim();
+          if (!reason) {
+            setCharacterStatus("Director lock reason is required.");
+            reasonInput.focus();
+            return;
+          }
+          await setFaceLock(field, dimension, locked, reason);
+        };
+        lockRow.appendChild(curationButton(field.value_locked ? "Unlock value" : "Lock value", lockHandler("value", !field.value_locked)));
+        lockRow.appendChild(curationButton(field.visibility_locked ? "Unlock visibility" : "Lock visibility", lockHandler("visibility", !field.visibility_locked)));
+        lockRow.appendChild(curationButton(field.priority_locked ? "Unlock priority" : "Lock priority", lockHandler("priority", !field.priority_locked)));
+        lockRow.appendChild(curationButton("Set value override", async () => {
+          const reason = String(reasonInput.value || "").trim();
+          const value = String(valueInput.value || "").trim();
+          if (!reason) {
+            setCharacterStatus("Director override reason is required.");
+            reasonInput.focus();
+            return;
+          }
+          if (!value) {
+            setCharacterStatus("Override value is required.");
+            valueInput.focus();
+            return;
+          }
+          await setFaceValueOverride(field, value, reason);
+        }));
+        lockRow.appendChild(curationButton("Clear value override", async () => {
+          const reason = String(reasonInput.value || "").trim();
+          if (!reason) {
+            setCharacterStatus("Director override reason is required.");
+            reasonInput.focus();
+            return;
+          }
+          await clearFaceValueOverride(field, reason);
+        }, field.source_kind !== "director_override"));
+        director.appendChild(lockRow);
+        row.appendChild(director);
+      }
+
+      return row;
+    }
+
+    function renderArrangeFace(fields) {
+      const section = document.createElement("section");
+      section.className = "face-section-block is-full face-arrange";
+      const header = document.createElement("div");
+      header.className = "face-arrange-header";
+      const titleBlock = document.createElement("div");
+      const title = document.createElement("h3");
+      title.textContent = "Arrange Face";
+      const desc = document.createElement("p");
+      desc.className = "mini";
+      desc.textContent = "Curate current character facts. History stays on the History page.";
+      titleBlock.append(title, desc);
+      const count = document.createElement("div");
+      count.className = "mini";
+      count.textContent = `${fields.length} eligible fact${fields.length === 1 ? "" : "s"}`;
+      header.append(titleBlock, count);
+      section.appendChild(header);
+
+      const groups = new Map();
+      for (const field of fields) {
+        const region = semanticFaceRegion(field);
+        if (!groups.has(region)) groups.set(region, []);
+        groups.get(region).push(field);
+      }
+      const order = ["identity", "current", "attributes", "skills", "traits", "relationships", "quotes", "biography", "custom", "hidden"];
+      for (const region of order) {
+        const items = sortFaceFields(groups.get(region) || []);
+        if (!items.length) continue;
+        const group = document.createElement("section");
+        group.className = "face-fact-group";
+        const heading = document.createElement("h4");
+        heading.textContent = semanticFaceRegionTitle(region);
+        group.appendChild(heading);
+        for (const field of items) {
+          group.appendChild(renderFaceFactRow(field));
+        }
+        section.appendChild(group);
+      }
+      return section;
     }
 
     function renderFaceCard(field) {
@@ -2037,8 +2517,9 @@
     }
 
     function renderFacePage(page) {
-      const fields = sortFaceFields(page.fields || []);
-      const heroKeys = new Set(["name", "portrait_url", "pronouns", "token_aura", "chapter3_archetype", "chapter4_first_skill", "tagline"]);
+      const allFields = sortFaceFields(page.fields || []);
+      const fields = visibleFaceFields(allFields);
+      const heroKeys = new Set(["name", "portrait_url", "pronouns", "token_aura", "chapter3_archetype", "chapter4_first_skill", "public_description", "tagline"]);
       const sheet = renderFaceHero(fields);
       const groups = new Map();
       for (const field of fields) {
@@ -2088,6 +2569,7 @@
       }
 
       sheet.appendChild(bodyGrid);
+      sheet.appendChild(renderArrangeFace(allFields));
       pageBody.appendChild(sheet);
 
       const actions = document.createElement("div");
@@ -2377,11 +2859,11 @@
           const item = document.createElement("div");
           item.className = "list-item";
           const title = document.createElement("strong");
-          title.textContent = entry.title || entry.entry_type || "Entry";
+          title.textContent = workbookEntryTitle(entry);
           const meta = document.createElement("span");
-          meta.textContent = [entry.entry_type, entry.created_at, entry.stage_number ? `Stage ${entry.stage_number}` : ""].filter(Boolean).join(" · ");
+          meta.textContent = workbookEntryMeta(entry);
           const body = document.createElement("p");
-          body.textContent = entry.body || "";
+          body.textContent = workbookEntryBody(entry);
           item.appendChild(title);
           item.appendChild(meta);
           item.appendChild(body);
@@ -2417,6 +2899,32 @@
           grid.appendChild(label);
         }
         section.appendChild(grid);
+        const skills = Array.isArray(page.skills) ? page.skills : [];
+        const skillList = document.createElement("div");
+        skillList.className = "list";
+        if (skills.length) {
+          const skillHeading = document.createElement("h3");
+          skillHeading.textContent = "Trained Skills";
+          section.appendChild(skillHeading);
+          for (const skill of skills) {
+            const item = document.createElement("div");
+            item.className = "list-item";
+            const title = document.createElement("strong");
+            title.textContent = skill.skill_name || skill.skill_id || "Skill";
+            const meta = document.createElement("span");
+            meta.textContent = [skill.attribute_name, `Step ${skill.ladder_step ?? 0}`, skill.is_helper ? "Helper" : "Skill"].filter(Boolean).join(" · ");
+            const body = document.createElement("p");
+            body.textContent = `Source: ${skill.source || "character"} · Improvements: ${skill.improvement_count ?? 0}`;
+            item.append(title, meta, body);
+            skillList.appendChild(item);
+          }
+        } else {
+          const emptySkills = document.createElement("p");
+          emptySkills.className = "empty-state";
+          emptySkills.textContent = "No trained skills yet.";
+          skillList.appendChild(emptySkills);
+        }
+        section.appendChild(skillList);
         const actions = document.createElement("div");
         actions.className = "action-row";
         const save = document.createElement("button");
@@ -2554,7 +3062,8 @@
       renderPage(page);
     }
 
-    async function loadCharacterCards() {
+    async function loadCharacterCards(options = {}) {
+      const respectRequestedId = options.respectRequestedId !== false;
       const response = await fetch("/api/character-cards/me", { credentials: "include" });
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.ok) {
@@ -2566,7 +3075,7 @@
       state.cards = Array.isArray(data.cards) ? data.cards : [];
       state.activeCharacterId = String(data.active_character?.character_card_id || data.active_persona?.character_card_id || "").trim();
       const requestedId = requestedCharacterId();
-      if (requestedId && state.cards.some((card) => card.id === requestedId)) {
+      if (respectRequestedId && requestedId && state.cards.some((card) => card.id === requestedId)) {
         state.selectedCharacterId = requestedId;
       } else if (state.activeCharacterId && state.cards.some((card) => card.id === state.activeCharacterId)) {
         state.selectedCharacterId = state.activeCharacterId;
@@ -2671,8 +3180,13 @@
               throw new Error(payload?.data?.error || payload?.error || `HTTP ${response.status}`);
             }
             setCharacterStatus("Character activated.");
-            await loadCharacterCards();
-            await loadWorkbook(state.selectedCharacterId, { retainPage: true });
+            state.activeCharacterId = card.id;
+            state.selectedCharacterId = card.id;
+            const url = new URL(window.location.href);
+            url.searchParams.set("character_id", card.id);
+            window.history.replaceState({}, "", url.toString());
+            await loadCharacterCards({ respectRequestedId: false });
+            await loadWorkbook(card.id, { retainPage: true });
           } catch (error) {
             setCharacterStatus(error.message || String(error));
           }

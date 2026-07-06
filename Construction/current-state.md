@@ -102,6 +102,11 @@ Character cards:
 - `GET /api/character-cards/me`
 - `POST /api/character-cards`
 - `PATCH /api/character-cards/{id}`
+- `GET /api/characters/venue-sheet`
+- `POST /api/character-workbooks/{id}/face-visibility`
+- `POST /api/character-workbooks/{id}/face-priority`
+- `POST /api/character-workbooks/{id}/face-lock`
+- `POST /api/character-workbooks/{id}/face-value`
 - `POST /api/character-journals`
 - Legacy/dormant authority routes still exist, but current product behavior does not rely on them:
   - `POST /api/character-card-permissions`
@@ -138,6 +143,11 @@ World, session, and venue runtime:
 - `GET /api/venues/{slug}/map`
 - `POST /api/venues/{slug}/map`
 - `DELETE /api/venues/{slug}/map`
+
+Character projection runtime:
+- Venue sheets are derived from the shared backend character projector and include a `projection_version`.
+- Server-authored websocket messages of type `character/projection_updated` are invalidation notices only; clients refetch `/api/characters/venue-sheet`.
+- First Theater and Catharsis character trays have separate Face and Mechanics tabs.
 - `GET /api/venues/{slug}/grid`
 - `PUT /api/venues/{slug}/grid`
 - `GET /api/discord/audio/status`
@@ -323,6 +333,8 @@ Strategy:
 - Create mailbox messages and note cards
 - Draft and publish performer profile fields in Trailers
 - Draft and edit character cards in Greenroom
+- Curate character Face facts in Greenroom with show/hide/inferred visibility, manual priority, Director locks, and Director displayed-value overrides
+- View the same curated character projection in Catharsis and First Theater venue trays with live `character/projection_updated` refetch, Face/Mechanics tabs, readable Bio/Quote presentation, and mechanics skills
 - Attach `sheet_links` metadata to character cards
 - Equip and unequip an existing character persona in The Cave
 - Open the Director's Chair and control the current showing with live audience-view, chat-policy, presence, and overlay controls
@@ -345,6 +357,7 @@ Strategy:
 - Browser-level character-sheet save confusion still needs direct front-end reproduction even though live authenticated create and PATCH both succeed against the backend
 - Starting a brand-new showing is still deferred; the live console can close a showing and control the current one, but it does not yet create a fresh run on demand
 - Some older docs still describe earlier kernel truths and are now historical
+- `/quote` is still singleton Featured Quote storage; `/quote add` / multi-quote collection is a future feature, not part of the completed Kernel 59A pass
 
 ## Recording Language
 - **Showing Review** means review of actions, chat, reactions, notes, and showing/session history

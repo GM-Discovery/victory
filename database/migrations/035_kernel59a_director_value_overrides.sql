@@ -1,0 +1,7 @@
+BEGIN;
+
+ALTER TABLE character_face_overrides
+  ADD COLUMN IF NOT EXISTS value_override_active BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS value_override TEXT NOT NULL DEFAULT '';
+
+COMMIT;

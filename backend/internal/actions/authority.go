@@ -59,7 +59,7 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 		return Decision{Allowed: false, Reason: "not_session_participant"}, nil
 	}
 	if actionType != "act/reveal_element" && actionType != "act/hide_element" {
-		if actionType != "create/index_card" && actionType != "update/index_card" && actionType != "delete/index_card" && actionType != "create/token" && actionType != "update/token" && actionType != "act/place_element" && actionType != "act/duplicate_element" && actionType != "act/remove_element" && actionType != "act/show_overlay" && actionType != "act/hide_overlay" && actionType != "act/set_element_lock" && actionType != "act/set_nameplate_visibility" && actionType != "chat/message" && actionType != "chat/ooc" && actionType != "persona/equip" && actionType != "persona/unequip" && actionType != "roll/dice" {
+		if actionType != "create/index_card" && actionType != "update/index_card" && actionType != "delete/index_card" && actionType != "create/token" && actionType != "update/token" && actionType != "act/place_element" && actionType != "act/duplicate_element" && actionType != "act/remove_element" && actionType != "act/show_overlay" && actionType != "act/hide_overlay" && actionType != "act/set_element_lock" && actionType != "act/set_nameplate_visibility" && actionType != "chat/message" && actionType != "chat/ooc" && actionType != "persona/equip" && actionType != "persona/unequip" && actionType != "roll/dice" && actionType != "game/event" {
 			return Decision{Allowed: false, Reason: "unknown_action"}, nil
 		}
 	}
@@ -125,6 +125,13 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 	}
 
 	if actionType == "roll/dice" {
+		return canActDiceRoll(ctx, q, userID, sessionID)
+	}
+
+	if actionType == "game/event" {
+		// Game events are always server-produced mirrors of a character
+		// mutation (Kernel 60 §9), never directly user-authored, so they
+		// share roll/dice's authority shape: any session participant.
 		return canActDiceRoll(ctx, q, userID, sessionID)
 	}
 

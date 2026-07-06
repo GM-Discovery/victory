@@ -4,7 +4,7 @@
   }
   root.VictoryCatharsisDice = factory();
 })(typeof globalThis !== "undefined" ? globalThis : window, function () {
-  const DEFAULT_HISTORY_LIMIT = 2;
+  const DEFAULT_HISTORY_LIMIT = 8;
 
   function normalizePositiveInt(value, fallback) {
     const parsed = Number.parseInt(String(value ?? ""), 10);
@@ -467,17 +467,32 @@
       rollButton.textContent = "Roll";
       actionRow.appendChild(rollButton);
 
+      const body = doc.createElement("div");
+      body.className = "dice-tray__body";
+      const controlsPane = doc.createElement("div");
+      controlsPane.className = "dice-tray__controls-pane";
+      controlsPane.append(quickRow, controls, expressionLabel, preview, actionRow);
+      const historyPane = doc.createElement("section");
+      historyPane.className = "dice-tray__history-pane";
+      historyPane.setAttribute("aria-label", "Recent rolls");
+      const historyTitle = doc.createElement("strong");
+      historyTitle.className = "dice-tray__history-title";
+      historyTitle.textContent = "Recent Rolls";
       const history = doc.createElement("div");
       history.className = "dice-tray__history";
+      historyPane.append(historyTitle, history);
+      body.append(controlsPane, historyPane);
 
-      shell.append(header, quickRow, controls, expressionLabel, preview, actionRow, history);
+      shell.append(header, body);
       root.appendChild(shell);
 
       elements = {
         root,
         shell,
         header,
+        body,
         status,
+        controlsPane,
         quickRow,
         controls,
         count,
@@ -489,6 +504,7 @@
         preview,
         actionRow,
         rollButton,
+        historyPane,
         history,
       };
 
@@ -555,10 +571,11 @@
       }
     }
 
-    function roll({ expression, visibility = "public", label = "" } = {}) {
+    function roll({ expression, visibility = "public", label = "", skillId = "" } = {}) {
       const normalizedExpression = String(expression || "").trim();
       const normalizedLabel = String(label || "").trim();
       const normalizedVisibility = String(visibility || "public").trim().toLowerCase() || "public";
+      const normalizedSkillId = String(skillId || "").trim();
       if (!normalizedExpression) {
         return Promise.reject(new Error("expression_required"));
       }
@@ -585,6 +602,7 @@
           expression: normalizedExpression,
           visibility: normalizedVisibility,
           label: normalizedLabel,
+          skill_id: normalizedSkillId,
         });
         if (!sent) {
           clearTimeoutFn(timer);

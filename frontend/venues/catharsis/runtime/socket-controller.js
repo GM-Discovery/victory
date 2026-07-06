@@ -91,7 +91,7 @@
       const centerWorld = getStageCamera()?.screenToWorld?.(size.width / 2, size.height / 2) || { x: 0, y: 0 };
       const focusWorld = getLastStagePoint() || centerWorld;
       return {
-        venue_slug: "the-cave",
+        venue_slug: "catharsis",
         focus_x: Math.round(Number(focusWorld.x || 0)),
         focus_y: Math.round(Number(focusWorld.y || 0)),
         camera_center_x: Math.round(Number(centerWorld.x || 0)),
@@ -141,7 +141,7 @@
         return null;
       }
 
-      ws = new WebSocketCtor(`${protocol}//${getLocation().host}/ws/the-cave`);
+      ws = new WebSocketCtor(`${protocol}//${getLocation().host}/ws/catharsis`);
 
       ws.addEventListener("open", () => {
         socketReconnectDelay = 1000;

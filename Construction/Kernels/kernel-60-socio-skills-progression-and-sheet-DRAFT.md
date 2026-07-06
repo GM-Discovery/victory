@@ -1,6 +1,6 @@
 # Kernel 60 — Socio- Skills, Progression, and the Living Character Sheet
 
-**Revision:** 0.2 DRAFT — OWNER DECISIONS RESOLVED (§11), READY FOR FINAL REVIEW
+**Revision:** 0.3 — FINALIZED, IMPLEMENTATION STARTING (§11 items 1–7 resolved; verified against current codebase 2026-07-04: dice ladder means, `CanAct` allowlist pattern, `DiceRollRequest` payload extensibility, and Chapter4 capacity pattern all check out)
 **Kernel type:** Game-rules domain layer (skills, dice progression, advancement), venue Game Events, right-tray character sheet UI
 **Canonical rules source:** `/opt/victory/frontend/assets/rulesets/Sociov1_1.md` (Socio- v1.1, full text — builders must read Chapters 5–8 before implementing)
 **Depends on:** Kernel 59 command registry/execute surface (shipped); compound dice pools in `backend/internal/dice` (shipped alongside this draft — `2d20+d12!+3` parses and rolls today); Chapter 2–4 onboarding facts (`workbook_context` chapters, attribute totals, first skill)
@@ -86,7 +86,7 @@ step  pool       mean
 
 (Note for the table: steps 18→19→20 swap dice sets — `2d20+d8` → `4d12` → `2d20+d10` — because `4d12`'s mean lands between them. Mathematically ordered per ruling; flag to players in the sheet UI so it doesn't read as a typo.)
 
-Store the ladder in one Go table (`backend/internal/characters/skill_ladder.go` or a new `rules` package) with `StepExpression(step int) string` returning the dice expression; the dice engine already rolls every entry.
+Store the ladder in one Go table (`backend/internal/characters/skill_ladder.go` or a new `rules` package) with `StepExpression(step int) string` returning the dice expression; the dice engine already rolls every entry. Per §11 item 7, expose both an exploding form (each group suffixed `!`, for normal skill checks) and a plain form (for advancement rolls) — e.g. `StepExpression(step)` returns the exploding form and `StepExpressionPlain(step)` the advancement form, or a single function with an `explode bool` parameter.
 
 **Skill dice caps by character level**: **track, don't enforce** (owner ruling). The server records `improvement_count`; the sheet shows each skill's improvement pips plus **player-toggleable checkboxes** the player can mark and unmark when they level (self-tracked, no mechanical enforcement — stored on the skill row so they persist, but the rules engine never reads them).
 
@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS character_skills (
 Rules:
 - **Catalogue lookup** reuses `Chapter4SkillByID/ByName` (exact or unambiguous-prefix match; ambiguous → `ambiguous_skill_name`). Custom skills reuse the existing custom-skill contract (`customStableID("skill")`) where the ruleset permits.
 - **Capacity** (owner ruling): counted in **half-slot units** so a player isn't overloaded with skills a character could invoke at once. A full skill costs 2 units, a **helper skill costs 1 unit (half capacity)**; total units per governing attribute ≤ attribute score × 2. Same transactional check pattern as `CommitChapter4FirstSkill`'s `attribute_capacity_full`.
+  - **This kernel does not add a helper-selection path** (§2 already defers helper cards as enforced mechanics, and there's no top-level helper lookup today — `Chapter4SkillByID/ByName` only indexes the 100 full skills; helper cards live nested inside each skill's `Helpers []Chapter4SkillHelper` with no by-ID/by-name index, and the custom-skill contract has no helper concept). `is_helper` is always `FALSE` for every row this kernel writes; the column and the half-unit formula exist now so a later kernel can populate real helper rows without a migration. Every `/char add skill` addition costs 2 units.
 - The Chapter-4 first skill is **backfilled** into `character_skills` on first read (step 1 = d6, since it is "trained"; source `chapter4_first`), so the sheet shows one unified list. Backfill is idempotent and never duplicates.
 - Concurrency: capacity check inside the insert transaction (same pattern as chapter4's transactional capacity check).
 
@@ -145,7 +146,7 @@ Flow for `/char advance <skill>`:
 ## 8. Click-to-roll and the right-tray sheet
 
 - **Right tray sheet**: a scrollable Face panel inside the venue right drawer (both catharsis and first-theater; the-cave later). Server provides a compact sheet endpoint (name/pronouns/aura/portrait + attributes + skills with current dice) — a trimmed projection of `buildWorkbookPages`, **not** a second source of truth. No private fields (journal, private notes) in the venue payload.
-- **Click a skill** → client sends the existing dice-tray roll with `expression = ladder expression`, `label = skill name`, and a new `skill_id` payload field threaded through `DiceRollRequest` → stored in the `roll/dice` payload (this is what advancement verification reads). Attribute contribution (owner ruling): **the attribute is NOT auto-added**. A skill's own description says when an attribute value is actually invoked, and it's rare — the full 100-skill catalogue with those descriptions already lives in `backend/internal/characters/chapter4_skills.go` (not just the picker cards). Click-to-roll rolls the skill's ladder dice only; when a skill's text invokes an attribute, that's table adjudication for now (a future per-skill metadata flag can automate it if it earns its keep).
+- **Click a skill** → client sends the existing dice-tray roll with `expression = ladder expression (exploding form, per §11 item 7)`, `label = skill name`, and a new `skill_id` payload field threaded through `DiceRollRequest` → stored in the `roll/dice` payload (this is what advancement verification reads). Attribute contribution (owner ruling): **the attribute is NOT auto-added**. A skill's own description says when an attribute value is actually invoked, and it's rare — the full 100-skill catalogue with those descriptions already lives in `backend/internal/characters/chapter4_skills.go` (not just the picker cards). Click-to-roll rolls the skill's ladder dice only; when a skill's text invokes an attribute, that's table adjudication for now (a future per-skill metadata flag can automate it if it earns its keep).
 - TV is not enforced by the app in this kernel (Narrator judgment per Chapter 6); the roll simply reports totals. TV tables become app-visible reference content in the Guide tab (cheap, optional).
 
 ## 9. Game Events (the deferred mirror, built now)
@@ -166,9 +167,10 @@ Flow for `/char advance <skill>`:
 1. **Ladder order**: reordered by mean roll value; `4d12` sits at step 19 and `5d12` at step 23 (§4). The chart's original placement was a math error.
 2. **Tier caps**: track only, never enforce. Sheet shows improvement pips plus player-toggleable checkboxes for self-tracked leveling (§4, §5).
 3. **Attribute in rolls**: not auto-added. Skill descriptions (full catalogue in `chapter4_skills.go`) say when an attribute is invoked, and it's rare (§8).
-4. **Advancement verification**: untagged rolls don't count — players roll through too many surfaces (`/r`, `/roll`, dice buttons, sheet clicks, custom rollers) to infer skill use; only `skill_id`-tagged rolls qualify (§7). Register `/r` as an alias of `/roll`.
+4. **Advancement verification**: untagged rolls don't count — players roll through too many surfaces (`/r`, `/roll`, dice buttons, sheet clicks, custom rollers) to infer skill use; only `skill_id`-tagged rolls qualify (§7). `/r` is already registered as an alias of `/roll` (`registry.go` — verified, no work needed here).
 5. **Advancement explosion**: none — a max face is already well over 10 and disqualifies itself (§7).
-6. **Helper skills**: count at **half capacity** (1 unit vs 2 in half-slot accounting) so players aren't overloaded with simultaneous skills (§5).
+6. **Helper skills**: count at **half capacity** (1 unit vs 2 in half-slot accounting) so players aren't overloaded with simultaneous skills (§5) — **but this kernel reserves the column only**; no helper-selection path is built now (no top-level helper lookup exists, and §2 already deferred helper cards as enforced mechanics). Every row this kernel writes is a full skill (`is_helper = FALSE`, 2 units).
+7. **Normal skill-roll explosion**: skill checks explode by default (each max face rolls a bonus die, matching `/roll`'s existing behavior); only `/char advance` suppresses it (§7 item 2 is a carve-out from this default, not a no-op). `StepExpression(step)` must therefore expose both forms: an exploding expression for click-to-roll (e.g. `d12!`, `d10!+d4!`) and a plain one for the advancement roll.
 
 ## 12. Lattice risk register
 

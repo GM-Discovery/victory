@@ -61,6 +61,7 @@
     const setRendererFallback = typeof deps.setRendererFallback === "function" ? deps.setRendererFallback : () => {};
     const setMovementReport = typeof deps.setMovementReport === "function" ? deps.setMovementReport : () => {};
     const appendSystemChatNotice = typeof deps.appendSystemChatNotice === "function" ? deps.appendSystemChatNotice : () => {};
+    const handleCharacterProjectionInvalidation = typeof deps.handleCharacterProjectionInvalidation === "function" ? deps.handleCharacterProjectionInvalidation : () => {};
     const chatClosedMessage = typeof deps.chatClosedMessage === "function" ? deps.chatClosedMessage : () => "Chat closed.";
     const getCurrentVenueMapState = typeof deps.getCurrentVenueMapState === "function" ? deps.getCurrentVenueMapState : () => null;
     const getCurrentVenueMapAssetID = typeof deps.getCurrentVenueMapAssetID === "function" ? deps.getCurrentVenueMapAssetID : () => "";
@@ -389,6 +390,11 @@
         return msg;
       }
 
+      if (msg.kind === "character_projection_updated") {
+        await handleCharacterProjectionInvalidation(msg);
+        return msg;
+      }
+
       if (msg.kind === "action" && msg.action) {
         const actionType = msg.action.type || "";
         if (actionType === "roll/dice") {
@@ -397,6 +403,10 @@
         }
         if (actionType === "chat/message" || actionType === "chat/ooc") {
           deps.appendChatActionLine?.(msg.action);
+          return msg;
+        }
+        if (actionType === "game/event") {
+          deps.appendGameEventLine?.(msg.action);
           return msg;
         }
         if (

@@ -402,6 +402,12 @@
     return Math.max(d4, d6);
   };
 
+  const ch2SelectedBonusLabel = () => {
+    const choice = (ch2Local.stageRules?.bonus_choices || []).find((item) => item.id === ch2Local.bonusChoiceId);
+    if (!choice) return "recorded Socio stage bonus";
+    return `${choice.name} (+${choice.modifier} ${choice.target_attribute})`;
+  };
+
   const ch2RenderBonusChoices = () => {
     const stage = ch2Local.stageRules;
     ch2BonusChoices.innerHTML = (stage.bonus_choices || []).map((choice) => `
@@ -712,7 +718,7 @@
         page_key: "history",
         entry_type: "chapter2_stage",
         title: `Stage ${ch2Local.stageNumber}: ${ch2Local.stageRules.name}`,
-        body: `Final roll ${result.final_roll}. Bonus: ${ch2Local.bonusChoiceId}.`,
+        body: `Final roll ${result.final_roll}. Selected ${ch2SelectedBonusLabel()}.`,
         stage_number: ch2Local.stageNumber,
         sort_order: ch2Local.stageNumber,
         payload: {

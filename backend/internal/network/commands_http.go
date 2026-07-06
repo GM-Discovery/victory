@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -173,17 +174,16 @@ func HandleCommandsExecute(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 			return
 
 		case "char":
-			handleCharExecute(ctx, w, pool, userID, sessionID, args, req.IdempotencyKey)
+			handleCharExecute(ctx, w, hub, pool, userID, sessionID, args, req.IdempotencyKey)
 			return
 
 		case "bio":
-			handleFieldSetExecute(ctx, w, pool, userID, sessionID, "bio.set", args, req.IdempotencyKey, commands.ExecuteBioSet)
+			handleFieldSetExecute(ctx, w, hub, pool, userID, sessionID, "bio.set", args, req.IdempotencyKey, []string{"face", "bio"}, commands.ExecuteBioSet)
 			return
 
 		case "quote":
-			handleFieldSetExecute(ctx, w, pool, userID, sessionID, "quote.set", args, req.IdempotencyKey, commands.ExecuteQuoteSet)
+			handleFieldSetExecute(ctx, w, hub, pool, userID, sessionID, "quote.set", args, req.IdempotencyKey, []string{"face", "quote"}, commands.ExecuteQuoteSet)
 			return
-
 
 		case "journal":
 			handleJournalExecute(ctx, w, pool, userID, args, req.IdempotencyKey)
@@ -195,12 +195,25 @@ func HandleCommandsExecute(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func handleCharExecute(ctx context.Context, w http.ResponseWriter, pool *pgxpool.Pool, userID, sessionID string, args []string, idempotencyKey string) {
+func handleCharExecute(ctx context.Context, w http.ResponseWriter, hub *Hub, pool *pgxpool.Pool, userID, sessionID string, args []string, idempotencyKey string) {
 	if len(args) == 0 {
 		args = []string{"face"}
 	}
 
 	sub := strings.ToLower(strings.TrimSpace(args[0]))
+
+	switch sub {
+	case "add":
+		handleCharAddSkillExecute(ctx, w, hub, pool, userID, sessionID, args[1:], idempotencyKey)
+		return
+	case "skills":
+		handleCharSkillsListExecute(ctx, w, pool, userID, sessionID)
+		return
+	case "advance":
+		handleCharAdvanceExecute(ctx, w, hub, pool, userID, sessionID, args[1:])
+		return
+	}
+
 	if sub != "set" {
 		page, err := commands.ExecuteCharNavigate(sub)
 		if err != nil {
@@ -237,7 +250,7 @@ func handleCharExecute(ctx context.Context, w http.ResponseWriter, pool *pgxpool
 		return
 	}
 
-	result, _, err := commands.ExecuteIdempotent(ctx, pool, userID, "char.set."+field, idempotencyKey, func(ctx context.Context) (map[string]any, error) {
+	result, replayed, err := commands.ExecuteIdempotent(ctx, pool, userID, "char.set."+field, idempotencyKey, func(ctx context.Context) (map[string]any, error) {
 		card, err := commands.ExecuteCharSet(ctx, pool, userID, cardID, field, value)
 		if err != nil {
 			return nil, err
@@ -248,6 +261,168 @@ func handleCharExecute(ctx context.Context, w http.ResponseWriter, pool *pgxpool
 		writeCommandsError(w, err)
 		return
 	}
+	if !replayed {
+		BroadcastCharacterProjectionInvalidation(ctx, hub, pool, cardID, []string{"face", "identity"}, "")
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": result})
+}
+
+// broadcastGameEvent mirrors the ooc/chat broadcast pattern for the Game
+// Events lane: a nil event (mirror failed, or no session) is a no-op.
+func broadcastGameEvent(hub *Hub, event *actions.StoredAction) {
+	if event == nil {
+		return
+	}
+	msgOut, _ := json.Marshal(map[string]any{"type": "action", "data": event})
+	hub.Broadcast(msgOut)
+}
+
+// handleCharAddSkillExecute implements "/char add skill <name>" and
+// "/char add skill --custom --name <n> --description <d> --attribute <a>"
+// (Kernel 60 §6).
+func handleCharAddSkillExecute(ctx context.Context, w http.ResponseWriter, hub *Hub, pool *pgxpool.Pool, userID, sessionID string, args []string, idempotencyKey string) {
+	if len(args) == 0 || strings.ToLower(strings.TrimSpace(args[0])) != "skill" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid_command_arguments"})
+		return
+	}
+
+	name, custom, err := parseCharAddSkillArgs(args[1:])
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+
+	cardID, noActive := resolveCardIDOrWriteError(ctx, w, pool, userID, sessionID)
+	if noActive {
+		return
+	}
+
+	result, replayed, err := commands.ExecuteIdempotent(ctx, pool, userID, "char.add_skill", idempotencyKey, func(ctx context.Context) (map[string]any, error) {
+		skill, event, err := commands.ExecuteCharAddSkill(ctx, pool, userID, sessionID, cardID, name, custom)
+		if err != nil {
+			return nil, err
+		}
+		out := map[string]any{"skill": skill}
+		if event != nil {
+			out["game_event"] = event
+		}
+		return out, nil
+	})
+	if err != nil {
+		writeCommandsError(w, err)
+		return
+	}
+	if !replayed {
+		if event, ok := result["game_event"].(*actions.StoredAction); ok {
+			broadcastGameEvent(hub, event)
+		}
+		BroadcastCharacterProjectionInvalidation(ctx, hub, pool, cardID, []string{"mechanics", "skills"}, "")
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": result})
+}
+
+// parseCharAddSkillArgs splits "<name...>" or "--custom --name <n>
+// --description <d> --attribute <a>" (each flag's value runs until the next
+// --flag token, so multi-word names/descriptions work without quoting).
+func parseCharAddSkillArgs(args []string) (string, *characters.CustomSkillDetail, error) {
+	if len(args) == 0 {
+		return "", nil, errors.New("invalid_command_arguments")
+	}
+	if strings.ToLower(strings.TrimSpace(args[0])) != "--custom" {
+		return strings.TrimSpace(strings.Join(args, " ")), nil, nil
+	}
+
+	flags := map[string][]string{}
+	current := ""
+	for _, tok := range args[1:] {
+		lower := strings.ToLower(tok)
+		if lower == "--name" || lower == "--description" || lower == "--attribute" {
+			current = strings.TrimPrefix(lower, "--")
+			continue
+		}
+		if current == "" {
+			continue
+		}
+		flags[current] = append(flags[current], tok)
+	}
+
+	name := strings.TrimSpace(strings.Join(flags["name"], " "))
+	description := strings.TrimSpace(strings.Join(flags["description"], " "))
+	attribute := strings.TrimSpace(strings.Join(flags["attribute"], " "))
+	if name == "" {
+		return "", nil, errors.New("custom_skill_name_required")
+	}
+	if description == "" {
+		return "", nil, errors.New("custom_skill_description_required")
+	}
+	if attribute == "" {
+		return "", nil, errors.New("attribute_required")
+	}
+
+	return "", &characters.CustomSkillDetail{Name: name, Description: description, AttributeName: attribute}, nil
+}
+
+// handleCharSkillsListExecute implements "/char skills" -- a private,
+// read-only reply, so it bypasses the idempotency wrapper entirely (Kernel
+// 60 §6).
+func handleCharSkillsListExecute(ctx context.Context, w http.ResponseWriter, pool *pgxpool.Pool, userID, sessionID string) {
+	cardID, noActive := resolveCardIDOrWriteError(ctx, w, pool, userID, sessionID)
+	if noActive {
+		return
+	}
+	skills, err := commands.ExecuteCharSkillsList(ctx, pool, userID, cardID)
+	if err != nil {
+		writeCommandsError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": map[string]any{"skills": skills}})
+}
+
+// handleCharAdvanceExecute implements "/char advance <skill>" (Kernel 60
+// §7). The idempotency key is hardcoded to "attempt" under a
+// skill+session-scoped command path -- "once per skill per session" is a
+// server-enforced rule (§7 item 5, §11 item 4), not a client-optional
+// dedupe, so it must not depend on the client supplying (or reusing) a key.
+func handleCharAdvanceExecute(ctx context.Context, w http.ResponseWriter, hub *Hub, pool *pgxpool.Pool, userID, sessionID string, args []string) {
+	name := strings.TrimSpace(strings.Join(args, " "))
+	if name == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid_command_arguments"})
+		return
+	}
+
+	cardID, noActive := resolveCardIDOrWriteError(ctx, w, pool, userID, sessionID)
+	if noActive {
+		return
+	}
+
+	skill, err := characters.FindCharacterSkillByName(ctx, pool, userID, cardID, name)
+	if err != nil {
+		writeCommandsError(w, err)
+		return
+	}
+
+	commandPath := fmt.Sprintf("char.advance.%s.%s", skill.SkillID, sessionID)
+	result, replayed, err := commands.ExecuteIdempotent(ctx, pool, userID, commandPath, "attempt", func(ctx context.Context) (map[string]any, error) {
+		outcome, event, err := commands.ExecuteCharAdvance(ctx, pool, userID, sessionID, cardID, skill.SkillName)
+		if err != nil {
+			return nil, err
+		}
+		out := map[string]any{"outcome": outcome}
+		if event != nil {
+			out["game_event"] = event
+		}
+		return out, nil
+	})
+	if err != nil {
+		writeCommandsError(w, err)
+		return
+	}
+	if !replayed {
+		if event, ok := result["game_event"].(*actions.StoredAction); ok {
+			broadcastGameEvent(hub, event)
+		}
+		BroadcastCharacterProjectionInvalidation(ctx, hub, pool, cardID, []string{"mechanics", "skills"}, "")
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": result})
 }
 
@@ -255,7 +430,7 @@ func handleCharExecute(ctx context.Context, w http.ResponseWriter, pool *pgxpool
 // single character_cards column via a read-modify-write, resolve the active
 // character the same way, and require the same "set <text...>" argument
 // shape (subcommand + free-text tail).
-func handleFieldSetExecute(ctx context.Context, w http.ResponseWriter, pool *pgxpool.Pool, userID, sessionID, commandPath string, args []string, idempotencyKey string, exec func(context.Context, *pgxpool.Pool, string, string, string) (characters.CharacterCard, error)) {
+func handleFieldSetExecute(ctx context.Context, w http.ResponseWriter, hub *Hub, pool *pgxpool.Pool, userID, sessionID, commandPath string, args []string, idempotencyKey string, changedDimensions []string, exec func(context.Context, *pgxpool.Pool, string, string, string) (characters.CharacterCard, error)) {
 	if len(args) < 2 || strings.ToLower(strings.TrimSpace(args[0])) != "set" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid_command_arguments"})
 		return
@@ -267,7 +442,7 @@ func handleFieldSetExecute(ctx context.Context, w http.ResponseWriter, pool *pgx
 		return
 	}
 
-	result, _, err := commands.ExecuteIdempotent(ctx, pool, userID, commandPath, idempotencyKey, func(ctx context.Context) (map[string]any, error) {
+	result, replayed, err := commands.ExecuteIdempotent(ctx, pool, userID, commandPath, idempotencyKey, func(ctx context.Context) (map[string]any, error) {
 		card, err := exec(ctx, pool, userID, cardID, text)
 		if err != nil {
 			return nil, err
@@ -277,6 +452,9 @@ func handleFieldSetExecute(ctx context.Context, w http.ResponseWriter, pool *pgx
 	if err != nil {
 		writeCommandsError(w, err)
 		return
+	}
+	if !replayed {
+		BroadcastCharacterProjectionInvalidation(ctx, hub, pool, cardID, changedDimensions, "")
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": result})
 }

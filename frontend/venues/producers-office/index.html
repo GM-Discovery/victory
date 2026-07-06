@@ -505,6 +505,7 @@
             <div class="request-grid" style="margin-top: 8px;">
               <div id="discord-audio-first-theater"></div>
               <div id="discord-audio-the-cave"></div>
+              <div id="discord-audio-catharsis"></div>
             </div>
           </div>
         </div>
@@ -699,6 +700,7 @@
               <select id="venue-slug" required>
                 <option value="the-cave">The Cave</option>
                 <option value="first-theater">First Theater</option>
+                <option value="catharsis">Catharsis</option>
                 <option value="workshop">Workshop</option>
                 <option value="audition-hall">Audition Hall</option>
                 <option value="greenroom">The Greenroom</option>
@@ -1625,6 +1627,10 @@
         window.VictoryDiscordAudio?.mount({
           venueSlug: "the-cave",
           mount: "#discord-audio-the-cave",
+        });
+        window.VictoryDiscordAudio?.mount({
+          venueSlug: "catharsis",
+          mount: "#discord-audio-catharsis",
         });
 
         for (const option of Array.from(venueSlug.options)) {

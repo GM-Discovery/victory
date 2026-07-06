@@ -682,7 +682,11 @@ func HandleCreateCharacterCard(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func HandleCharacterCardByID(pool *pgxpool.Pool) http.HandlerFunc {
+func HandleCharacterCardByID(pool *pgxpool.Pool, notifiers ...ProjectionChangeNotifier) http.HandlerFunc {
+	var notify ProjectionChangeNotifier
+	if len(notifiers) > 0 {
+		notify = notifiers[0]
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPatch && r.Method != http.MethodPost {
 			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
@@ -715,6 +719,9 @@ func HandleCharacterCardByID(pool *pgxpool.Pool) http.HandlerFunc {
 				writeCharacterError(w, err)
 				return
 			}
+			if notify != nil {
+				notify(ctx, cardID, []string{"active_character"}, "")
+			}
 
 			writeJSON(w, http.StatusOK, response{Ok: true, Data: card})
 			return
@@ -745,6 +752,9 @@ func HandleCharacterCardByID(pool *pgxpool.Pool) http.HandlerFunc {
 		if err != nil {
 			writeCharacterError(w, err)
 			return
+		}
+		if notify != nil {
+			notify(ctx, cardID, []string{"face", "identity"}, "")
 		}
 
 		writeJSON(w, http.StatusOK, response{Ok: true, Data: card})
@@ -991,6 +1001,10 @@ func UpdateCard(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID str
 		return CharacterCard{}, errors.New("forbidden")
 	}
 
+	if err := rejectLockedFaceValueChanges(ctx, pool, cardID, input); err != nil {
+		return CharacterCard{}, err
+	}
+
 	var sheetLinksParam any
 	if input.SheetLinks != nil {
 		sheetLinksJSON, err := json.Marshal(*input.SheetLinks)
@@ -1049,6 +1063,60 @@ func UpdateCard(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID str
 		return CharacterCard{}, err
 	}
 	return card, nil
+}
+
+func rejectLockedFaceValueChanges(ctx context.Context, pool *pgxpool.Pool, cardID string, input CharacterCardInput) error {
+	overrides, err := loadFaceOverrides(ctx, pool, cardID)
+	if err != nil {
+		return err
+	}
+	hasLocked := false
+	for _, o := range overrides {
+		if o.ValueLocked {
+			hasLocked = true
+			break
+		}
+	}
+	if !hasLocked {
+		return nil
+	}
+
+	var current struct {
+		Name, Pronouns, PortraitURL, TokenAura, Color, Tagline, PublicDescription string
+	}
+	if err := pool.QueryRow(ctx, `
+		SELECT name, pronouns, portrait_url, COALESCE(token_aura, ''), color, tagline, public_description
+		FROM character_cards
+		WHERE id = $1 AND is_deleted = FALSE
+	`, cardID).Scan(&current.Name, &current.Pronouns, &current.PortraitURL, &current.TokenAura, &current.Color, &current.Tagline, &current.PublicDescription); err != nil {
+		return err
+	}
+
+	check := func(key, before, after string) error {
+		if o, ok := overrides[key]; ok && o.ValueLocked && strings.TrimSpace(before) != strings.TrimSpace(after) {
+			return errors.New("face_value_locked")
+		}
+		return nil
+	}
+	if err := check("name", current.Name, input.Name); err != nil {
+		return err
+	}
+	if err := check("pronouns", current.Pronouns, input.Pronouns); err != nil {
+		return err
+	}
+	if err := check("portrait_url", current.PortraitURL, input.PortraitURL); err != nil {
+		return err
+	}
+	if err := check("token_aura", current.TokenAura, input.TokenAura); err != nil {
+		return err
+	}
+	if err := check("tagline", current.Tagline, input.Tagline); err != nil {
+		return err
+	}
+	if err := check("public_description", current.PublicDescription, input.PublicDescription); err != nil {
+		return err
+	}
+	return nil
 }
 
 // LoadCardForActor loads a character card for actorUserID, enforcing the same
@@ -1670,9 +1738,9 @@ func writeCharacterError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusNotFound, response{Ok: false, Data: map[string]any{"error": "not_found"}})
 	case err.Error() == "not_authenticated":
 		writeJSON(w, http.StatusUnauthorized, response{Ok: false, Data: map[string]any{"error": err.Error()}})
-	case err.Error() == "forbidden", strings.Contains(err.Error(), "permission_required"), err.Error() == "target_must_be_cast_or_crew":
+	case err.Error() == "forbidden", err.Error() == "director_authority_required", strings.Contains(err.Error(), "permission_required"), err.Error() == "target_must_be_cast_or_crew":
 		writeJSON(w, http.StatusForbidden, response{Ok: false, Data: map[string]any{"error": err.Error()}})
-	case strings.Contains(err.Error(), "required"), strings.Contains(err.Error(), "unknown_"), strings.Contains(err.Error(), "invalid_"), strings.Contains(err.Error(), "not_eligible"), strings.Contains(err.Error(), "not_found_"):
+	case strings.Contains(err.Error(), "required"), strings.Contains(err.Error(), "unknown_"), strings.Contains(err.Error(), "invalid_"), strings.Contains(err.Error(), "not_eligible"), strings.Contains(err.Error(), "not_found_"), strings.Contains(err.Error(), "_locked"):
 		writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": err.Error()}})
 	default:
 		writeJSON(w, http.StatusInternalServerError, response{Ok: false, Data: map[string]any{"error": "character_kernel_failed"}})

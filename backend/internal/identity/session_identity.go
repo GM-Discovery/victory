@@ -23,6 +23,15 @@ type identityQuerier interface {
 }
 
 func ResolveActiveCaveSessionID(ctx context.Context, q identityQuerier, userID string) (string, error) {
+	return ResolveActiveVenueSessionID(ctx, q, userID, "the-cave")
+}
+
+func ResolveActiveVenueSessionID(ctx context.Context, q identityQuerier, userID, venueSlug string) (string, error) {
+	venueSlug = strings.ToLower(strings.TrimSpace(venueSlug))
+	if venueSlug == "" {
+		return "", errors.New("venue slug is required")
+	}
+
 	var sessionID string
 
 	err := q.QueryRow(ctx, `
@@ -30,12 +39,12 @@ func ResolveActiveCaveSessionID(ctx context.Context, q identityQuerier, userID s
 		FROM sessions s
 		JOIN venues v ON v.id = s.venue_id
 		JOIN session_participants sp ON sp.session_id = s.id
-		WHERE v.slug = 'the-cave'
+		WHERE v.slug = $2
 		  AND s.status IN ('rehearsal', 'live')
 		  AND sp.user_id = $1
 		ORDER BY s.started_at DESC
 		LIMIT 1
-	`, userID).Scan(&sessionID)
+	`, userID, venueSlug).Scan(&sessionID)
 	if err != nil {
 		return "", err
 	}
@@ -44,13 +53,21 @@ func ResolveActiveCaveSessionID(ctx context.Context, q identityQuerier, userID s
 }
 
 func ResolveSessionIdentity(ctx context.Context, q identityQuerier, sessionID, userID string) (SessionIdentity, error) {
+	return ResolveSessionIdentityForVenue(ctx, q, sessionID, userID, "the-cave")
+}
+
+func ResolveSessionIdentityForVenue(ctx context.Context, q identityQuerier, sessionID, userID, venueSlug string) (SessionIdentity, error) {
 	sessionID = strings.TrimSpace(sessionID)
 	userID = strings.TrimSpace(userID)
+	venueSlug = strings.ToLower(strings.TrimSpace(venueSlug))
 	if sessionID == "" {
 		return SessionIdentity{}, errors.New("session_id is required")
 	}
 	if userID == "" {
 		return SessionIdentity{}, errors.New("user_id is required")
+	}
+	if venueSlug == "" {
+		return SessionIdentity{}, errors.New("venue slug is required")
 	}
 
 	var ident SessionIdentity
@@ -76,12 +93,12 @@ func ResolveSessionIdentity(ctx context.Context, q identityQuerier, sessionID, u
 		JOIN users u ON u.id = sp.user_id
 		LEFT JOIN current_session_personas csp ON csp.session_id = s.id AND csp.user_id = sp.user_id
 		LEFT JOIN character_cards cc ON cc.id = csp.character_card_id AND cc.is_deleted = FALSE
-		WHERE v.slug = 'the-cave'
+		WHERE v.slug = $3
 		  AND s.id = $1::uuid
 		  AND sp.user_id = $2
 		  AND s.status IN ('rehearsal', 'live')
 		LIMIT 1
-	`, sessionID, userID).Scan(&ident.SessionParticipantID, &ident.SessionID, &ident.UserID, &ident.Handle, &ident.DisplayName, &ident.Role, &personaCardID, &personaName, &personaPronouns, &personaPortraitURL, &personaColor, &personaTagline)
+	`, sessionID, userID, venueSlug).Scan(&ident.SessionParticipantID, &ident.SessionID, &ident.UserID, &ident.Handle, &ident.DisplayName, &ident.Role, &personaCardID, &personaName, &personaPronouns, &personaPortraitURL, &personaColor, &personaTagline)
 	if err != nil {
 		return SessionIdentity{}, err
 	}

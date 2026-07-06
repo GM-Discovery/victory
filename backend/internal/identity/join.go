@@ -27,6 +27,15 @@ type JoinResponse struct {
 }
 
 func JoinTheCave(ctx context.Context, pool *pgxpool.Pool, req JoinRequest, sessionCookie string) (*JoinResponse, error) {
+	return JoinVenue(ctx, pool, req, sessionCookie, "the-cave")
+}
+
+func JoinVenue(ctx context.Context, pool *pgxpool.Pool, req JoinRequest, sessionCookie, venueSlug string) (*JoinResponse, error) {
+	venueSlug = strings.ToLower(strings.TrimSpace(venueSlug))
+	if venueSlug == "" {
+		return nil, errors.New("venue slug is required")
+	}
+
 	displayName := strings.TrimSpace(req.DisplayName)
 
 	userID, handle, resolvedRole, err := resolveJoiningUser(ctx, pool, req, sessionCookie)
@@ -49,11 +58,11 @@ func JoinTheCave(ctx context.Context, pool *pgxpool.Pool, req JoinRequest, sessi
 		SELECT s.id
 		FROM sessions s
 		JOIN venues v ON v.id = s.venue_id
-		WHERE v.slug = 'the-cave'
+		WHERE v.slug = $1
 		  AND s.status IN ('rehearsal', 'live')
 		ORDER BY s.started_at DESC
 		LIMIT 1
-	`).Scan(&sessionID)
+	`, venueSlug).Scan(&sessionID)
 	if err != nil {
 		return nil, err
 	}

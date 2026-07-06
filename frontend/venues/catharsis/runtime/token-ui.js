@@ -271,7 +271,7 @@
       const snapped = tokenPlacementPointForCreate(placementPoint, { source: { data: { snap_mode: snapMode } } }, snapMode);
       const targetPayload = {
         asset_id: String(asset.id || "").trim(),
-        venue_slug: "the-cave",
+        venue_slug: "catharsis",
         layer: "stage",
         x: snapped.x,
         y: snapped.y,
@@ -357,7 +357,7 @@
       const sent = sendAction("update/token", {
         element_id: target.elementId || "",
         element_slug: target.elementSlug || "",
-        venue_slug: "the-cave",
+        venue_slug: "catharsis",
         layer: "stage",
         x: Number(target.position?.x ?? 0),
         y: Number(target.position?.y ?? 0),
