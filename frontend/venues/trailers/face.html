@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>My Face — Trailers</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #17120e;
+      --panel: rgba(27, 21, 17, 0.92);
+      --panel-strong: rgba(19, 15, 12, 0.96);
+      --line: rgba(255, 233, 197, 0.12);
+      --accent: #f0d3a4;
+      --accent-strong: #fff2d7;
+      --muted: #d0bfa6;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(172, 120, 64, 0.28), transparent 30%),
+        radial-gradient(circle at 85% 0%, rgba(82, 119, 167, 0.18), transparent 28%),
+        linear-gradient(180deg, #17120e 0%, #0e0b09 100%);
+      color: #f6ecdd;
+    }
+
+    .header {
+      padding: 22px 24px 12px;
+      max-width: 1000px;
+      width: 100%;
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: #d7ab6f;
+      font-size: 0.76rem;
+      margin: 0 0 8px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.9rem, 4vw, 3rem);
+      line-height: 1.05;
+    }
+
+    .subtitle {
+      margin: 10px 0 0;
+      color: var(--muted);
+      max-width: 72ch;
+      line-height: 1.5;
+    }
+
+    .launchbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 18px 0 0;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 999px;
+      text-decoration: none;
+      border: 1px solid var(--line);
+      padding: 11px 16px;
+      color: var(--accent-strong);
+      background: rgba(255, 255, 255, 0.03);
+      font-weight: 700;
+    }
+
+    .stage {
+      max-width: 1000px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 8px 24px 48px;
+      box-sizing: border-box;
+      display: grid;
+      gap: 18px;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 22px;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.24);
+    }
+
+    .identity-card {
+      display: grid;
+      grid-template-columns: minmax(120px, 160px) 1fr;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .portrait {
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      border-radius: 14px;
+      object-fit: cover;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: #241b15;
+    }
+
+    .portrait-empty {
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      border: 1px dashed rgba(255,255,255,0.16);
+      color: var(--muted);
+      font-size: 0.85rem;
+      background: #201813;
+    }
+
+    .stage-name {
+      margin: 0;
+      font-size: clamp(1.6rem, 3vw, 2.4rem);
+      line-height: 1.1;
+    }
+
+    .identity-meta {
+      margin: 8px 0 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      color: var(--muted);
+    }
+
+    .identity-meta span {
+      white-space: nowrap;
+    }
+
+    .region-title {
+      margin: 0 0 14px;
+      font-size: 1.05rem;
+      color: var(--accent);
+      letter-spacing: 0.02em;
+    }
+
+    .fact-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+
+    .fact {
+      min-width: 0;
+    }
+
+    .fact-label {
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin: 0 0 4px;
+    }
+
+    .fact-value {
+      margin: 0;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .intro-line {
+      margin: 14px 0 0;
+      color: var(--accent-strong);
+      font-size: 1.05rem;
+      line-height: 1.5;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+    }
+
+    .empty-state h2 {
+      color: #f6ecdd;
+      margin: 0 0 8px;
+    }
+
+    .status-line {
+      color: var(--muted);
+      min-height: 1.4em;
+    }
+
+    @media (max-width: 560px) {
+      .identity-card {
+        grid-template-columns: 1fr;
+      }
+      .portrait, .portrait-empty {
+        max-width: 220px;
+        margin: 0 auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <header class="header">
+      <p class="eyebrow">Venue / My Trailer</p>
+      <h1>My Face</h1>
+      <p class="subtitle">
+        This is the compiled, curated view of your Player Workbook that other signed-in Victory members see. Facts you haven't added yet simply don't appear here — there's no "not set" wall.
+      </p>
+      <div class="launchbar">
+        <a class="chip" href="/venues/trailers/">Legacy Editor</a>
+        <a class="chip" href="/account/">Account</a>
+      </div>
+    </header>
+
+    <main class="stage">
+      <p class="status-line" id="status-line">Loading your Face...</p>
+
+      <section class="card identity-card" id="identity-card" hidden>
+        <div id="portrait-wrap"></div>
+        <div>
+          <h2 class="stage-name" id="stage-name">—</h2>
+          <div class="identity-meta" id="identity-meta"></div>
+          <p class="intro-line" id="intro-line" hidden></p>
+        </div>
+      </section>
+
+      <div id="regions"></div>
+
+      <section class="card empty-state" id="empty-state" hidden>
+        <h2>Your Face is empty so far</h2>
+        <p>Add facts through the Workbook and choose which ones to show here. Only your stage name is required — everything else is optional.</p>
+      </section>
+    </main>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/identity.js"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script>
+    const REGION_ORDER = ["at_a_glance", "play_and_create", "about", "credits_and_links"];
+    const REGION_TITLES = {
+      at_a_glance: "At a Glance",
+      play_and_create: "Play & Create",
+      about: "About",
+      credits_and_links: "Credits & Links",
+    };
+    const IDENTITY_IMAGE_KEYS = new Set(["portrait_url", "banner_url"]);
+
+    function fieldByKey(fields, key) {
+      return (fields || []).find((f) => f.field_key === key);
+    }
+
+    function renderIdentity(facePreview) {
+      const identityFields = (facePreview.regions && facePreview.regions.identity_header) || [];
+      const portraitField = fieldByKey(identityFields, "portrait_url");
+      const portraitWrap = document.getElementById("portrait-wrap");
+
+      portraitWrap.innerHTML = "";
+      if (portraitField && portraitField.display_value) {
+        const img = document.createElement("img");
+        img.className = "portrait";
+        img.src = portraitField.display_value;
+        img.alt = facePreview.stage_name || "Portrait";
+        portraitWrap.appendChild(img);
+      } else {
+        const placeholder = document.createElement("div");
+        placeholder.className = "portrait-empty";
+        placeholder.textContent = "No portrait yet";
+        portraitWrap.appendChild(placeholder);
+      }
+
+      document.getElementById("stage-name").textContent = facePreview.stage_name || "Unnamed Player";
+
+      const metaEl = document.getElementById("identity-meta");
+      metaEl.innerHTML = "";
+      for (const field of identityFields) {
+        if (IDENTITY_IMAGE_KEYS.has(field.field_key)) continue;
+        const span = document.createElement("span");
+        span.textContent = field.display_value;
+        metaEl.appendChild(span);
+      }
+
+      const introField = fieldByKey(
+        (facePreview.regions && facePreview.regions.at_a_glance) || [],
+        "short_intro"
+      );
+      const introEl = document.getElementById("intro-line");
+      if (introField && introField.display_value) {
+        introEl.textContent = introField.display_value;
+        introEl.hidden = false;
+      } else {
+        introEl.hidden = true;
+      }
+    }
+
+    function renderRegions(facePreview) {
+      const container = document.getElementById("regions");
+      container.innerHTML = "";
+
+      let hasAnyContent = false;
+
+      for (const regionKey of REGION_ORDER) {
+        const fields = (facePreview.regions && facePreview.regions[regionKey]) || [];
+        const visibleFields = fields.filter((f) => !(regionKey === "at_a_glance" && f.field_key === "short_intro"));
+        if (visibleFields.length === 0) continue;
+
+        hasAnyContent = true;
+        const section = document.createElement("section");
+        section.className = "card";
+
+        const title = document.createElement("h3");
+        title.className = "region-title";
+        title.textContent = REGION_TITLES[regionKey] || regionKey;
+        section.appendChild(title);
+
+        const grid = document.createElement("div");
+        grid.className = "fact-grid";
+
+        for (const field of visibleFields) {
+          const fact = document.createElement("div");
+          fact.className = "fact";
+
+          const label = document.createElement("p");
+          label.className = "fact-label";
+          label.textContent = field.label;
+
+          const value = document.createElement("p");
+          value.className = "fact-value";
+          value.textContent = field.display_value;
+
+          fact.appendChild(label);
+          fact.appendChild(value);
+          grid.appendChild(fact);
+        }
+
+        section.appendChild(grid);
+        container.appendChild(section);
+      }
+
+      const identityHasExtra = ((facePreview.regions && facePreview.regions.identity_header) || [])
+        .some((f) => !IDENTITY_IMAGE_KEYS.has(f.field_key));
+
+      document.getElementById("empty-state").hidden = hasAnyContent || identityHasExtra;
+    }
+
+    async function loadFace() {
+      const statusLine = document.getElementById("status-line");
+
+      const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
+      const sessionPayload = await sessionResponse.json().catch(() => null);
+      if (!sessionResponse.ok || !sessionPayload?.ok || !sessionPayload.signed_in) {
+        showForbiddenScreen();
+        return;
+      }
+
+      const response = await fetch("/api/player-profile/me", { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+
+      if (isForbiddenAccessResponse(response, payload)) {
+        showForbiddenScreen();
+        return;
+      }
+
+      if (!response.ok || !payload?.ok) {
+        statusLine.textContent = "Could not load your Face right now.";
+        return;
+      }
+
+      const facePreview = payload.data.face_preview || { regions: {} };
+      renderIdentity(facePreview);
+      renderRegions(facePreview);
+      document.getElementById("identity-card").hidden = false;
+      statusLine.textContent = "";
+    }
+
+    loadFace().catch((error) => {
+      console.error("my face bootstrap failed", error);
+      document.getElementById("status-line").textContent = "Something went wrong loading your Face.";
+    });
+  </script>
+</body>
+</html>

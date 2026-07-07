@@ -441,16 +441,16 @@ async function loadVenues() {
       "grants-cabin": { x: 28, y: 21 },
       "audition-hall": { x: 29, y: 37 },
       "producers-office": { x: 39, y: 14 },
-      "directors-chair": { x: 51, y: 24 },
-      greenroom: { x: 87, y: 48 },
+      "directors-chair": { x: 55, y: 23 },
+      greenroom: { x: 86, y: 47 },
       trailers: { x: 68, y: 15 },
       catharsis: { x: 36, y: 69 },
       "victory-theater": { x: 82, y: 75 },
       workshop: { x: 75, y: 33 },
       warehouse: { x: 75, y: 27 },
-      "soil-experts": { x: 5, y: 66 },
-      construction: { x: 26, y: 57 },
-      "info-booth": { x: 48, y: 92 },
+      "soil-experts": { x: 4, y: 65 },
+      construction: { x: 30, y: 58 },
+      "info-booth": { x: 50, y: 93 },
     };
 
     venueIconsEl.innerHTML = "";

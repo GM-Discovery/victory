@@ -119,6 +119,7 @@ migrations=(
   "$ROOT/database/migrations/033_kernel60_character_skills.sql"
   "$ROOT/database/migrations/034_kernel59a_character_face_overrides.sql"
   "$ROOT/database/migrations/035_kernel59a_director_value_overrides.sql"
+  "$ROOT/database/migrations/036_kernel61_player_workbook_foundation.sql"
 )
 
 for migration in "${migrations[@]}"; do

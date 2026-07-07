@@ -51,6 +51,7 @@
       margin: 0;
       padding: 0;
       min-height: 4px;
+      z-index: 40;
       overflow: visible;
       background: linear-gradient(
         to bottom,
@@ -96,6 +97,16 @@
       transition:
         opacity 140ms ease,
         transform 180ms ease;
+    }
+
+    .venue-shell--signed-in .header-hover-zone {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 260px;
+      z-index: 0;
+      pointer-events: auto;
     }
 
     .venue-shell--signed-in .header:hover > *,
@@ -641,6 +652,7 @@
         <a class="chip" href="/venues/audition-hall/">Open Audition Hall</a>
         <a class="chip" href="/venues/producers-office/">Open Producer's Office</a>
       </div>
+      <div class="header-hover-zone" aria-hidden="true"></div>
     </header>
 
     <main class="content">

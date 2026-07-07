@@ -34,6 +34,7 @@ import (
 	"victory/backend/internal/identity"
 	"victory/backend/internal/messages"
 	"victory/backend/internal/network"
+	"victory/backend/internal/playerprofile"
 	"victory/backend/internal/profiles"
 	"victory/backend/internal/showings"
 	"victory/backend/internal/venues"
@@ -83,6 +84,9 @@ func main() {
 	}
 	if err := assets.EnsureKernel49WarehouseStorageSurface(ctx, pool); err != nil {
 		log.Fatalf("kernel 49 warehouse bootstrap failed: %v", err)
+	}
+	if err := playerprofile.EnsureKernel61PlayerWorkbookSurface(ctx, pool); err != nil {
+		log.Fatalf("kernel 61 player workbook bootstrap failed: %v", err)
 	}
 
 	hub := network.NewHub()
@@ -148,6 +152,14 @@ func main() {
 	mux.HandleFunc("/api/profiles/me/publish", profiles.HandlePublishMyProfile(pool))
 	mux.HandleFunc("/api/profiles/admin/save", profiles.HandleAdminSaveProfile(pool))
 	mux.HandleFunc("/api/profiles/admin/publish", profiles.HandleAdminPublishProfile(pool))
+	mux.HandleFunc("/api/player-profile/catalogue", playerprofile.HandleCatalogue(pool))
+	mux.HandleFunc("/api/player-profile/me", playerprofile.HandleOwnerWorkbook(pool))
+	mux.HandleFunc("/api/player-profile/face-visibility", playerprofile.HandleFaceVisibility(pool, nil))
+	mux.HandleFunc("/api/player-profile/face-priority", playerprofile.HandleFacePriority(pool, nil))
+	mux.HandleFunc("/api/player-profile/stage-name", playerprofile.HandleStageName(pool, nil))
+	mux.HandleFunc("/api/player-profile/pages/", playerprofile.HandlePageCommit(pool, nil))
+	mux.HandleFunc("/api/player-profile/events/", playerprofile.HandleDeleteEvent(pool, nil))
+	mux.HandleFunc("/api/player-profile/", playerprofile.HandleSocialFace(pool))
 	mux.HandleFunc("GET /api/characters/parentage-chart", characters.HandleParentageChart())
 	mux.HandleFunc("GET /api/characters/chapter2-rules", characters.HandleChapter2Rules())
 	mux.HandleFunc("GET /api/character-cards/me", characters.HandleMyCharacterCards(pool))

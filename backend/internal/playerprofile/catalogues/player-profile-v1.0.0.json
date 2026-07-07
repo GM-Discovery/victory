@@ -1,0 +1,591 @@
+{
+  "catalogue_key": "player-profile",
+  "catalogue_version": "1.0.0",
+  "pages": [
+    {
+      "page_key": "identity_presentation",
+      "page_title": "Identity & Presentation",
+      "page_description": "How you want to be seen across Victory. Stage name lives on the Account page -- everything here is optional context around it.",
+      "fields": [
+        {
+          "field_key": "real_name",
+          "field_label": "Real Name",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "identity_header",
+          "default_priority": 10,
+          "help_text": "Only shown on Face if you choose to show it."
+        },
+        {
+          "field_key": "pronouns",
+          "field_label": "Pronouns",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "identity_header",
+          "default_priority": 20
+        },
+        {
+          "field_key": "portrait_url",
+          "field_label": "Portrait",
+          "field_type": "url",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "identity_header",
+          "default_priority": 100
+        },
+        {
+          "field_key": "banner_url",
+          "field_label": "Banner",
+          "field_type": "url",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "identity_header",
+          "default_priority": 90
+        },
+        {
+          "field_key": "short_intro",
+          "field_label": "Short Introduction",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "at_a_glance",
+          "default_priority": 95
+        },
+        {
+          "field_key": "about_text",
+          "field_label": "About",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 40
+        },
+        {
+          "field_key": "location_timezone",
+          "field_label": "Broad Location / Time Zone",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 15
+        },
+        {
+          "field_key": "languages",
+          "field_label": "Languages",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 10
+        },
+        {
+          "field_key": "name_pronunciation",
+          "field_label": "Preferred Name Pronunciation",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 5
+        },
+        {
+          "field_key": "identity_note",
+          "field_label": "Identity / Representation Note",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 5
+        }
+      ]
+    },
+    {
+      "page_key": "ttrpg_identity",
+      "page_title": "TTRPG Identity",
+      "page_description": "Your tabletop preferences and profile-level class/archetype choices. These are descriptive profile facts, not executable rules.",
+      "fields": [
+        {
+          "field_key": "dnd_class",
+          "field_label": "D&D Class",
+          "field_type": "single_select_custom",
+          "required": false,
+          "allow_custom": true,
+          "options": ["Barbarian", "Bard", "Cleric", "Druid", "Fighter", "Monk", "Paladin", "Ranger", "Rogue", "Sorcerer", "Warlock", "Wizard", "Artificer"],
+          "face_eligible": true,
+          "face_region": "at_a_glance",
+          "default_priority": 80
+        },
+        {
+          "field_key": "socio_class",
+          "field_label": "Socio Class / Archetype",
+          "field_type": "single_select_custom",
+          "required": false,
+          "allow_custom": true,
+          "options": ["Prodigy", "Wildcard", "Anchor", "Operator", "Catalyst", "Guardian"],
+          "face_eligible": true,
+          "face_region": "at_a_glance",
+          "default_priority": 79
+        },
+        {
+          "field_key": "favorite_ttrpgs",
+          "field_label": "Favorite TTRPGs",
+          "field_type": "multi_select_custom",
+          "required": false,
+          "allow_custom": true,
+          "max_items": 3,
+          "options": ["Dungeons & Dragons 5e", "Pathfinder 2e", "Call of Cthulhu", "Blades in the Dark", "Vampire: the Masquerade", "Fate Core", "Powered by the Apocalypse", "Savage Worlds", "Numenera", "Root RPG"],
+          "face_eligible": true,
+          "face_region": "at_a_glance",
+          "default_priority": 78
+        },
+        {
+          "field_key": "other_systems_played",
+          "field_label": "Other Systems Played",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 30
+        },
+        {
+          "field_key": "systems_currently_playing",
+          "field_label": "Systems Currently Playing",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 30
+        },
+        {
+          "field_key": "experience_range",
+          "field_label": "Years / Experience Range",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 20
+        },
+        {
+          "field_key": "usual_roles",
+          "field_label": "Usual Roles",
+          "field_type": "multi_select_custom",
+          "required": false,
+          "allow_custom": true,
+          "max_items": 6,
+          "options": ["Player", "GM", "Facilitator", "Designer", "Writer", "Artist", "Performer", "Organizer"],
+          "face_eligible": true,
+          "face_region": "at_a_glance",
+          "default_priority": 70
+        },
+        {
+          "field_key": "favorite_genres",
+          "field_label": "Favorite Genres",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 25
+        },
+        {
+          "field_key": "favorite_mechanics",
+          "field_label": "Favorite Mechanics",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 15
+        },
+        {
+          "field_key": "favorite_character_types",
+          "field_label": "Favorite Character Types",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 15
+        },
+        {
+          "field_key": "group_size_preferences",
+          "field_label": "Group Size / Format Preferences",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 10
+        }
+      ]
+    },
+    {
+      "page_key": "table_style_preferences",
+      "page_title": "Table Style & Preferences",
+      "page_description": "How you like a table to run.",
+      "fields": [
+        {
+          "field_key": "rules_light_to_dense",
+          "field_label": "Rules-Light to Rules-Dense",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 10
+        },
+        {
+          "field_key": "session_length_pref",
+          "field_label": "Short-Session to Long-Session Preference",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 10
+        },
+        {
+          "field_key": "campaign_length_pref",
+          "field_label": "One-Shot / Short / Long / Open Table",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 10
+        },
+        {
+          "field_key": "preferred_tone",
+          "field_label": "Preferred Tone",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 10
+        },
+        {
+          "field_key": "prep_vs_improv",
+          "field_label": "Preparation vs. Improvisation Preference",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": false,
+          "default_priority": 0
+        },
+        {
+          "field_key": "player_agency_pref",
+          "field_label": "Player Agency Preferences",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": false,
+          "default_priority": 0
+        },
+        {
+          "field_key": "safety_tools_pref",
+          "field_label": "Safety-Tool Preferences",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": false,
+          "default_priority": 0,
+          "help_text": "Owner-only unless you place a summary elsewhere on Face."
+        },
+        {
+          "field_key": "what_helps_me_enjoy",
+          "field_label": "What Helps Me Enjoy a Table",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": false,
+          "default_priority": 0
+        },
+        {
+          "field_key": "what_makes_collab_difficult",
+          "field_label": "What Makes Collaboration Difficult",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": false,
+          "default_priority": 0
+        },
+        {
+          "field_key": "looking_to_try",
+          "field_label": "Things I Am Looking to Try",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 5
+        }
+      ]
+    },
+    {
+      "page_key": "creative_and_production",
+      "page_title": "Creative & Production Work",
+      "page_description": "Your creative roles, skills, and production history.",
+      "fields": [
+        {
+          "field_key": "creative_roles",
+          "field_label": "Creative Roles",
+          "field_type": "multi_select_custom",
+          "required": false,
+          "allow_custom": true,
+          "max_items": 8,
+          "options": ["Writing", "Design", "Art", "Layout", "Coding", "Audio", "Video", "Performing"],
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 20
+        },
+        {
+          "field_key": "practical_skills",
+          "field_label": "Practical Skills",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 15
+        },
+        {
+          "field_key": "systems_authored",
+          "field_label": "Systems or Settings Authored",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "credits_and_links",
+          "default_priority": 20
+        },
+        {
+          "field_key": "current_projects",
+          "field_label": "Current Projects",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 15
+        },
+        {
+          "field_key": "collaboration_interests",
+          "field_label": "Collaboration Interests",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 10
+        },
+        {
+          "field_key": "looking_for_help",
+          "field_label": "Looking For Help With",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": false,
+          "default_priority": 0
+        },
+        {
+          "field_key": "offering_help",
+          "field_label": "Offering Help With",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "play_and_create",
+          "default_priority": 8
+        },
+        {
+          "field_key": "credits_text",
+          "field_label": "Credits",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "credits_and_links",
+          "default_priority": 30
+        },
+        {
+          "field_key": "portfolio_links",
+          "field_label": "Portfolio Links",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "credits_and_links",
+          "default_priority": 10
+        },
+        {
+          "field_key": "preferred_attribution_name",
+          "field_label": "Preferred Attribution Name",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": false,
+          "default_priority": 0
+        }
+      ]
+    },
+    {
+      "page_key": "availability_and_communication",
+      "page_title": "Availability & Communication",
+      "page_description": "How and when to reach you, and how to work well with you.",
+      "fields": [
+        {
+          "field_key": "general_availability",
+          "field_label": "General Availability",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 10
+        },
+        {
+          "field_key": "preferred_session_times",
+          "field_label": "Preferred Session Times",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": false,
+          "default_priority": 0
+        },
+        {
+          "field_key": "preferred_channels",
+          "field_label": "Preferred Communication Channels",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": false,
+          "default_priority": 0
+        },
+        {
+          "field_key": "response_pace",
+          "field_label": "Expected Response Pace",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": false,
+          "default_priority": 0
+        },
+        {
+          "field_key": "voice_text_video_comfort",
+          "field_label": "Voice / Text / Video Comfort",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": false,
+          "default_priority": 0
+        },
+        {
+          "field_key": "scheduling_constraints",
+          "field_label": "Scheduling Constraints",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": false,
+          "default_priority": 0
+        },
+        {
+          "field_key": "accessibility_notes",
+          "field_label": "Accessibility / Accommodation Notes",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": false,
+          "default_priority": 0,
+          "help_text": "Owner-only. This is never surfaced on Face automatically."
+        },
+        {
+          "field_key": "how_to_work_with_me",
+          "field_label": "How to Work Well With Me",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 8
+        }
+      ]
+    },
+    {
+      "page_key": "favorites_and_personality",
+      "page_title": "Favorites & Personality",
+      "page_description": "The lighter, personal side of your profile.",
+      "fields": [
+        {
+          "field_key": "favorite_fun",
+          "field_label": "Favorite Way to Have Fun",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 6
+        },
+        {
+          "field_key": "most_relaxed",
+          "field_label": "Where I'm Most Relaxed",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 6
+        },
+        {
+          "field_key": "favorite_color",
+          "field_label": "Favorite Color",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 4
+        },
+        {
+          "field_key": "favorite_artist",
+          "field_label": "Favorite Artist",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 4
+        },
+        {
+          "field_key": "favorite_food",
+          "field_label": "Favorite Food",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 4
+        },
+        {
+          "field_key": "favorite_song",
+          "field_label": "Favorite Song",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 4
+        },
+        {
+          "field_key": "favorite_place",
+          "field_label": "Favorite Place",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 4
+        },
+        {
+          "field_key": "favorite_movie_or_show",
+          "field_label": "Favorite Movie or Show",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 4
+        },
+        {
+          "field_key": "favorite_book",
+          "field_label": "Favorite Book",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 4
+        },
+        {
+          "field_key": "hidden_talent",
+          "field_label": "Hidden Talent",
+          "field_type": "text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 6
+        },
+        {
+          "field_key": "ideal_day",
+          "field_label": "Ideal Day",
+          "field_type": "long_text",
+          "required": false,
+          "face_eligible": true,
+          "face_region": "about",
+          "default_priority": 6
+        }
+      ]
+    }
+  ]
+}
