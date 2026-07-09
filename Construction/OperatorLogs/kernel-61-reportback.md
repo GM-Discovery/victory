@@ -8,11 +8,18 @@
 
 ## 1. Status
 
+**SUPERSEDED — see Kernel 61A.** This kernel (61) reached PARTIAL on its own (schema, domain layer, HTTP API, legacy-data migration, and a first read-only "My Face" page, all live-verified). Everything this reportback originally listed as not done — the Workbook/History UI, Face compiler, stage-name UI, websocket live-invalidation, secure email flow, cross-user viewing, `fresh-install.sh --local`, and legacy `/api/profiles/*` closure — was completed across the Kernel 61A closure sessions. **Kernel 61A reached PASS on 2026-07-09.** See `Construction/OperatorLogs/kernel-61A-reportback.md` for the final acceptance-criterion ledger and evidence; this file is kept as the historical record of the initial backend-foundation pass.
+
+<details>
+<summary>Original Kernel 61 status text (2026-07-06, kept for history)</summary>
+
 **PARTIAL**
 
 The backend schema, domain layer, HTTP API, and legacy-data migration are built and live-verified against the real database and the real (only) `performer_profiles` row (Straturli's). A first frontend surface — a read-only "My Face" page — is built and browser-verified, desktop and mobile, for both a populated and an empty profile. Two real bugs were found and fixed live during rollout (a JSON-encoding bug and a legacy-import self-heal gap), plus an unrelated but blocking CSS bug in four venues' hover-reveal headers (three fixed, one — Producer's Office — was already correct).
 
 Not done: the Workbook (multi-page editing) and History (event list + delete) frontend modes, websocket live-invalidation, the secure email-change flow, a true two-browser cross-account viewing test, a from-scratch `fresh-install.sh` run, the legacy `/api/profiles/*` compatibility/deprecation work, and all operator-log/roadmap documentation updates. Kernel 61 is not PASS-eligible until those exist — see the ledger below for exactly what's proven and what isn't.
+
+</details>
 
 ---
 
@@ -215,7 +222,7 @@ Screenshots captured (not committed to the repo, in this session's scratchpad):
 
 ## 6. Operator notes
 
-- **Docker rebuild**: `docker compose up -d --build backend` from `/opt/victory`; Caddy runs outside Docker directly against `/opt/victory/frontend` on disk, so frontend HTML/CSS edits are live immediately with no rebuild.
+- **Docker rebuild**: `docker compose up -d --build backend` from `/opt/victory`. **Correction (2026-07-07):** Caddy does *not* run outside Docker as originally stated here — it's a container named `bread-caddy` (image `caddy:2-alpine`), shared with an unrelated project on this host (`bread-exchange`). Its real config is `/opt/bread-exchange/Caddyfile` (not `/opt/victory/Caddyfile`, which appears to be stale/unused), and it mounts `/opt/victory/frontend` as a live volume (`/srv/web2`), proxying `victory.amurray.family`'s `/api/*`, `/ws/*`, `/auth/*` to the `backend` service and serving everything else as static files. The practical conclusion still holds: frontend HTML/CSS edits on disk are live immediately, no rebuild needed — just via a live-mounted volume rather than a host-level process.
 - **Go build cache**: use `GOCACHE=/tmp/victory-gocache` for all `go build`/`vet`/`test` invocations in this environment.
 - **Catalogue**: `backend/internal/playerprofile/catalogues/player-profile-v1.0.0.json`, go:embed'd — a new catalogue version means a new file + version bump, not editing v1.0.0 in place.
 - **Migration image storage**: no new asset/image storage was introduced; `portrait_url`/`banner_url` are plain URL-string facts today (no upload pipeline built).

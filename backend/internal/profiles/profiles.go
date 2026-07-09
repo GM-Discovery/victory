@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -237,212 +236,53 @@ func EnsureKernel9ProfileSurface(ctx context.Context, pool *pgxpool.Pool) error 
 	return nil
 }
 
+// Kernel 61A §10, Path B: the legacy performer_profiles surface is closed.
+// Every route below returns a typed deprecation response instead of reading
+// or writing performer_profiles -- the table itself is left in place,
+// untouched, as historical/migration-audit data only (Kernel 61 §11.5).
+// Real traffic now lives entirely under /api/player-profile/*.
+const deprecationMessage = "This endpoint is retired. Player profiles now live under /api/player-profile/*. See Kernel 61/61A."
+
+func writeDeprecatedJSON(w http.ResponseWriter) {
+	writeJSON(w, http.StatusGone, response{Ok: false, Data: map[string]any{
+		"error":   "deprecated_use_player_profile_workbook",
+		"message": deprecationMessage,
+	}})
+}
+
 func HandleGetMyProfile(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false})
-			return
-		}
-
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-		defer cancel()
-
-		userID, err := requireAuthenticatedUser(ctx, pool, r)
-		if err != nil {
-			writeForbiddenJSON(w, err)
-			return
-		}
-
-		row, err := loadProfile(ctx, pool, userID)
-		if err != nil {
-			writeErrorJSON(w, err)
-			return
-		}
-
-		writeJSON(w, http.StatusOK, response{Ok: true, Data: row})
+		writeDeprecatedJSON(w)
 	}
 }
 
 func HandleGetPublicProfile(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false})
-			return
-		}
-
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-		defer cancel()
-
-		userID, err := requireAuthenticatedUser(ctx, pool, r)
-		if err != nil {
-			writeForbiddenJSON(w, err)
-			return
-		}
-
-		targetUserID := strings.TrimSpace(r.URL.Query().Get("user_id"))
-		if targetUserID == "" {
-			targetUserID = userID
-		}
-
-		row, err := loadProfile(ctx, pool, targetUserID)
-		if err != nil {
-			writeErrorJSON(w, err)
-			return
-		}
-
-		row.Profile = row.Profile.publicProjection()
-		row.Profile.Draft = PublicFields{}
-		row.Profile.Published = PublicFields{}
-		writeJSON(w, http.StatusOK, response{Ok: true, Data: row})
+		writeDeprecatedJSON(w)
 	}
 }
 
 func HandleSaveMyProfile(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPatch && r.Method != http.MethodPost {
-			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false})
-			return
-		}
-
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-		defer cancel()
-
-		userID, err := requireAuthenticatedUser(ctx, pool, r)
-		if err != nil {
-			writeForbiddenJSON(w, err)
-			return
-		}
-
-		var input profileRequest
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			writeErrorJSON(w, errors.New("invalid_json"))
-			return
-		}
-
-		input.UserID = userID
-		row, err := upsertDraftProfile(ctx, pool, input)
-		if err != nil {
-			writeErrorJSON(w, err)
-			return
-		}
-
-		writeJSON(w, http.StatusOK, response{Ok: true, Data: row})
+		writeDeprecatedJSON(w)
 	}
 }
 
 func HandlePublishMyProfile(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false})
-			return
-		}
-
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-		defer cancel()
-
-		userID, err := requireAuthenticatedUser(ctx, pool, r)
-		if err != nil {
-			writeForbiddenJSON(w, err)
-			return
-		}
-
-		row, err := publishProfile(ctx, pool, userID)
-		if err != nil {
-			writeErrorJSON(w, err)
-			return
-		}
-
-		writeJSON(w, http.StatusOK, response{Ok: true, Data: row})
+		writeDeprecatedJSON(w)
 	}
 }
 
 func HandleAdminSaveProfile(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPatch && r.Method != http.MethodPost {
-			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false})
-			return
-		}
-
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-		defer cancel()
-
-		userID, err := requireAuthenticatedUser(ctx, pool, r)
-		if err != nil {
-			writeForbiddenJSON(w, err)
-			return
-		}
-
-		if ok, err := hasProducerOverride(ctx, pool, userID); err != nil {
-			writeErrorJSON(w, err)
-			return
-		} else if !ok {
-			writeForbiddenJSON(w, errors.New("producer_membership_required"))
-			return
-		}
-
-		var input profileRequest
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			writeErrorJSON(w, errors.New("invalid_json"))
-			return
-		}
-
-		if strings.TrimSpace(input.UserID) == "" {
-			writeErrorJSON(w, errors.New("user_id is required"))
-			return
-		}
-
-		row, err := upsertDraftProfile(ctx, pool, input)
-		if err != nil {
-			writeErrorJSON(w, err)
-			return
-		}
-
-		writeJSON(w, http.StatusOK, response{Ok: true, Data: row})
+		writeDeprecatedJSON(w)
 	}
 }
 
 func HandleAdminPublishProfile(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false})
-			return
-		}
-
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-		defer cancel()
-
-		userID, err := requireAuthenticatedUser(ctx, pool, r)
-		if err != nil {
-			writeForbiddenJSON(w, err)
-			return
-		}
-
-		if ok, err := hasProducerOverride(ctx, pool, userID); err != nil {
-			writeErrorJSON(w, err)
-			return
-		} else if !ok {
-			writeForbiddenJSON(w, errors.New("producer_membership_required"))
-			return
-		}
-
-		var input profileRequest
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			writeErrorJSON(w, errors.New("invalid_json"))
-			return
-		}
-
-		if strings.TrimSpace(input.UserID) == "" {
-			writeErrorJSON(w, errors.New("user_id is required"))
-			return
-		}
-
-		row, err := publishProfile(ctx, pool, input.UserID)
-		if err != nil {
-			writeErrorJSON(w, err)
-			return
-		}
-
-		writeJSON(w, http.StatusOK, response{Ok: true, Data: row})
+		writeDeprecatedJSON(w)
 	}
 }
 

@@ -200,6 +200,33 @@ A second game supplies different character objects and play structures while reu
 
 ---
 
+## V8. Player identity and social profile
+
+### Goal
+Every real Victory account (not a fictional character) has one server-authoritative Player Workbook and one owner-curated Trailer Face, cleanly separated from the Character Workbook system in V1.
+
+### Required capabilities
+
+- versioned page/field catalogue driving both backend validation and frontend rendering, independent of any Character Workbook contract;
+- typed profile events → recomputed current facts, with owner-deletable ordinary history and an append-only stage-name ledger tied to the account UUID;
+- an owner Face compiler (show/hide/inferred visibility, manual/inferred priority) reusing the Kernel 59A override-dimension pattern rather than inventing a second one;
+- a compiled social Face reachable by another authenticated user via a stable, copyable link, with no workbook/history/email/handle/UUID/edit-control leakage and no route-ID-based cross-account mutation;
+- targeted (not global) websocket projection invalidation, so owner and viewer tabs refetch live without polling;
+- a secure, real-reauthentication account-email-change path, scoped to accounts that actually have a safe reauth mechanism (password) rather than a weak stand-in for accounts that don't (provider-only);
+- a closed legacy profile surface: old routes typed-deprecated, no writes reach the pre-Workbook table, no live UI reads stale data from it.
+
+### Completion proof (Kernel 61 / 61A)
+
+- A real existing account's legacy profile data migrates into typed facts without changing its UUID, handle, memberships, grants, or character ownership.
+- The owner can complete Workbook pages, curate a Face, rename their stage name (ledger-backed, idempotent, undeletable), and change their email (password-reauthenticated) entirely through the UI.
+- A second authenticated browser opens the first user's Trailer Face via a copied link, sees only the compiled Face, and cannot mutate anything on that account through any request shape.
+- A Face-visibility/stage-name change made in one owner tab appears in a second owner tab and in a viewer's open Trailer tab without a reload.
+- `scripts/smoke/fresh-install.sh --local` proves the whole loop (workbook → catalogue → commit → Face → delete history) on a brand-new account from an empty database.
+
+**Status:** PARTIAL as of Kernel 61A (2026-07-09) — see `Construction/OperatorLogs/kernel-61-reportback.md` and `kernel-61A-reportback.md` for the exact per-criterion ledger. Single-account functionality (Workbook, History, Face Compiler, Stage Name, legacy closure), cross-user Face viewing, and targeted live updates are done; secure email is done for password-holding accounts only (provider-only accounts are explicitly blocked, not weakly confirmed); still open: any actual Trailer-discovery mechanism beyond a copied link, and the full operator-log/field-guide documentation pass.
+
+---
+
 # Track S — Socio Playable Experience
 
 ## S1. Character vertical stabilization

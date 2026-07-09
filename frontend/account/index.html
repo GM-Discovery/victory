@@ -256,7 +256,7 @@
       <p class="subtitle">This is your account hub. Use Trailers to edit your public profile and reach your character spaces.</p>
 
       <div class="toolbar">
-        <a class="button" href="/venues/trailers/">Open Trailers</a>
+        <a class="button" href="/venues/trailers/face.html">Open Trailers</a>
         <button id="logout-button" class="chip" type="button">Logout</button>
       </div>
 
@@ -282,6 +282,19 @@
           <div id="session-state" class="session-state" data-state="loading">Checking account...</div>
           <p class="note" id="session-note">We are checking your account now.</p>
           <div class="meta" id="account-meta"></div>
+          <div class="toolbar" style="margin-top: 12px;">
+            <button class="chip" type="button" id="edit-email-button" hidden>Change Email</button>
+          </div>
+          <div id="email-editor" hidden style="margin-top: 12px;">
+            <p class="note" id="email-editor-note"></p>
+            <input type="password" id="email-current-password" placeholder="Current password" autocomplete="current-password" style="width:100%; box-sizing:border-box; margin-bottom:8px;" />
+            <input type="email" id="email-new-value" placeholder="New email" style="width:100%; box-sizing:border-box; margin-bottom:8px;" />
+            <div class="toolbar">
+              <button class="button" type="button" id="save-email-button">Save Email</button>
+              <button class="chip" type="button" id="cancel-email-button">Cancel</button>
+            </div>
+            <p class="note" id="email-status"></p>
+          </div>
         </section>
 
         <section class="panel">
@@ -472,8 +485,15 @@
         renderMeta(accountMeta, [
           { label: "Handle", value: profileValue(user.handle) },
           { label: "Display Name", value: profileValue(user.display_name) },
+          { label: "Email", value: profileValue(user.email) },
           { label: "Victory user ID", value: shortId(user.id) },
         ]);
+
+        const editEmailButton = document.getElementById("edit-email-button");
+        if (editEmailButton) {
+          editEmailButton.hidden = false;
+          editEmailButton.dataset.hasPassword = user.has_password ? "1" : "0";
+        }
 
         if (discordHeading) {
           discordHeading.textContent = auth.discord_linked ? "Discord linked" : "Discord not linked";
@@ -527,7 +547,7 @@
         }
 
         try {
-          const profileResponse = await fetch("/api/profiles/me", {
+          const profileResponse = await fetch("/api/player-profile/me", {
             credentials: "include",
           });
           const profilePayload = await profileResponse.json().catch(() => null);
@@ -537,24 +557,25 @@
             profileHeading.textContent = "Profile unavailable";
             renderMeta(document.getElementById("profile-meta"), [
               { label: "Trailers", value: "Open Trailers to edit" },
-              { label: "Persona", value: "Still null" },
             ]);
             return;
           }
 
-          const profile = profilePayload.data?.profile || {};
-          const publicProfile = profile.public || {};
-          profileHeading.textContent = profileValue(publicProfile.stage_name) !== "Not set" ? profileValue(publicProfile.stage_name) : "Profile ready";
-          profileNote.textContent = profile.is_published ? "Published profile is live." : "Draft profile exists. Publish it from Trailers when ready.";
+          const data = profilePayload.data || {};
+          const facts = data.facts || {};
+          const factValue = (key) => profileValue(facts[key]?.display_value);
+
+          profileHeading.textContent = data.stage_name || "Profile ready";
+          profileNote.textContent = "Manage your Workbook and Face from Trailers.";
 
           renderMeta(document.getElementById("profile-meta"), [
-            { label: "Stage Name", value: profileValue(publicProfile.stage_name) },
-            { label: "Pronouns", value: profileValue(publicProfile.pronouns) },
-            { label: "Age Range", value: profileValue(publicProfile.performance_age_range) },
-            { label: "Favorite Color", value: profileValue(publicProfile.favorite_color) },
-            { label: "Favorite Artist", value: profileValue(publicProfile.favorite_artist) },
-            { label: "Favorite Food", value: profileValue(publicProfile.favorite_food) },
-            { label: "Ideal Day", value: profileValue(publicProfile.ideal_day) },
+            { label: "Stage Name", value: profileValue(data.stage_name) },
+            { label: "Pronouns", value: factValue("pronouns") },
+            { label: "Real Name", value: factValue("real_name") },
+            { label: "Favorite Color", value: factValue("favorite_color") },
+            { label: "Favorite Artist", value: factValue("favorite_artist") },
+            { label: "Favorite Food", value: factValue("favorite_food") },
+            { label: "Ideal Day", value: factValue("ideal_day") },
           ]);
         } catch (profileError) {
           console.error("profile load failed", profileError);
@@ -572,6 +593,83 @@
         if (recovery) recovery.classList.add("visible");
       }
     }
+
+    function openEmailEditor() {
+      const editor = document.getElementById("email-editor");
+      const button = document.getElementById("edit-email-button");
+      const note = document.getElementById("email-editor-note");
+      const status = document.getElementById("email-status");
+
+      document.getElementById("email-current-password").value = "";
+      document.getElementById("email-new-value").value = "";
+      status.textContent = "";
+
+      if (button.dataset.hasPassword !== "1") {
+        note.textContent = "This account signed up through Discord and has no password set, so there's no safe way to confirm an email change here yet.";
+        document.getElementById("email-current-password").hidden = true;
+        document.getElementById("save-email-button").hidden = true;
+      } else {
+        note.textContent = "Enter your current password to confirm this change.";
+        document.getElementById("email-current-password").hidden = false;
+        document.getElementById("save-email-button").hidden = false;
+      }
+
+      editor.hidden = false;
+      button.hidden = true;
+    }
+
+    function closeEmailEditor() {
+      document.getElementById("email-editor").hidden = true;
+      document.getElementById("edit-email-button").hidden = false;
+    }
+
+    async function saveEmail() {
+      const status = document.getElementById("email-status");
+      const currentPassword = document.getElementById("email-current-password").value;
+      const newEmail = document.getElementById("email-new-value").value.trim();
+
+      if (!newEmail) {
+        status.textContent = "Enter a new email address.";
+        return;
+      }
+
+      status.textContent = "Saving...";
+      try {
+        const response = await fetch("/api/account/email", {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ current_password: currentPassword, new_email: newEmail }),
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || !payload?.ok) {
+          const code = payload?.error || `HTTP ${response.status}`;
+          const messages = {
+            invalid_email_format: "That doesn't look like a valid email address.",
+            email_already_in_use: "That email is already in use by another account.",
+            current_password_required: "Enter your current password.",
+            invalid_credentials: "That password isn't correct.",
+            password_reauth_unavailable_for_this_account: "This account has no password to confirm with.",
+          };
+          status.textContent = messages[code] || `Could not update email (${code}).`;
+          return;
+        }
+
+        status.textContent = "Email updated.";
+        setTimeout(() => {
+          closeEmailEditor();
+          bootstrapAccount();
+        }, 900);
+      } catch (error) {
+        console.error("email update failed", error);
+        status.textContent = "Could not reach the server. Try again.";
+      }
+    }
+
+    document.getElementById("edit-email-button").addEventListener("click", openEmailEditor);
+    document.getElementById("cancel-email-button").addEventListener("click", closeEmailEditor);
+    document.getElementById("save-email-button").addEventListener("click", saveEmail);
 
     bootstrapAccount();
   </script>

@@ -623,3 +623,58 @@ VALUES (
 - New actions record the active persona in `payload.actor_persona` and project it through `actor.persona`.
 - Existing actions without persona data still project `persona: null`.
 - Dice, grid, tokens, HP, initiative, and fog remain outside this kernel.
+
+## Kernel 61 / 61A — Player Workbook, Trailer Face, and Legacy Profile Migration
+
+**Status: PARTIAL.** Full ledger in `Construction/OperatorLogs/kernel-61-reportback.md` and `kernel-61A-reportback.md`. This section is the durable operator reference; the reportbacks are the point-in-time evidence record.
+
+### Account vs Player Workbook vs Trailer Face vs Character Workbook
+
+These are four distinct layers — do not conflate them:
+
+- **Account** (`users` table + `auth.*`): stable UUID, sign-in handle (read-only outside admin tooling), email (private, securely editable — see below). This is authentication and accountability, not presentation.
+- **Player Workbook** (`player_profile_*` tables, `backend/internal/playerprofile/`): a *real user's* private, catalogue-driven pages, typed profile events, and current facts. One per account, created on first touch (`EnsureWorkbook`). Reachable at `/venues/trailers/workbook.html`.
+- **Trailer Face**: the owner-curated *compiled social projection* of eligible Player Workbook facts — not a separate data store, a projection (`BuildTrailerFace`) over Workbook facts + `player_profile_face_overrides`. Owner view: `/venues/trailers/face.html`. Social (another authenticated user's) view: `/venues/trailers/view.html?id=<workbook_id>`.
+- **Character Workbook** (`character_workbook_*`, `character_face_overrides`, Kernel 53/59A): a *fictional character's* sheet — completely separate schema, completely separate Face-override mechanism, lives in Greenroom. A user can own many characters but has exactly one Trailer. Do not route player-identity work through Character Workbook tables or vice versa.
+
+### Stage-name ledger
+
+- `player_stage_name_history`, keyed by the account UUID (not the workbook ID) — survives even if the Workbook itself were ever rebuilt.
+- Append-only: a change closes the current open interval (`ended_at = NOW()`) and opens a new one in one transaction (`ChangeStageName` in `stagename.go`). A partial unique index (`idx_player_stage_name_history_current`) enforces exactly one open row per user at the DB level, not just in application code.
+- Idempotent: resubmitting the same normalized (case/whitespace-insensitive) name is a no-op, no duplicate row.
+- **Cannot be deleted through any ordinary endpoint** — `DELETE /api/player-profile/events/{id}` only ever targets `player_profile_events`, a different table entirely, so a stage-name ledger ID passed there 404s. There is no delete path for this table anywhere in the product, including for the operator.
+- UI: inline "Edit" control next to the stage name on `face.html`; read-only ledger view on `workbook.html`'s History tab.
+
+### Ordinary History / event deletion
+
+- `player_profile_events` (page commits, legacy imports) are owner-deletable, unlike the stage-name ledger.
+- Deleting an event triggers `RecomputePlayerFacts`, which fully rebuilds `player_profile_facts` from whatever events remain (fold in chronological order, last write per field wins) — not a patch, a full recompute, so there's no drift possible between events and facts.
+- The Workbook's History tab computes an accurate **client-side** deletion-impact preview before the owner confirms, by replaying the same fold logic in JS. That JS copy is not shared with the Go implementation — if `DeriveEffectiveFacts` in `facts.go` ever changes, the client-side preview in `workbook.html` needs a matching update or it will silently drift.
+
+### Targeted profile invalidation (websocket)
+
+- Endpoint: `/ws/player-profile` (`backend/internal/network/profile_ws.go`) — deliberately **not** built on the existing `ServeVenueWS`, because that requires an active venue *session* (Cave/Catharsis-style), which Trailers has no concept of. This is a standalone, auth-only websocket.
+- Client sends `{"type":"watch_profile","profile_id":"<workbook_id>"}` after connecting. The server only ever recognizes that one inbound message type — everything else is silently dropped, and nothing is ever relayed from one client to another, so a client cannot forge a `player_profile/projection_updated` event.
+- Server pushes `{"type":"player_profile/projection_updated","profile_id","projection_version","changed_dimensions","ts"}` to every client currently watching that `profile_id` — owner's other tabs and another user's Trailer-viewer tab both use the exact same mechanism; there is no separate "owner channel."
+- The payload is deliberately just an opaque ID + version, never facts — clients always refetch through the real authenticated HTTP endpoint, the push is invalidation-only.
+- Wired into every mutation via the `ProjectionChangeNotifier` callback pattern (matches the existing `characters.ProjectionChangeNotifier` shape) — `network.BroadcastPlayerProfileProjectionInvalidation`, passed into `main.go`'s player-profile route registrations.
+
+### Secure email behavior
+
+- `PATCH /api/account/email` (`backend/internal/identity/account_email.go`). Owner-only (resolved from session, never a client-supplied target ID), format-validated, case-insensitive-unique-checked, and **real password reauthentication** via the same `VerifyPassword` Argon2id check used at login.
+- **Accounts with no password credential (Discord-only signup) are explicitly refused** (`password_reauth_unavailable_for_this_account`) rather than given a weaker confirmation path — there is currently no safe step-up reauth for provider-only accounts. This is a known, deliberate gap, not an oversight: fixing it means building a real Discord-OAuth step-up flow, which was out of scope for this pass.
+- Email is never written into any Player Workbook table — it cannot appear in an event, History entry, fact, or Face under any circumstance, by construction (it isn't a catalogue field and `IsReservedFieldKey` blocks it from ever becoming a Face override target even if someone tried).
+- UI: `/account/` — "Change Email" button reveals an inline current-password + new-email form.
+
+### Legacy `/api/profiles/*` status
+
+- **Closed (Path B: deprecate/disable), not adapted.** All 6 routes (`GET /me`, `GET /public`, `POST /me/save`, `POST /me/publish`, `POST /admin/save`, `POST /admin/publish`) now return `410 Gone` with `{"error":"deprecated_use_player_profile_workbook"}` — none of them read or write `performer_profiles` anymore.
+- `performer_profiles` itself is **not dropped** — left in place, untouched, as historical/migration-audit data (per Kernel 61 §11.5). It was migrated into the new tables once, idempotently, during Kernel 61.
+- The old Trailers editor (`frontend/venues/trailers/index.html`) is now a redirect stub to `face.html`, not a working form — kept as a URL (nothing that links to `/venues/trailers/` breaks), but there is no legacy UI left that reads or writes through the old surface.
+- `frontend/account/index.html`'s profile summary panel was migrated to read `GET /api/player-profile/me` instead of the deprecated route.
+
+### Straturli / cabin preservation
+
+- Nothing in Kernel 61/61A touches `users`, `location_memberships`, `access_grants`, `character_cards`, venue tables, or operator resolution (`OPERATOR_HANDLE`/`OPERATOR_USER_ID` env-based, unrelated to any Player Workbook table).
+- Live-reverified each session: Straturli's UUID, handle, operator status, and Grant's Cabin access all unchanged. Straturli's own stage name was never touched by any test — the account owner changed it themselves through the real UI between sessions (confirmed live as "Grant A. Murray", not a leftover migration artifact like the original "The Starmaker").
+- A pre-existing, unrelated flaky test (`internal/network`'s `TestMirrorVictoryChatToDiscordPostsMessageAndPersistsBridgeRow`) leaks orphaned `bridge_operator_*` fixture users/rows into the live DB when run — confirmed via `git stash` that this happens with or without any Kernel 61A code present. Not fixed (out of scope), but do not mistake those rows for Kernel 61A test residue if seen in the `users` table.

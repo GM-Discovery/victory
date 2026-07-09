@@ -134,6 +134,47 @@
       line-height: 1.1;
     }
 
+    .stage-name-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .stage-name-row .chip {
+      padding: 6px 14px;
+      font-size: 0.82rem;
+    }
+
+    .stage-name-editor {
+      margin-top: 12px;
+      max-width: 360px;
+    }
+
+    .stage-name-editor input {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: #211913;
+      color: #fff6e9;
+      padding: 10px 14px;
+      font: inherit;
+    }
+
+    .stage-name-editor-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .mini-link {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
     .identity-meta {
       margin: 8px 0 0;
       display: flex;
@@ -201,6 +242,93 @@
       min-height: 1.4em;
     }
 
+    .compiler-fact {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+
+    .compiler-fact.is-hidden {
+      opacity: 0.6;
+    }
+
+    .compiler-fact-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      flex-wrap: wrap;
+    }
+
+    .compiler-fact-label {
+      font-weight: 700;
+      color: var(--accent-strong);
+    }
+
+    .compiler-fact-region {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .compiler-fact-value {
+      margin: 6px 0 10px;
+      line-height: 1.5;
+      color: var(--muted);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .compiler-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .control-group-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-right: 4px;
+    }
+
+    .mini-button {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--accent-strong);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .mini-button.active {
+      background: linear-gradient(180deg, #6b4a24 0%, #4a341c 100%);
+      border-color: rgba(255, 233, 197, 0.3);
+    }
+
+    .mini-button:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+
+    .priority-score {
+      min-width: 2.4em;
+      text-align: center;
+      font-weight: 700;
+      color: var(--accent-strong);
+    }
+
     @media (max-width: 560px) {
       .identity-card {
         grid-template-columns: 1fr;
@@ -230,8 +358,9 @@
         This is the compiled, curated view of your Player Workbook that other signed-in Victory members see. Facts you haven't added yet simply don't appear here — there's no "not set" wall.
       </p>
       <div class="launchbar">
-        <a class="chip" href="/venues/trailers/">Legacy Editor</a>
+        <a class="chip" href="/venues/trailers/workbook.html">Edit My Workbook</a>
         <a class="chip" href="/account/">Account</a>
+        <button class="chip" type="button" id="toggle-compiler-button" hidden>Edit Face</button>
       </div>
     </header>
 
@@ -241,7 +370,20 @@
       <section class="card identity-card" id="identity-card" hidden>
         <div id="portrait-wrap"></div>
         <div>
-          <h2 class="stage-name" id="stage-name">—</h2>
+          <div class="stage-name-row">
+            <h2 class="stage-name" id="stage-name">—</h2>
+            <button class="chip" type="button" id="edit-stage-name-button">Edit</button>
+            <button class="chip" type="button" id="copy-trailer-link-button">Copy Trailer Link</button>
+          </div>
+          <div id="stage-name-editor" class="stage-name-editor" hidden>
+            <input type="text" id="stage-name-input" maxlength="80" />
+            <div class="stage-name-editor-actions">
+              <button class="chip" type="button" id="save-stage-name-button">Save</button>
+              <button class="chip" type="button" id="cancel-stage-name-button">Cancel</button>
+            </div>
+            <p class="status-line" id="stage-name-status"></p>
+            <a class="mini-link" href="/venues/trailers/workbook.html">View stage name history</a>
+          </div>
           <div class="identity-meta" id="identity-meta"></div>
           <p class="intro-line" id="intro-line" hidden></p>
         </div>
@@ -253,12 +395,22 @@
         <h2>Your Face is empty so far</h2>
         <p>Add facts through the Workbook and choose which ones to show here. Only your stage name is required — everything else is optional.</p>
       </section>
+
+      <section class="card" id="compiler-section" hidden>
+        <h2 style="margin-top:0;">Face Compiler</h2>
+        <p class="note" style="color: var(--muted); margin-bottom: 18px;">
+          Every fact you've answered that's eligible for Face appears here, whether it's currently shown or not. Hidden facts are dimmed. Priority controls only reorder within a fact's own region.
+        </p>
+        <p class="status-line" id="compiler-status"></p>
+        <div id="compiler-list"></div>
+      </section>
     </main>
   </div>
 
   <script src="/lib/forbidden.js"></script>
   <script src="/lib/identity.js"></script>
   <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script src="/lib/player-profile-ws.js"></script>
   <script>
     const REGION_ORDER = ["at_a_glance", "play_and_create", "about", "credits_and_links"];
     const REGION_TITLES = {
@@ -366,6 +518,232 @@
       document.getElementById("empty-state").hidden = hasAnyContent || identityHasExtra;
     }
 
+    let latestMe = null;
+    let compilerOpen = false;
+
+    function openStageNameEditor() {
+      const input = document.getElementById("stage-name-input");
+      input.value = latestMe ? latestMe.stage_name : "";
+      document.getElementById("stage-name-status").textContent = "";
+      document.getElementById("stage-name-editor").hidden = false;
+      document.getElementById("edit-stage-name-button").hidden = true;
+      input.focus();
+      input.select();
+    }
+
+    function closeStageNameEditor() {
+      document.getElementById("stage-name-editor").hidden = true;
+      document.getElementById("edit-stage-name-button").hidden = false;
+    }
+
+    async function saveStageName() {
+      const input = document.getElementById("stage-name-input");
+      const status = document.getElementById("stage-name-status");
+      const candidate = input.value.trim();
+
+      if (!candidate) {
+        status.textContent = "Stage name can't be blank.";
+        return;
+      }
+
+      status.textContent = "Saving...";
+      try {
+        const response = await fetch("/api/player-profile/stage-name", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stage_name: candidate }),
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (isForbiddenAccessResponse(response, payload)) {
+          showForbiddenScreen();
+          return;
+        }
+        if (!response.ok || !payload?.ok) {
+          status.textContent = "Save failed: " + (payload?.data?.error || `HTTP ${response.status}`);
+          return;
+        }
+
+        await refreshFace();
+        closeStageNameEditor();
+      } catch (error) {
+        console.error(error);
+        status.textContent = "Save failed. Check your connection.";
+      }
+    }
+
+    document.getElementById("edit-stage-name-button").addEventListener("click", openStageNameEditor);
+    document.getElementById("cancel-stage-name-button").addEventListener("click", closeStageNameEditor);
+    document.getElementById("save-stage-name-button").addEventListener("click", saveStageName);
+    document.getElementById("stage-name-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); saveStageName(); }
+      if (e.key === "Escape") { e.preventDefault(); closeStageNameEditor(); }
+    });
+
+    document.getElementById("copy-trailer-link-button").addEventListener("click", async () => {
+      const button = document.getElementById("copy-trailer-link-button");
+      if (!latestMe || !latestMe.workbook || !latestMe.workbook.id) return;
+      const url = `${window.location.origin}/venues/trailers/view.html?id=${encodeURIComponent(latestMe.workbook.id)}`;
+      const original = button.textContent;
+      try {
+        await navigator.clipboard.writeText(url);
+        button.textContent = "Link Copied!";
+      } catch (error) {
+        console.error("clipboard write failed", error);
+        window.prompt("Copy your Trailer link:", url);
+      }
+      setTimeout(() => { button.textContent = original; }, 1800);
+    });
+
+    function renderCompiler(me) {
+      const list = document.getElementById("compiler-list");
+      list.innerHTML = "";
+
+      const fields = me.eligible_fields || [];
+      if (fields.length === 0) {
+        list.innerHTML = '<p class="empty-note" style="color: var(--muted);">Nothing eligible for Face yet — answer some Workbook fields first.</p>';
+        return;
+      }
+
+      let currentRegion = null;
+      for (const field of fields) {
+        if (field.region !== currentRegion) {
+          currentRegion = field.region;
+          const heading = document.createElement("p");
+          heading.className = "compiler-fact-region";
+          heading.style.margin = "18px 0 8px";
+          heading.textContent = REGION_TITLES[currentRegion] || currentRegion;
+          list.appendChild(heading);
+        }
+
+        const card = document.createElement("div");
+        card.className = "compiler-fact" + (field.face_visible ? "" : " is-hidden");
+
+        const head = document.createElement("div");
+        head.className = "compiler-fact-head";
+        const label = document.createElement("span");
+        label.className = "compiler-fact-label";
+        label.textContent = field.label;
+        head.appendChild(label);
+        card.appendChild(head);
+
+        const value = document.createElement("p");
+        value.className = "compiler-fact-value";
+        value.textContent = field.display_value || "(no value)";
+        card.appendChild(value);
+
+        const controls = document.createElement("div");
+        controls.className = "compiler-controls";
+
+        const visGroup = document.createElement("div");
+        visGroup.className = "control-group";
+        const visLabel = document.createElement("span");
+        visLabel.className = "control-group-label";
+        visLabel.textContent = "Visibility:";
+        visGroup.appendChild(visLabel);
+
+        const modeNow = field.face_visibility_mode;
+        const shownBtn = makeMiniButton("Show", modeNow === "shown", () => setVisibility(field.field_key, "shown"));
+        const hiddenBtn = makeMiniButton("Hide", modeNow === "hidden", () => setVisibility(field.field_key, "hidden"));
+        const autoBtn = makeMiniButton("Auto", modeNow === "inferred", () => setVisibility(field.field_key, "inferred"));
+        visGroup.appendChild(shownBtn);
+        visGroup.appendChild(hiddenBtn);
+        visGroup.appendChild(autoBtn);
+        controls.appendChild(visGroup);
+
+        const prioGroup = document.createElement("div");
+        prioGroup.className = "control-group";
+        const prioLabel = document.createElement("span");
+        prioLabel.className = "control-group-label";
+        prioLabel.textContent = "Priority:";
+        prioGroup.appendChild(prioLabel);
+
+        const minusBtn = makeMiniButton("−", false, () => setPriority(field.field_key, field.priority_score - 5));
+        const scoreSpan = document.createElement("span");
+        scoreSpan.className = "priority-score";
+        scoreSpan.textContent = field.priority_score;
+        const plusBtn = makeMiniButton("+", false, () => setPriority(field.field_key, field.priority_score + 5));
+        const resetBtn = makeMiniButton("Reset", field.priority_mode === "inferred", () => resetPriority(field.field_key));
+
+        prioGroup.appendChild(minusBtn);
+        prioGroup.appendChild(scoreSpan);
+        prioGroup.appendChild(plusBtn);
+        prioGroup.appendChild(resetBtn);
+        controls.appendChild(prioGroup);
+
+        card.appendChild(controls);
+        list.appendChild(card);
+      }
+    }
+
+    function makeMiniButton(text, isActive, onClick) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "mini-button" + (isActive ? " active" : "");
+      btn.textContent = text;
+      btn.addEventListener("click", onClick);
+      return btn;
+    }
+
+    async function setVisibility(fieldKey, mode) {
+      await mutateFace("/api/player-profile/face-visibility", { field_key: fieldKey, mode });
+    }
+
+    async function setPriority(fieldKey, score) {
+      await mutateFace("/api/player-profile/face-priority", { field_key: fieldKey, mode: "manual", score });
+    }
+
+    async function resetPriority(fieldKey) {
+      await mutateFace("/api/player-profile/face-priority", { field_key: fieldKey, mode: "inferred" });
+    }
+
+    async function mutateFace(url, body) {
+      const status = document.getElementById("compiler-status");
+      status.textContent = "Saving...";
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const payload = await response.json().catch(() => null);
+        if (isForbiddenAccessResponse(response, payload)) {
+          showForbiddenScreen();
+          return;
+        }
+        if (!response.ok || !payload?.ok) {
+          status.textContent = "Save failed: " + (payload?.data?.error || `HTTP ${response.status}`);
+          return;
+        }
+        await refreshFace();
+        status.textContent = "Saved.";
+      } catch (error) {
+        console.error(error);
+        status.textContent = "Save failed. Check your connection.";
+      }
+    }
+
+    async function refreshFace() {
+      const response = await fetch("/api/player-profile/me", { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) throw new Error("failed to refresh face");
+      latestMe = payload.data;
+
+      const facePreview = latestMe.face_preview || { regions: {} };
+      renderIdentity(facePreview);
+      renderRegions(facePreview);
+      renderCompiler(latestMe);
+    }
+
+    document.getElementById("toggle-compiler-button").addEventListener("click", () => {
+      compilerOpen = !compilerOpen;
+      document.getElementById("compiler-section").hidden = !compilerOpen;
+      document.getElementById("toggle-compiler-button").textContent = compilerOpen ? "Done Editing" : "Edit Face";
+      if (compilerOpen && latestMe) renderCompiler(latestMe);
+    });
+
     async function loadFace() {
       const statusLine = document.getElementById("status-line");
 
@@ -389,11 +767,19 @@
         return;
       }
 
-      const facePreview = payload.data.face_preview || { regions: {} };
+      latestMe = payload.data;
+      const facePreview = latestMe.face_preview || { regions: {} };
       renderIdentity(facePreview);
       renderRegions(facePreview);
       document.getElementById("identity-card").hidden = false;
+      document.getElementById("toggle-compiler-button").hidden = false;
       statusLine.textContent = "";
+
+      if (latestMe.workbook && latestMe.workbook.id) {
+        watchPlayerProfile(latestMe.workbook.id, () => {
+          refreshFace().catch((error) => console.error("live update refresh failed", error));
+        });
+      }
     }
 
     loadFace().catch((error) => {

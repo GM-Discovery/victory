@@ -11,6 +11,48 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-07-06 to 2026-07-09 — Kernel 61 / 61A: Trailer Player Workbook, Face Compiler, and Legacy Profile Migration
+
+Replaced the fixed performer-profile form in Trailers with a server-authoritative Player Workbook: catalogue-driven pages, typed profile events, recomputed current facts, an owner-curated Trailer Face, an append-only stage-name ledger, cross-user Face viewing, targeted websocket live updates, a secure email-change flow, and closure of the legacy `/api/profiles/*` surface. Spanned several sessions; status is **PARTIAL** — see `Construction/OperatorLogs/kernel-61-reportback.md` and `kernel-61A-reportback.md` for the full acceptance-criterion ledger. Durable operator reference notes are in `operator-notes.md` under "Kernel 61 / 61A."
+
+### Backend
+- Migration `036_kernel61_player_workbook_foundation.sql`: `player_profile_workbooks`, `player_profile_events`, `player_profile_facts`, `player_stage_name_history` (partial-unique-indexed to one open row per user), `player_profile_face_overrides`. Additive only — no existing table altered or dropped.
+- New package `backend/internal/playerprofile/`: versioned JSON catalogue (6 pages, ~50 fields incl. D&D class, Socio class/archetype, favorite-3-TTRPGs), event→fact derivation/recomputation, Face projection with visibility/priority overrides, stage-name ledger transaction, legacy `performer_profiles` import (idempotent, self-healing across bootstrap restarts).
+- 8 HTTP routes under `/api/player-profile/*`; social route keyed by workbook ID, not raw account UUID.
+- All 6 legacy `/api/profiles/*` routes now return typed `410 Gone` instead of touching `performer_profiles` (`backend/internal/profiles/profiles.go`) — Path B closure, chosen by the operator over building a compatibility adapter.
+- `PATCH /api/account/email` (`backend/internal/identity/account_email.go`): owner-only, real Argon2id password reauthentication, case-insensitive uniqueness, explicit typed refusal (not weak confirmation) for password-less/provider-only accounts.
+- Targeted websocket invalidation: new standalone `/ws/player-profile` endpoint (not built on the session-coupled `ServeVenueWS`), `Hub.BroadcastProfileWatchers`/`SetClientWatchProfile`, `player_profile/projection_updated` trusted event wired into every mutation via the existing `ProjectionChangeNotifier` callback pattern.
+
+### Frontend
+- `frontend/venues/trailers/face.html` — My Face (read-only preview + owner Face compiler + inline stage-name editor + Copy Trailer Link).
+- `frontend/venues/trailers/workbook.html` (new) — catalogue-driven Workbook editor + History tab with client-computed deletion-impact preview.
+- `frontend/venues/trailers/view.html` (new) — read-only cross-user Trailer viewer, reached via a copied link (`?id=<workbook_id>`), no edit surface at all.
+- `frontend/venues/trailers/index.html` — the ~1,240-line legacy editor replaced with a small redirect stub to `face.html`.
+- `frontend/account/index.html` — profile panel migrated off the deprecated legacy route; new email-change UI.
+- `frontend/lib/player-profile-ws.js` (new) — shared websocket-watch client used by all three Trailer pages.
+
+### Real bugs found and fixed live (not just in test)
+- Page commits were writing a fact for every field on a page, including untouched blank ones — polluted stored facts with empty-string noise. Fixed by only submitting non-empty fields (or fields with an existing fact, so intentional clears still work).
+- `RecomputePlayerFacts` sent bare Go strings to a `jsonb` column; pgx treats a plain `string` as pre-encoded JSON text rather than marshaling it, so unquoted values failed Postgres's JSON parser. Fixed with explicit `json.Marshal`.
+- Legacy-import idempotency check returned early without recomputing facts, so a partial prior failure could stay broken forever across restarts. Fixed: facts always recompute on every bootstrap run.
+- `scripts/smoke/fresh-install.sh`'s backend process was started via a backgrounded `go run` inside a subshell, so `$BACKEND_PID` was never the actual server process — repeated `--local` runs left orphaned backend processes holding the port and stale throwaway databases undropped. Fixed by building the binary once and running it directly, plus a belt-and-suspenders port-based cleanup fallback.
+- A pre-existing, unrelated hover-reveal header CSS bug (shared across `trailers`, `directors-chair`, `the-cave`) made newly-added nav buttons unclickable — the header had no continuous hoverable region and no explicit `z-index`. Fixed using the pattern `producers-office` already had correct.
+
+### Verification
+- Live two-browser test: Copy Trailer Link → second real account opens it → sees only the compiled Face (no email/handle/UUID/workbook/history/controls) → cannot mutate the first account through any request shape → a Face/stage-name change in the first account's tab appears in the second account's open viewer tab without a reload, and in a second tab of the *same* account, via the new websocket push.
+- Full stage-name proof on a disposable fixture account: ledger open/close transaction, same-name idempotency (exactly 2 rows after 2 duplicate resubmits), undeletable via the ordinary event-delete endpoint, UUID/handle/email/memberships/characters unchanged.
+- Email flow proof: invalid format, duplicate (case-insensitive), missing/wrong password, valid change, and the password-less-account refusal path — all live, all via the real `/auth/signup` + `/api/account/email` flow, not synthetic data.
+- `scripts/smoke/fresh-install.sh --local` run twice consecutively from empty, including new assertions proving a brand-new account can load the catalogue, get one workbook, commit a page, project a Face, and delete ordinary History — all pass, and the process/DB cleanup fix was verified by confirming a clean `ss`/`pg_database` state after each run.
+- Straturli re-verified live each session: UUID/handle/operator status/Grant's Cabin access unchanged; Straturli's own stage name was changed by the actual account owner through the real UI between sessions (not by any test) — went from the legacy-migrated "The Starmaker" to "Grant A. Murray," and the Workbook shows real, deliberately-entered data (D&D class, Socio archetype, favorite TTRPGs, etc.), confirming real adoption of the feature.
+- `go build`/`go vet` clean throughout; `go test ./internal/playerprofile/... ./internal/profiles/...` clean; pre-existing unrelated failures in `internal/assets` (filesystem-path test bug) and `internal/identity`/`internal/network` (live Discord API rate-limiting/state-drift tests) confirmed via `git stash` to exist independent of any Kernel 61A code.
+
+### Known gaps (PARTIAL, not PASS)
+- No Trailer-discovery mechanism beyond a manually copied link — no search, no directory, deliberately out of scope per the kernel spec's "do not build a new social/discovery system."
+- Email reauthentication only covers password-holding accounts; provider-only (Discord signup) accounts are explicitly and cleanly refused, not given a weaker path.
+- A pre-existing flaky Discord chat-bridge test leaks orphaned fixture users into the live `users` table when run — unrelated to this kernel, not fixed (out of scope).
+
+---
+
 ## 2026-07-03 — Kernel 58 Greenroom Summary Panel Removal and Sidebar Contrast Pass
 
 ### Frontend

@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Workbook — Trailers</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #17120e;
+      --panel: rgba(27, 21, 17, 0.92);
+      --panel-strong: rgba(19, 15, 12, 0.96);
+      --line: rgba(255, 233, 197, 0.12);
+      --accent: #f0d3a4;
+      --accent-strong: #fff2d7;
+      --muted: #d0bfa6;
+      --danger: #e2a07a;
+      --danger-strong: #ffb98c;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(172, 120, 64, 0.28), transparent 30%),
+        radial-gradient(circle at 85% 0%, rgba(82, 119, 167, 0.18), transparent 28%),
+        linear-gradient(180deg, #17120e 0%, #0e0b09 100%);
+      color: #f6ecdd;
+    }
+
+    .header {
+      padding: 22px 24px 12px;
+      max-width: 1180px;
+      width: 100%;
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: #d7ab6f;
+      font-size: 0.76rem;
+      margin: 0 0 8px;
+    }
+
+    h1 { margin: 0; font-size: clamp(1.9rem, 4vw, 3rem); line-height: 1.05; }
+
+    .subtitle { margin: 10px 0 0; color: var(--muted); max-width: 72ch; line-height: 1.5; }
+
+    .launchbar { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
+
+    .chip {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      border-radius: 999px; text-decoration: none; border: 1px solid var(--line);
+      padding: 11px 16px; color: var(--accent-strong); background: rgba(255, 255, 255, 0.03);
+      font-weight: 700; cursor: pointer; font: inherit;
+    }
+
+    .chip[aria-current="true"] {
+      background: linear-gradient(180deg, #6b4a24 0%, #4a341c 100%);
+      border-color: rgba(255, 233, 197, 0.3);
+    }
+
+    .tabbar { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+
+    [hidden] { display: none !important; }
+
+    .stage {
+      max-width: 1180px; width: 100%; margin: 0 auto; padding: 8px 24px 48px;
+      box-sizing: border-box; display: grid; gap: 18px;
+      grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+      align-items: start;
+    }
+
+    @media (max-width: 860px) {
+      .stage { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+      padding: 22px; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.24);
+    }
+
+    .page-nav { display: grid; gap: 8px; padding: 14px; position: sticky; top: 16px; }
+
+    .page-nav-item {
+      display: block; width: 100%; text-align: left; padding: 12px 14px; border-radius: 12px;
+      border: 1px solid transparent; background: transparent; color: var(--muted);
+      font: inherit; font-weight: 700; cursor: pointer;
+    }
+
+    .page-nav-item:hover { background: rgba(255,255,255,0.04); }
+
+    .page-nav-item[aria-current="true"] {
+      background: rgba(240, 211, 164, 0.12); border-color: var(--line); color: var(--accent-strong);
+    }
+
+    .page-nav-item .completion { display: block; font-size: 0.76rem; font-weight: 400; color: var(--muted); margin-top: 2px; }
+
+    .mobile-page-select { display: none; margin-bottom: 12px; }
+
+    @media (max-width: 860px) {
+      .page-nav { display: none; }
+      .mobile-page-select { display: block; }
+    }
+
+    .mobile-page-select select {
+      width: 100%; box-sizing: border-box; border-radius: 12px; border: 1px solid rgba(255,255,255,0.14);
+      background: #211913; color: #fff6e9; padding: 12px 14px; font: inherit; font-weight: 700;
+    }
+
+    .page-title { margin: 0 0 6px; font-size: 1.5rem; }
+    .page-description { margin: 0 0 22px; color: var(--muted); line-height: 1.5; }
+
+    .field { display: grid; gap: 8px; margin-bottom: 20px; }
+
+    .field label { font-weight: 700; }
+
+    .field .help-text { color: var(--muted); font-size: 0.85rem; margin: 0; }
+
+    .field .error-text { color: var(--danger-strong); font-size: 0.85rem; margin: 0; }
+
+    input[type="text"], input[type="url"], textarea, select {
+      width: 100%; box-sizing: border-box; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+      background: #211913; color: #fff6e9; padding: 12px 14px; font: inherit;
+    }
+
+    input.field-invalid, textarea.field-invalid, select.field-invalid {
+      border-color: var(--danger-strong);
+    }
+
+    textarea { min-height: 90px; resize: vertical; }
+
+    .custom-toggle-input { margin-top: 8px; }
+
+    .image-upload-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+    .image-upload-row input[type="file"] { width: auto; }
+
+    .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+
+    .value-chip {
+      display: inline-flex; align-items: center; gap: 8px; border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05);
+      padding: 8px 10px 8px 14px; font-size: 0.9rem;
+    }
+
+    .value-chip button {
+      border: none; background: transparent; color: var(--muted); cursor: pointer;
+      font-size: 1rem; line-height: 1; padding: 0 2px; font-weight: 700;
+    }
+
+    .value-chip button:hover { color: var(--danger-strong); }
+
+    .option-checks { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); margin-bottom: 8px; }
+
+    .option-checks label {
+      display: flex; align-items: center; gap: 8px; font-weight: 400; font-size: 0.92rem;
+      color: var(--accent-strong); cursor: pointer;
+    }
+
+    .option-checks input { width: auto; }
+
+    .multi-custom-row { display: flex; gap: 8px; margin-top: 4px; }
+    .multi-custom-row input { flex: 1; }
+    .multi-custom-row button { white-space: nowrap; }
+
+    .limit-note { font-size: 0.8rem; color: var(--muted); }
+    .limit-note.at-max { color: var(--danger-strong); }
+
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; }
+
+    .button {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      border-radius: 999px; border: 1px solid var(--line); padding: 12px 20px;
+      color: var(--accent-strong); font-weight: 700; cursor: pointer; font: inherit;
+      background: linear-gradient(180deg, #784f28 0%, #54361c 100%);
+    }
+
+    .button:disabled { opacity: 0.5; cursor: default; }
+
+    .status-line { color: var(--muted); min-height: 1.3em; }
+
+    .history-card {
+      border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; margin-bottom: 14px;
+    }
+
+    .history-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+
+    .history-title { font-weight: 700; color: var(--accent-strong); }
+
+    .history-time { color: var(--muted); font-size: 0.82rem; white-space: nowrap; }
+
+    .history-summary { margin: 8px 0 10px; line-height: 1.5; }
+
+    .history-delete-preview {
+      margin-top: 12px; padding: 12px 14px; border-radius: 10px;
+      background: rgba(226, 160, 122, 0.1); border: 1px solid rgba(226, 160, 122, 0.3);
+      font-size: 0.9rem; line-height: 1.5;
+    }
+
+    .link-button {
+      background: none; border: none; color: var(--danger-strong); font: inherit; font-weight: 700;
+      cursor: pointer; padding: 0; text-decoration: underline;
+    }
+
+    .stagename-card { margin-top: 24px; }
+
+    .stagename-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; }
+    .stagename-row:first-of-type { border-top: 0; }
+
+    .empty-note { color: var(--muted); text-align: center; padding: 24px; }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <header class="header">
+      <p class="eyebrow">Venue / My Trailer</p>
+      <h1>My Workbook</h1>
+      <p class="subtitle">
+        Answer pages at your own pace. Committing a page creates readable History and updates your current facts — you choose later which ones appear on your Face.
+      </p>
+      <div class="launchbar">
+        <a class="chip" href="/venues/trailers/face.html">My Face</a>
+        <a class="chip" href="/account/">Account</a>
+      </div>
+      <div class="tabbar" role="tablist">
+        <button class="chip" type="button" id="tab-workbook" role="tab" aria-current="true">Workbook</button>
+        <button class="chip" type="button" id="tab-history" role="tab" aria-current="false">History</button>
+      </div>
+    </header>
+
+    <main class="stage">
+      <p class="status-line" id="status-line" style="grid-column: 1 / -1;">Loading your Workbook...</p>
+
+      <div id="workbook-view" style="display: contents;" hidden>
+        <nav class="card page-nav" id="page-nav" aria-label="Workbook pages"></nav>
+
+        <section class="card">
+          <div class="mobile-page-select">
+            <select id="mobile-page-select" aria-label="Workbook page"></select>
+          </div>
+          <h2 class="page-title" id="page-title"></h2>
+          <p class="page-description" id="page-description"></p>
+          <form id="page-form"></form>
+          <div class="actions">
+            <button class="button" type="button" id="save-page-button">Save Page</button>
+            <span class="status-line" id="save-status"></span>
+          </div>
+        </section>
+      </div>
+
+      <div id="history-view" style="grid-column: 1 / -1;" hidden>
+        <section class="card">
+          <h2 style="margin-top:0;">Profile History</h2>
+          <p class="note" style="color: var(--muted);">Ordinary events can be deleted. Deleting recomputes your current facts — you'll see exactly what changes before you confirm.</p>
+          <div id="history-list"></div>
+        </section>
+
+        <section class="card stagename-card">
+          <h2 style="margin-top:0;">Stage Name History</h2>
+          <p class="note" style="color: var(--muted);">Read-only. This ledger cannot be edited or deleted here.</p>
+          <div id="stagename-list"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/identity.js"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script src="/lib/player-profile-ws.js"></script>
+  <script>
+    const state = {
+      catalogue: null,
+      me: null,
+      activePageKey: null,
+      pageAnswers: {}, // pageKey -> { fieldKey: value }
+      fieldErrors: {}, // fieldKey -> message
+    };
+
+    function fieldTypeIsCollection(t) {
+      return t === "multi_select_custom";
+    }
+
+    function formatTimestamp(iso) {
+      try {
+        return new Date(iso).toLocaleString(undefined, {
+          year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+        });
+      } catch (e) {
+        return iso;
+      }
+    }
+
+    function pageByKey(pageKey) {
+      return (state.catalogue.pages || []).find((p) => p.page_key === pageKey);
+    }
+
+    function fieldByKey(fieldKey) {
+      for (const page of state.catalogue.pages || []) {
+        const f = page.fields.find((x) => x.field_key === fieldKey);
+        if (f) return f;
+      }
+      return null;
+    }
+
+    function currentFactValue(fieldKey) {
+      const fact = state.me.facts && state.me.facts[fieldKey];
+      if (!fact) return null;
+      return fact.value;
+    }
+
+    // --- Page nav ---
+
+    function renderPageNav() {
+      const nav = document.getElementById("page-nav");
+      const mobileSelect = document.getElementById("mobile-page-select");
+      nav.innerHTML = "";
+      mobileSelect.innerHTML = "";
+
+      for (const page of state.catalogue.pages) {
+        const answered = page.fields.filter((f) => {
+          const v = currentFactValue(f.field_key);
+          return v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0);
+        }).length;
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "page-nav-item";
+        btn.setAttribute("aria-current", String(page.page_key === state.activePageKey));
+        btn.innerHTML = `${page.page_title}<span class="completion">${answered}/${page.fields.length} answered</span>`;
+        btn.addEventListener("click", () => selectPage(page.page_key));
+        nav.appendChild(btn);
+
+        const opt = document.createElement("option");
+        opt.value = page.page_key;
+        opt.textContent = `${page.page_title} (${answered}/${page.fields.length})`;
+        opt.selected = page.page_key === state.activePageKey;
+        mobileSelect.appendChild(opt);
+      }
+    }
+
+    // --- Field rendering ---
+
+    function initAnswersForPage(page) {
+      const answers = {};
+      for (const field of page.fields) {
+        const current = currentFactValue(field.field_key);
+        if (fieldTypeIsCollection(field.field_type)) {
+          answers[field.field_key] = Array.isArray(current) ? current.slice() : [];
+        } else {
+          answers[field.field_key] = typeof current === "string" ? current : (current == null ? "" : String(current));
+        }
+      }
+      state.pageAnswers[page.page_key] = answers;
+    }
+
+    const IMAGE_UPLOAD_FIELD_KEYS = new Set(["portrait_url", "banner_url"]);
+
+    function renderTextField(field, container) {
+      const wrap = document.createElement("div");
+      wrap.className = "field";
+      const label = document.createElement("label");
+      label.setAttribute("for", field.field_key);
+      label.textContent = field.field_label;
+      wrap.appendChild(label);
+
+      const isLong = field.field_type === "long_text";
+      const input = document.createElement(isLong ? "textarea" : "input");
+      if (!isLong) input.type = field.field_type === "url" ? "url" : "text";
+      input.id = field.field_key;
+      input.value = state.pageAnswers[state.activePageKey][field.field_key] || "";
+      input.addEventListener("input", () => {
+        state.pageAnswers[state.activePageKey][field.field_key] = input.value;
+      });
+      wrap.appendChild(input);
+
+      if (field.field_type === "url" && IMAGE_UPLOAD_FIELD_KEYS.has(field.field_key)) {
+        const uploadRow = document.createElement("div");
+        uploadRow.className = "image-upload-row";
+
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = "image/*";
+
+        const helper = document.createElement("span");
+        helper.className = "help-text";
+        helper.textContent = "Or upload an image directly — it's stored as part of this fact's value.";
+
+        fileInput.addEventListener("change", () => {
+          const selected = fileInput.files && fileInput.files[0];
+          if (!selected) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const dataUrl = String(reader.result || "");
+            input.value = dataUrl;
+            state.pageAnswers[state.activePageKey][field.field_key] = dataUrl;
+          };
+          reader.readAsDataURL(selected);
+        });
+
+        uploadRow.appendChild(fileInput);
+        uploadRow.appendChild(helper);
+        wrap.appendChild(uploadRow);
+      }
+
+      appendHelpAndError(wrap, field);
+      container.appendChild(wrap);
+    }
+
+    function renderSingleSelectField(field, container) {
+      const wrap = document.createElement("div");
+      wrap.className = "field";
+      const label = document.createElement("label");
+      label.setAttribute("for", field.field_key);
+      label.textContent = field.field_label;
+      wrap.appendChild(label);
+
+      const currentValue = state.pageAnswers[state.activePageKey][field.field_key] || "";
+      const options = field.options || [];
+      const isKnownOption = options.some((o) => o.toLowerCase() === currentValue.toLowerCase());
+
+      const select = document.createElement("select");
+      select.id = field.field_key;
+      const blankOpt = document.createElement("option");
+      blankOpt.value = "";
+      blankOpt.textContent = "— None —";
+      select.appendChild(blankOpt);
+      for (const opt of options) {
+        const optEl = document.createElement("option");
+        optEl.value = opt;
+        optEl.textContent = opt;
+        select.appendChild(optEl);
+      }
+
+      let customInput = null;
+      if (field.allow_custom) {
+        const customOpt = document.createElement("option");
+        customOpt.value = "__custom__";
+        customOpt.textContent = "Custom...";
+        select.appendChild(customOpt);
+
+        customInput = document.createElement("input");
+        customInput.type = "text";
+        customInput.className = "custom-toggle-input";
+        customInput.placeholder = "Enter your own";
+        customInput.hidden = true;
+
+        if (currentValue && !isKnownOption) {
+          select.value = "__custom__";
+          customInput.hidden = false;
+          customInput.value = currentValue;
+        } else {
+          select.value = currentValue;
+        }
+
+        select.addEventListener("change", () => {
+          if (select.value === "__custom__") {
+            customInput.hidden = false;
+            customInput.focus();
+            state.pageAnswers[state.activePageKey][field.field_key] = customInput.value;
+          } else {
+            customInput.hidden = true;
+            state.pageAnswers[state.activePageKey][field.field_key] = select.value;
+          }
+        });
+        customInput.addEventListener("input", () => {
+          state.pageAnswers[state.activePageKey][field.field_key] = customInput.value;
+        });
+      } else {
+        select.value = currentValue;
+        select.addEventListener("change", () => {
+          state.pageAnswers[state.activePageKey][field.field_key] = select.value;
+        });
+      }
+
+      wrap.appendChild(select);
+      if (customInput) wrap.appendChild(customInput);
+      appendHelpAndError(wrap, field);
+      container.appendChild(wrap);
+    }
+
+    function renderMultiSelectField(field, container) {
+      const wrap = document.createElement("div");
+      wrap.className = "field";
+      const label = document.createElement("label");
+      label.textContent = field.field_label;
+      wrap.appendChild(label);
+
+      const values = state.pageAnswers[state.activePageKey][field.field_key] || [];
+      const options = field.options || [];
+
+      const checksWrap = document.createElement("div");
+      checksWrap.className = "option-checks";
+      for (const opt of options) {
+        const optLabel = document.createElement("label");
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = values.some((v) => v.toLowerCase() === opt.toLowerCase());
+        cb.addEventListener("change", () => {
+          const list = state.pageAnswers[state.activePageKey][field.field_key];
+          const idx = list.findIndex((v) => v.toLowerCase() === opt.toLowerCase());
+          if (cb.checked) {
+            if (field.max_items && list.length >= field.max_items && idx === -1) {
+              cb.checked = false;
+              return;
+            }
+            if (idx === -1) list.push(opt);
+          } else if (idx !== -1) {
+            list.splice(idx, 1);
+          }
+          rerenderField(field);
+        });
+        optLabel.appendChild(cb);
+        optLabel.appendChild(document.createTextNode(opt));
+        checksWrap.appendChild(optLabel);
+      }
+      wrap.appendChild(checksWrap);
+
+      const customValues = values.filter((v) => !options.some((o) => o.toLowerCase() === v.toLowerCase()));
+      if (customValues.length) {
+        const chipRow = document.createElement("div");
+        chipRow.className = "chip-row";
+        for (const v of customValues) {
+          const chip = document.createElement("span");
+          chip.className = "value-chip";
+          chip.textContent = v;
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.textContent = "×";
+          removeBtn.setAttribute("aria-label", "Remove " + v);
+          removeBtn.addEventListener("click", () => {
+            const list = state.pageAnswers[state.activePageKey][field.field_key];
+            const idx = list.indexOf(v);
+            if (idx !== -1) list.splice(idx, 1);
+            rerenderField(field);
+          });
+          chip.appendChild(removeBtn);
+          chipRow.appendChild(chip);
+        }
+        wrap.appendChild(chipRow);
+      }
+
+      if (field.allow_custom) {
+        const row = document.createElement("div");
+        row.className = "multi-custom-row";
+        const input = document.createElement("input");
+        input.type = "text";
+        input.placeholder = "Add your own...";
+        const addBtn = document.createElement("button");
+        addBtn.type = "button";
+        addBtn.className = "chip";
+        addBtn.textContent = "Add";
+        const addCustom = () => {
+          const val = input.value.trim();
+          if (!val) return;
+          const list = state.pageAnswers[state.activePageKey][field.field_key];
+          if (field.max_items && list.length >= field.max_items) return;
+          if (list.some((v) => v.toLowerCase() === val.toLowerCase())) return;
+          list.push(val);
+          input.value = "";
+          rerenderField(field);
+        };
+        addBtn.addEventListener("click", addCustom);
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") { e.preventDefault(); addCustom(); }
+        });
+        row.appendChild(input);
+        row.appendChild(addBtn);
+        wrap.appendChild(row);
+      }
+
+      if (field.max_items) {
+        const note = document.createElement("p");
+        note.className = "limit-note" + (values.length >= field.max_items ? " at-max" : "");
+        note.textContent = `${values.length} of ${field.max_items} selected`;
+        wrap.appendChild(note);
+      }
+
+      appendHelpAndError(wrap, field);
+      container.appendChild(wrap);
+    }
+
+    function appendHelpAndError(wrap, field) {
+      if (field.help_text) {
+        const help = document.createElement("p");
+        help.className = "help-text";
+        help.textContent = field.help_text;
+        wrap.appendChild(help);
+      }
+      const err = state.fieldErrors[field.field_key];
+      if (err) {
+        const errEl = document.createElement("p");
+        errEl.className = "error-text";
+        errEl.textContent = err;
+        wrap.appendChild(errEl);
+        wrap.querySelectorAll("input, textarea, select").forEach((el) => el.classList.add("field-invalid"));
+      }
+    }
+
+    function rerenderField(field) {
+      renderActivePage();
+    }
+
+    function renderActivePage() {
+      const page = pageByKey(state.activePageKey);
+      document.getElementById("page-title").textContent = page.page_title;
+      document.getElementById("page-description").textContent = page.page_description || "";
+
+      const form = document.getElementById("page-form");
+      form.innerHTML = "";
+      for (const field of page.fields) {
+        if (field.field_type === "text" || field.field_type === "long_text" || field.field_type === "url") {
+          renderTextField(field, form);
+        } else if (field.field_type === "single_select" || field.field_type === "single_select_custom") {
+          renderSingleSelectField(field, form);
+        } else if (field.field_type === "multi_select_custom") {
+          renderMultiSelectField(field, form);
+        }
+      }
+      renderPageNav();
+    }
+
+    function selectPage(pageKey) {
+      state.activePageKey = pageKey;
+      state.fieldErrors = {};
+      if (!state.pageAnswers[pageKey]) initAnswersForPage(pageByKey(pageKey));
+      document.getElementById("save-status").textContent = "";
+      renderActivePage();
+    }
+
+    // Only submit a field if it has a real value, or the field currently
+    // has an existing fact (so an intentional clear of a previously-set
+    // value still goes through). This keeps an untouched blank field from
+    // ever becoming a stored empty-string fact -- otherwise every page
+    // commit would silently write a fact for every field on the page,
+    // including ones the owner never touched, and those could leak onto
+    // the Face as blank entries.
+    function buildSubmittableAnswers(pageKey) {
+      const raw = state.pageAnswers[pageKey];
+      const page = pageByKey(pageKey);
+      const out = {};
+      for (const field of page.fields) {
+        const value = raw[field.field_key];
+        const isEmpty = Array.isArray(value) ? value.length === 0 : !value;
+        const hasExistingFact = Object.prototype.hasOwnProperty.call(state.me.facts || {}, field.field_key);
+        if (!isEmpty || hasExistingFact) {
+          out[field.field_key] = value;
+        }
+      }
+      return out;
+    }
+
+    async function savePage() {
+      const saveStatus = document.getElementById("save-status");
+      const saveButton = document.getElementById("save-page-button");
+      saveButton.disabled = true;
+      saveStatus.textContent = "Saving...";
+      state.fieldErrors = {};
+
+      try {
+        const response = await fetch(`/api/player-profile/pages/${encodeURIComponent(state.activePageKey)}/commit`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ answers: buildSubmittableAnswers(state.activePageKey) }),
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (isForbiddenAccessResponse(response, payload)) {
+          showForbiddenScreen();
+          return;
+        }
+
+        if (!response.ok || !payload?.ok) {
+          const errCode = String(payload?.data?.error || "save_failed");
+          const parts = errCode.split(":");
+          if (parts.length === 2) {
+            state.fieldErrors[parts[1]] = describeFieldError(parts[0]);
+            saveStatus.textContent = "Please fix the highlighted field.";
+          } else {
+            saveStatus.textContent = "Save failed: " + errCode;
+          }
+          renderActivePage();
+          return;
+        }
+
+        await reloadMe();
+        saveStatus.textContent = payload.data.changed ? "Saved." : "No changes to save.";
+        initAnswersForPage(pageByKey(state.activePageKey));
+        renderActivePage();
+      } catch (error) {
+        console.error(error);
+        saveStatus.textContent = "Save failed. Check your connection.";
+      } finally {
+        saveButton.disabled = false;
+      }
+    }
+
+    function describeFieldError(code) {
+      switch (code) {
+        case "invalid_option": return "Choose one of the listed options, or use Custom.";
+        case "too_many_items": return "Too many selected — remove one first.";
+        case "unknown_field": return "This field isn't recognized by the current catalogue.";
+        case "required_field_missing": return "This field is required.";
+        case "invalid_value_type": return "That value isn't valid for this field.";
+        default: return "This value isn't valid.";
+      }
+    }
+
+    // --- History ---
+
+    function reconstructFactsExcluding(excludeEventId) {
+      const events = (state.me.events || [])
+        .filter((e) => e.id !== excludeEventId)
+        .slice()
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+      const facts = {};
+      for (const event of events) {
+        for (const [key, value] of Object.entries(event.payload || {})) {
+          facts[key] = value;
+        }
+      }
+      return facts;
+    }
+
+    function describeDeletionImpact(event) {
+      const before = {};
+      for (const [key, fact] of Object.entries(state.me.facts || {})) {
+        before[key] = fact.value;
+      }
+      const after = reconstructFactsExcluding(event.id);
+
+      const touchedKeys = Object.keys(event.payload || {});
+      const removed = [];
+      const reverted = [];
+
+      for (const key of touchedKeys) {
+        const field = fieldByKey(key);
+        const label = field ? field.field_label : key;
+        const hadAfter = Object.prototype.hasOwnProperty.call(after, key);
+        if (!hadAfter) {
+          removed.push(label);
+        } else if (JSON.stringify(after[key]) !== JSON.stringify(before[key])) {
+          reverted.push(label);
+        }
+      }
+
+      if (removed.length === 0 && reverted.length === 0) {
+        return "No currently-visible facts will change.";
+      }
+      const parts = [];
+      if (removed.length) parts.push(`remove ${removed.join(", ")}`);
+      if (reverted.length) parts.push(`revert ${reverted.join(", ")} to an earlier value`);
+      return "This will " + parts.join(" and ") + ".";
+    }
+
+    function historyTitleFor(event) {
+      if (event.event_type && event.event_type.startsWith("legacy_")) {
+        return "Legacy Profile Import";
+      }
+      const page = pageByKey(event.page_key);
+      return page ? page.page_title : (event.page_key || "Profile Update");
+    }
+
+    function renderHistory() {
+      const list = document.getElementById("history-list");
+      list.innerHTML = "";
+
+      const events = state.me.events || [];
+      if (events.length === 0) {
+        list.innerHTML = '<p class="empty-note">No profile history yet. Commit a Workbook page to start building it.</p>';
+      }
+
+      for (const event of events) {
+        const card = document.createElement("div");
+        card.className = "history-card";
+
+        const head = document.createElement("div");
+        head.className = "history-head";
+        const title = document.createElement("span");
+        title.className = "history-title";
+        title.textContent = historyTitleFor(event);
+        const time = document.createElement("span");
+        time.className = "history-time";
+        time.textContent = formatTimestamp(event.created_at);
+        head.appendChild(title);
+        head.appendChild(time);
+        card.appendChild(head);
+
+        const summary = document.createElement("p");
+        summary.className = "history-summary";
+        summary.textContent = event.human_summary || "";
+        card.appendChild(summary);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "link-button";
+        deleteBtn.textContent = "Delete this event";
+
+        const previewBox = document.createElement("div");
+        previewBox.className = "history-delete-preview";
+        previewBox.hidden = true;
+
+        deleteBtn.addEventListener("click", () => {
+          if (!previewBox.hidden) return;
+          previewBox.hidden = false;
+          previewBox.innerHTML = "";
+
+          const impactText = document.createElement("p");
+          impactText.textContent = describeDeletionImpact(event);
+          previewBox.appendChild(impactText);
+
+          const confirmBtn = document.createElement("button");
+          confirmBtn.type = "button";
+          confirmBtn.className = "chip";
+          confirmBtn.textContent = "Confirm Delete";
+          confirmBtn.addEventListener("click", () => performDelete(event.id));
+
+          const cancelBtn = document.createElement("button");
+          cancelBtn.type = "button";
+          cancelBtn.className = "chip";
+          cancelBtn.textContent = "Cancel";
+          cancelBtn.style.marginLeft = "8px";
+          cancelBtn.addEventListener("click", () => { previewBox.hidden = true; });
+
+          previewBox.appendChild(confirmBtn);
+          previewBox.appendChild(cancelBtn);
+        });
+
+        card.appendChild(deleteBtn);
+        card.appendChild(previewBox);
+        list.appendChild(card);
+      }
+    }
+
+    async function performDelete(eventId) {
+      try {
+        const response = await fetch(`/api/player-profile/events/${encodeURIComponent(eventId)}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (isForbiddenAccessResponse(response, payload)) {
+          showForbiddenScreen();
+          return;
+        }
+        if (!response.ok || !payload?.ok) {
+          alert("Delete failed: " + (payload?.data?.error || `HTTP ${response.status}`));
+          return;
+        }
+
+        await reloadMe();
+        renderHistory();
+        if (state.activePageKey) {
+          initAnswersForPage(pageByKey(state.activePageKey));
+          renderActivePage();
+        }
+      } catch (error) {
+        console.error(error);
+        alert("Delete failed. Check your connection.");
+      }
+    }
+
+    function renderStageNameHistory() {
+      const list = document.getElementById("stagename-list");
+      list.innerHTML = "";
+      const entries = state.me.stage_name_history || [];
+      if (entries.length === 0) {
+        list.innerHTML = '<p class="empty-note">No stage name recorded yet.</p>';
+        return;
+      }
+      for (const entry of entries.slice().reverse()) {
+        const row = document.createElement("div");
+        row.className = "stagename-row";
+        const name = document.createElement("span");
+        name.textContent = entry.stage_name;
+        name.style.fontWeight = "700";
+        const period = document.createElement("span");
+        period.style.color = "var(--muted)";
+        period.textContent = entry.ended_at
+          ? `${formatTimestamp(entry.started_at)} — ${formatTimestamp(entry.ended_at)}`
+          : `${formatTimestamp(entry.started_at)} — Current`;
+        row.appendChild(name);
+        row.appendChild(period);
+        list.appendChild(row);
+      }
+    }
+
+    // --- Tabs ---
+
+    function showTab(tab) {
+      const isWorkbook = tab === "workbook";
+      document.getElementById("workbook-view").hidden = !isWorkbook;
+      document.getElementById("history-view").hidden = isWorkbook;
+      document.getElementById("tab-workbook").setAttribute("aria-current", String(isWorkbook));
+      document.getElementById("tab-history").setAttribute("aria-current", String(!isWorkbook));
+      if (!isWorkbook) {
+        renderHistory();
+        renderStageNameHistory();
+      }
+    }
+
+    document.getElementById("tab-workbook").addEventListener("click", () => showTab("workbook"));
+    document.getElementById("tab-history").addEventListener("click", () => showTab("history"));
+    document.getElementById("save-page-button").addEventListener("click", savePage);
+    document.getElementById("mobile-page-select").addEventListener("change", (e) => selectPage(e.target.value));
+
+    async function reloadMe() {
+      const response = await fetch("/api/player-profile/me", { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) throw new Error("failed to load workbook");
+      state.me = payload.data;
+    }
+
+    async function bootstrap() {
+      const statusLine = document.getElementById("status-line");
+
+      const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
+      const sessionPayload = await sessionResponse.json().catch(() => null);
+      if (!sessionResponse.ok || !sessionPayload?.ok || !sessionPayload.signed_in) {
+        showForbiddenScreen();
+        return;
+      }
+
+      const catResponse = await fetch("/api/player-profile/catalogue", { credentials: "include" });
+      const catPayload = await catResponse.json().catch(() => null);
+      if (isForbiddenAccessResponse(catResponse, catPayload)) {
+        showForbiddenScreen();
+        return;
+      }
+      if (!catResponse.ok || !catPayload?.ok) {
+        statusLine.textContent = "Could not load the profile catalogue.";
+        return;
+      }
+      state.catalogue = catPayload.data;
+
+      await reloadMe();
+
+      state.activePageKey = state.catalogue.pages[0].page_key;
+      initAnswersForPage(state.catalogue.pages[0]);
+
+      statusLine.hidden = true;
+      document.getElementById("workbook-view").hidden = false;
+      renderActivePage();
+
+      if (state.me && state.me.workbook && state.me.workbook.id) {
+        watchPlayerProfile(state.me.workbook.id, () => handleLiveProfileUpdate().catch((error) => {
+          console.error("live update refresh failed", error);
+        }));
+      }
+    }
+
+    // A live update from another tab (e.g. a Face-visibility toggle made
+    // on My Face) refetches data and refreshes anything read-only on
+    // screen, but deliberately does not overwrite the currently open
+    // Workbook page's in-progress answers -- clobbering text someone is
+    // mid-typing would be worse than a stale completion count until they
+    // switch pages or tabs themselves.
+    async function handleLiveProfileUpdate() {
+      await reloadMe();
+      renderPageNav();
+      if (!document.getElementById("history-view").hidden) {
+        renderHistory();
+        renderStageNameHistory();
+      }
+    }
+
+    bootstrap().catch((error) => {
+      console.error("workbook bootstrap failed", error);
+      document.getElementById("status-line").textContent = "Something went wrong loading your Workbook.";
+    });
+  </script>
+</body>
+</html>

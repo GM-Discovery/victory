@@ -145,6 +145,7 @@ func main() {
 	mux.HandleFunc("/api/requests/respond", identity.HandleRespondPermissionRequest(pool))
 	mux.HandleFunc("/api/productions", identity.HandleListProductions(pool))
 	mux.HandleFunc("/api/account/me", identity.HandleAccountMe(pool))
+	mux.HandleFunc("/api/account/email", identity.HandleUpdateAccountEmail(pool))
 	mux.HandleFunc("/api/session/me", identity.HandleMe(pool))
 	mux.HandleFunc("/api/profiles/me", profiles.HandleGetMyProfile(pool))
 	mux.HandleFunc("/api/profiles/public", profiles.HandleGetPublicProfile(pool))
@@ -152,13 +153,16 @@ func main() {
 	mux.HandleFunc("/api/profiles/me/publish", profiles.HandlePublishMyProfile(pool))
 	mux.HandleFunc("/api/profiles/admin/save", profiles.HandleAdminSaveProfile(pool))
 	mux.HandleFunc("/api/profiles/admin/publish", profiles.HandleAdminPublishProfile(pool))
+	playerProfileNotify := func(ctx context.Context, userID string, changed []string) {
+		network.BroadcastPlayerProfileProjectionInvalidation(ctx, hub, pool, userID, changed)
+	}
 	mux.HandleFunc("/api/player-profile/catalogue", playerprofile.HandleCatalogue(pool))
 	mux.HandleFunc("/api/player-profile/me", playerprofile.HandleOwnerWorkbook(pool))
-	mux.HandleFunc("/api/player-profile/face-visibility", playerprofile.HandleFaceVisibility(pool, nil))
-	mux.HandleFunc("/api/player-profile/face-priority", playerprofile.HandleFacePriority(pool, nil))
-	mux.HandleFunc("/api/player-profile/stage-name", playerprofile.HandleStageName(pool, nil))
-	mux.HandleFunc("/api/player-profile/pages/", playerprofile.HandlePageCommit(pool, nil))
-	mux.HandleFunc("/api/player-profile/events/", playerprofile.HandleDeleteEvent(pool, nil))
+	mux.HandleFunc("/api/player-profile/face-visibility", playerprofile.HandleFaceVisibility(pool, playerProfileNotify))
+	mux.HandleFunc("/api/player-profile/face-priority", playerprofile.HandleFacePriority(pool, playerProfileNotify))
+	mux.HandleFunc("/api/player-profile/stage-name", playerprofile.HandleStageName(pool, playerProfileNotify))
+	mux.HandleFunc("/api/player-profile/pages/", playerprofile.HandlePageCommit(pool, playerProfileNotify))
+	mux.HandleFunc("/api/player-profile/events/", playerprofile.HandleDeleteEvent(pool, playerProfileNotify))
 	mux.HandleFunc("/api/player-profile/", playerprofile.HandleSocialFace(pool))
 	mux.HandleFunc("GET /api/characters/parentage-chart", characters.HandleParentageChart())
 	mux.HandleFunc("GET /api/characters/chapter2-rules", characters.HandleChapter2Rules())
@@ -606,6 +610,7 @@ func main() {
 
 	mux.HandleFunc("/ws/the-cave", network.ServeCaveWS(hub, pool, discordServerLinkConfig))
 	mux.HandleFunc("/ws/catharsis", network.ServeVenueWS(hub, pool, discordServerLinkConfig, "catharsis"))
+	mux.HandleFunc("/ws/player-profile", network.ServeProfileWS(hub, pool))
 
 	server := &http.Server{
 		Addr:              ":" + port,

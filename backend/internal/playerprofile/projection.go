@@ -3,6 +3,7 @@ package playerprofile
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ type OwnerWorkbookView struct {
 	Events            []ProfileEvent         `json:"events"`
 	StageNameHistory  []StageNameEntry       `json:"stage_name_history"`
 	FacePreview       TrailerFace            `json:"face_preview"`
+	EligibleFields    []ProjectedField       `json:"eligible_fields"`
 	ProjectionVersion string                 `json:"projection_version"`
 }
 
@@ -114,6 +116,21 @@ func ProjectOwnerWorkbook(ctx context.Context, pool *pgxpool.Pool, userID string
 	}
 	projected := BuildProjectedFields(cat, facts, overrides)
 
+	// Unlike the Face preview (visible-only), the Face compiler needs every
+	// eligible fact -- including currently-hidden ones -- so the owner can
+	// find and re-show them. Sorted by region then priority so the compiler
+	// UI can group consistently with how Face itself groups.
+	eligible := append([]ProjectedField(nil), projected...)
+	sort.SliceStable(eligible, func(i, j int) bool {
+		if eligible[i].Region != eligible[j].Region {
+			return eligible[i].Region < eligible[j].Region
+		}
+		if eligible[i].PriorityScore != eligible[j].PriorityScore {
+			return eligible[i].PriorityScore > eligible[j].PriorityScore
+		}
+		return eligible[i].Label < eligible[j].Label
+	})
+
 	version, err := ProjectionVersion(ctx, pool, wb.ID)
 	if err != nil {
 		return OwnerWorkbookView{}, err
@@ -126,6 +143,7 @@ func ProjectOwnerWorkbook(ctx context.Context, pool *pgxpool.Pool, userID string
 		Events:            eventsDesc,
 		StageNameHistory:  stageHistory,
 		FacePreview:       BuildTrailerFace(version, stageName, projected),
+		EligibleFields:    eligible,
 		ProjectionVersion: version,
 	}, nil
 }

@@ -54,6 +54,12 @@ cleanup() {
     kill "$BACKEND_PID" >/dev/null 2>&1 || true
     wait "$BACKEND_PID" >/dev/null 2>&1 || true
   fi
+  # Belt-and-suspenders: if anything is still holding BACKEND_PORT (e.g. an
+  # interrupted prior run's orphan), free it too, so repeated --local runs
+  # don't accumulate stray backend processes.
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -ti "tcp:${BACKEND_PORT}" 2>/dev/null | xargs -r kill -9 2>/dev/null || true
+  fi
   if [[ "$KEEP_DB" -eq 0 ]]; then
     docker exec -i "$POSTGRES_CONTAINER" dropdb -U "$POSTGRES_USER" "$DB_NAME" >/dev/null 2>&1 || true
   fi
@@ -128,31 +134,37 @@ for migration in "${migrations[@]}"; do
 done
 echo "PASS migrations from empty DB"
 
-(
-  cd "$BACKEND_DIR"
-  env \
-    PORT="$BACKEND_PORT" \
-    DATABASE_URL="postgres://victory:REDACTED@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
-    STORAGE_ROOT="$ROOT/storage" \
-    SESSION_COOKIE_SECURE=false \
-    COOKIE_SECURE=false \
-    OPERATOR_HANDLE=fresh_install_operator \
-    DISCORD_CLIENT_ID= \
-    DISCORD_CLIENT_SECRET= \
-    DISCORD_REDIRECT_URL= \
-    DISCORD_OAUTH_SCOPES="identify email" \
-    DISCORD_OAUTH_ENABLED=false \
-    DISCORD_APPLICATION_ID= \
-    DISCORD_BOT_TOKEN= \
-    DISCORD_BOT_PERMISSIONS=16 \
-    DISCORD_BOT_REDIRECT_URL= \
-    DISCORD_PUBLIC_KEY= \
-    DISCORD_SERVER_LINK_ENABLED=false \
-    DISCORD_GATEWAY_ENABLED=false \
-    DISCORD_GATEWAY_INTENTS=513 \
-    DISCORD_GATEWAY_URL= \
-    go run ./cmd/victory >"$BACKEND_LOG" 2>&1
-) &
+# Build once and run the compiled binary directly (rather than `go run`,
+# backgrounded inside a subshell) so $BACKEND_PID is the actual server
+# process's PID. `go run` forks a child for the compiled binary and a
+# wrapping subshell adds a second layer -- `kill "$BACKEND_PID"` on either
+# of those doesn't reliably reach the real server, leaving an orphaned
+# process holding $BACKEND_PORT after the script exits.
+FRESH_INSTALL_BIN="${TMPDIR:-/tmp}/victory-fresh-install-backend-bin"
+(cd "$BACKEND_DIR" && go build -o "$FRESH_INSTALL_BIN" ./cmd/victory)
+
+env \
+  PORT="$BACKEND_PORT" \
+  DATABASE_URL="postgres://victory:REDACTED@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
+  STORAGE_ROOT="$ROOT/storage" \
+  SESSION_COOKIE_SECURE=false \
+  COOKIE_SECURE=false \
+  OPERATOR_HANDLE=fresh_install_operator \
+  DISCORD_CLIENT_ID= \
+  DISCORD_CLIENT_SECRET= \
+  DISCORD_REDIRECT_URL= \
+  DISCORD_OAUTH_SCOPES="identify email" \
+  DISCORD_OAUTH_ENABLED=false \
+  DISCORD_APPLICATION_ID= \
+  DISCORD_BOT_TOKEN= \
+  DISCORD_BOT_PERMISSIONS=16 \
+  DISCORD_BOT_REDIRECT_URL= \
+  DISCORD_PUBLIC_KEY= \
+  DISCORD_SERVER_LINK_ENABLED=false \
+  DISCORD_GATEWAY_ENABLED=false \
+  DISCORD_GATEWAY_INTENTS=513 \
+  DISCORD_GATEWAY_URL= \
+  "$FRESH_INSTALL_BIN" >"$BACKEND_LOG" 2>&1 &
 BACKEND_PID=$!
 
 health_url="http://127.0.0.1:${BACKEND_PORT}/health"
@@ -297,5 +309,94 @@ if [[ "$account_response" != *'"current_role":"producer"'* ]]; then
   exit 1
 fi
 echo "PASS account authority reflects bootstrap producer grant"
+
+# --- Kernel 61 / 61A: Player Workbook / Trailer Face loop on a brand-new account ---
+
+catalogue_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' -H "Cookie: victory_session=$raw_session" "http://127.0.0.1:${BACKEND_PORT}/api/player-profile/catalogue")"
+if [[ "$catalogue_status" != "200" ]]; then
+  echo "expected /api/player-profile/catalogue to return 200, got $catalogue_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+if [[ "$(cat "$BODY_OUT")" != *'"catalogue_key"'* ]]; then
+  echo "expected catalogue response to contain catalogue_key" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS fresh account can load the player-profile catalogue"
+
+me_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' -H "Cookie: victory_session=$raw_session" "http://127.0.0.1:${BACKEND_PORT}/api/player-profile/me")"
+if [[ "$me_status" != "200" ]]; then
+  echo "expected /api/player-profile/me to return 200, got $me_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+me_response="$(cat "$BODY_OUT")"
+workbook_id="$(printf '%s' "$me_response" | grep -o '"id":"[^"]*"' | head -n1 | sed 's/"id":"//;s/"$//')"
+if [[ -z "$workbook_id" ]]; then
+  echo "failed to extract workbook id from /api/player-profile/me response" >&2
+  echo "$me_response" >&2
+  exit 1
+fi
+echo "PASS fresh account received exactly one Player Workbook ($workbook_id)"
+
+commit_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H 'Content-Type: application/json' \
+  -X POST -d '{"answers":{"real_name":"Fresh Install Test"}}' \
+  "http://127.0.0.1:${BACKEND_PORT}/api/player-profile/pages/identity_presentation/commit")"
+if [[ "$commit_status" != "200" ]]; then
+  echo "expected page commit to return 200, got $commit_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+commit_response="$(cat "$BODY_OUT")"
+if [[ "$commit_response" != *'"changed":true'* ]]; then
+  echo "expected page commit to report changed:true" >&2
+  echo "$commit_response" >&2
+  exit 1
+fi
+event_id="$(printf '%s' "$commit_response" | grep -o '"id":"[^"]*"' | head -n1 | sed 's/"id":"//;s/"$//')"
+if [[ -z "$event_id" ]]; then
+  echo "failed to extract event id from page commit response" >&2
+  echo "$commit_response" >&2
+  exit 1
+fi
+echo "PASS fresh account can commit a Workbook page"
+
+face_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' -H "Cookie: victory_session=$raw_session" "http://127.0.0.1:${BACKEND_PORT}/api/player-profile/${workbook_id}/face")"
+if [[ "$face_status" != "200" ]]; then
+  echo "expected social Face projection to return 200, got $face_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS fresh account's Face projects successfully"
+
+delete_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' -H "Cookie: victory_session=$raw_session" \
+  -X DELETE "http://127.0.0.1:${BACKEND_PORT}/api/player-profile/events/${event_id}")"
+if [[ "$delete_status" != "200" ]]; then
+  echo "expected ordinary History deletion to return 200, got $delete_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+if [[ "$(cat "$BODY_OUT")" != *'"deleted":true'* ]]; then
+  echo "expected delete response to report deleted:true" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS fresh account can delete ordinary History and facts recompute"
+
+for file in \
+  frontend/venues/trailers/face.html \
+  frontend/venues/trailers/workbook.html \
+  frontend/venues/trailers/view.html \
+  frontend/venues/trailers/index.html \
+  frontend/account/index.html
+do
+  if [[ ! -f "$ROOT/$file" ]]; then
+    echo "missing required file: $file" >&2
+    exit 1
+  fi
+done
+echo "PASS Trailer and Account page files exist"
 
 echo "PASS clean-install smoke complete"

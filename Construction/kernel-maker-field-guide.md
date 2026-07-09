@@ -272,6 +272,24 @@ git diff --check
 - **Client claims authority**: Server must resolve current user, role, session, and persona. Client payloads are requests, not facts.
 - **Presence mistaken for history**: Presence is ephemeral and in-memory. Actions are the durable record.
 - **Dirty worktree collisions**: Read `git status --short` before editing. Do not revert unrelated user changes.
+- **`scripts/smoke/fresh-install.sh --local` leaves an orphaned backend process / undropped throwaway DB**: fixed as of Kernel 61A — the script used to background a `go run ./cmd/victory` inside a subshell and capture `$!`, which is neither `go run`'s own PID nor the actual compiled binary's PID, so `kill "$BACKEND_PID"` in the cleanup trap often missed the real process. It now builds the binary once and runs it directly, plus a `lsof`-based port-cleanup fallback. If you ever see `ss -ltnp | grep 18081` show a stray process after a run, that's this bug regressing — check the backend-start block hasn't been changed back to a backgrounded `go run`.
+
+## Two-Browser / Live-Update Verification Technique
+
+Established during Kernel 61/61A for proving cross-account behavior (one user views/mutates, a second user must not be affected) and websocket live-updates. Reuse this rather than inventing a new approach:
+
+1. Get two real accounts. Prefer creating disposable ones via the real `POST /api/auth/signup` endpoint (captures a genuine session cookie from `Set-Cookie` in the response headers, and gives you a *known* password so you can also test reauth flows) over reusing long-lived fixture accounts (`testflow1`, `tester1`, etc. — fine for read/UI checks, but their passwords aren't known to you). Delete disposable accounts afterward (`DELETE FROM users WHERE handle = '...'` — cascades through most owned data, but tables without `ON DELETE CASCADE` like `showings.created_by` can block it; don't fight that, it's not your problem to fix mid-kernel).
+2. For a fixture account where you don't know the password, insert a temporary row directly into `auth.sessions` (raw random token + `digest(raw_token,'sha256')` as `token_hash`, matching `backend/internal/sessions.HashToken`) and delete it when done. **Never do this for Straturli** unless the task specifically requires verifying Straturli's own account — prefer any other real or fixture account.
+3. Drive two (or more) simultaneous browser contexts with Playwright (`/tmp/node_modules/playwright`, chromium pre-installed in this environment) — one `context`/`page` per account, cookies set via `context.addCookies`. This environment has outbound internet access and can reach the real deployed site directly (e.g. `https://victory.amurray.family`).
+4. For websocket-push proofs specifically: assert the *other* tab's DOM updates without calling reload — that's the actual thing under test, not just that a second `fetch` would return the new value.
+5. Clean up: delete temp `auth.sessions` rows and disposable accounts; re-check the real preservation counts (`users`, `location_memberships`, `access_grants`, `character_cards`, Straturli's UUID) haven't shifted for reasons other than your own cleanup.
+
+## Kernel 61 / 61A Notes
+For the Player Workbook / Trailer Face system:
+- See `operator-notes.md`'s "Kernel 61 / 61A" section for the Account vs Player Workbook vs Trailer Face vs Character Workbook distinction — these are easy to conflate and have completely separate schemas.
+- The catalogue (`backend/internal/playerprofile/catalogues/player-profile-v1.0.0.json`) is versioned data, go:embed'd — a new catalogue revision adds a new file and bumps the version, never edits v1.0.0 in place.
+- `/ws/player-profile` is a separate, simpler websocket endpoint from `/ws/the-cave` / `/ws/catharsis` — it has no venue-session concept, just auth + a `watch_profile` subscribe message. Don't try to route player-profile invalidation through `ServeVenueWS`.
+- `performer_profiles` (the pre-Kernel-61 table) is permanently read-only now — all 6 `/api/profiles/*` routes return `410 Gone`. Do not resurrect writes to it; extend the Player Workbook model instead.
 
 ## Kernel Implementation Checklist
 1. Read `Construction/OperatorLogs/operator-notes.md` and the newest relevant kernel docs.

@@ -56,6 +56,7 @@ The repository must be rechecked, but the current reported state is approximatel
 | Kernel 59 | Infrastructure subset shipped | Registry, resolver, basic commands, HTTP execution, and receipts exist; the broader value/override/event specification was not completed |
 | Kernel 59A | PASS | Greenroom Face controls, shared venue projection, projection invalidation, Face/Mechanics tray tabs, Director locks/value overrides, and screenshot-backed two-venue browser acceptance are complete |
 | Kernel 60 | Backend vertical largely proven | Browser-level sheet/click/event proof and trusted `game/event` authority still need verification; venue/session identity issue was reported |
+| Kernel 61 / 61A | PARTIAL | Trailer Player Workbook, Face Compiler, and legacy `performer_profiles` migration (real-user identity, track V8 — unrelated to the stale "Kernel 61" planning entry below). Single-account Workbook/History/Face-Compiler/Stage-Name UI, cross-user Face viewing via a copyable link, targeted websocket live updates, password-reauthenticated email change, and legacy-route closure are done and browser-proven. Still open: a real Trailer-discovery mechanism beyond a copied link, and the operator-log/field-guide documentation pass. |
 
 No future kernel may silently call these items complete merely because a later feature depends on them.
 
@@ -85,7 +86,9 @@ A continuation kernel does not rewrite the earlier report. It appends the missin
 
 # 5. Committed implementation horizon
 
-## Kernel 61 — Greenroom Face Curation and Shared Venue Character Sheet
+> **Numbering correction (2026-07-09):** this document's planned "Kernel 61" below (Greenroom Face Curation) is stale — its own status line already says the work shipped as **Kernel 59A**, before this document's Kernel 61 slot was ever built. The repository's real, already-shipped Kernel 61 is a *different* feature entirely: **Trailer Player Workbook, Face Compiler, and Legacy Profile Migration** (real-user identity/social-profile, not the fictional Character Workbook this section describes) — see `Construction/OperatorLogs/kernel-61-reportback.md` and its closure pass `kernel-61A-reportback.md` for status (PARTIAL as of 61A — see §3 baseline table below). Track home is `V8` in `victory-track-roadmaps-v1.md`. The section immediately below is kept as a historical record of the original plan and should not be treated as describing what "Kernel 61" is in the actual repository.
+
+## Kernel 61 (superseded planning entry) — Greenroom Face Curation and Shared Venue Character Sheet
 
 **Primary tracks:** V1, S1  
 **Complementary payoff:** C3, O2/O5  
