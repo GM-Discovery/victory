@@ -204,6 +204,9 @@
       <h1 id="page-title">Trailer</h1>
       <div class="launchbar">
         <a class="chip" href="/venues/trailers/face.html">My Face</a>
+        <a class="chip" href="/venues/trailers/people.html">My People</a>
+        <button class="chip" type="button" id="add-person-button" hidden>Add to My People</button>
+        <a class="chip" id="open-notes-link" href="#" hidden>Open My Notes</a>
       </div>
     </header>
 
@@ -381,6 +384,10 @@
       document.getElementById("identity-card").hidden = false;
       statusLine.textContent = "";
 
+      setupMyPeopleControls(profileId).catch((error) => {
+        console.error("my people controls failed", error);
+      });
+
       watchPlayerProfile(profileId, async () => {
         try {
           const refetch = await fetch(`/api/player-profile/${encodeURIComponent(profileId)}/face`, {
@@ -393,6 +400,56 @@
           renderRegions(updated);
         } catch (error) {
           console.error("trailer live update failed", error);
+        }
+      });
+    }
+
+    // "Add to My People" / "Open My Notes" (Kernel 62 §8.1). The button only
+    // appears on someone else's Trailer -- adding creates a private,
+    // directional record the subject never sees or gets notified about.
+    async function setupMyPeopleControls(profileId) {
+      const addButton = document.getElementById("add-person-button");
+      const notesLink = document.getElementById("open-notes-link");
+
+      const meResponse = await fetch("/api/player-profile/me", { credentials: "include" });
+      const mePayload = await meResponse.json().catch(() => null);
+      const myProfileId = mePayload?.data?.workbook?.id || "";
+      if (!meResponse.ok || !mePayload?.ok || myProfileId === profileId) return;
+
+      const lookupResponse = await fetch(
+        "/api/player-relationships?subject_profile_id=" + encodeURIComponent(profileId),
+        { credentials: "include" }
+      );
+      const lookupPayload = await lookupResponse.json().catch(() => null);
+      if (!lookupResponse.ok || !lookupPayload?.ok) return;
+
+      const existing = lookupPayload.data && lookupPayload.data.relationship;
+      if (existing) {
+        notesLink.href = "/venues/trailers/person.html?id=" + encodeURIComponent(existing.id);
+        notesLink.hidden = false;
+        return;
+      }
+
+      addButton.hidden = false;
+      addButton.addEventListener("click", async () => {
+        addButton.disabled = true;
+        try {
+          const response = await fetch("/api/player-relationships", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ subject_profile_id: profileId }),
+          });
+          const created = await response.json().catch(() => null);
+          if (!response.ok || !created?.ok || !created.data?.relationship?.id) {
+            addButton.disabled = false;
+            alert("Could not add to My People: " + (created?.data?.error || `HTTP ${response.status}`));
+            return;
+          }
+          window.location.href = "/venues/trailers/person.html?id=" + encodeURIComponent(created.data.relationship.id);
+        } catch (error) {
+          console.error("add to my people failed", error);
+          addButton.disabled = false;
         }
       });
     }

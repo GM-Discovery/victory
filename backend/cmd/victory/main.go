@@ -35,6 +35,7 @@ import (
 	"victory/backend/internal/messages"
 	"victory/backend/internal/network"
 	"victory/backend/internal/playerprofile"
+	"victory/backend/internal/playerrelationships"
 	"victory/backend/internal/profiles"
 	"victory/backend/internal/showings"
 	"victory/backend/internal/venues"
@@ -87,6 +88,9 @@ func main() {
 	}
 	if err := playerprofile.EnsureKernel61PlayerWorkbookSurface(ctx, pool); err != nil {
 		log.Fatalf("kernel 61 player workbook bootstrap failed: %v", err)
+	}
+	if _, err := playerrelationships.LoadCatalogue(); err != nil {
+		log.Fatalf("kernel 62 relationship catalogue invalid: %v", err)
 	}
 
 	hub := network.NewHub()
@@ -164,6 +168,9 @@ func main() {
 	mux.HandleFunc("/api/player-profile/pages/", playerprofile.HandlePageCommit(pool, playerProfileNotify))
 	mux.HandleFunc("/api/player-profile/events/", playerprofile.HandleDeleteEvent(pool, playerProfileNotify))
 	mux.HandleFunc("/api/player-profile/", playerprofile.HandleSocialFace(pool))
+	mux.HandleFunc("/api/player-relationships/catalogue", playerrelationships.HandleCatalogue(pool))
+	mux.HandleFunc("/api/player-relationships", playerrelationships.HandleCollection(pool))
+	mux.HandleFunc("/api/player-relationships/", playerrelationships.HandleByID(pool))
 	mux.HandleFunc("GET /api/characters/parentage-chart", characters.HandleParentageChart())
 	mux.HandleFunc("GET /api/characters/chapter2-rules", characters.HandleChapter2Rules())
 	mux.HandleFunc("GET /api/character-cards/me", characters.HandleMyCharacterCards(pool))

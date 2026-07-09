@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>My People — Victory</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #17120e;
+      --panel: rgba(27, 21, 17, 0.92);
+      --panel-strong: rgba(19, 15, 12, 0.96);
+      --line: rgba(255, 233, 197, 0.12);
+      --accent: #f0d3a4;
+      --accent-strong: #fff2d7;
+      --muted: #d0bfa6;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(172, 120, 64, 0.28), transparent 30%),
+        radial-gradient(circle at 85% 0%, rgba(82, 119, 167, 0.18), transparent 28%),
+        linear-gradient(180deg, #17120e 0%, #0e0b09 100%);
+      color: #f6ecdd;
+    }
+
+    .header {
+      padding: 22px 24px 12px;
+      max-width: 1000px;
+      width: 100%;
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: #d7ab6f;
+      font-size: 0.76rem;
+      margin: 0 0 8px;
+    }
+
+    h1 { margin: 0; font-size: clamp(1.9rem, 4vw, 3rem); line-height: 1.05; }
+
+    .subtitle { margin: 10px 0 0; color: var(--muted); max-width: 72ch; line-height: 1.5; }
+
+    .launchbar { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
+
+    .chip {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      border-radius: 999px; text-decoration: none; border: 1px solid var(--line);
+      padding: 11px 16px; color: var(--accent-strong); background: rgba(255, 255, 255, 0.03);
+      font-weight: 700; cursor: pointer; font: inherit;
+    }
+
+    .stage {
+      max-width: 1000px; width: 100%; margin: 0 auto; padding: 8px 24px 48px;
+      box-sizing: border-box; display: grid; gap: 18px;
+    }
+
+    [hidden] { display: none !important; }
+
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+      padding: 22px; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.24);
+    }
+
+    .controls { display: grid; gap: 12px; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); align-items: end; }
+
+    @media (max-width: 720px) {
+      .controls { grid-template-columns: 1fr 1fr; }
+    }
+
+    .control label { display: block; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
+
+    input[type="text"], select {
+      width: 100%; box-sizing: border-box; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+      background: #211913; color: #fff6e9; padding: 12px 14px; font: inherit;
+    }
+
+    .person-row {
+      display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 16px; align-items: center;
+      width: 100%; text-align: left; padding: 16px; border-radius: 14px;
+      border: 1px solid var(--line); background: rgba(255,255,255,0.02);
+      color: inherit; font: inherit; cursor: pointer; margin-bottom: 12px; box-sizing: border-box;
+    }
+
+    .person-row:hover { background: rgba(255,255,255,0.05); }
+
+    .person-row.archived { opacity: 0.6; }
+
+    .thumb {
+      width: 64px; height: 64px; border-radius: 12px; object-fit: cover;
+      border: 1px solid rgba(255,255,255,0.12); background: #241b15;
+    }
+
+    .thumb-empty {
+      width: 64px; height: 64px; border-radius: 12px; display: grid; place-items: center;
+      border: 1px dashed rgba(255,255,255,0.16); color: var(--muted); font-size: 1.4rem; background: #201813;
+    }
+
+    .person-name { margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--accent-strong); }
+
+    .person-nickname { color: var(--muted); font-weight: 400; font-size: 0.95rem; }
+
+    .person-meta { margin: 6px 0 0; display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); font-size: 0.85rem; }
+
+    .cat-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+    .cat-chip {
+      display: inline-flex; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(240, 211, 164, 0.08); padding: 3px 10px; font-size: 0.78rem; color: var(--accent);
+    }
+
+    .badge {
+      display: inline-flex; border-radius: 999px; padding: 4px 12px; font-size: 0.78rem; font-weight: 700;
+      border: 1px solid rgba(255,255,255,0.2); color: var(--muted); white-space: nowrap;
+    }
+
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+    .empty-state h2 { color: #f6ecdd; margin: 0 0 8px; }
+
+    .status-line { color: var(--muted); min-height: 1.4em; }
+
+    .privacy-note { color: var(--muted); font-size: 0.9rem; margin: 12px 0 0; }
+
+    @media (max-width: 560px) {
+      .person-row { grid-template-columns: 48px minmax(0, 1fr); }
+      .person-row .badge-col { grid-column: 2; justify-self: start; }
+      .thumb, .thumb-empty { width: 48px; height: 48px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <header class="header">
+      <p class="eyebrow">Victory / Trailers</p>
+      <h1>My People</h1>
+      <p class="subtitle">
+        Your private list of real people you're keeping track of. Only you can see this list and your notes — they are not shared with anyone on it.
+      </p>
+      <div class="launchbar">
+        <a class="chip" href="/venues/trailers/face.html">My Face</a>
+        <a class="chip" href="/venues/trailers/workbook.html">My Workbook</a>
+        <a class="chip" href="/account/">Account</a>
+      </div>
+    </header>
+
+    <main class="stage">
+      <p class="status-line" id="status-line">Loading My People...</p>
+
+      <section class="card" id="controls-card" hidden>
+        <div class="controls">
+          <div class="control">
+            <label for="search-input">Search</label>
+            <input type="text" id="search-input" placeholder="Stage name or private nickname" />
+          </div>
+          <div class="control">
+            <label for="category-filter">Category</label>
+            <select id="category-filter"><option value="">All categories</option></select>
+          </div>
+          <div class="control">
+            <label for="state-filter">Show</label>
+            <select id="state-filter">
+              <option value="active">Active</option>
+              <option value="archived">Archived</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+          <div class="control">
+            <label for="sort-select">Sort by</label>
+            <select id="sort-select">
+              <option value="updated">Last updated</option>
+              <option value="name">Stage name</option>
+              <option value="followups">Open follow-ups</option>
+            </select>
+          </div>
+        </div>
+        <p class="privacy-note" id="archived-note" hidden>Archived relationships are hidden from your default list but can be restored.</p>
+      </section>
+
+      <div id="people-list"></div>
+
+      <section class="card empty-state" id="empty-state" hidden>
+        <h2>My People is empty</h2>
+        <p>Open someone's Trailer and choose <strong>Add to My People</strong>.</p>
+      </section>
+
+      <section class="card empty-state" id="no-match-state" hidden>
+        <h2>No matches</h2>
+        <p>No one in this view matches your search or filters.</p>
+      </section>
+    </main>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script>
+    const state = {
+      vocab: null,        // vocabularies from the relationship catalogue
+      categories: [],     // [{key,label}]
+      items: [],          // current fetched relationship rows
+      filter: "active",
+    };
+
+    function vocabLabel(vocabKey, key) {
+      const terms = (state.vocab && state.vocab[vocabKey]) || [];
+      const term = terms.find((t) => t.key === key);
+      return term ? term.label : key;
+    }
+
+    function categoryLabel(cat) {
+      if (cat.category_key === "custom" && cat.custom_label) return cat.custom_label;
+      const term = state.categories.find((c) => c.key === cat.category_key);
+      return term ? term.label : cat.category_key;
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "";
+      try {
+        return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+      } catch (e) {
+        return iso;
+      }
+    }
+
+    function qualitativeSummary(item) {
+      const parts = [];
+      if (item.trust_level && item.trust_level !== "unknown") parts.push("Trust: " + vocabLabel("trust_level", item.trust_level));
+      if (item.closeness_level && item.closeness_level !== "unknown") parts.push("Closeness: " + vocabLabel("closeness_level", item.closeness_level));
+      if (item.reliability_level && item.reliability_level !== "unknown") parts.push("Reliability: " + vocabLabel("reliability_level", item.reliability_level));
+      if (item.communication_ease_level && item.communication_ease_level !== "unknown") parts.push("Communication: " + vocabLabel("communication_ease_level", item.communication_ease_level));
+      return parts;
+    }
+
+    function applyClientFilters(items) {
+      const query = document.getElementById("search-input").value.trim().toLowerCase();
+      const category = document.getElementById("category-filter").value;
+      const sort = document.getElementById("sort-select").value;
+
+      let out = items.slice();
+
+      if (query) {
+        out = out.filter((item) => {
+          const stage = (item.subject && item.subject.stage_name || "").toLowerCase();
+          const nick = (item.private_nickname || "").toLowerCase();
+          return stage.includes(query) || nick.includes(query);
+        });
+      }
+
+      if (category) {
+        out = out.filter((item) => (item.categories || []).some((c) => c.category_key === category));
+      }
+
+      if (sort === "name") {
+        out.sort((a, b) => ((a.subject && a.subject.stage_name) || "").localeCompare((b.subject && b.subject.stage_name) || ""));
+      } else if (sort === "followups") {
+        out.sort((a, b) => (b.open_followup_count || 0) - (a.open_followup_count || 0));
+      } else {
+        out.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+      }
+
+      return out;
+    }
+
+    function renderList() {
+      const listEl = document.getElementById("people-list");
+      listEl.innerHTML = "";
+
+      const filtered = applyClientFilters(state.items);
+
+      document.getElementById("empty-state").hidden = !(state.items.length === 0 && state.filter === "active");
+      document.getElementById("no-match-state").hidden = !(state.items.length > 0 && filtered.length === 0);
+      document.getElementById("archived-note").hidden = state.filter !== "archived";
+
+      for (const item of filtered) {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "person-row" + (item.archived ? " archived" : "");
+        row.addEventListener("click", () => {
+          window.location.href = "/venues/trailers/person.html?id=" + encodeURIComponent(item.id);
+        });
+
+        if (item.subject && item.subject.portrait_url) {
+          const img = document.createElement("img");
+          img.className = "thumb";
+          img.src = item.subject.portrait_url;
+          img.alt = item.subject.stage_name || "Portrait";
+          row.appendChild(img);
+        } else {
+          const placeholder = document.createElement("div");
+          placeholder.className = "thumb-empty";
+          placeholder.textContent = "☺";
+          row.appendChild(placeholder);
+        }
+
+        const info = document.createElement("div");
+
+        const name = document.createElement("p");
+        name.className = "person-name";
+        name.textContent = (item.subject && item.subject.stage_name) || "Unnamed Player";
+        if (item.private_nickname) {
+          const nick = document.createElement("span");
+          nick.className = "person-nickname";
+          nick.textContent = " — “" + item.private_nickname + "”";
+          name.appendChild(nick);
+        }
+        info.appendChild(name);
+
+        const meta = document.createElement("div");
+        meta.className = "person-meta";
+        for (const part of qualitativeSummary(item)) {
+          const span = document.createElement("span");
+          span.textContent = part;
+          meta.appendChild(span);
+        }
+        if (item.last_journal_at) {
+          const span = document.createElement("span");
+          span.textContent = "Last journal: " + formatDate(item.last_journal_at);
+          meta.appendChild(span);
+        }
+        if (item.open_followup_count > 0) {
+          const span = document.createElement("span");
+          span.textContent = item.open_followup_count + " open follow-up" + (item.open_followup_count === 1 ? "" : "s");
+          meta.appendChild(span);
+        }
+        if (item.shared_production_count > 0) {
+          const span = document.createElement("span");
+          span.textContent = item.shared_production_count + " shared production" + (item.shared_production_count === 1 ? "" : "s");
+          meta.appendChild(span);
+        }
+        if (meta.children.length) info.appendChild(meta);
+
+        const cats = item.categories || [];
+        if (cats.length) {
+          const chipRow = document.createElement("div");
+          chipRow.className = "cat-chips";
+          for (const cat of cats) {
+            const chip = document.createElement("span");
+            chip.className = "cat-chip";
+            chip.textContent = categoryLabel(cat);
+            chipRow.appendChild(chip);
+          }
+          info.appendChild(chipRow);
+        }
+
+        row.appendChild(info);
+
+        const badgeCol = document.createElement("div");
+        badgeCol.className = "badge-col";
+        if (item.archived) {
+          const badge = document.createElement("span");
+          badge.className = "badge";
+          badge.textContent = "Archived";
+          badgeCol.appendChild(badge);
+        } else if (item.relationship_state && item.relationship_state !== "active") {
+          const badge = document.createElement("span");
+          badge.className = "badge";
+          badge.textContent = vocabLabel("relationship_state", item.relationship_state);
+          badgeCol.appendChild(badge);
+        }
+        row.appendChild(badgeCol);
+
+        listEl.appendChild(row);
+      }
+    }
+
+    async function fetchList() {
+      const statusLine = document.getElementById("status-line");
+      const response = await fetch("/api/player-relationships?state=" + encodeURIComponent(state.filter), {
+        credentials: "include",
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (isForbiddenAccessResponse(response, payload)) {
+        showForbiddenScreen();
+        return;
+      }
+      if (!response.ok || !payload?.ok) {
+        statusLine.textContent = "Could not load My People.";
+        statusLine.hidden = false;
+        return;
+      }
+
+      state.items = (payload.data && payload.data.relationships) || [];
+      statusLine.hidden = true;
+      renderList();
+    }
+
+    async function bootstrap() {
+      const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
+      const sessionPayload = await sessionResponse.json().catch(() => null);
+      if (!sessionResponse.ok || !sessionPayload?.ok || !sessionPayload.signed_in) {
+        showForbiddenScreen();
+        return;
+      }
+
+      const catResponse = await fetch("/api/player-relationships/catalogue", { credentials: "include" });
+      const catPayload = await catResponse.json().catch(() => null);
+      if (isForbiddenAccessResponse(catResponse, catPayload)) {
+        showForbiddenScreen();
+        return;
+      }
+      if (catResponse.ok && catPayload?.ok) {
+        state.vocab = catPayload.data.vocabularies || {};
+        state.categories = catPayload.data.categories || [];
+        const catFilter = document.getElementById("category-filter");
+        for (const term of state.categories) {
+          const opt = document.createElement("option");
+          opt.value = term.key;
+          opt.textContent = term.label;
+          catFilter.appendChild(opt);
+        }
+      }
+
+      document.getElementById("controls-card").hidden = false;
+      document.getElementById("search-input").addEventListener("input", renderList);
+      document.getElementById("category-filter").addEventListener("change", renderList);
+      document.getElementById("sort-select").addEventListener("change", renderList);
+      document.getElementById("state-filter").addEventListener("change", async (e) => {
+        state.filter = e.target.value;
+        await fetchList();
+      });
+
+      await fetchList();
+    }
+
+    bootstrap().catch((error) => {
+      console.error("my people bootstrap failed", error);
+      document.getElementById("status-line").textContent = "Something went wrong loading My People.";
+    });
+  </script>
+</body>
+</html>

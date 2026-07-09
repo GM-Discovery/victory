@@ -1500,3 +1500,26 @@ The kernel spec explicitly required an author decision before implementation cou
 - **Bug found and fixed**: the confirmed first skill was not appearing on the Mechanics or Face workbook pages at all — Chapter 3 had this projection, Chapter 4 did not. Added `chapter4MechanicsFields`/`chapter4FaceWidgetFields` mirroring the Chapter 3 pattern exactly; re-verified live via direct API call (Builder archetype, Construction skill) — Mechanics now shows `chapter4_skill_stable_id: "SKILL_CRAFT_CONSTRUCTION"` and `chapter4_die_size: "d6"`; Face shows `chapter4_first_skill: "Construction"` and `chapter4_first_skill_die: "d6"`
 - **Persona equip proof**: `GET /api/character-cards/me` correctly reports the confirmed character as `active_character` immediately after Chapter 4 confirmation
 - All test character cards and sessions deleted after each verification pass
+
+## Kernel 62 — Player Relationship Matrix, Private Notes, and Relationship Journals (2026-07-09)
+
+**Status: PASS** — see `Construction/OperatorLogs/kernel-62-reportback.md` for the full ledger. Changes uncommitted by operator decision (working tree left for personal review).
+
+### What shipped
+- Migration `037_kernel62_player_relationships.sql`: six new tables (`player_relationships` directional + unique pair + not-self CHECK, categories, facts, events, journal entries with soft delete, followups). Applied to the live DB (purely additive) and appended to the fresh-install migrations array.
+- New backend package `backend/internal/playerrelationships/` mirroring the Kernel 61 `playerprofile` slice file-for-file: embedded versioned catalogue `player-relationship-v1.0.0.json` (Connection / Understanding Them / Our Relationship / Shared Work and Play — all freeform text fields), fixed §6 qualitative vocabularies + category set, events→facts fold with full-replace recompute, journal, follow-ups (open/done/dismissed + reopen; zero notification code), shared-context projection over verified `memberships`×`productions` overlap only.
+- Privacy shape: observer always from session cookie (no request field exists to spoof); every non-owner access → 404 via `loadRelationshipOwned` (never 403, existence not confirmed); raw account UUIDs struct-tagged out of all JSON (unit-tested); subjects addressed only by opaque Player Workbook ID via the K61 `resolveUserIDForWorkbookID` pattern.
+- Routes in `main.go`: `/api/player-relationships/catalogue`, `/api/player-relationships`, `/api/player-relationships/` (single prefix handler); startup-fatal relationship-catalogue validation beside the K61 bootstrap.
+- Frontend: `frontend/venues/trailers/people.html` (My People: search/category/state filters, 3 sorts, empty states, privacy copy) and `person.html` (subject Face header with `/ws/player-profile` live refresh, nickname/categories/qualitative dropdowns, honest "Victory can currently verify" panel, 4-page workbook + history with deletion impact preview, journal with tag/category filters, follow-ups, archive/unarchive). Entry points: `Add to My People` ⇄ `Open My Notes` on `view.html`; `My People` chips on `face.html` and `/account/`.
+- Archived-state rule: the state dropdown offers active/quiet/strained/rebuilding only; `archived` is entered/left exclusively through Archive/Unarchive (which also set/clear `archived_at`), so there is exactly one archive mental model.
+
+### Verification
+- `go build`/`go vet` clean; `internal/playerrelationships` 10 pure unit tests pass; `git diff --check` clean; `node --check` on every touched inline script.
+- Full `go test ./...`: the two known pre-existing Discord failures (`identity` reconcile test, `network` chat-bridge fixture-leak) — re-confirmed present on the clean tree via `git stash`; no Kernel 62 file touches those packages.
+- `scripts/smoke/fresh-install.sh --local`: full PASS including 9 new two-account Kernel 62 assertions (create by profile ID, nickname+qualitative save, page commit, journal, subject-404, archive filter split, self-relationship 400, page files).
+- New `scripts/smoke/kernel62-browser.js` (Playwright, run with `NODE_PATH=/tmp/node_modules`): 14/14 groups PASS against the live rebuilt stack — add-from-Trailer, persistence across reload, journal CRUD + filters, follow-up done/dismiss, search, mobile viewport, subject/third-user 404s, subject-DOM-never-contains-notes scan, directionality, stage-name-change follow, archive round trip. 11 screenshots in `Construction/OperatorLogs/evidence/kernel-62/`.
+- Live deploy: migration applied, `docker compose up -d --build backend`, `/health` OK. Straturli untouched (no identity/access tables modified; feature tables are all new).
+- Residue: three clearly-named throwaway accounts on the live install from the browser proof (`k62_subject_1783620159501`, `k62_observer_1783620159501`, `k62_third_1783620159501`) — inert, documented in the reportback.
+
+### Next recommended kernel
+Discord fixture-leak cleanup (restores a clean `go test ./...` baseline before Third Place / Show Run roster work builds on this relationship primitive).

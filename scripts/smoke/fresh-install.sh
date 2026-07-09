@@ -126,6 +126,7 @@ migrations=(
   "$ROOT/database/migrations/034_kernel59a_character_face_overrides.sql"
   "$ROOT/database/migrations/035_kernel59a_director_value_overrides.sql"
   "$ROOT/database/migrations/036_kernel61_player_workbook_foundation.sql"
+  "$ROOT/database/migrations/037_kernel62_player_relationships.sql"
 )
 
 for migration in "${migrations[@]}"; do
@@ -398,5 +399,137 @@ do
   fi
 done
 echo "PASS Trailer and Account page files exist"
+
+# --- Kernel 62: private relationship records between two fresh accounts ---
+# User A is the operator account above (workbook_id). User B is a second
+# fresh account. B records private notes about A; A must never be able to
+# read them (Kernel 62 §15.6).
+
+second_handle="fresh_install_second"
+SECOND_HEADERS="${TMPDIR:-/tmp}/victory-fresh-install-second.headers"
+second_signup_status="$(
+  curl -s -D "$SECOND_HEADERS" -o "$BODY_OUT" -w '%{http_code}' \
+    -H 'Content-Type: application/json' \
+    -X POST \
+    -d "{\"email\":\"${second_handle}@example.com\",\"handle\":\"$second_handle\",\"password\":\"$login_password\",\"display_name\":\"Fresh Install Second\"}" \
+    "http://127.0.0.1:${BACKEND_PORT}/api/auth/signup"
+)"
+if [[ "$second_signup_status" != "200" ]]; then
+  echo "expected second signup to return 200, got $second_signup_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+second_session="$(tr -d '\r' < "$SECOND_HEADERS" | sed -n 's/^Set-Cookie: victory_session=\([^;]*\).*/\1/p' | tail -n1)"
+if [[ -z "$second_session" ]]; then
+  echo "failed to capture second account session cookie" >&2
+  exit 1
+fi
+echo "PASS second fresh account (B) signed up"
+
+rel_create_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$second_session" -H 'Content-Type: application/json' \
+  -X POST -d "{\"subject_profile_id\":\"$workbook_id\"}" \
+  "http://127.0.0.1:${BACKEND_PORT}/api/player-relationships")"
+if [[ "$rel_create_status" != "200" ]]; then
+  echo "expected relationship create to return 200, got $rel_create_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+relationship_id="$(grep -o '"id":"[^"]*"' "$BODY_OUT" | head -n1 | sed 's/"id":"//;s/"$//')"
+if [[ -z "$relationship_id" ]]; then
+  echo "failed to extract relationship id" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS B created a private relationship about A ($relationship_id)"
+
+nickname_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$second_session" -H 'Content-Type: application/json' \
+  -X PATCH -d '{"private_nickname":"Smoke Test Friend","trust_level":"trusted"}' \
+  "http://127.0.0.1:${BACKEND_PORT}/api/player-relationships/${relationship_id}")"
+if [[ "$nickname_status" != "200" || "$(cat "$BODY_OUT")" != *'"private_nickname":"Smoke Test Friend"'* ]]; then
+  echo "expected private nickname save to succeed, got $nickname_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS B saved a private nickname and qualitative value"
+
+rel_page_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$second_session" -H 'Content-Type: application/json' \
+  -X POST -d '{"answers":{"how_i_know_them":"Fresh install smoke"}}' \
+  "http://127.0.0.1:${BACKEND_PORT}/api/player-relationships/${relationship_id}/pages/connection")"
+if [[ "$rel_page_status" != "200" || "$(cat "$BODY_OUT")" != *'"changed":true'* ]]; then
+  echo "expected relationship page save to report changed:true, got $rel_page_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS B saved a relationship workbook page"
+
+journal_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$second_session" -H 'Content-Type: application/json' \
+  -X POST -d '{"title":"Smoke","body":"Private smoke-test journal entry."}' \
+  "http://127.0.0.1:${BACKEND_PORT}/api/player-relationships/${relationship_id}/journal")"
+if [[ "$journal_status" != "200" ]]; then
+  echo "expected journal create to return 200, got $journal_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS B wrote a private journal entry"
+
+subject_read_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" \
+  "http://127.0.0.1:${BACKEND_PORT}/api/player-relationships/${relationship_id}")"
+if [[ "$subject_read_status" != "404" ]]; then
+  echo "expected subject read of observer relationship to return 404, got $subject_read_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS A (the subject) cannot read B's relationship record"
+
+archive_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$second_session" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/player-relationships/${relationship_id}/archive")"
+if [[ "$archive_status" != "200" ]]; then
+  echo "expected archive to return 200, got $archive_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+active_list="$(curl -s -H "Cookie: victory_session=$second_session" "http://127.0.0.1:${BACKEND_PORT}/api/player-relationships?state=active")"
+archived_list="$(curl -s -H "Cookie: victory_session=$second_session" "http://127.0.0.1:${BACKEND_PORT}/api/player-relationships?state=archived")"
+if [[ "$active_list" == *"$relationship_id"* ]]; then
+  echo "archived relationship still appears in active list" >&2
+  echo "$active_list" >&2
+  exit 1
+fi
+if [[ "$archived_list" != *"$relationship_id"* ]]; then
+  echo "archived relationship missing from archived list" >&2
+  echo "$archived_list" >&2
+  exit 1
+fi
+echo "PASS archive hides the relationship from the default list"
+
+second_me="$(curl -s -H "Cookie: victory_session=$second_session" "http://127.0.0.1:${BACKEND_PORT}/api/player-profile/me")"
+second_workbook_id="$(printf '%s' "$second_me" | grep -o '"id":"[^"]*"' | head -n1 | sed 's/"id":"//;s/"$//')"
+self_rel_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$second_session" -H 'Content-Type: application/json' \
+  -X POST -d "{\"subject_profile_id\":\"$second_workbook_id\"}" \
+  "http://127.0.0.1:${BACKEND_PORT}/api/player-relationships")"
+if [[ "$self_rel_status" != "400" ]]; then
+  echo "expected self-relationship to be rejected with 400, got $self_rel_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS self-relationship is rejected"
+
+for file in \
+  frontend/venues/trailers/people.html \
+  frontend/venues/trailers/person.html
+do
+  if [[ ! -f "$ROOT/$file" ]]; then
+    echo "missing required file: $file" >&2
+    exit 1
+  fi
+done
+echo "PASS My People page files exist"
 
 echo "PASS clean-install smoke complete"

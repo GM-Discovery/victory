@@ -291,6 +291,14 @@ For the Player Workbook / Trailer Face system:
 - `/ws/player-profile` is a separate, simpler websocket endpoint from `/ws/the-cave` / `/ws/catharsis` — it has no venue-session concept, just auth + a `watch_profile` subscribe message. Don't try to route player-profile invalidation through `ServeVenueWS`.
 - `performer_profiles` (the pre-Kernel-61 table) is permanently read-only now — all 6 `/api/profiles/*` routes return `410 Gone`. Do not resurrect writes to it; extend the Player Workbook model instead.
 
+## Kernel 62 Notes
+For the private player-relationship layer (My People):
+- See `operator-notes.md`'s "Kernel 62" section for the directional model, subject-invisibility rule, vocabularies, archive semantics, and shared-context limits.
+- `backend/internal/playerrelationships/` deliberately mirrors `playerprofile` — if you need to change the events→facts engine in one, check whether the other has the same issue.
+- **Non-owner access to any `/api/player-relationships/...` route must stay a 404, never a 403** — a 403 would confirm a private record exists. Any new subroute must go through `loadRelationshipOwned` first.
+- Follow-ups must never grow reminders/notifications, and no route may let a user enumerate or count records *about* them — both are hard spec rules, not missing features.
+- The Kernel 62 two-user privacy proof is scripted: `NODE_PATH=/tmp/node_modules node scripts/smoke/kernel62-browser.js` (three disposable signup accounts, 404 + DOM-scan assertions, desktop+mobile screenshots into `Construction/OperatorLogs/evidence/kernel-62/`). Extend that script for future privacy-sensitive kernels rather than hand-driving two browsers.
+
 ## Kernel Implementation Checklist
 1. Read `Construction/OperatorLogs/operator-notes.md` and the newest relevant kernel docs.
 2. Check `git status --short`.

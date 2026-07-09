@@ -223,7 +223,19 @@ Every real Victory account (not a fictional character) has one server-authoritat
 - A Face-visibility/stage-name change made in one owner tab appears in a second owner tab and in a viewer's open Trailer tab without a reload.
 - `scripts/smoke/fresh-install.sh --local` proves the whole loop (workbook → catalogue → commit → Face → delete history) on a brand-new account from an empty database.
 
-**Status:** PARTIAL as of Kernel 61A (2026-07-09) — see `Construction/OperatorLogs/kernel-61-reportback.md` and `kernel-61A-reportback.md` for the exact per-criterion ledger. Single-account functionality (Workbook, History, Face Compiler, Stage Name, legacy closure), cross-user Face viewing, and targeted live updates are done; secure email is done for password-holding accounts only (provider-only accounts are explicitly blocked, not weakly confirmed); still open: any actual Trailer-discovery mechanism beyond a copied link, and the full operator-log/field-guide documentation pass.
+**Status:** PASS as of Kernel 61A (2026-07-09) — see `Construction/OperatorLogs/kernel-61-reportback.md` and `kernel-61A-reportback.md` for the exact per-criterion ledger. Secure email is done for password-holding accounts only (provider-only accounts are explicitly blocked, not weakly confirmed — a future provider-step-up kernel owns that gap). Global Trailer discovery deliberately does not exist.
+
+### Kernel 62 continuation — private player relationships (My People)
+
+Kernel 62 (PASS, 2026-07-09 — `Construction/OperatorLogs/kernel-62-reportback.md`) extends V8 with the private social layer on top of the Trailer Face contract:
+
+- directional, observer-private relationship records (`player_relationships` + categories/facts/events/journal/followups, migration 037) keyed to the subject's stable account UUID but addressed externally only by the opaque profile ID;
+- hard subject invisibility: every non-owner access is a 404, no enumeration/count routes, raw account UUIDs never serialized;
+- My People list + per-person relationship workbook (4 catalogue pages), qualitative word vocabularies, private journal, stored-only follow-ups (no scheduler/notifications), archive/unarchive;
+- shared-context panel limited to server-verifiable production-membership overlap ("Victory can currently verify");
+- entry points from another user's Trailer Face (`Add to My People` / `Open My Notes`), My Face, and Account.
+
+Still out of scope for V8 after Kernel 62 (deferred to a future Third Place / Faceprint Commons or roster kernel): any global user discovery, mutual/social-graph features, and subject-visible interactions.
 
 ---
 

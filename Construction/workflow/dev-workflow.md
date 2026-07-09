@@ -94,6 +94,14 @@ Inspect tables:
 docker exec -it victory-postgres psql -U victory -d victory -c '\dt'
 ```
 
+## Browser Proof Scripts (Playwright)
+Playwright is not vendored in the repo. The working install lives at `/tmp/node_modules` (browsers in `/root/.cache/ms-playwright`), so run proof scripts as:
+```bash
+cd /opt/victory
+NODE_PATH=/tmp/node_modules node scripts/smoke/kernel62-browser.js
+```
+If `/tmp` has been cleared, reinstall with `npm i playwright` in a scratch dir and `npx playwright install chromium`. Scripts target the deployed site by default (`--host-resolver-rules` maps the domain to 127.0.0.1) and create clearly-named disposable accounts via real `/api/auth/signup`.
+
 ## Working Rules
 Do:
 - keep Postgres in Docker

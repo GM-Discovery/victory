@@ -678,3 +678,37 @@ These are four distinct layers — do not conflate them:
 - Nothing in Kernel 61/61A touches `users`, `location_memberships`, `access_grants`, `character_cards`, venue tables, or operator resolution (`OPERATOR_HANDLE`/`OPERATOR_USER_ID` env-based, unrelated to any Player Workbook table).
 - Live-reverified each session: Straturli's UUID, handle, operator status, and Grant's Cabin access all unchanged. Straturli's own stage name was never touched by any test — the account owner changed it themselves through the real UI between sessions (confirmed live as "Grant A. Murray", not a leftover migration artifact like the original "The Starmaker").
 - A pre-existing, unrelated flaky test (`internal/network`'s `TestMirrorVictoryChatToDiscordPostsMessageAndPersistsBridgeRow`) leaks orphaned `bridge_operator_*` fixture users/rows into the live DB when run — confirmed via `git stash` that this happens with or without any Kernel 61A code present. Not fixed (out of scope), but do not mistake those rows for Kernel 61A test residue if seen in the `users` table.
+
+## Kernel 62 — Private Player Relationships (My People)
+
+### Private directional relationship model
+
+- A relationship record is **directional and observer-private**: `player_relationships(observer_user_id, subject_user_id)`, unique per pair, CHECK against self. "B has notes about A" implies nothing about A→B, and A's own My People list is unaffected.
+- The record follows the subject's **stable account UUID**, so stage-name changes never detach it — but externally the subject is only ever addressed by their opaque Player Workbook ID (`resolveSubjectUserID` mirrors K61's `resolveUserIDForWorkbookID`). Raw account UUIDs are struct-tagged out of every JSON response (`ObserverUserID`/`SubjectUserID` are `json:"-"`), and there is a unit test that marshals every view type and greps for the UUIDs.
+- Package `backend/internal/playerrelationships/` deliberately mirrors `playerprofile` (catalogue → validation → events → full-replace fact recompute → HTTP). Same `{ok,data}` envelope, same `writeError` shape.
+
+### Subject invisibility rule
+
+- The subject can never see that the record exists. Every relationship route proves `observer_user_id == session user` inside `loadRelationshipOwned`; failure is `relationship_not_found` → **404, never 403**, so a non-owner cannot distinguish "not mine" from "doesn't exist."
+- There are no enumeration surfaces: no "who has notes about me," no counts, no global note search. The observer identity has no request field at all — it cannot be spoofed, only derived from `victory_session`.
+- No websocket/notification is emitted for any relationship mutation. The only live update on the person page is the **subject's own public Face header** via the existing `/ws/player-profile` watch — public data the observer could see anyway.
+
+### Qualitative dropdown vocabulary
+
+- Words, not numbers, per Kernel 62 §6: trust (`unknown/cautious/developing/trusted/deeply_trusted`), closeness (`…/distant/familiar/friendly/close/core_relationship`), reliability (`…/inconsistent/usually_reliable/reliable/highly_reliable`), communication ease (`…/difficult/uneven/workable/easy/very_easy`), state (`active/quiet/strained/rebuilding/archived`). Fixed sets in `vocab.go`; server rejects any other key; UI renders labels served by `/api/player-relationships/catalogue`.
+
+### Archive behavior
+
+- Archive/unarchive only — **no relationship delete exists** (journal-entry delete does, as soft delete). Archive sets `archived_at` AND `relationship_state='archived'`; unarchive clears both. The state dropdown cannot set `archived` directly (`ValidateSettableStateKey` excludes it), so `archived_at` and the state can never disagree. List filter: Active (default) / Archived / All.
+
+### No notifications for follow-ups
+
+- Follow-ups are stored rows with `open/done/dismissed` (+ UI reopen). There is deliberately no scheduler, reminder, email, calendar, or websocket path for them anywhere in the package — if someone later "helpfully" adds due-date alerts, that is a spec violation, not a missing feature.
+
+### Shared context limits
+
+- `ProjectSharedContext` surfaces **only** what the server can verify: productions where both users hold active `memberships` rows, each side's roles, and the overlap start (later of the two earliest memberships). Pure fold (`FoldSharedProductions`), unit-tested, safely empty. Nothing inferred — no attendance, chat frequency, closeness, or "you may know." The UI labels the panel "Victory can currently verify" and shows an honest empty state; the observer's own Shared Work and Play page is separate manual private notes.
+
+### Privacy caveat about self-hosted operators
+
+- The privacy copy says exactly "Only you can see these notes. They are not shared with this person." — application-level enforcement only. A self-hosted operator with database access can technically read `player_relationship_*` tables; nothing claims cryptographic secrecy, and no doc should.

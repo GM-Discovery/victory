@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>My Notes — Victory</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #17120e;
+      --panel: rgba(27, 21, 17, 0.92);
+      --panel-strong: rgba(19, 15, 12, 0.96);
+      --line: rgba(255, 233, 197, 0.12);
+      --accent: #f0d3a4;
+      --accent-strong: #fff2d7;
+      --muted: #d0bfa6;
+      --danger: #e2a07a;
+      --danger-strong: #ffb98c;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(172, 120, 64, 0.28), transparent 30%),
+        radial-gradient(circle at 85% 0%, rgba(82, 119, 167, 0.18), transparent 28%),
+        linear-gradient(180deg, #17120e 0%, #0e0b09 100%);
+      color: #f6ecdd;
+    }
+
+    .header {
+      padding: 22px 24px 12px; max-width: 1180px; width: 100%; margin: 0 auto; box-sizing: border-box;
+    }
+
+    .eyebrow { text-transform: uppercase; letter-spacing: 0.18em; color: #d7ab6f; font-size: 0.76rem; margin: 0 0 8px; }
+
+    h1 { margin: 0; font-size: clamp(1.7rem, 4vw, 2.6rem); line-height: 1.05; }
+
+    .launchbar { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
+
+    .chip {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      border-radius: 999px; text-decoration: none; border: 1px solid var(--line);
+      padding: 11px 16px; color: var(--accent-strong); background: rgba(255, 255, 255, 0.03);
+      font-weight: 700; cursor: pointer; font: inherit;
+    }
+
+    .chip[aria-current="true"] {
+      background: linear-gradient(180deg, #6b4a24 0%, #4a341c 100%);
+      border-color: rgba(255, 233, 197, 0.3);
+    }
+
+    .tabbar { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+
+    [hidden] { display: none !important; }
+
+    .stage {
+      max-width: 1180px; width: 100%; margin: 0 auto; padding: 8px 24px 48px;
+      box-sizing: border-box; display: grid; gap: 18px;
+    }
+
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+      padding: 22px; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.24);
+    }
+
+    .subject-header { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 18px; align-items: center; }
+
+    .subject-portrait {
+      width: 88px; height: 88px; border-radius: 14px; object-fit: cover;
+      border: 1px solid rgba(255,255,255,0.12); background: #241b15;
+    }
+
+    .subject-portrait-empty {
+      width: 88px; height: 88px; border-radius: 14px; display: grid; place-items: center;
+      border: 1px dashed rgba(255,255,255,0.16); color: var(--muted); font-size: 1.8rem; background: #201813;
+    }
+
+    .subject-name { margin: 0; font-size: 1.6rem; }
+
+    .subject-nickname { color: var(--muted); font-size: 1rem; font-weight: 400; }
+
+    .privacy-banner {
+      margin: 10px 0 0; padding: 10px 14px; border-radius: 10px;
+      background: rgba(240, 211, 164, 0.08); border: 1px solid rgba(240, 211, 164, 0.2);
+      color: var(--accent); font-size: 0.9rem; line-height: 1.5;
+    }
+
+    .badge {
+      display: inline-flex; border-radius: 999px; padding: 4px 12px; font-size: 0.78rem; font-weight: 700;
+      border: 1px solid rgba(255,255,255,0.2); color: var(--muted); margin-left: 10px; vertical-align: middle;
+    }
+
+    .section-title { margin: 0 0 14px; font-size: 1.15rem; color: var(--accent); }
+
+    .field { display: grid; gap: 8px; margin-bottom: 18px; }
+    .field label { font-weight: 700; }
+    .field .help-text { color: var(--muted); font-size: 0.85rem; margin: 0; }
+    .field .error-text { color: var(--danger-strong); font-size: 0.85rem; margin: 0; }
+
+    input[type="text"], input[type="date"], textarea, select {
+      width: 100%; box-sizing: border-box; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+      background: #211913; color: #fff6e9; padding: 12px 14px; font: inherit;
+    }
+
+    input.field-invalid, textarea.field-invalid, select.field-invalid { border-color: var(--danger-strong); }
+
+    textarea { min-height: 90px; resize: vertical; }
+
+    .dropdown-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+
+    .option-checks { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); margin-bottom: 8px; }
+
+    .option-checks label {
+      display: flex; align-items: center; gap: 8px; font-weight: 400; font-size: 0.92rem;
+      color: var(--accent-strong); cursor: pointer;
+    }
+
+    .option-checks input { width: auto; }
+
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; }
+
+    .button {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      border-radius: 999px; border: 1px solid var(--line); padding: 12px 20px;
+      color: var(--accent-strong); font-weight: 700; cursor: pointer; font: inherit;
+      background: linear-gradient(180deg, #784f28 0%, #54361c 100%);
+    }
+
+    .button.secondary { background: rgba(255,255,255,0.04); }
+
+    .button:disabled { opacity: 0.5; cursor: default; }
+
+    .status-line { color: var(--muted); min-height: 1.3em; }
+
+    .workbook-grid {
+      display: grid; gap: 18px; grid-template-columns: minmax(200px, 240px) minmax(0, 1fr); align-items: start;
+    }
+
+    @media (max-width: 860px) { .workbook-grid { grid-template-columns: 1fr; } }
+
+    .page-nav { display: grid; gap: 8px; padding: 14px; }
+
+    .page-nav-item {
+      display: block; width: 100%; text-align: left; padding: 12px 14px; border-radius: 12px;
+      border: 1px solid transparent; background: transparent; color: var(--muted);
+      font: inherit; font-weight: 700; cursor: pointer;
+    }
+
+    .page-nav-item:hover { background: rgba(255,255,255,0.04); }
+
+    .page-nav-item[aria-current="true"] {
+      background: rgba(240, 211, 164, 0.12); border-color: var(--line); color: var(--accent-strong);
+    }
+
+    .page-nav-item .completion { display: block; font-size: 0.76rem; font-weight: 400; color: var(--muted); margin-top: 2px; }
+
+    .page-title { margin: 0 0 6px; font-size: 1.4rem; }
+    .page-description { margin: 0 0 20px; color: var(--muted); line-height: 1.5; }
+
+    .entry-card { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; }
+
+    .entry-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+
+    .entry-title { font-weight: 700; color: var(--accent-strong); }
+
+    .entry-time { color: var(--muted); font-size: 0.82rem; white-space: nowrap; }
+
+    .entry-body { margin: 8px 0 10px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+
+    .entry-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+
+    .tag-chip {
+      display: inline-flex; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(240, 211, 164, 0.08); padding: 3px 10px; font-size: 0.78rem; color: var(--accent);
+    }
+
+    .link-button {
+      background: none; border: none; color: var(--danger-strong); font: inherit; font-weight: 700;
+      cursor: pointer; padding: 0; text-decoration: underline;
+    }
+
+    .link-button.safe { color: var(--accent); }
+
+    .delete-preview {
+      margin-top: 12px; padding: 12px 14px; border-radius: 10px;
+      background: rgba(226, 160, 122, 0.1); border: 1px solid rgba(226, 160, 122, 0.3);
+      font-size: 0.9rem; line-height: 1.5;
+    }
+
+    .followup-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+
+    .followup-row.done .entry-title, .followup-row.dismissed .entry-title { text-decoration: line-through; color: var(--muted); }
+
+    .verified-list { margin: 0; padding: 0; list-style: none; }
+    .verified-list li { padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.08); line-height: 1.5; }
+    .verified-list li:first-child { border-top: 0; }
+
+    .empty-note { color: var(--muted); text-align: center; padding: 24px; }
+
+    .not-found { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .not-found h2 { color: #f6ecdd; }
+
+    @media (max-width: 560px) {
+      .subject-header { grid-template-columns: 64px minmax(0, 1fr); }
+      .subject-portrait, .subject-portrait-empty { width: 64px; height: 64px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <header class="header">
+      <p class="eyebrow">Victory / My People</p>
+      <h1 id="page-heading">My Notes</h1>
+      <div class="launchbar">
+        <a class="chip" href="/venues/trailers/people.html">← My People</a>
+        <a class="chip" id="view-trailer-link" href="#" hidden>View Trailer</a>
+        <a class="chip" href="/venues/trailers/face.html">My Face</a>
+      </div>
+      <div class="tabbar" role="tablist" id="tabbar" hidden>
+        <button class="chip" type="button" data-tab="workbook" role="tab" aria-current="true">Workbook</button>
+        <button class="chip" type="button" data-tab="journal" role="tab" aria-current="false">Journal</button>
+        <button class="chip" type="button" data-tab="followups" role="tab" aria-current="false">Follow-Up</button>
+        <button class="chip" type="button" data-tab="history" role="tab" aria-current="false">History</button>
+      </div>
+    </header>
+
+    <main class="stage">
+      <p class="status-line" id="status-line">Loading your notes...</p>
+
+      <section class="card not-found" id="not-found-state" hidden>
+        <h2>Not found</h2>
+        <p>This link doesn't point at one of your relationships.</p>
+        <a class="chip" href="/venues/trailers/people.html">← Back to My People</a>
+      </section>
+
+      <section class="card" id="subject-card" hidden>
+        <div class="subject-header">
+          <div id="subject-portrait-wrap"></div>
+          <div>
+            <h2 class="subject-name" id="subject-name">—<span class="badge" id="archived-badge" hidden>Archived</span></h2>
+            <p class="subject-nickname" id="subject-nickname" hidden></p>
+            <p class="privacy-banner">Only you can see these notes. They are not shared with this person.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="relationship-card" hidden>
+        <h3 class="section-title">This relationship</h3>
+
+        <div class="field">
+          <label for="nickname-input">Private nickname</label>
+          <input type="text" id="nickname-input" placeholder="A name or memory label only you see" />
+          <p class="help-text">Their current stage name stays visible alongside this.</p>
+        </div>
+
+        <div class="field">
+          <label>Categories</label>
+          <div class="option-checks" id="category-checks"></div>
+          <input type="text" id="custom-category-input" placeholder="Custom category label" hidden />
+          <p class="error-text" id="category-error" hidden></p>
+        </div>
+
+        <div class="dropdown-grid" id="dropdown-grid"></div>
+
+        <div class="actions">
+          <button class="button" type="button" id="save-relationship-button">Save</button>
+          <button class="button secondary" type="button" id="archive-button">Archive</button>
+          <span class="status-line" id="relationship-status"></span>
+        </div>
+      </section>
+
+      <section class="card" id="shared-card" hidden>
+        <h3 class="section-title">Victory can currently verify</h3>
+        <ul class="verified-list" id="verified-list"></ul>
+        <p class="empty-note" id="verified-empty" hidden>Nothing verifiable yet — no shared productions on record. Your own notes on the Shared Work and Play page are separate and always private.</p>
+      </section>
+
+      <section id="workbook-view" hidden>
+        <div class="workbook-grid">
+          <nav class="card page-nav" id="page-nav" aria-label="Relationship workbook pages"></nav>
+          <section class="card">
+            <h2 class="page-title" id="page-title"></h2>
+            <p class="page-description" id="page-description"></p>
+            <form id="page-form"></form>
+            <div class="actions">
+              <button class="button" type="button" id="save-page-button">Save Page</button>
+              <span class="status-line" id="save-status"></span>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="journal-view" hidden>
+        <section class="card">
+          <h3 class="section-title" id="journal-form-title">New journal entry</h3>
+          <div class="field">
+            <label for="journal-title">Title</label>
+            <input type="text" id="journal-title" placeholder="Optional title" />
+          </div>
+          <div class="dropdown-grid">
+            <div class="field">
+              <label for="journal-date">Date</label>
+              <input type="date" id="journal-date" />
+            </div>
+            <div class="field">
+              <label for="journal-category">Category</label>
+              <input type="text" id="journal-category" placeholder="general" />
+            </div>
+            <div class="field">
+              <label for="journal-tags">Tags (comma separated)</label>
+              <input type="text" id="journal-tags" placeholder="session, planning" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="journal-body">Entry</label>
+            <textarea id="journal-body" placeholder="Only you can read this."></textarea>
+          </div>
+          <div class="actions">
+            <button class="button" type="button" id="save-journal-button">Save Entry</button>
+            <button class="button secondary" type="button" id="cancel-edit-button" hidden>Cancel Edit</button>
+            <span class="status-line" id="journal-status"></span>
+          </div>
+        </section>
+
+        <section class="card" style="margin-top:18px;">
+          <h3 class="section-title">Entries</h3>
+          <div class="dropdown-grid" style="margin-bottom:16px;">
+            <div class="field">
+              <label for="journal-filter-category">Filter by category</label>
+              <select id="journal-filter-category"><option value="">All</option></select>
+            </div>
+            <div class="field">
+              <label for="journal-filter-tag">Filter by tag</label>
+              <select id="journal-filter-tag"><option value="">All</option></select>
+            </div>
+          </div>
+          <div id="journal-list"></div>
+          <p class="empty-note" id="journal-empty" hidden>You have not written notes about this person yet.</p>
+        </section>
+      </section>
+
+      <section id="followups-view" hidden>
+        <section class="card">
+          <h3 class="section-title">New follow-up</h3>
+          <p class="help-text" style="color: var(--muted); margin-top:0;">Follow-ups are stored notes to yourself. Victory never sends reminders or notifications for them.</p>
+          <div class="field">
+            <label for="followup-title">What do you want to remember to do?</label>
+            <input type="text" id="followup-title" placeholder="e.g. Ask about co-running a one-shot" />
+          </div>
+          <div class="dropdown-grid">
+            <div class="field">
+              <label for="followup-date">Target date (optional)</label>
+              <input type="date" id="followup-date" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="followup-notes">Notes</label>
+            <textarea id="followup-notes"></textarea>
+          </div>
+          <div class="actions">
+            <button class="button" type="button" id="save-followup-button">Add Follow-Up</button>
+            <span class="status-line" id="followup-status"></span>
+          </div>
+        </section>
+
+        <section class="card" style="margin-top:18px;">
+          <h3 class="section-title">Follow-up items</h3>
+          <div id="followup-list"></div>
+          <p class="empty-note" id="followup-empty" hidden>No follow-up items yet.</p>
+        </section>
+      </section>
+
+      <section id="history-view" hidden>
+        <section class="card">
+          <h3 class="section-title">Notes history</h3>
+          <p class="help-text" style="color: var(--muted);">Ordinary events can be deleted. Deleting recomputes your current notes — you'll see exactly what changes before you confirm.</p>
+          <div id="history-list"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script src="/lib/player-profile-ws.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const relationshipId = (params.get("id") || "").trim();
+    const apiBase = "/api/player-relationships/" + encodeURIComponent(relationshipId);
+
+    const state = {
+      catalogue: null,
+      vocab: {},
+      categories: [],
+      detail: null,
+      journal: [],
+      followups: [],
+      activeTab: "workbook",
+      activePageKey: null,
+      pageAnswers: {},
+      fieldErrors: {},
+      editingEntryId: null,
+      selectedCategories: [], // [{category_key, custom_label}]
+    };
+
+    // Structured dropdowns rendered on the relationship card. The archived
+    // state is not offered here -- it belongs to the Archive button.
+    const DROPDOWNS = [
+      { key: "relationship_state", label: "Relationship state", vocab: "relationship_state", excludeKeys: ["archived"] },
+      { key: "trust_level", label: "Trust", vocab: "trust_level" },
+      { key: "closeness_level", label: "Closeness", vocab: "closeness_level" },
+      { key: "reliability_level", label: "Reliability", vocab: "reliability_level" },
+      { key: "communication_ease_level", label: "Communication ease", vocab: "communication_ease_level" },
+    ];
+
+    function vocabTerms(vocabKey) {
+      return (state.vocab && state.vocab[vocabKey]) || [];
+    }
+
+    function vocabLabel(vocabKey, key) {
+      const term = vocabTerms(vocabKey).find((t) => t.key === key);
+      return term ? term.label : key;
+    }
+
+    function formatTimestamp(iso) {
+      try {
+        return new Date(iso).toLocaleString(undefined, {
+          year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+        });
+      } catch (e) { return iso; }
+    }
+
+    async function apiFetch(path, options) {
+      const response = await fetch(path, Object.assign({ credentials: "include" }, options || {}));
+      const payload = await response.json().catch(() => null);
+      if (isForbiddenAccessResponse(response, payload)) {
+        showForbiddenScreen();
+        throw new Error("forbidden");
+      }
+      return { response, payload };
+    }
+
+    // --- Subject header + relationship card ---
+
+    function renderSubjectHeader() {
+      const detail = state.detail;
+      const subject = detail.subject || {};
+      const wrap = document.getElementById("subject-portrait-wrap");
+      wrap.innerHTML = "";
+      if (subject.portrait_url) {
+        const img = document.createElement("img");
+        img.className = "subject-portrait";
+        img.src = subject.portrait_url;
+        img.alt = subject.stage_name || "Portrait";
+        wrap.appendChild(img);
+      } else {
+        const placeholder = document.createElement("div");
+        placeholder.className = "subject-portrait-empty";
+        placeholder.textContent = "☺";
+        wrap.appendChild(placeholder);
+      }
+
+      const stageName = subject.stage_name || "Unnamed Player";
+      document.getElementById("subject-name").firstChild.textContent = stageName;
+      document.getElementById("page-heading").textContent = "My Notes: " + stageName;
+      document.title = "My Notes: " + stageName + " — Victory";
+      document.getElementById("archived-badge").hidden = !detail.archived;
+
+      const nickEl = document.getElementById("subject-nickname");
+      if (detail.private_nickname) {
+        nickEl.textContent = "Your nickname: “" + detail.private_nickname + "”";
+        nickEl.hidden = false;
+      } else {
+        nickEl.hidden = true;
+      }
+
+      const trailerLink = document.getElementById("view-trailer-link");
+      if (subject.subject_profile_id) {
+        trailerLink.href = "/venues/trailers/view.html?id=" + encodeURIComponent(subject.subject_profile_id);
+        trailerLink.hidden = false;
+      }
+    }
+
+    function renderRelationshipCard() {
+      const detail = state.detail;
+      document.getElementById("nickname-input").value = detail.private_nickname || "";
+
+      state.selectedCategories = (detail.categories || []).map((c) => ({
+        category_key: c.category_key, custom_label: c.custom_label || "",
+      }));
+
+      const checksWrap = document.getElementById("category-checks");
+      checksWrap.innerHTML = "";
+      const customInput = document.getElementById("custom-category-input");
+      for (const term of state.categories) {
+        const label = document.createElement("label");
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.value = term.key;
+        cb.checked = state.selectedCategories.some((c) => c.category_key === term.key);
+        cb.addEventListener("change", () => {
+          if (term.key === "custom") {
+            customInput.hidden = !cb.checked;
+            if (cb.checked) customInput.focus();
+            if (!cb.checked) {
+              state.selectedCategories = state.selectedCategories.filter((c) => c.category_key !== "custom");
+            }
+            return;
+          }
+          if (cb.checked) {
+            state.selectedCategories.push({ category_key: term.key, custom_label: "" });
+          } else {
+            state.selectedCategories = state.selectedCategories.filter((c) => c.category_key !== term.key);
+          }
+        });
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(term.label));
+        checksWrap.appendChild(label);
+      }
+
+      const existingCustom = state.selectedCategories.find((c) => c.category_key === "custom");
+      customInput.hidden = !existingCustom;
+      customInput.value = existingCustom ? existingCustom.custom_label : "";
+
+      const grid = document.getElementById("dropdown-grid");
+      grid.innerHTML = "";
+      for (const dd of DROPDOWNS) {
+        const field = document.createElement("div");
+        field.className = "field";
+        const label = document.createElement("label");
+        label.setAttribute("for", "dd-" + dd.key);
+        label.textContent = dd.label;
+        field.appendChild(label);
+
+        const select = document.createElement("select");
+        select.id = "dd-" + dd.key;
+        const current = detail[dd.key] || "";
+        let terms = vocabTerms(dd.vocab);
+        if (dd.excludeKeys) terms = terms.filter((t) => !dd.excludeKeys.includes(t.key));
+        for (const term of terms) {
+          const opt = document.createElement("option");
+          opt.value = term.key;
+          opt.textContent = term.label;
+          select.appendChild(opt);
+        }
+        if (dd.key === "relationship_state" && detail.archived) {
+          const opt = document.createElement("option");
+          opt.value = "archived";
+          opt.textContent = "Archived (unarchive to change)";
+          opt.disabled = true;
+          select.appendChild(opt);
+        }
+        select.value = current;
+        select.disabled = dd.key === "relationship_state" && detail.archived;
+        field.appendChild(select);
+        grid.appendChild(field);
+      }
+
+      const archiveButton = document.getElementById("archive-button");
+      archiveButton.textContent = detail.archived ? "Unarchive" : "Archive";
+    }
+
+    function renderSharedContext() {
+      const shared = (state.detail.shared_context || {});
+      const productions = shared.productions || [];
+      const listEl = document.getElementById("verified-list");
+      listEl.innerHTML = "";
+      document.getElementById("verified-empty").hidden = productions.length > 0;
+      for (const p of productions) {
+        const li = document.createElement("li");
+        const since = p.since ? new Date(p.since).toLocaleDateString(undefined, { year: "numeric", month: "short" }) : "";
+        li.textContent = p.production_name
+          + " — you: " + (p.observer_roles || []).join(", ")
+          + "; them: " + (p.subject_roles || []).join(", ")
+          + (since ? " (together since " + since + ")" : "");
+        listEl.appendChild(li);
+      }
+    }
+
+    async function saveRelationship() {
+      const statusEl = document.getElementById("relationship-status");
+      const catError = document.getElementById("category-error");
+      catError.hidden = true;
+      statusEl.textContent = "Saving...";
+
+      const categories = state.selectedCategories.filter((c) => c.category_key !== "custom");
+      const customChecked = !document.getElementById("custom-category-input").hidden;
+      if (customChecked) {
+        const label = document.getElementById("custom-category-input").value.trim();
+        if (!label) {
+          catError.textContent = "Custom category needs a label.";
+          catError.hidden = false;
+          statusEl.textContent = "";
+          return;
+        }
+        categories.push({ category_key: "custom", custom_label: label });
+      }
+
+      const body = {
+        private_nickname: document.getElementById("nickname-input").value,
+        trust_level: document.getElementById("dd-trust_level").value,
+        closeness_level: document.getElementById("dd-closeness_level").value,
+        reliability_level: document.getElementById("dd-reliability_level").value,
+        communication_ease_level: document.getElementById("dd-communication_ease_level").value,
+        categories: categories,
+      };
+      if (!state.detail.archived) {
+        body.relationship_state = document.getElementById("dd-relationship_state").value;
+      }
+
+      try {
+        const { response, payload } = await apiFetch(apiBase, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!response.ok || !payload?.ok) {
+          statusEl.textContent = "Save failed: " + (payload?.data?.error || `HTTP ${response.status}`);
+          return;
+        }
+        await reloadDetail();
+        statusEl.textContent = "Saved.";
+      } catch (error) {
+        if (error.message !== "forbidden") statusEl.textContent = "Save failed. Check your connection.";
+      }
+    }
+
+    async function toggleArchive() {
+      const statusEl = document.getElementById("relationship-status");
+      const action = state.detail.archived ? "unarchive" : "archive";
+      try {
+        const { response, payload } = await apiFetch(apiBase + "/" + action, { method: "POST" });
+        if (!response.ok || !payload?.ok) {
+          statusEl.textContent = "Could not " + action + ".";
+          return;
+        }
+        await reloadDetail();
+        statusEl.textContent = action === "archive"
+          ? "Archived. This relationship is hidden from your default list but can be restored."
+          : "Restored to your active list.";
+      } catch (error) {
+        if (error.message !== "forbidden") statusEl.textContent = "Could not " + action + ".";
+      }
+    }
+
+    // --- Workbook (relationship pages) ---
+
+    function pageByKey(pageKey) {
+      return (state.catalogue.pages || []).find((p) => p.page_key === pageKey);
+    }
+
+    function fieldByKey(fieldKey) {
+      for (const page of state.catalogue.pages || []) {
+        const f = page.fields.find((x) => x.field_key === fieldKey);
+        if (f) return f;
+      }
+      return null;
+    }
+
+    function currentFactValue(fieldKey) {
+      const fact = state.detail.facts && state.detail.facts[fieldKey];
+      if (!fact) return null;
+      return fact.value;
+    }
+
+    function initAnswersForPage(page) {
+      const answers = {};
+      for (const field of page.fields) {
+        const current = currentFactValue(field.field_key);
+        answers[field.field_key] = typeof current === "string" ? current : (current == null ? "" : String(current));
+      }
+      state.pageAnswers[page.page_key] = answers;
+    }
+
+    function renderPageNav() {
+      const nav = document.getElementById("page-nav");
+      nav.innerHTML = "";
+      for (const page of state.catalogue.pages) {
+        const answered = page.fields.filter((f) => {
+          const v = currentFactValue(f.field_key);
+          return v !== null && v !== undefined && v !== "";
+        }).length;
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "page-nav-item";
+        btn.setAttribute("aria-current", String(page.page_key === state.activePageKey));
+        btn.innerHTML = `${page.page_title}<span class="completion">${answered}/${page.fields.length} answered</span>`;
+        btn.addEventListener("click", () => selectPage(page.page_key));
+        nav.appendChild(btn);
+      }
+    }
+
+    function appendHelpAndError(wrap, field) {
+      if (field.help_text) {
+        const help = document.createElement("p");
+        help.className = "help-text";
+        help.textContent = field.help_text;
+        wrap.appendChild(help);
+      }
+      const err = state.fieldErrors[field.field_key];
+      if (err) {
+        const errEl = document.createElement("p");
+        errEl.className = "error-text";
+        errEl.textContent = err;
+        wrap.appendChild(errEl);
+        wrap.querySelectorAll("input, textarea").forEach((el) => el.classList.add("field-invalid"));
+      }
+    }
+
+    function renderActivePage() {
+      const page = pageByKey(state.activePageKey);
+      document.getElementById("page-title").textContent = page.page_title;
+      document.getElementById("page-description").textContent = page.page_description || "";
+
+      const form = document.getElementById("page-form");
+      form.innerHTML = "";
+      for (const field of page.fields) {
+        const wrap = document.createElement("div");
+        wrap.className = "field";
+        const label = document.createElement("label");
+        label.setAttribute("for", field.field_key);
+        label.textContent = field.field_label;
+        wrap.appendChild(label);
+
+        const isLong = field.field_type === "long_text";
+        const input = document.createElement(isLong ? "textarea" : "input");
+        if (!isLong) input.type = "text";
+        input.id = field.field_key;
+        input.value = state.pageAnswers[state.activePageKey][field.field_key] || "";
+        input.addEventListener("input", () => {
+          state.pageAnswers[state.activePageKey][field.field_key] = input.value;
+        });
+        wrap.appendChild(input);
+
+        appendHelpAndError(wrap, field);
+        form.appendChild(wrap);
+      }
+      renderPageNav();
+    }
+
+    function selectPage(pageKey) {
+      state.activePageKey = pageKey;
+      state.fieldErrors = {};
+      if (!state.pageAnswers[pageKey]) initAnswersForPage(pageByKey(pageKey));
+      document.getElementById("save-status").textContent = "";
+      renderActivePage();
+    }
+
+    // Only submit a field if it has a real value or an existing fact, so an
+    // untouched blank never becomes a stored empty fact (same discipline as
+    // the Player Workbook page).
+    function buildSubmittableAnswers(pageKey) {
+      const raw = state.pageAnswers[pageKey];
+      const page = pageByKey(pageKey);
+      const out = {};
+      for (const field of page.fields) {
+        const value = raw[field.field_key];
+        const hasExistingFact = Object.prototype.hasOwnProperty.call(state.detail.facts || {}, field.field_key);
+        if (value || hasExistingFact) {
+          out[field.field_key] = value;
+        }
+      }
+      return out;
+    }
+
+    async function savePage() {
+      const saveStatus = document.getElementById("save-status");
+      const saveButton = document.getElementById("save-page-button");
+      saveButton.disabled = true;
+      saveStatus.textContent = "Saving...";
+      state.fieldErrors = {};
+
+      try {
+        const { response, payload } = await apiFetch(apiBase + "/pages/" + encodeURIComponent(state.activePageKey), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ answers: buildSubmittableAnswers(state.activePageKey) }),
+        });
+
+        if (!response.ok || !payload?.ok) {
+          const errCode = String(payload?.data?.error || "save_failed");
+          const parts = errCode.split(":");
+          if (parts.length === 2) {
+            state.fieldErrors[parts[1]] = "This value isn't valid.";
+            saveStatus.textContent = "Please fix the highlighted field.";
+          } else {
+            saveStatus.textContent = "Save failed: " + errCode;
+          }
+          renderActivePage();
+          return;
+        }
+
+        await reloadDetail();
+        saveStatus.textContent = payload.data.changed ? "Saved." : "No changes to save.";
+        initAnswersForPage(pageByKey(state.activePageKey));
+        renderActivePage();
+      } catch (error) {
+        if (error.message !== "forbidden") saveStatus.textContent = "Save failed. Check your connection.";
+      } finally {
+        saveButton.disabled = false;
+      }
+    }
+
+    // --- Journal ---
+
+    function journalFilterOptions() {
+      const catSelect = document.getElementById("journal-filter-category");
+      const tagSelect = document.getElementById("journal-filter-tag");
+      const currentCat = catSelect.value;
+      const currentTag = tagSelect.value;
+
+      const cats = new Set();
+      const tags = new Set();
+      for (const entry of state.journal) {
+        if (entry.note_category) cats.add(entry.note_category);
+        for (const tag of entry.tags || []) tags.add(tag);
+      }
+
+      catSelect.innerHTML = '<option value="">All</option>';
+      for (const cat of Array.from(cats).sort()) {
+        const opt = document.createElement("option");
+        opt.value = cat;
+        opt.textContent = cat;
+        catSelect.appendChild(opt);
+      }
+      catSelect.value = cats.has(currentCat) ? currentCat : "";
+
+      tagSelect.innerHTML = '<option value="">All</option>';
+      for (const tag of Array.from(tags).sort()) {
+        const opt = document.createElement("option");
+        opt.value = tag;
+        opt.textContent = tag;
+        tagSelect.appendChild(opt);
+      }
+      tagSelect.value = tags.has(currentTag) ? currentTag : "";
+    }
+
+    function renderJournal() {
+      journalFilterOptions();
+
+      const listEl = document.getElementById("journal-list");
+      listEl.innerHTML = "";
+
+      const catFilter = document.getElementById("journal-filter-category").value;
+      const tagFilter = document.getElementById("journal-filter-tag").value;
+
+      let entries = state.journal.slice();
+      if (catFilter) entries = entries.filter((e) => e.note_category === catFilter);
+      if (tagFilter) entries = entries.filter((e) => (e.tags || []).includes(tagFilter));
+
+      document.getElementById("journal-empty").hidden = !(state.journal.length === 0);
+
+      for (const entry of entries) {
+        const card = document.createElement("div");
+        card.className = "entry-card";
+
+        const head = document.createElement("div");
+        head.className = "entry-head";
+        const title = document.createElement("span");
+        title.className = "entry-title";
+        title.textContent = entry.title || "(untitled)";
+        const time = document.createElement("span");
+        time.className = "entry-time";
+        time.textContent = entry.entry_date || formatTimestamp(entry.created_at);
+        head.appendChild(title);
+        head.appendChild(time);
+        card.appendChild(head);
+
+        const meta = document.createElement("div");
+        meta.className = "entry-meta";
+        if (entry.note_category && entry.note_category !== "general") {
+          const chip = document.createElement("span");
+          chip.className = "tag-chip";
+          chip.textContent = entry.note_category;
+          meta.appendChild(chip);
+        }
+        for (const tag of entry.tags || []) {
+          const chip = document.createElement("span");
+          chip.className = "tag-chip";
+          chip.textContent = "#" + tag;
+          meta.appendChild(chip);
+        }
+        if (meta.children.length) card.appendChild(meta);
+
+        const body = document.createElement("p");
+        body.className = "entry-body";
+        body.textContent = entry.body;
+        card.appendChild(body);
+
+        const editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.className = "link-button safe";
+        editBtn.textContent = "Edit";
+        editBtn.addEventListener("click", () => startEditEntry(entry));
+        card.appendChild(editBtn);
+
+        card.appendChild(document.createTextNode("  "));
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "link-button";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.addEventListener("click", () => deleteEntry(entry.id));
+        card.appendChild(deleteBtn);
+
+        listEl.appendChild(card);
+      }
+    }
+
+    function startEditEntry(entry) {
+      state.editingEntryId = entry.id;
+      document.getElementById("journal-form-title").textContent = "Edit journal entry";
+      document.getElementById("journal-title").value = entry.title || "";
+      document.getElementById("journal-date").value = entry.entry_date || "";
+      document.getElementById("journal-category").value = entry.note_category || "";
+      document.getElementById("journal-tags").value = (entry.tags || []).join(", ");
+      document.getElementById("journal-body").value = entry.body || "";
+      document.getElementById("cancel-edit-button").hidden = false;
+      document.getElementById("save-journal-button").textContent = "Save Changes";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function resetJournalForm() {
+      state.editingEntryId = null;
+      document.getElementById("journal-form-title").textContent = "New journal entry";
+      document.getElementById("journal-title").value = "";
+      document.getElementById("journal-date").value = "";
+      document.getElementById("journal-category").value = "";
+      document.getElementById("journal-tags").value = "";
+      document.getElementById("journal-body").value = "";
+      document.getElementById("cancel-edit-button").hidden = true;
+      document.getElementById("save-journal-button").textContent = "Save Entry";
+    }
+
+    async function saveJournalEntry() {
+      const statusEl = document.getElementById("journal-status");
+      statusEl.textContent = "Saving...";
+
+      const input = {
+        title: document.getElementById("journal-title").value,
+        body: document.getElementById("journal-body").value,
+        entry_date: document.getElementById("journal-date").value,
+        note_category: document.getElementById("journal-category").value,
+        tags: document.getElementById("journal-tags").value.split(",").map((t) => t.trim()).filter(Boolean),
+      };
+
+      const path = state.editingEntryId
+        ? apiBase + "/journal/" + encodeURIComponent(state.editingEntryId)
+        : apiBase + "/journal";
+      const method = state.editingEntryId ? "PATCH" : "POST";
+
+      try {
+        const { response, payload } = await apiFetch(path, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        });
+        if (!response.ok || !payload?.ok) {
+          statusEl.textContent = "Save failed: " + (payload?.data?.error || `HTTP ${response.status}`);
+          return;
+        }
+        resetJournalForm();
+        await reloadJournal();
+        statusEl.textContent = "Saved.";
+      } catch (error) {
+        if (error.message !== "forbidden") statusEl.textContent = "Save failed. Check your connection.";
+      }
+    }
+
+    async function deleteEntry(entryId) {
+      if (!window.confirm("Delete this journal entry? Only you could ever see it.")) return;
+      try {
+        const { response, payload } = await apiFetch(apiBase + "/journal/" + encodeURIComponent(entryId), {
+          method: "DELETE",
+        });
+        if (!response.ok || !payload?.ok) {
+          alert("Delete failed: " + (payload?.data?.error || `HTTP ${response.status}`));
+          return;
+        }
+        if (state.editingEntryId === entryId) resetJournalForm();
+        await reloadJournal();
+      } catch (error) {
+        if (error.message !== "forbidden") alert("Delete failed. Check your connection.");
+      }
+    }
+
+    // --- Follow-ups ---
+
+    function renderFollowUps() {
+      const listEl = document.getElementById("followup-list");
+      listEl.innerHTML = "";
+      document.getElementById("followup-empty").hidden = state.followups.length > 0;
+
+      for (const item of state.followups) {
+        const card = document.createElement("div");
+        card.className = "entry-card followup-row " + item.status;
+
+        const info = document.createElement("div");
+        const head = document.createElement("div");
+        head.className = "entry-head";
+        const title = document.createElement("span");
+        title.className = "entry-title";
+        title.textContent = item.title;
+        head.appendChild(title);
+        const time = document.createElement("span");
+        time.className = "entry-time";
+        time.textContent = item.status === "open"
+          ? (item.target_date ? "Target: " + item.target_date : "No target date")
+          : (item.status === "done" ? "Done" : "Dismissed");
+        head.appendChild(time);
+        info.appendChild(head);
+        if (item.notes) {
+          const notes = document.createElement("p");
+          notes.className = "entry-body";
+          notes.textContent = item.notes;
+          info.appendChild(notes);
+        }
+        card.appendChild(info);
+
+        const actions = document.createElement("div");
+        actions.style.display = "grid";
+        actions.style.gap = "6px";
+        if (item.status === "open") {
+          const doneBtn = document.createElement("button");
+          doneBtn.type = "button";
+          doneBtn.className = "chip";
+          doneBtn.textContent = "Done";
+          doneBtn.addEventListener("click", () => followUpAction(item.id, "complete"));
+          actions.appendChild(doneBtn);
+
+          const dismissBtn = document.createElement("button");
+          dismissBtn.type = "button";
+          dismissBtn.className = "chip";
+          dismissBtn.textContent = "Dismiss";
+          dismissBtn.addEventListener("click", () => followUpAction(item.id, "dismiss"));
+          actions.appendChild(dismissBtn);
+        } else {
+          const reopenBtn = document.createElement("button");
+          reopenBtn.type = "button";
+          reopenBtn.className = "chip";
+          reopenBtn.textContent = "Reopen";
+          reopenBtn.addEventListener("click", () => followUpAction(item.id, "reopen"));
+          actions.appendChild(reopenBtn);
+        }
+        card.appendChild(actions);
+
+        listEl.appendChild(card);
+      }
+    }
+
+    async function saveFollowUp() {
+      const statusEl = document.getElementById("followup-status");
+      statusEl.textContent = "Saving...";
+      const input = {
+        title: document.getElementById("followup-title").value,
+        notes: document.getElementById("followup-notes").value,
+        target_date: document.getElementById("followup-date").value,
+      };
+      try {
+        const { response, payload } = await apiFetch(apiBase + "/followups", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        });
+        if (!response.ok || !payload?.ok) {
+          statusEl.textContent = "Save failed: " + (payload?.data?.error || `HTTP ${response.status}`);
+          return;
+        }
+        document.getElementById("followup-title").value = "";
+        document.getElementById("followup-notes").value = "";
+        document.getElementById("followup-date").value = "";
+        await reloadFollowUps();
+        statusEl.textContent = "Added.";
+      } catch (error) {
+        if (error.message !== "forbidden") statusEl.textContent = "Save failed. Check your connection.";
+      }
+    }
+
+    async function followUpAction(followupId, action) {
+      try {
+        const { response, payload } = await apiFetch(
+          apiBase + "/followups/" + encodeURIComponent(followupId) + "/" + action,
+          { method: "POST" }
+        );
+        if (!response.ok || !payload?.ok) {
+          alert("Action failed: " + (payload?.data?.error || `HTTP ${response.status}`));
+          return;
+        }
+        await reloadFollowUps();
+      } catch (error) {
+        if (error.message !== "forbidden") alert("Action failed. Check your connection.");
+      }
+    }
+
+    // --- History ---
+
+    function reconstructFactsExcluding(excludeEventId) {
+      const events = (state.detail.events || [])
+        .filter((e) => e.id !== excludeEventId)
+        .slice()
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+      const facts = {};
+      for (const event of events) {
+        for (const [key, value] of Object.entries(event.payload || {})) {
+          facts[key] = value;
+        }
+      }
+      return facts;
+    }
+
+    function describeDeletionImpact(event) {
+      const before = {};
+      for (const [key, fact] of Object.entries(state.detail.facts || {})) {
+        before[key] = fact.value;
+      }
+      const after = reconstructFactsExcluding(event.id);
+
+      const touchedKeys = Object.keys(event.payload || {});
+      const removed = [];
+      const reverted = [];
+      for (const key of touchedKeys) {
+        const field = fieldByKey(key);
+        const label = field ? field.field_label : key;
+        const hadAfter = Object.prototype.hasOwnProperty.call(after, key);
+        if (!hadAfter) {
+          removed.push(label);
+        } else if (JSON.stringify(after[key]) !== JSON.stringify(before[key])) {
+          reverted.push(label);
+        }
+      }
+
+      if (removed.length === 0 && reverted.length === 0) {
+        return "No currently-visible notes will change.";
+      }
+      const parts = [];
+      if (removed.length) parts.push(`remove ${removed.join(", ")}`);
+      if (reverted.length) parts.push(`revert ${reverted.join(", ")} to an earlier value`);
+      return "This will " + parts.join(" and ") + ".";
+    }
+
+    function renderHistory() {
+      const list = document.getElementById("history-list");
+      list.innerHTML = "";
+
+      const events = state.detail.events || [];
+      if (events.length === 0) {
+        list.innerHTML = '<p class="empty-note">No notes history yet. Save a workbook page to start building it.</p>';
+        return;
+      }
+
+      for (const event of events) {
+        const card = document.createElement("div");
+        card.className = "entry-card";
+
+        const head = document.createElement("div");
+        head.className = "entry-head";
+        const title = document.createElement("span");
+        title.className = "entry-title";
+        const page = pageByKey(event.page_key);
+        title.textContent = page ? page.page_title : (event.page_key || "Update");
+        const time = document.createElement("span");
+        time.className = "entry-time";
+        time.textContent = formatTimestamp(event.created_at);
+        head.appendChild(title);
+        head.appendChild(time);
+        card.appendChild(head);
+
+        const summary = document.createElement("p");
+        summary.className = "entry-body";
+        summary.textContent = event.human_summary || "";
+        card.appendChild(summary);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "link-button";
+        deleteBtn.textContent = "Delete this event";
+
+        const previewBox = document.createElement("div");
+        previewBox.className = "delete-preview";
+        previewBox.hidden = true;
+
+        deleteBtn.addEventListener("click", () => {
+          if (!previewBox.hidden) return;
+          previewBox.hidden = false;
+          previewBox.innerHTML = "";
+
+          const impactText = document.createElement("p");
+          impactText.textContent = describeDeletionImpact(event);
+          previewBox.appendChild(impactText);
+
+          const confirmBtn = document.createElement("button");
+          confirmBtn.type = "button";
+          confirmBtn.className = "chip";
+          confirmBtn.textContent = "Confirm Delete";
+          confirmBtn.addEventListener("click", () => performEventDelete(event.id));
+          previewBox.appendChild(confirmBtn);
+
+          const cancelBtn = document.createElement("button");
+          cancelBtn.type = "button";
+          cancelBtn.className = "chip";
+          cancelBtn.textContent = "Cancel";
+          cancelBtn.style.marginLeft = "8px";
+          cancelBtn.addEventListener("click", () => { previewBox.hidden = true; });
+          previewBox.appendChild(cancelBtn);
+        });
+
+        card.appendChild(deleteBtn);
+        card.appendChild(previewBox);
+        list.appendChild(card);
+      }
+    }
+
+    async function performEventDelete(eventId) {
+      try {
+        const { response, payload } = await apiFetch(apiBase + "/events/" + encodeURIComponent(eventId), {
+          method: "DELETE",
+        });
+        if (!response.ok || !payload?.ok) {
+          alert("Delete failed: " + (payload?.data?.error || `HTTP ${response.status}`));
+          return;
+        }
+        await reloadDetail();
+        renderHistory();
+        if (state.activePageKey) {
+          initAnswersForPage(pageByKey(state.activePageKey));
+          renderActivePage();
+        }
+      } catch (error) {
+        if (error.message !== "forbidden") alert("Delete failed. Check your connection.");
+      }
+    }
+
+    // --- Tabs ---
+
+    function showTab(tab) {
+      state.activeTab = tab;
+      for (const btn of document.querySelectorAll("#tabbar [data-tab]")) {
+        btn.setAttribute("aria-current", String(btn.dataset.tab === tab));
+      }
+      document.getElementById("workbook-view").hidden = tab !== "workbook";
+      document.getElementById("journal-view").hidden = tab !== "journal";
+      document.getElementById("followups-view").hidden = tab !== "followups";
+      document.getElementById("history-view").hidden = tab !== "history";
+      if (tab === "history") renderHistory();
+      if (tab === "journal") renderJournal();
+      if (tab === "followups") renderFollowUps();
+    }
+
+    // --- Loading ---
+
+    async function reloadDetail() {
+      const { response, payload } = await apiFetch(apiBase);
+      if (!response.ok || !payload?.ok) throw new Error("detail_load_failed:" + response.status);
+      state.detail = payload.data;
+      renderSubjectHeader();
+      renderRelationshipCard();
+      renderSharedContext();
+      renderPageNav();
+    }
+
+    async function reloadJournal() {
+      const { response, payload } = await apiFetch(apiBase + "/journal");
+      if (!response.ok || !payload?.ok) return;
+      state.journal = (payload.data && payload.data.entries) || [];
+      renderJournal();
+    }
+
+    async function reloadFollowUps() {
+      const { response, payload } = await apiFetch(apiBase + "/followups");
+      if (!response.ok || !payload?.ok) return;
+      state.followups = (payload.data && payload.data.followups) || [];
+      renderFollowUps();
+    }
+
+    async function bootstrap() {
+      const statusLine = document.getElementById("status-line");
+
+      const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
+      const sessionPayload = await sessionResponse.json().catch(() => null);
+      if (!sessionResponse.ok || !sessionPayload?.ok || !sessionPayload.signed_in) {
+        showForbiddenScreen();
+        return;
+      }
+
+      if (!relationshipId) {
+        statusLine.hidden = true;
+        document.getElementById("not-found-state").hidden = false;
+        return;
+      }
+
+      const { response: catResponse, payload: catPayload } = await apiFetch("/api/player-relationships/catalogue");
+      if (!catResponse.ok || !catPayload?.ok) {
+        statusLine.textContent = "Could not load the relationship catalogue.";
+        return;
+      }
+      state.catalogue = catPayload.data.catalogue;
+      state.vocab = catPayload.data.vocabularies || {};
+      state.categories = catPayload.data.categories || [];
+
+      try {
+        await reloadDetail();
+      } catch (error) {
+        statusLine.hidden = true;
+        document.getElementById("not-found-state").hidden = false;
+        return;
+      }
+
+      await reloadJournal();
+      await reloadFollowUps();
+
+      state.activePageKey = state.catalogue.pages[0].page_key;
+      initAnswersForPage(state.catalogue.pages[0]);
+
+      statusLine.hidden = true;
+      document.getElementById("subject-card").hidden = false;
+      document.getElementById("relationship-card").hidden = false;
+      document.getElementById("shared-card").hidden = false;
+      document.getElementById("tabbar").hidden = false;
+      renderActivePage();
+      showTab("workbook");
+
+      // Live subject Face header: if the subject changes their stage name or
+      // portrait while this page is open, refresh the header (their public
+      // presentation only -- notes stay untouched).
+      const profileId = state.detail.subject && state.detail.subject.subject_profile_id;
+      if (profileId && typeof watchPlayerProfile === "function") {
+        watchPlayerProfile(profileId, async () => {
+          try {
+            await reloadDetail();
+          } catch (error) {
+            console.error("subject header live update failed", error);
+          }
+        });
+      }
+    }
+
+    document.getElementById("save-relationship-button").addEventListener("click", saveRelationship);
+    document.getElementById("archive-button").addEventListener("click", toggleArchive);
+    document.getElementById("save-page-button").addEventListener("click", savePage);
+    document.getElementById("save-journal-button").addEventListener("click", saveJournalEntry);
+    document.getElementById("cancel-edit-button").addEventListener("click", resetJournalForm);
+    document.getElementById("save-followup-button").addEventListener("click", saveFollowUp);
+    document.getElementById("journal-filter-category").addEventListener("change", renderJournal);
+    document.getElementById("journal-filter-tag").addEventListener("change", renderJournal);
+    for (const btn of document.querySelectorAll("#tabbar [data-tab]")) {
+      btn.addEventListener("click", () => showTab(btn.dataset.tab));
+    }
+
+    bootstrap().catch((error) => {
+      console.error("person page bootstrap failed", error);
+      document.getElementById("status-line").textContent = "Something went wrong loading your notes.";
+    });
+  </script>
+</body>
+</html>

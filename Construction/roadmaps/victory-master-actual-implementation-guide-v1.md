@@ -56,7 +56,8 @@ The repository must be rechecked, but the current reported state is approximatel
 | Kernel 59 | Infrastructure subset shipped | Registry, resolver, basic commands, HTTP execution, and receipts exist; the broader value/override/event specification was not completed |
 | Kernel 59A | PASS | Greenroom Face controls, shared venue projection, projection invalidation, Face/Mechanics tray tabs, Director locks/value overrides, and screenshot-backed two-venue browser acceptance are complete |
 | Kernel 60 | Backend vertical largely proven | Browser-level sheet/click/event proof and trusted `game/event` authority still need verification; venue/session identity issue was reported |
-| Kernel 61 / 61A | PARTIAL | Trailer Player Workbook, Face Compiler, and legacy `performer_profiles` migration (real-user identity, track V8 — unrelated to the stale "Kernel 61" planning entry below). Single-account Workbook/History/Face-Compiler/Stage-Name UI, cross-user Face viewing via a copyable link, targeted websocket live updates, password-reauthenticated email change, and legacy-route closure are done and browser-proven. Still open: a real Trailer-discovery mechanism beyond a copied link, and the operator-log/field-guide documentation pass. |
+| Kernel 61 / 61A | PASS (per `kernel-61A-reportback.md`, 2026-07-09) | Trailer Player Workbook, Face Compiler, and legacy `performer_profiles` migration (real-user identity, track V8 — unrelated to the stale "Kernel 61" planning entry below). Single-account Workbook/History/Face-Compiler/Stage-Name UI, cross-user Face viewing via a copyable link, targeted websocket live updates, password-reauthenticated email change, and legacy-route closure are done and browser-proven. Global Trailer discovery still deliberately does not exist; provider-only email step-up remains a known deferred gap. |
+| Kernel 62 | PASS (per `kernel-62-reportback.md`, 2026-07-09) | Player Relationship Matrix / My People (track V8 continuation): private, directional relationship records about other real users — relationship workbook (events→facts), qualitative dropdowns, categories, private journal, stored follow-ups (no notifications), archive/unarchive, verified-shared-productions context panel, and hard subject-invisibility (all non-owner access 404s). First persistent cross-user surface, built on the Kernel 61A opaque profile-ID contract. |
 
 No future kernel may silently call these items complete merely because a later feature depends on them.
 
@@ -127,7 +128,9 @@ The active Socio character becomes readable and curatable both before and during
 
 ---
 
-## Kernel 62 — Venue Action Integrity and Kernel 60 Browser Completion
+> **Numbering correction (2026-07-09):** the repository's real, already-shipped **Kernel 62** is **Player Relationship Matrix, Private Notes, and Relationship Journals** (My People — track V8 continuation), spec at `Construction/Kernels/kernel-62-player-relationship-matrix-private-notes-v0.1.md`, status **PASS** per `Construction/OperatorLogs/kernel-62-reportback.md`. The planned kernel below (Venue Action Integrity / Kernel 60 browser completion) was **not** built as Kernel 62 — it remains fully open and should take the next unused kernel number when picked up. Kept below as the historical planning entry.
+
+## Kernel 62 (superseded planning entry) — Venue Action Integrity and Kernel 60 Browser Completion
 
 **Primary tracks:** O4/O5, V2, S1  
 **Complementary payoff:** C1

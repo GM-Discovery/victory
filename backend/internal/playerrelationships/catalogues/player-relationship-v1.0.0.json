@@ -1,0 +1,147 @@
+{
+  "catalogue_key": "player-relationship",
+  "catalogue_version": "1.0.0",
+  "pages": [
+    {
+      "page_key": "connection",
+      "page_title": "Connection",
+      "page_description": "How you know this person. Only you can see these notes.",
+      "fields": [
+        {
+          "field_key": "how_i_know_them",
+          "field_label": "How I know them",
+          "field_type": "long_text",
+          "help_text": "In your own words -- context, history, whatever helps you remember."
+        },
+        {
+          "field_key": "where_we_met",
+          "field_label": "Where we met",
+          "field_type": "text"
+        },
+        {
+          "field_key": "first_meaningful_context",
+          "field_label": "First meaningful context",
+          "field_type": "long_text",
+          "help_text": "The first game, project, or conversation that made this person real to you."
+        },
+        {
+          "field_key": "name_i_know_them_by",
+          "field_label": "What name I know them by",
+          "field_type": "text",
+          "help_text": "If it differs from their current stage name."
+        },
+        {
+          "field_key": "connection_notes",
+          "field_label": "Connection notes",
+          "field_type": "long_text"
+        }
+      ]
+    },
+    {
+      "page_key": "understanding_them",
+      "page_title": "Understanding Them",
+      "page_description": "What you have learned about this person. Private working notes, not objective truth.",
+      "fields": [
+        {
+          "field_key": "interests",
+          "field_label": "Interests",
+          "field_type": "long_text"
+        },
+        {
+          "field_key": "strengths",
+          "field_label": "Strengths",
+          "field_type": "long_text"
+        },
+        {
+          "field_key": "things_they_care_about",
+          "field_label": "Things they care about",
+          "field_type": "long_text"
+        },
+        {
+          "field_key": "communication_preferences",
+          "field_label": "Communication preferences",
+          "field_type": "long_text"
+        },
+        {
+          "field_key": "things_to_remember",
+          "field_label": "Things to remember",
+          "field_type": "long_text"
+        },
+        {
+          "field_key": "practical_boundaries",
+          "field_label": "Practical boundaries",
+          "field_type": "long_text"
+        },
+        {
+          "field_key": "collaboration_helps",
+          "field_label": "What seems to help collaboration",
+          "field_type": "long_text"
+        }
+      ]
+    },
+    {
+      "page_key": "our_relationship",
+      "page_title": "Our Relationship",
+      "page_description": "Your private read on where this relationship stands. These are your working notes, not objective truth.",
+      "fields": [
+        {
+          "field_key": "what_i_value",
+          "field_label": "What I value about this relationship",
+          "field_type": "long_text"
+        },
+        {
+          "field_key": "unresolved_matters",
+          "field_label": "Unresolved matters",
+          "field_type": "long_text"
+        },
+        {
+          "field_key": "caution_or_care_notes",
+          "field_label": "Current caution or care notes",
+          "field_type": "long_text"
+        }
+      ]
+    },
+    {
+      "page_key": "shared_work_play",
+      "page_title": "Shared Work and Play",
+      "page_description": "What you have done together, in your own words. Victory shows what it can verify separately.",
+      "fields": [
+        {
+          "field_key": "productions_together",
+          "field_label": "Productions",
+          "field_type": "long_text"
+        },
+        {
+          "field_key": "campaigns_together",
+          "field_label": "Campaigns",
+          "field_type": "long_text"
+        },
+        {
+          "field_key": "projects_together",
+          "field_label": "Projects",
+          "field_type": "long_text"
+        },
+        {
+          "field_key": "roles_held_together",
+          "field_label": "Roles held together",
+          "field_type": "long_text"
+        },
+        {
+          "field_key": "systems_played_together",
+          "field_label": "Systems played together",
+          "field_type": "long_text"
+        },
+        {
+          "field_key": "collaboration_history",
+          "field_label": "Collaboration history",
+          "field_type": "long_text"
+        },
+        {
+          "field_key": "things_we_might_do",
+          "field_label": "Things we said we might do",
+          "field_type": "long_text"
+        }
+      ]
+    }
+  ]
+}
