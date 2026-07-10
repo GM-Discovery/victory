@@ -26,16 +26,6 @@ func TestMirrorVictoryChatToDiscordPostsMessageAndPersistsBridgeRow(t *testing.T
 	}
 
 	locationID, sessionID, showingID, userID := setupDiscordChatBridgeFixture(t, pool)
-	t.Cleanup(func() {
-		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_chat_message_bridges WHERE location_id = $1`, locationID)
-		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_session_threads WHERE location_id = $1`, locationID)
-		_, _ = pool.Exec(context.Background(), `DELETE FROM session_participants WHERE session_id = $1`, sessionID)
-		_, _ = pool.Exec(context.Background(), `DELETE FROM showings WHERE id = $1`, showingID)
-		_, _ = pool.Exec(context.Background(), `DELETE FROM sessions WHERE id = $1`, sessionID)
-		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)
-		_, _ = pool.Exec(context.Background(), `DELETE FROM location_memberships WHERE user_id = $1`, userID)
-		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
-	})
 
 	var receivedMethod string
 	var receivedPath string
@@ -77,8 +67,20 @@ func TestMirrorVictoryChatToDiscordPostsMessageAndPersistsBridgeRow(t *testing.T
 		t.Fatalf("seed discord runtime config: %v", err)
 	}
 
+	actionID := "8f3f6d1a-6c2e-4b8a-9e5b-2a1c7d4e9f00"
+	// discord_chat_message_bridges.action_id has a real FK to actions(id),
+	// so this fixture needs an actual actions row -- ON DELETE CASCADE from
+	// sessions means it's cleaned up automatically when the fixture's
+	// session is deleted, no separate cleanup needed here.
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO actions (id, session_id, moment_id, actor_id, type, payload)
+		VALUES ($1::uuid, $2::uuid, 1, $3::uuid, 'chat/message', $4::jsonb)
+	`, actionID, sessionID, userID, `{"text":"Hello from Victory"}`); err != nil {
+		t.Fatalf("insert action: %v", err)
+	}
+
 	action := &actions.StoredAction{
-		ID:               "action-mirror-1",
+		ID:               actionID,
 		SessionID:        sessionID,
 		ShowingID:        showingID,
 		ActorID:          userID,
@@ -119,6 +121,22 @@ func TestMirrorVictoryChatToDiscordPostsMessageAndPersistsBridgeRow(t *testing.T
 
 func setupDiscordChatBridgeFixture(t *testing.T, pool *pgxpool.Pool) (locationID, sessionID, showingID, userID string) {
 	t.Helper()
+
+	// Registered before any insert below so a mid-setup t.Fatalf (e.g. a
+	// unique-constraint collision on the thread insert) still cleans up
+	// whatever rows were already created -- the named return values are read
+	// at cleanup time, so an empty string for a field never reached simply
+	// makes that one DELETE a no-op.
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_chat_message_bridges WHERE location_id = $1`, locationID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_session_threads WHERE location_id = $1`, locationID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM session_participants WHERE session_id = $1`, sessionID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM showings WHERE id = $1`, showingID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM sessions WHERE id = $1`, sessionID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM location_memberships WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
+	})
 
 	ctx := context.Background()
 	suffix := strings.ReplaceAll(strings.ToLower(t.Name()), "/", "_") + "_" + time.Now().UTC().Format("150405.000000")

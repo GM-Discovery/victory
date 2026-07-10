@@ -315,11 +315,15 @@ func TestDiscordAudioStatusIncludesVoiceParticipantsAndFeatureNotes(t *testing.T
 	if len(payload.Data.Participants) != 2 {
 		t.Fatalf("expected 2 participants, got %+v", payload.Data.Participants)
 	}
-	if payload.Data.Participants[0].DisplayName != "Grant" || payload.Data.Participants[0].LinkedUserID == "" || payload.Data.Participants[0].VictoryDisplayName != "Grant" {
-		t.Fatalf("expected linked participant label, got %+v", payload.Data.Participants[0])
+	// Snapshot() sorts participants alphabetically by display name (a
+	// deliberate, deterministic UI ordering -- see discord_audio_presence.go),
+	// so "Buddy" legitimately sorts before "Grant" regardless of insertion
+	// order.
+	if payload.Data.Participants[0].SourceLabel != "via Discord" || payload.Data.Participants[0].DisplayName != "Buddy" || payload.Data.Participants[0].LinkedUserID != "" {
+		t.Fatalf("expected unlinked participant label, got %+v", payload.Data.Participants[0])
 	}
-	if payload.Data.Participants[1].SourceLabel != "via Discord" || payload.Data.Participants[1].DisplayName != "Buddy" || payload.Data.Participants[1].LinkedUserID != "" {
-		t.Fatalf("expected unlinked participant label, got %+v", payload.Data.Participants[1])
+	if payload.Data.Participants[1].DisplayName != "Grant" || payload.Data.Participants[1].LinkedUserID == "" || payload.Data.Participants[1].VictoryDisplayName != "Grant" {
+		t.Fatalf("expected linked participant label, got %+v", payload.Data.Participants[1])
 	}
 }
 

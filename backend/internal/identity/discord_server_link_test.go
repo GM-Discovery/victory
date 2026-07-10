@@ -266,10 +266,12 @@ func TestDiscordBootstrapReconcileRestoresMappingsAndMicCommand(t *testing.T) {
 	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)
 	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_links WHERE location_id = $1`, locationID)
 	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_channel_mappings WHERE location_id = $1`, locationID)
+	_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_session_threads WHERE location_id = $1 AND venue_slug = $2`, locationID, "first-theater")
 	t.Cleanup(func() {
 		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_link_settings WHERE location_id = $1`, locationID)
 		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_server_links WHERE location_id = $1`, locationID)
 		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_channel_mappings WHERE location_id = $1`, locationID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_session_threads WHERE location_id = $1 AND venue_slug = $2`, locationID, "first-theater")
 	})
 
 	_, _ = pool.Exec(context.Background(), `
@@ -318,12 +320,13 @@ func TestDiscordBootstrapReconcileRestoresMappingsAndMicCommand(t *testing.T) {
 
 	channelsJSON := `[
 		{"id":"cat-core","name":"Victory Theater","type":4},
-		{"id":"sys-1","name":"victory-system","type":0},
-		{"id":"ann-1","name":"victory-announcements","type":0},
-		{"id":"lobby-1","name":"victory-lobby","type":0},
-		{"id":"support-1","name":"victory-support","type":0},
+		{"id":"sys-1","name":"victory-system","type":0,"parent_id":"cat-core"},
+		{"id":"ann-1","name":"victory-announcements","type":0,"parent_id":"cat-core"},
+		{"id":"lobby-1","name":"victory-lobby","type":0,"parent_id":"cat-core"},
+		{"id":"support-1","name":"victory-support","type":0,"parent_id":"cat-core"},
 		{"id":"the-cave-cat","name":"The Cave","type":4},
 		{"id":"first-theater-cat","name":"First Theater","type":4},
+		{"id":"catharsis-cat","name":"Catharsis","type":4},
 		{"id":"middle-school-stage-cat","name":"Middle School Stage","type":4},
 		{"id":"producers-office-cat","name":"Producer's Office","type":4},
 		{"id":"directors-chair-cat","name":"The Director's Chair","type":4},
@@ -333,7 +336,11 @@ func TestDiscordBootstrapReconcileRestoresMappingsAndMicCommand(t *testing.T) {
 		{"id":"workshop-cat","name":"Workshop","type":4},
 		{"id":"the-cave-chat","name":"the-cave-chat","type":0,"parent_id":"the-cave-cat"},
 		{"id":"first-theater-chat","name":"first-theater-chat","type":0,"parent_id":"first-theater-cat"},
-		{"id":"middle-school-stage-chat","name":"middle-school-stage-chat","type":0,"parent_id":"middle-school-stage-cat"}
+		{"id":"catharsis-chat","name":"catharsis-chat","type":0,"parent_id":"catharsis-cat"},
+		{"id":"middle-school-stage-chat","name":"middle-school-stage-chat","type":0,"parent_id":"middle-school-stage-cat"},
+		{"id":"the-cave-audio","name":"The Cave Audio","type":2,"parent_id":"the-cave-cat"},
+		{"id":"first-theater-audio","name":"First Theater Audio","type":2,"parent_id":"first-theater-cat"},
+		{"id":"catharsis-audio","name":"Catharsis Audio","type":2,"parent_id":"catharsis-cat"}
 	]`
 
 	cfg := DiscordServerLinkConfig{
@@ -350,7 +357,12 @@ func TestDiscordBootstrapReconcileRestoresMappingsAndMicCommand(t *testing.T) {
 				return jsonResponse(`[]`), nil
 			case req.Method == http.MethodPost && strings.HasSuffix(req.URL.Path, "/applications/app-1/guilds/guild-1/commands"):
 				return jsonResponse(`{"id":"mic-1","name":"mic"}`), nil
-			case req.Method == http.MethodPut && strings.HasSuffix(req.URL.Path, "/channels/first-theater-chat/thread-members/@me"):
+			// Reconcile joins every currently-active mic thread at the shared
+			// test location, which may include real threads left by other
+			// venues/production data -- match by path shape, not by this
+			// test's own synthetic thread ID, so an unrelated active thread
+			// never causes an unhandled-request failure here.
+			case req.Method == http.MethodPut && strings.HasSuffix(req.URL.Path, "/thread-members/@me"):
 				return jsonResponse(`{}`), nil
 			default:
 				t.Fatalf("unexpected discord request %s %s", req.Method, req.URL.Path)

@@ -108,7 +108,7 @@ func TestDiscordChannelMappingRepairCreatesAndReusesSkeleton(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM auth.discord_channel_mappings WHERE location_id = $1`, locationID).Scan(&count); err != nil {
 		t.Fatalf("count mappings after repeat: %v", err)
 	}
-	if count != 19 {
+	if count != 21 {
 		t.Fatalf("repeat repair changed mapping count to %d", count)
 	}
 
@@ -179,9 +179,9 @@ func (t *discordMappingTransport) RoundTrip(req *http.Request) (*http.Response, 
 	defer t.mu.Unlock()
 
 	switch {
-	case req.Method == http.MethodGet && strings.HasSuffix(req.URL.Path, "/guilds/guild-1/channels"):
+	case req.Method == http.MethodGet && strings.Contains(req.URL.Path, "/guilds/") && strings.HasSuffix(req.URL.Path, "/channels"):
 		return jsonResponse(mustJSON(t.channels)), nil
-	case req.Method == http.MethodPost && strings.HasSuffix(req.URL.Path, "/guilds/guild-1/channels"):
+	case req.Method == http.MethodPost && strings.Contains(req.URL.Path, "/guilds/") && strings.HasSuffix(req.URL.Path, "/channels"):
 		var payload struct {
 			Name     string `json:"name"`
 			Type     int    `json:"type"`

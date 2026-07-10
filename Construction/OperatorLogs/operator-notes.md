@@ -712,3 +712,28 @@ These are four distinct layers — do not conflate them:
 ### Privacy caveat about self-hosted operators
 
 - The privacy copy says exactly "Only you can see these notes. They are not shared with this person." — application-level enforcement only. A self-hosted operator with database access can technically read `player_relationship_*` tables; nothing claims cryptographic secrecy, and no doc should.
+
+## Kernel 63 — Discord Test Fixture-Leak Cleanup and Back-to-Map Navigation
+
+### Discord automatic-reconcile channel-mapping bug (real production fix)
+
+- `saveDiscordChannelMapping` (`backend/internal/identity/discord_channel_mapping.go`) now wraps `created_by_user_id` in `NULLIF($11, '')::uuid` before casting, matching the guard already present on `parent_discord_channel_id`. Before this fix, `ReconcileDiscordBootstrap` — the goroutine that runs automatically on every real server boot — always called the mapping-save path with an empty `createdBy` string, and the bare `::uuid` cast of `""` crashed on every single spec. The crash was swallowed into `summary.Failed` rather than surfaced, so **automatic startup channel-mapping reconcile has never actually persisted a mapping** since this code shipped; only the manual, authenticated `/api/discord/channel-mapping/repair` HTTP path (which supplies a real user ID) ever worked. If you're debugging "why didn't the bot channels get mapped automatically," this is why — check whether a human has ever hit the manual repair endpoint for the location in question.
+- Found this by fixing test fixtures far enough that `TestDiscordBootstrapReconcileRestoresMappingsAndMicCommand` finally exercised the automatic-reconcile path for the first time in its history; it had always failed earlier (at channel-listing mock gaps) before reaching this bug.
+
+### First Theater / Catharsis back-pill is hover-hidden (correction to prior assumption)
+
+- Both venues' `header-pill--back` sits inside `.header-right`, and both have `.top-bar[data-open="false"] .header-right { opacity:0; visibility:hidden; display:none; }` — the pill is **not visible by default**, only when the header is hovered/pinned open. Don't assume these two venues already have adequate "back to map" affordance just because a pill exists in the markup; verify with `getComputedStyle`, not a DOM-presence check.
+
+### `back-to-map.js` shared component
+
+- `frontend/lib/back-to-map.js` mirrors `venue-account-badge.js`'s mount-detection pattern exactly (`.launchbar`/`.toolbar`/`.header-right`/`.top-actions` host detection, floating fallback). Add `<script src="/lib/back-to-map.js"></script>` for default mounting, or `data-back-to-map="floating"` on the tag to force the floating pill regardless of host — required for any page whose obvious mount point is hover-hidden by default (see above). The floating pill sits top-**left** (`z-index:95`) deliberately, so it never collides with the account badge's top-right float.
+- `document.currentScript` must be read synchronously at the top of the IIFE, not inside the deferred `DOMContentLoaded` callback — it reads back `null` by the time that callback fires. This bit the first draft of the component; fixed before it shipped.
+
+### Operator-only venues can't be browser-proven with a plain test account
+
+- `access.ResolveVisibleVenues` only returns the full venue list for the literal env-configured operator (`OPERATOR_HANDLE`/`OPERATOR_USER_ID`) — a `location_memberships.role='producer'` grant is NOT the same thing and does not unlock every venue. Middle School Stage and Stage Template are currently operator-only (not in any of the `authenticated_surface`/`approved_performer_surface`/`performer_surface`/`owned_workbook_surface` branches), so a disposable producer-bootstrapped test account correctly sees the forbidden-screen there, not the real shell. Do not mutate `OPERATOR_HANDLE` to work around this in a test/proof script — it's a single, shared, environment-wide identity, not something to reassign temporarily. Verify such pages statically (served-HTML content check) instead.
+
+### Live-DB test residue
+
+- 12 `bridge_operator_testmirrorvictorychattodiscordpostsmessageandpersistsbridgerow_*` fixture users (and their FK-linked sessions/memberships) were cleaned up as part of this kernel — the leak source (missing `discord_session_threads` cleanup, see reportback) is now fixed, so this should not recur.
+- ~25 other older stale test users (`tester1`, `kernel49test...`, etc.) remain, explicitly untouched — unrelated to the tests this kernel fixed. Named as a follow-up sweep candidate, not folded into this kernel's cleanup.

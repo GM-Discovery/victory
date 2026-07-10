@@ -537,7 +537,7 @@ func saveDiscordChannelMapping(ctx context.Context, pool *pgxpool.Pool, location
 			last_verified_at,
 			updated_at
 		)
-		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, NULLIF($10, ''), $11::uuid, $12, NOW())
+		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, NULLIF($10, ''), NULLIF($11, '')::uuid, $12, NOW())
 		ON CONFLICT (location_id, mapping_kind, victory_scope_kind, victory_scope_slug) DO UPDATE
 		SET discord_server_id = EXCLUDED.discord_server_id,
 			discord_channel_id = EXCLUDED.discord_channel_id,
