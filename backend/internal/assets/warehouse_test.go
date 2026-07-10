@@ -2,11 +2,13 @@ package assets
 
 import (
 	"context"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"victory/backend/internal/db"
+	"victory/backend/internal/dbtest"
 )
 
 func TestDefaultWarehouseStorageSettings(t *testing.T) {
@@ -28,29 +30,87 @@ func TestDefaultWarehouseStorageSettings(t *testing.T) {
 	}
 }
 
+// loadWarehouseStorageStats takes a location UUID, not a filesystem path -
+// filesystem usage is loaded separately by loadWarehouseFilesystemStats and
+// the two are never combined inside loadWarehouseStorageStats itself. The
+// original version of this test passed a nonexistent filesystem path where
+// the location UUID belongs, which failed the `$1::uuid` cast on every run
+// regardless of which database it targeted. This fixture creates its own
+// location + asset row so the assertion is meaningful without depending on
+// any pre-seeded production asset data.
 func TestLoadWarehouseStorageStatsKeepsDatabaseUsageWhenFilesystemLookupFails(t *testing.T) {
 	pool := openWarehouseTestPool(t)
-	stats, err := loadWarehouseStorageStats(context.Background(), pool, "/path/that/does/not/exist")
+	ctx := context.Background()
+
+	locationID, userID := insertWarehouseTestLocationAndUser(t, pool)
+	const wantStoredBytes = 4096
+	insertWarehouseTestAsset(t, pool, locationID, userID, wantStoredBytes)
+
+	stats, err := loadWarehouseStorageStats(ctx, pool, locationID)
 	if err != nil {
 		t.Fatalf("load warehouse storage stats: %v", err)
 	}
-	if stats.TotalStoredBytes <= 0 {
-		t.Fatalf("expected database-backed stored bytes, got %d", stats.TotalStoredBytes)
+	if stats.TotalStoredBytes != wantStoredBytes {
+		t.Fatalf("total stored bytes = %d, want %d", stats.TotalStoredBytes, wantStoredBytes)
 	}
-	if stats.ActiveAssets <= 0 {
-		t.Fatalf("expected active assets to be counted, got %d", stats.ActiveAssets)
+	if stats.ActiveAssets != 1 {
+		t.Fatalf("active assets = %d, want 1", stats.ActiveAssets)
 	}
 }
 
 func openWarehouseTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
+	return dbtest.OpenTestPool(t)
+}
 
-	pool, err := db.NewPool(context.Background(), "postgres://victory:REDACTED@127.0.0.1:5432/victory?sslmode=disable")
-	if err != nil {
-		t.Skipf("postgres unavailable for integration test: %v", err)
+func insertWarehouseTestLocationAndUser(t *testing.T, pool *pgxpool.Pool) (locationID, userID string) {
+	t.Helper()
+
+	ctx := context.Background()
+	suffix := strings.ReplaceAll(strings.ToLower(t.Name()), "/", "_") + "_" + time.Now().UTC().Format("150405.000000")
+
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO locations (name, slug)
+		VALUES ($1, $2)
+		RETURNING id::text
+	`, "Warehouse Test Location", "warehouse-test-location-"+suffix).Scan(&locationID); err != nil {
+		t.Fatalf("insert location: %v", err)
 	}
-	if err := pool.Ping(context.Background()); err != nil {
-		t.Skipf("postgres unavailable for integration test: %v", err)
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO users (handle, display_name)
+		VALUES ($1, $2)
+		RETURNING id::text
+	`, "warehouse_test_"+suffix, "Warehouse Test User").Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
 	}
-	return pool
+
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM assets WHERE location_id = $1`, locationID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM locations WHERE id = $1`, locationID)
+	})
+
+	return locationID, userID
+}
+
+func insertWarehouseTestAsset(t *testing.T, pool *pgxpool.Pool, locationID, userID string, storedBytes int64) string {
+	t.Helper()
+
+	var assetID string
+	if err := pool.QueryRow(context.Background(), `
+		INSERT INTO assets (
+			producer_user_id, location_id, uploader_user_id, owner_user_id, owner_state,
+			width, height, byte_size, checksum_sha256, storage_root, original_path,
+			stored_bytes
+		)
+		VALUES (
+			$1::uuid, $2::uuid, $1::uuid, $1::uuid, 'personal',
+			64, 64, $3::integer, decode('deadbeef', 'hex'), '/tmp', '/tmp/warehouse-test-asset',
+			$3::bigint
+		)
+		RETURNING id::text
+	`, userID, locationID, storedBytes).Scan(&assetID); err != nil {
+		t.Fatalf("insert asset: %v", err)
+	}
+	return assetID
 }

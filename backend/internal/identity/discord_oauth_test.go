@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"victory/backend/internal/db"
+	"victory/backend/internal/dbtest"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -332,13 +332,5 @@ func jsonResponse(body string) *http.Response {
 
 func openDiscordTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-
-	pool, err := db.NewPool(context.Background(), "postgres://victory:REDACTED@127.0.0.1:5432/victory?sslmode=disable")
-	if err != nil {
-		t.Skipf("postgres unavailable for integration test: %v", err)
-	}
-	if err := pool.Ping(context.Background()); err != nil {
-		t.Skipf("postgres unavailable for integration test: %v", err)
-	}
-	return pool
+	return dbtest.OpenTestPool(t)
 }

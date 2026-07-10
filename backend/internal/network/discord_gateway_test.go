@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"victory/backend/internal/db"
+	"victory/backend/internal/dbtest"
 	"victory/backend/internal/identity"
 	"victory/backend/internal/showings"
 
@@ -564,15 +564,7 @@ func TestDiscordGatewayMessageDeleteMarksImportDeleted(t *testing.T) {
 
 func openDiscordGatewayTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-
-	pool, err := db.NewPool(context.Background(), "postgres://victory:REDACTED@127.0.0.1:5432/victory?sslmode=disable")
-	if err != nil {
-		t.Skipf("postgres unavailable for integration test: %v", err)
-	}
-	if err := pool.Ping(context.Background()); err != nil {
-		t.Skipf("postgres unavailable for integration test: %v", err)
-	}
-	return pool
+	return dbtest.OpenTestPool(t)
 }
 
 func setupDiscordGatewayEditFixture(t *testing.T, pool *pgxpool.Pool) (locationID, venueID, lotID, productionID, userID, sessionID, showingID string) {

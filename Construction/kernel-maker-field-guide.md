@@ -242,9 +242,19 @@ node --check "$tmp"
 ## Backend Test Commands
 Run from `/opt/victory/backend`.
 
+**As of Kernel 64, DB-touching tests require `TEST_DATABASE_URL` and will hard-fail (not skip) without it.** Three packages open a real Postgres pool in tests: `internal/identity`, `internal/network`, `internal/assets`. Every other package is pure/unit (no DB). Point `TEST_DATABASE_URL` at a dedicated test database whose name contains `test` (e.g. `victory_test`) - never at the live `victory` database. The safety gate lives in `backend/internal/dbtest` (Go) and `scripts/test/require-isolated-database.sh` (shell); both reject a missing, live-looking, or production-looking URL with a clear error instead of silently running against the wrong database.
+
+One-time (or after a schema change) setup of the dedicated test database:
+```bash
+cd /opt/victory
+TEST_DATABASE_URL="postgres://victory:REDACTED@127.0.0.1:5432/victory_test?sslmode=disable" \
+  scripts/test/setup-test-database.sh
+```
+This creates `victory_test` if missing, applies every migration, and boots the real backend once against it so Go-side `Ensure*Surface` bootstrap (e.g. the `first-theater`/`catharsis`/`middle-school-stage` venues from `internal/access.EnsureKernel16VenueSurface`) runs too - the raw SQL migrations alone don't create everything a live install has. Safe to re-run any time; nothing in it is destructive. For a full wipe-and-rebuild instead, see `scripts/test/reset-test-database.sh` (requires `CONFIRM_TEST_DB_RESET=1` in addition to a validated `TEST_DATABASE_URL`, and will refuse to run against anything that isn't a dedicated test database).
+
 Full suite:
 ```bash
-GOCACHE=/tmp/victory-gocache go test ./...
+GOCACHE=/tmp/victory-gocache TEST_DATABASE_URL="postgres://victory:REDACTED@127.0.0.1:5432/victory_test?sslmode=disable" go test ./...
 ```
 
 Focused suites:
@@ -253,6 +263,7 @@ GOCACHE=/tmp/victory-gocache go test ./internal/actions ./internal/network ./int
 GOCACHE=/tmp/victory-gocache go test ./internal/characters
 GOCACHE=/tmp/victory-gocache go test ./internal/profiles ./internal/access
 ```
+(Add `TEST_DATABASE_URL=...` to any of these that touch `internal/network`, `internal/identity`, or `internal/assets`.)
 
 Use `GOCACHE=/tmp/victory-gocache` because agents often run in restricted environments where the default Go cache location is not writable.
 
@@ -260,6 +271,8 @@ Always finish with:
 ```bash
 git diff --check
 ```
+
+Do not set `DATABASE_URL` for test runs - it plays no role in `go test` (the live app database is only read by the real server process and `victory-bootstrap`), and unsetting it removes any chance of a DB-touching test coincidentally reaching it.
 
 ## Common Failure Modes
 - **Port conflict on 8081**: Docker backend and host-Go backend are both running. Stop one or use `PORT=18081`.
@@ -299,6 +312,15 @@ For the private player-relationship layer (My People):
 - Follow-ups must never grow reminders/notifications, and no route may let a user enumerate or count records *about* them — both are hard spec rules, not missing features.
 - The Kernel 62 two-user privacy proof is scripted: `NODE_PATH=/tmp/node_modules node scripts/smoke/kernel62-browser.js` (three disposable signup accounts, 404 + DOM-scan assertions, desktop+mobile screenshots into `Construction/OperatorLogs/evidence/kernel-62/`). Extend that script for future privacy-sensitive kernels rather than hand-driving two browsers.
 
+## Kernel 64 Notes
+For DB test isolation and the live-DB safety gate:
+- **`go test ./...` now requires `TEST_DATABASE_URL`** for the three DB-touching packages (`internal/identity`, `internal/network`, `internal/assets`) - see "Backend Test Commands" above. Before Kernel 64, these tests connected to a hardcoded live-looking URL directly in the test source; that hardcoding is gone.
+- The safety gate is duplicated in two languages on purpose: `backend/internal/dbtest.ValidateTestDatabaseURL` (Go, enforced per test binary) and `scripts/test/require-isolated-database.sh`'s `require_isolated_database` function (shell, used by the setup/reset scripts). Keep the rules in sync if either changes - a database name must contain `test`, must not be empty/`victory`/`postgres`, must not look production-y, and must not equal `DATABASE_URL`.
+- The dedicated test database (`victory_test` by convention) lives on the **same** Postgres server as the live app database - there's only one Postgres instance in this deployment. The discriminator is the database *name*, not the host. An earlier, unused version of `require-isolated-database.sh` rejected `127.0.0.1`/`victory-postgres` hosts outright, which would have made this impossible; that check is gone.
+- Raw SQL migrations alone do not fully seed a fresh database - several venues (`first-theater`, `catharsis`, `middle-school-stage`, `warehouse`, `workshop`, etc.) only exist because `internal/access.EnsureKernel16VenueSurface` (and the other `Ensure*Surface` functions `cmd/victory/main.go` runs on every real boot) create them in Go, not SQL. `scripts/test/setup-test-database.sh` and `reset-test-database.sh` both build and briefly boot the real `victory` binary against the test database for exactly this reason - don't "simplify" that away or DB-touching tests that assume a real venue exists will fail against a freshly migrated database even though they pass against the long-lived live one.
+- Fixed three test fixtures that only worked by accident against the live database's organic (non-migration-tracked) state: `internal/assets/warehouse_test.go`'s stats test previously passed a filesystem path where a location UUID belonged (always failed the `::uuid` cast, regardless of database); `internal/network/discord_chat_bridge_test.go` assumed a `first-theater` venue and a production already existed for `amurray-family` on whatever database it ran against - both are now created by the fixture itself (using the `the-cave` venue, which is genuinely migration-seeded, and an idempotent `ON CONFLICT DO NOTHING` production insert).
+- `scripts/smoke/fresh-install.sh --local` is intentionally untouched by any of this - it manages its own fully disposable `victory_fresh_*` database per run and never reads `TEST_DATABASE_URL`. Keep it that way; don't route it through the new safety gate.
+
 ## Kernel Implementation Checklist
 1. Read `Construction/OperatorLogs/operator-notes.md` and the newest relevant kernel docs.
 2. Check `git status --short`.
@@ -309,7 +331,7 @@ For the private player-relationship layer (My People):
 7. Preserve append-only actions.
 8. Update snapshots and live broadcasts together when a live state changes.
 9. Keep The Cave live-session focused; move drafting/admin workflows to the right venue.
-10. Run Go tests with `GOCACHE=/tmp/victory-gocache`.
+10. Run Go tests with `GOCACHE=/tmp/victory-gocache` and, if touching `internal/identity`/`internal/network`/`internal/assets`, `TEST_DATABASE_URL` pointed at a dedicated test database (see "Backend Test Commands" above) - never the live app database.
 11. Run `node --check` for edited inline venue scripts.
 12. Run `git diff --check`.
 13. Record the important result in Construction notes when the kernel changes system behavior.

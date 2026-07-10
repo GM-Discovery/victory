@@ -152,13 +152,32 @@ func setupDiscordChatBridgeFixture(t *testing.T, pool *pgxpool.Pool) (locationID
 	`).Scan(&locationID); err != nil {
 		t.Fatalf("load location: %v", err)
 	}
+	// showings.EnsureForSession requires at least one production to exist
+	// for the session's location (returns "production_required" otherwise).
+	// The live database happens to have one for "amurray-family" already
+	// (created out of band, not by any migration or bootstrap code), but a
+	// freshly migrated database does not - ensure one idempotently rather
+	// than assuming it's already there.
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO productions (location_id, name, slug)
+		VALUES ($1::uuid, 'Chat Bridge Test Production', 'chat-bridge-test-production')
+		ON CONFLICT (location_id, slug) DO NOTHING
+	`, locationID); err != nil {
+		t.Fatalf("ensure production: %v", err)
+	}
+	// "the-cave" is used here (rather than "first-theater", which this
+	// fixture originally assumed) because it's seeded by
+	// database/migrations/002_seed_world.sql and therefore exists on any
+	// freshly migrated database, not only the long-lived live one. Any
+	// slug in discordChatBridgeEligibleVenues (discord_chat_bridge.go)
+	// would work equally well for this test.
 	var venueID string
 	if err := pool.QueryRow(ctx, `
 		SELECT v.id::text
 		FROM venues v
 		JOIN lots lo ON lo.id = v.lot_id
 		WHERE lo.location_id = $1::uuid
-		  AND v.slug = 'first-theater'
+		  AND v.slug = 'the-cave'
 		LIMIT 1
 	`, locationID).Scan(&venueID); err != nil {
 		t.Fatalf("load venue: %v", err)
@@ -226,13 +245,13 @@ func setupDiscordChatBridgeFixture(t *testing.T, pool *pgxpool.Pool) (locationID
 		VALUES (
 			$1::uuid,
 			$2::uuid,
-			'first-theater',
+			'the-cave',
 			$3::uuid,
 			$4::uuid,
 			'guild-bridge',
 			'parent-bridge',
 			'bridge-thread-1',
-			'First Theater — Showtime',
+			'The Cave — Showtime',
 			$5::uuid,
 			'discord-user-bridge',
 			NOW(),

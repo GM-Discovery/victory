@@ -737,3 +737,26 @@ These are four distinct layers — do not conflate them:
 
 - 12 `bridge_operator_testmirrorvictorychattodiscordpostsmessageandpersistsbridgerow_*` fixture users (and their FK-linked sessions/memberships) were cleaned up as part of this kernel — the leak source (missing `discord_session_threads` cleanup, see reportback) is now fixed, so this should not recur.
 - ~25 other older stale test users (`tester1`, `kernel49test...`, etc.) remain, explicitly untouched — unrelated to the tests this kernel fixed. Named as a follow-up sweep candidate, not folded into this kernel's cleanup.
+
+## Kernel 64 — DB Test Isolation and Live-DB Safety Gate
+
+### The dedicated test database lives on the same Postgres server as the live one
+
+- There is only one Postgres instance in this deployment (`victory-postgres`, port `127.0.0.1:5432` published to host). The dedicated test database (`victory_test` by convention) is just a different database name on that same server, not a second server. If you ever see `TEST_DATABASE_URL` rejected for its host, that's a bug in the safety-gate rules — the discriminator is supposed to be the database *name* (must contain `test`, must not be `victory`/`postgres`/production-looking), never the host. An earlier version of `scripts/test/require-isolated-database.sh` got this backwards (rejected the host outright) before this kernel fixed it — if you ever see that pattern reintroduced, it's a regression.
+
+### Raw SQL migrations are not the whole seed story
+
+- Several venues — `first-theater`, `catharsis`, `middle-school-stage`, `warehouse`, `workshop`, `library`, `trailers`, `grants-cabin`, `construction`, `audition-hall`, `soil-experts` — are created by Go-side `Ensure*Surface` bootstrap functions that `cmd/victory/main.go`'s `main()` runs on every real server boot (e.g. `internal/access.EnsureKernel16VenueSurface`), not by any file under `database/migrations/`. A database that only has the SQL migrations applied is missing all of these. `scripts/test/setup-test-database.sh` and `reset-test-database.sh` both build and briefly boot the real `victory` binary against the target database for exactly this reason, then kill it — the binary is never meant to keep running as part of test-DB setup, just to execute its idempotent startup bootstrap once. If a future kernel adds a new `Ensure*Surface` function and forgets to wire it into `main.go`'s startup sequence, this same "works live, fails against a fresh DB" pattern will resurface — check `main.go`'s `Ensure*` call list first when a DB-touching test fails only against `victory_test`.
+
+### Two organic, never-migrated pieces of live-DB state that tripped up test fixtures
+
+- The live database has a `productions` row for the `amurray-family` location (`"Main Production"`) that was created out-of-band at some point — no migration file or Go bootstrap function creates it. `showings.EnsureForSession` requires at least one production to exist for the session's location (`production_required` error otherwise). `internal/network/discord_chat_bridge_test.go`'s fixture now creates its own (`ON CONFLICT (location_id, slug) DO NOTHING`, so it's safe against both a fresh DB and the live DB's existing one) rather than assuming one is already there.
+- Similarly, `gateway-thread-location` (a second, separate `locations` row) exists live but isn't created by the canonical migration list (which instead seeds `victory-theater` as the Kernel 42 neutral install location, per `025_kernel42_neutral_install_location.sql`) — a reminder that the live database's history and a from-empty migration replay are not byte-identical, and that's expected, not a bug to chase.
+
+### The safety gate is duplicated in two languages, on purpose
+
+- `backend/internal/dbtest.ValidateTestDatabaseURL` (Go) and `scripts/test/require-isolated-database.sh`'s `require_isolated_database` function (shell) implement the same rules independently — Go tests can't shell out per-test cheaply, and the shell scripts run before any Go test binary exists, so there's no single point both can share without adding a dependency the other doesn't need. If the rules ever change (e.g. the required marker stops being the substring `"test"`), update both. Each file's header comment points at the other.
+
+### `go test ./...` behavior change
+
+- Before this kernel, `go test ./...` connected straight to the live `victory` database with no env var involved at all (three test files, each with a function like `openDiscordTestPool` hardcoding the live connection string) and silently `t.Skip`'d if Postgres was unreachable — meaning a broken DB connection looked like a pass, not a failure. Both of those are gone: `TEST_DATABASE_URL` is required and unsafe/missing values now `t.Fatalf`. If you see `go test ./...` suddenly "failing" after pulling this kernel's changes, you almost certainly just need to run `scripts/test/setup-test-database.sh` once and export `TEST_DATABASE_URL` — see `dev-workflow.md`'s "Database Changes" section.
