@@ -127,6 +127,7 @@ migrations=(
   "$ROOT/database/migrations/035_kernel59a_director_value_overrides.sql"
   "$ROOT/database/migrations/036_kernel61_player_workbook_foundation.sql"
   "$ROOT/database/migrations/037_kernel62_player_relationships.sql"
+  "$ROOT/database/migrations/038_kernel65_third_place.sql"
 )
 
 for migration in "${migrations[@]}"; do
@@ -531,5 +532,86 @@ do
   fi
 done
 echo "PASS My People page files exist"
+
+# --- Kernel 65: Third Place Headshot Commons ---
+# Reuses fresh accounts A ($raw_session, $workbook_id) and B ($second_session)
+# already created above for the Kernel 62 checks.
+
+anon_headshots_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' "http://127.0.0.1:${BACKEND_PORT}/api/third-place/headshots")"
+if [[ "$anon_headshots_status" != "401" ]]; then
+  echo "expected anonymous Third Place list to return 401, got $anon_headshots_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS Third Place list rejects anonymous requests"
+
+leave_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/third-place/headshots/me")"
+if [[ "$leave_status" != "200" || "$(cat "$BODY_OUT")" != *'"created":true'* ]]; then
+  echo "expected A to leave a new Headshot with created:true, got $leave_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+headshot_id="$(grep -o '"headshot_id":"[^"]*"' "$BODY_OUT" | head -n1 | sed 's/"headshot_id":"//;s/"$//')"
+if [[ -z "$headshot_id" ]]; then
+  echo "failed to extract headshot id" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS A left a Headshot ($headshot_id)"
+
+leave_again_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/third-place/headshots/me")"
+if [[ "$leave_again_status" != "200" || "$(cat "$BODY_OUT")" != *'"created":false'* ]]; then
+  echo "expected repeated Leave Headshot to be idempotent (created:false), got $leave_again_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS repeated Leave Headshot did not create a duplicate"
+
+b_commons_list="$(curl -s -H "Cookie: victory_session=$second_session" "http://127.0.0.1:${BACKEND_PORT}/api/third-place/headshots")"
+if [[ "$b_commons_list" != *"\"headshot_id\":\"$headshot_id\""* ]]; then
+  echo "expected B to see A's Headshot in the commons list" >&2
+  echo "$b_commons_list" >&2
+  exit 1
+fi
+if [[ "$b_commons_list" == *'"email"'* || "$b_commons_list" == *'"handle"'* ]]; then
+  echo "Third Place commons payload must not include email/handle" >&2
+  echo "$b_commons_list" >&2
+  exit 1
+fi
+echo "PASS B sees A's Headshot with no private account fields"
+
+remove_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" \
+  -X DELETE "http://127.0.0.1:${BACKEND_PORT}/api/third-place/headshots/me")"
+if [[ "$remove_status" != "200" ]]; then
+  echo "expected Remove My Headshot to return 200, got $remove_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+b_commons_after_remove="$(curl -s -H "Cookie: victory_session=$second_session" "http://127.0.0.1:${BACKEND_PORT}/api/third-place/headshots")"
+if [[ "$b_commons_after_remove" == *"\"headshot_id\":\"$headshot_id\""* ]]; then
+  echo "removed Headshot still appears in the active commons list" >&2
+  echo "$b_commons_after_remove" >&2
+  exit 1
+fi
+echo "PASS removed Headshot no longer appears in the active commons list"
+
+a_history="$(curl -s -H "Cookie: victory_session=$raw_session" "http://127.0.0.1:${BACKEND_PORT}/api/third-place/headshots/me/history")"
+if [[ "$a_history" != *'"status":"removed"'* ]]; then
+  echo "expected A's Headshot history to show a removed record" >&2
+  echo "$a_history" >&2
+  exit 1
+fi
+echo "PASS A's Headshot history preserves the placement/removal record"
+
+if [[ ! -f "$ROOT/frontend/venues/third-place/index.html" ]]; then
+  echo "missing required file: frontend/venues/third-place/index.html" >&2
+  exit 1
+fi
+echo "PASS Third Place page file exists"
 
 echo "PASS clean-install smoke complete"

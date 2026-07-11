@@ -38,6 +38,7 @@ import (
 	"victory/backend/internal/playerrelationships"
 	"victory/backend/internal/profiles"
 	"victory/backend/internal/showings"
+	"victory/backend/internal/thirdplace"
 	"victory/backend/internal/venues"
 	"victory/backend/internal/world"
 )
@@ -171,6 +172,9 @@ func main() {
 	mux.HandleFunc("/api/player-relationships/catalogue", playerrelationships.HandleCatalogue(pool))
 	mux.HandleFunc("/api/player-relationships", playerrelationships.HandleCollection(pool))
 	mux.HandleFunc("/api/player-relationships/", playerrelationships.HandleByID(pool))
+	mux.HandleFunc("/api/third-place/headshots", thirdplace.HandleCollection(pool))
+	mux.HandleFunc("/api/third-place/headshots/me", thirdplace.HandleMe(pool))
+	mux.HandleFunc("/api/third-place/headshots/me/history", thirdplace.HandleMyHistory(pool))
 	mux.HandleFunc("GET /api/characters/parentage-chart", characters.HandleParentageChart())
 	mux.HandleFunc("GET /api/characters/chapter2-rules", characters.HandleChapter2Rules())
 	mux.HandleFunc("GET /api/character-cards/me", characters.HandleMyCharacterCards(pool))

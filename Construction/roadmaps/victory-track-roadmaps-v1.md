@@ -235,7 +235,19 @@ Kernel 62 (PASS, 2026-07-09 — `Construction/OperatorLogs/kernel-62-reportback.
 - shared-context panel limited to server-verifiable production-membership overlap ("Victory can currently verify");
 - entry points from another user's Trailer Face (`Add to My People` / `Open My Notes`), My Face, and Account.
 
-Still out of scope for V8 after Kernel 62 (deferred to a future Third Place / Faceprint Commons or roster kernel): any global user discovery, mutual/social-graph features, and subject-visible interactions.
+Still out of scope for V8 after Kernel 62 (deferred to a future Third Place / roster kernel): any global user discovery, mutual/social-graph features, and subject-visible interactions.
+
+### Kernel 65 continuation — Third Place Headshot Commons
+
+Kernel 65 (PASS, 2026-07-11 — `Construction/OperatorLogs/kernel-65-reportback.md`) adds the first opt-in social commons on top of the Trailer Face + My People contracts, deliberately smaller than a full directory:
+
+- a signed-in `third-place` venue, seeded the same way as `trailers`/`greenroom` (migration 038) and given the exact same map-visibility rule as `trailers` in `access.ResolveVisibleVenues` (not a new gate);
+- `third_place_headshots`: one row per placement/removal, at most one *active* row per account enforced by a partial unique index the upsert targets directly (safe under concurrency, not just application logic); removal closes the row rather than deleting it, re-leaving after removal opens a new one;
+- a Headshot is never stored content — `ProjectHeadshot` re-derives stage name, portrait, and up to 3 "At a Glance" facts from the owner's *current* Trailer Face on every read, reusing `playerprofile.ProjectTrailerFace` rather than duplicating projection logic;
+- relationship state is computed per viewer via the existing `playerrelationships.GetRelationshipBySubjectProfile`, never stored on the Headshot itself and never visible to the owner or any other viewer;
+- Headshot Commons list, own-Headshot status, and owner-only placement/removal history, all authenticated-only, with no impressions/autographs/tags/feeds/rosters (explicitly deferred, per the kernel's own scope boundary).
+
+This is the "Third Place" the Kernel 62 note above deferred to — not a Faceprint (an earlier, abandoned name for the same concept; do not resurrect that term). Global user discovery, mutual/social-graph features, impressions, autographs, and any Show Run/roster primitive remain out of scope, deferred to a future kernel.
 
 ---
 

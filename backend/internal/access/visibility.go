@@ -141,7 +141,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 			FROM venues v
 			JOIN lots l ON l.id = v.lot_id
 			JOIN location_memberships lm ON lm.location_id = l.location_id
-			WHERE v.slug = 'trailers'
+			WHERE v.slug IN ('trailers', 'third-place')
 			  AND lm.user_id = $1
 			  AND lm.active = TRUE
 			  AND lm.role IN ('producer', 'director', 'cast', 'crew')

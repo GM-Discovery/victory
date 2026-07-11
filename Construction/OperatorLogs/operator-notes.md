@@ -760,3 +760,29 @@ These are four distinct layers — do not conflate them:
 ### `go test ./...` behavior change
 
 - Before this kernel, `go test ./...` connected straight to the live `victory` database with no env var involved at all (three test files, each with a function like `openDiscordTestPool` hardcoding the live connection string) and silently `t.Skip`'d if Postgres was unreachable — meaning a broken DB connection looked like a pass, not a failure. Both of those are gone: `TEST_DATABASE_URL` is required and unsafe/missing values now `t.Fatalf`. If you see `go test ./...` suddenly "failing" after pulling this kernel's changes, you almost certainly just need to run `scripts/test/setup-test-database.sh` once and export `TEST_DATABASE_URL` — see `dev-workflow.md`'s "Database Changes" section.
+
+## Kernel 65 — Third Place Headshot Commons MVP
+
+### Third Place venue and visibility rule
+
+- `third-place` is seeded exactly like `trailers`/`greenroom` (idempotent `INSERT ... WHERE NOT EXISTS`, migration 038) and is deliberately given the *same* map-visibility rule as `trailers` in `access.ResolveVisibleVenues` — one UNION arm now reads `v.slug IN ('trailers', 'third-place')` instead of `v.slug = 'trailers'`. That rule requires an active `location_memberships` row with role in `producer/director/cast/crew` (see `IsPerformerRole`) — a plain `audience`-role account won't see the *map tile*, but the underlying page and every `/api/third-place/*` route only ever check "is this an authenticated session," no role check at all. This mirrors Trailers exactly: the venue tile is performer-gated, the API/page itself is not. Don't "fix" this apparent inconsistency without re-reading Kernel 61A/65's own precedent first — it's intentional.
+
+### Headshot terminology and one-active-per-account rule
+
+- The product term is **Headshot** (the presence marker) inside **Third Place** (the venue). An earlier concept called "Faceprint" was explicitly abandoned — don't resurrect that name in copy, code, or docs.
+- "At most one active Headshot per account" is enforced by a **partial unique index** (`uq_third_place_headshots_active_user`, `WHERE removed_at IS NULL AND status = 'active'`), and `LeaveHeadshot`'s `INSERT ... ON CONFLICT (user_id) WHERE removed_at IS NULL AND status = 'active' DO UPDATE` targets that exact predicate. This is race-safe at the database level, not just "idempotent because the Go code checks first" — worth knowing if a future kernel is tempted to add a second write path to this table without going through `LeaveHeadshot`.
+- `created` (new row vs refreshed existing row) is determined via the `(xmax = 0)` Postgres idiom in the same `RETURNING` clause as the upsert — a single round trip, no separate existence check beforehand. If you need this "was it actually inserted" signal elsewhere in the codebase, this is the pattern to reach for instead of a read-then-write.
+- The table has **no column that could hold Face content** at all — `id, user_id, status, placed_at, removed_at, created_at, updated_at`. "History never snapshots old Face content" is a schema fact, not a policy someone could accidentally violate by adding a field.
+
+### Live projection, not stored content
+
+- A Headshot's stage name, portrait, and headline facts are recomputed on every single read via `playerprofile.ProjectTrailerFace` (Kernel 61A) — `internal/thirdplace` imports `playerprofile` and `playerrelationships` directly and duplicates none of their logic. If Trailer Face projection ever changes shape, Third Place picks it up automatically with no migration of its own.
+- Relationship state (`Add to My People` vs `Open My Notes`) is computed per viewer via `playerrelationships.GetRelationshipBySubjectProfile`, called fresh inside `ProjectHeadshot` — never stored on the Headshot row, never visible to the owner or to any other viewer. A third project-owned test (`TestProjectHeadshotRelationshipStateForViewer`) specifically proves a second, unrelated viewer sees `none`/`Add to My People` even after a first viewer has already added the same owner to their own My People.
+
+### Live update reuses Kernel 61A's existing socket unchanged
+
+- `frontend/venues/third-place/index.html` opens one `watchPlayerProfile(profileId, ...)` (from `frontend/lib/player-profile-ws.js`, untouched) per visible Headshot card and refetches the whole commons list on any invalidation, rather than patching one card's fields in place. No backend change was needed for this — `/ws/player-profile` was already generic enough to reuse as-is.
+
+### Browser-proof residue
+
+- Disposable accounts `k65_owner_*`, `k65_viewer_*`, `k65_third_*` (one timestamp suffix, the final successful debugging run) remain on the live DB, holding no elevated privileges — left deliberately, per Kernel 62 precedent. Four earlier debugging runs' worth of the same pattern (12 accounts total) were found and deleted before finishing this kernel; if you see more `k65_*` accounts accumulate from a future re-run of `scripts/smoke/kernel65-third-place-browser.js`, the same cleanup is safe (`DELETE FROM users WHERE handle LIKE 'k65_%'` — cascades through the Headshot, relationship, and session rows via `ON DELETE CASCADE`).

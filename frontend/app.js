@@ -174,6 +174,8 @@ function venueHref(slug) {
       return "/venues/greenroom/";
     case "trailers":
       return "/venues/trailers/";
+    case "third-place":
+      return "/venues/third-place/";
     case "producers-office":
       return "/venues/producers-office/";
     case "directors-chair":
@@ -242,6 +244,7 @@ function createVenuePin(venue, assetURL, fallbackPositions) {
     construction: "/assets/construction.png",
     greenroom: "/assets/Greenroom.png",
     trailers: "/assets/trailers.png",
+    "third-place": "/assets/default.png",
     warehouse: "/assets/warehouse.png",
     "producers-office": "/assets/producersoffice.png",
     "directors-chair": "/assets/directorschair.png",
@@ -444,6 +447,7 @@ async function loadVenues() {
       "directors-chair": { x: 55, y: 23 },
       greenroom: { x: 86, y: 47 },
       trailers: { x: 68, y: 15 },
+      "third-place": { x: 60, y: 8 },
       catharsis: { x: 36, y: 69 },
       "victory-theater": { x: 82, y: 75 },
       workshop: { x: 75, y: 33 },

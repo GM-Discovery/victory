@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Third Place — Victory</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #17120e;
+      --panel: rgba(27, 21, 17, 0.92);
+      --panel-strong: rgba(19, 15, 12, 0.96);
+      --line: rgba(255, 233, 197, 0.12);
+      --accent: #f0d3a4;
+      --accent-strong: #fff2d7;
+      --muted: #d0bfa6;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(172, 120, 64, 0.28), transparent 30%),
+        radial-gradient(circle at 85% 0%, rgba(82, 119, 167, 0.18), transparent 28%),
+        linear-gradient(180deg, #17120e 0%, #0e0b09 100%);
+      color: #f6ecdd;
+    }
+
+    .header {
+      padding: 22px 24px 12px;
+      max-width: 1100px;
+      width: 100%;
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: #d7ab6f;
+      font-size: 0.76rem;
+      margin: 0 0 8px;
+    }
+
+    h1 { margin: 0; font-size: clamp(1.9rem, 4vw, 3rem); line-height: 1.05; }
+
+    .subtitle { margin: 10px 0 0; color: var(--muted); max-width: 72ch; line-height: 1.5; }
+
+    .launchbar { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
+
+    .chip {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      border-radius: 999px; text-decoration: none; border: 1px solid var(--line);
+      padding: 11px 16px; color: var(--accent-strong); background: rgba(255, 255, 255, 0.03);
+      font-weight: 700; cursor: pointer; font: inherit;
+    }
+
+    .chip:disabled { opacity: 0.6; cursor: default; }
+
+    .chip.danger { border-color: rgba(240, 130, 100, 0.4); color: #ffd6c4; }
+
+    .stage {
+      max-width: 1100px; width: 100%; margin: 0 auto; padding: 8px 24px 48px;
+      box-sizing: border-box; display: grid; gap: 18px;
+    }
+
+    [hidden] { display: none !important; }
+
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+      padding: 22px; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.24);
+    }
+
+    .my-headshot-status { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px; justify-content: space-between; }
+
+    .my-headshot-status p { margin: 0; color: var(--muted); }
+
+    .my-headshot-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .controls { display: grid; gap: 12px; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); align-items: end; }
+
+    @media (max-width: 720px) {
+      .controls { grid-template-columns: 1fr 1fr; }
+    }
+
+    .control label { display: block; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
+
+    input[type="text"], select {
+      width: 100%; box-sizing: border-box; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+      background: #211913; color: #fff6e9; padding: 12px 14px; font: inherit;
+    }
+
+    .headshot-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px;
+    }
+
+    .headshot-card {
+      background: rgba(255,255,255,0.02); border: 1px solid var(--line); border-radius: 16px;
+      padding: 18px; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box;
+      position: relative;
+    }
+
+    .headshot-card.is-you { border-color: rgba(240, 211, 164, 0.5); }
+
+    .you-badge {
+      position: absolute; top: 14px; right: 14px; border-radius: 999px; padding: 3px 10px;
+      font-size: 0.72rem; font-weight: 700; border: 1px solid rgba(255,255,255,0.24); color: var(--accent);
+      background: rgba(240, 211, 164, 0.1);
+    }
+
+    .headshot-portrait-row { display: flex; align-items: center; gap: 12px; }
+
+    .thumb {
+      width: 64px; height: 64px; border-radius: 12px; object-fit: cover;
+      border: 1px solid rgba(255,255,255,0.12); background: #241b15; flex-shrink: 0;
+    }
+
+    .thumb-empty {
+      width: 64px; height: 64px; border-radius: 12px; display: grid; place-items: center;
+      border: 1px dashed rgba(255,255,255,0.16); color: var(--muted); font-size: 1.4rem; background: #201813;
+      flex-shrink: 0;
+    }
+
+    .headshot-name { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--accent-strong); }
+
+    .headshot-placed { margin: 2px 0 0; color: var(--muted); font-size: 0.82rem; }
+
+    .headshot-facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; color: var(--muted); font-size: 0.86rem; }
+
+    .headshot-facts li { overflow-wrap: anywhere; }
+
+    .headshot-facts .fact-label { color: var(--accent); font-weight: 700; margin-right: 4px; }
+
+    .headshot-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; }
+
+    .headshot-card-actions .chip { padding: 9px 14px; font-size: 0.86rem; }
+
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+    .empty-state h2 { color: #f6ecdd; margin: 0 0 8px; }
+
+    .status-line { color: var(--muted); min-height: 1.4em; }
+
+    .privacy-note { color: var(--muted); font-size: 0.9rem; margin: 12px 0 0; }
+
+    .history-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+
+    .history-row {
+      display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; color: var(--muted); font-size: 0.9rem;
+    }
+
+    .history-row .badge {
+      display: inline-flex; border-radius: 999px; padding: 3px 10px; font-size: 0.76rem; font-weight: 700;
+      border: 1px solid rgba(255,255,255,0.2); color: var(--muted); white-space: nowrap;
+    }
+
+    .history-row .badge.active { color: var(--accent); border-color: rgba(240, 211, 164, 0.4); }
+
+    @media (max-width: 560px) {
+      .headshot-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <header class="header">
+      <p class="eyebrow">Victory / Third Place</p>
+      <h1>Third Place</h1>
+      <p class="subtitle">
+        A shared social commons. Leave one Headshot so other signed-in people can find you, open your Trailer, and add you to their own private My People list. Nothing here is a feed, a wall, or a roster.
+      </p>
+      <div class="launchbar">
+        <a class="chip" href="/venues/trailers/">Trailers</a>
+        <a class="chip" href="/venues/trailers/people.html">My People</a>
+        <a class="chip" href="/account/">Account</a>
+      </div>
+    </header>
+
+    <main class="stage">
+      <p class="status-line" id="status-line">Loading Third Place...</p>
+
+      <section class="card" id="my-headshot-card" hidden>
+        <div class="my-headshot-status">
+          <p id="my-headshot-line">You have not left a Headshot in Third Place yet.</p>
+          <div class="my-headshot-actions">
+            <button class="chip" type="button" id="leave-headshot-button">Leave Headshot</button>
+            <button class="chip danger" type="button" id="remove-headshot-button" hidden>Remove My Headshot</button>
+            <button class="chip" type="button" id="toggle-history-button" hidden>My Headshot History</button>
+          </div>
+        </div>
+        <section id="history-section" hidden>
+          <ul class="history-list" id="history-list"></ul>
+        </section>
+      </section>
+
+      <section class="card" id="controls-card" hidden>
+        <div class="controls">
+          <div class="control">
+            <label for="search-input">Search</label>
+            <input type="text" id="search-input" placeholder="Stage name" />
+          </div>
+          <div class="control">
+            <label for="sort-select">Sort by</label>
+            <select id="sort-select">
+              <option value="recent">Recently placed</option>
+              <option value="name">Stage name</option>
+            </select>
+          </div>
+        </div>
+        <p class="privacy-note">Only active Headshots are shown. Adding someone to My People is private — they are never notified.</p>
+      </section>
+
+      <div class="headshot-grid" id="headshot-grid"></div>
+
+      <section class="card empty-state" id="empty-state" hidden>
+        <h2>Third Place is quiet right now</h2>
+        <p>No one has left a Headshot yet. Be the first — click <strong>Leave Headshot</strong> above.</p>
+      </section>
+
+      <section class="card empty-state" id="no-match-state" hidden>
+        <h2>No matches</h2>
+        <p>No Headshot in Third Place matches your search.</p>
+      </section>
+    </main>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/back-to-map.js"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script src="/lib/player-profile-ws.js"></script>
+  <script>
+    const state = {
+      headshots: [],
+      myHeadshot: null,
+      watchers: [],
+    };
+
+    function formatDate(iso) {
+      if (!iso) return "";
+      try {
+        return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+      } catch (e) {
+        return iso;
+      }
+    }
+
+    function clearWatchers() {
+      for (const watcher of state.watchers) {
+        try { watcher.close(); } catch (e) { /* already closed */ }
+      }
+      state.watchers = [];
+    }
+
+    function applyClientFilters(items) {
+      const query = document.getElementById("search-input").value.trim().toLowerCase();
+      const sort = document.getElementById("sort-select").value;
+
+      let out = items.slice();
+      if (query) {
+        out = out.filter((item) => (item.stage_name || "").toLowerCase().includes(query));
+      }
+      if (sort === "name") {
+        out.sort((a, b) => (a.stage_name || "").localeCompare(b.stage_name || ""));
+      } else {
+        out.sort((a, b) => new Date(b.placed_at) - new Date(a.placed_at));
+      }
+      return out;
+    }
+
+    async function addToMyPeople(profileId, button) {
+      button.disabled = true;
+      try {
+        const response = await fetch("/api/player-relationships", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subject_profile_id: profileId }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok || !payload.data?.relationship?.id) {
+          button.disabled = false;
+          alert("Could not add to My People: " + (payload?.data?.error || `HTTP ${response.status}`));
+          return;
+        }
+        window.location.href = "/venues/trailers/person.html?id=" + encodeURIComponent(payload.data.relationship.id);
+      } catch (error) {
+        console.error("add to my people failed", error);
+        button.disabled = false;
+      }
+    }
+
+    function renderCard(item) {
+      const card = document.createElement("div");
+      card.className = "headshot-card" + (item.is_you ? " is-you" : "");
+
+      if (item.is_you) {
+        const youBadge = document.createElement("span");
+        youBadge.className = "you-badge";
+        youBadge.textContent = "You";
+        card.appendChild(youBadge);
+      }
+
+      const portraitRow = document.createElement("div");
+      portraitRow.className = "headshot-portrait-row";
+      if (item.portrait_url) {
+        const img = document.createElement("img");
+        img.className = "thumb";
+        img.src = item.portrait_url;
+        img.alt = (item.stage_name || "Headshot") + " portrait";
+        portraitRow.appendChild(img);
+      } else {
+        const placeholder = document.createElement("div");
+        placeholder.className = "thumb-empty";
+        placeholder.setAttribute("role", "img");
+        placeholder.setAttribute("aria-label", "No portrait");
+        placeholder.textContent = "☺";
+        portraitRow.appendChild(placeholder);
+      }
+
+      const nameCol = document.createElement("div");
+      const name = document.createElement("p");
+      name.className = "headshot-name";
+      name.textContent = item.stage_name || "Unnamed Player";
+      nameCol.appendChild(name);
+      const placed = document.createElement("p");
+      placed.className = "headshot-placed";
+      placed.textContent = "Placed " + formatDate(item.placed_at);
+      nameCol.appendChild(placed);
+      portraitRow.appendChild(nameCol);
+      card.appendChild(portraitRow);
+
+      if (item.headline_facts && item.headline_facts.length) {
+        const facts = document.createElement("ul");
+        facts.className = "headshot-facts";
+        for (const fact of item.headline_facts) {
+          const li = document.createElement("li");
+          const label = document.createElement("span");
+          label.className = "fact-label";
+          label.textContent = fact.label + ":";
+          li.appendChild(label);
+          li.appendChild(document.createTextNode(" " + fact.value));
+          facts.appendChild(li);
+        }
+        card.appendChild(facts);
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "headshot-card-actions";
+
+      const openLink = document.createElement("a");
+      openLink.className = "chip";
+      openLink.href = item.trailer_url;
+      openLink.textContent = "Open Trailer";
+      actions.appendChild(openLink);
+
+      if (!item.is_you) {
+        if (item.can_open_my_notes && item.relationship_id) {
+          const notesLink = document.createElement("a");
+          notesLink.className = "chip";
+          notesLink.href = "/venues/trailers/person.html?id=" + encodeURIComponent(item.relationship_id);
+          notesLink.textContent = "Open My Notes";
+          actions.appendChild(notesLink);
+        } else if (item.can_add_to_my_people) {
+          const addButton = document.createElement("button");
+          addButton.type = "button";
+          addButton.className = "chip";
+          addButton.textContent = "Add to My People";
+          addButton.addEventListener("click", () => addToMyPeople(item.profile_id, addButton));
+          actions.appendChild(addButton);
+        }
+      }
+
+      card.appendChild(actions);
+      return card;
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById("headshot-grid");
+      grid.innerHTML = "";
+      clearWatchers();
+
+      const filtered = applyClientFilters(state.headshots);
+
+      document.getElementById("empty-state").hidden = state.headshots.length !== 0;
+      document.getElementById("no-match-state").hidden = !(state.headshots.length > 0 && filtered.length === 0);
+
+      for (const item of filtered) {
+        grid.appendChild(renderCard(item));
+        // Live projection refresh (Kernel 61A's existing invalidation
+        // websocket, reused as-is): if this person's Trailer Face changes
+        // while Third Place is open, refetch the whole list rather than
+        // trying to patch one card's fields in place.
+        const watcher = watchPlayerProfile(item.profile_id, () => {
+          fetchHeadshots();
+        });
+        state.watchers.push(watcher);
+      }
+    }
+
+    function renderMyHeadshotStatus() {
+      const line = document.getElementById("my-headshot-line");
+      const leaveButton = document.getElementById("leave-headshot-button");
+      const removeButton = document.getElementById("remove-headshot-button");
+      const historyButton = document.getElementById("toggle-history-button");
+
+      if (state.myHeadshot) {
+        line.textContent = "Your Headshot is visible in Third Place.";
+        leaveButton.hidden = true;
+        removeButton.hidden = false;
+      } else {
+        line.textContent = "You have not left a Headshot in Third Place yet.";
+        leaveButton.hidden = false;
+        removeButton.hidden = true;
+      }
+      historyButton.hidden = false;
+    }
+
+    async function fetchHeadshots() {
+      const statusLine = document.getElementById("status-line");
+      const response = await fetch("/api/third-place/headshots", { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+
+      if (isForbiddenAccessResponse(response, payload)) {
+        showForbiddenScreen();
+        return;
+      }
+      if (!response.ok || !payload?.ok) {
+        statusLine.textContent = "Could not load Third Place.";
+        statusLine.hidden = false;
+        return;
+      }
+
+      state.headshots = (payload.data && payload.data.headshots) || [];
+      statusLine.hidden = true;
+      renderGrid();
+    }
+
+    async function fetchMyHeadshot() {
+      const response = await fetch("/api/third-place/headshots/me", { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (isForbiddenAccessResponse(response, payload)) {
+        showForbiddenScreen();
+        return;
+      }
+      if (!response.ok || !payload?.ok) return;
+      state.myHeadshot = (payload.data && payload.data.headshot) || null;
+      renderMyHeadshotStatus();
+    }
+
+    async function loadHistory() {
+      const list = document.getElementById("history-list");
+      list.innerHTML = "";
+      const response = await fetch("/api/third-place/headshots/me/history", { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) return;
+      const rows = (payload.data && payload.data.history) || [];
+      for (const row of rows) {
+        const li = document.createElement("li");
+        li.className = "history-row";
+        const left = document.createElement("span");
+        left.textContent = "Placed " + formatDate(row.placed_at) + (row.removed_at ? " · Removed " + formatDate(row.removed_at) : "");
+        const badge = document.createElement("span");
+        badge.className = "badge" + (row.status === "active" ? " active" : "");
+        badge.textContent = row.status === "active" ? "Active" : "Removed";
+        li.appendChild(left);
+        li.appendChild(badge);
+        list.appendChild(li);
+      }
+    }
+
+    async function bootstrap() {
+      const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
+      const sessionPayload = await sessionResponse.json().catch(() => null);
+      if (!sessionResponse.ok || !sessionPayload?.ok || !sessionPayload.signed_in) {
+        showForbiddenScreen();
+        return;
+      }
+
+      document.getElementById("my-headshot-card").hidden = false;
+      document.getElementById("controls-card").hidden = false;
+
+      document.getElementById("leave-headshot-button").addEventListener("click", async (event) => {
+        event.target.disabled = true;
+        try {
+          const response = await fetch("/api/third-place/headshots/me", { method: "POST", credentials: "include" });
+          const payload = await response.json().catch(() => null);
+          if (!response.ok || !payload?.ok) {
+            alert("Could not leave a Headshot: " + (payload?.data?.error || `HTTP ${response.status}`));
+            return;
+          }
+          state.myHeadshot = payload.data.headshot;
+          renderMyHeadshotStatus();
+          await fetchHeadshots();
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+
+      document.getElementById("remove-headshot-button").addEventListener("click", async (event) => {
+        event.target.disabled = true;
+        try {
+          const response = await fetch("/api/third-place/headshots/me", { method: "DELETE", credentials: "include" });
+          const payload = await response.json().catch(() => null);
+          if (!response.ok || !payload?.ok) {
+            alert("Could not remove your Headshot: " + (payload?.data?.error || `HTTP ${response.status}`));
+            return;
+          }
+          state.myHeadshot = null;
+          renderMyHeadshotStatus();
+          await fetchHeadshots();
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+
+      document.getElementById("toggle-history-button").addEventListener("click", async () => {
+        const section = document.getElementById("history-section");
+        section.hidden = !section.hidden;
+        if (!section.hidden) await loadHistory();
+      });
+
+      document.getElementById("search-input").addEventListener("input", renderGrid);
+      document.getElementById("sort-select").addEventListener("change", renderGrid);
+
+      await fetchMyHeadshot();
+      await fetchHeadshots();
+    }
+
+    bootstrap().catch((error) => {
+      console.error("third place bootstrap failed", error);
+      document.getElementById("status-line").textContent = "Something went wrong loading Third Place.";
+    });
+  </script>
+</body>
+</html>
