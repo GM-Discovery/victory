@@ -230,17 +230,39 @@ Show Run (Production Run)
   (Kernel 66). Showing and Scene are explicitly separate concepts (see
   below) and are not part of a Show Run's own table.
 
-Showing (live/runtime) vs. future scheduled occurrence
+Show (Show Instance)
+- The concrete playable/viewable instance of a Show Run: a planned future
+  occurrence (no session yet), a live occurrence, a multi-session arc, or a
+  completed/cancelled/archived one. Hierarchy: Production -> Show Run ->
+  Show -> Session(s) -> (later) Scene Configurations.
+- Not the same as a Session (technical live runtime window, `sessions`
+  table) and not the same as a Showing (Kernel 22's live 1:1
+  audience-visibility wrapper around an active session, `showings` table)
+  -- both remain untouched by Kernel 67.
+- Implemented by the `shows` table and backend/internal/shows (Kernel 67).
+  A Show has its own Audience Program (audience_title/
+  audience_program_blurb) but inherits its parent Show Run's roster and
+  authority wholesale -- it has no roster table of its own.
+- `sessions.show_id` is a nullable, manually-set link (not wired into the
+  `/session start` command flow) so a Session can optionally point back at
+  the Show it belongs to.
+
+Showing (live/runtime) vs. Show (scheduling/instance container)
 - "Showing" (Kernel 22, backend/internal/showings) is the live, 1:1 runtime
   wrapper auto-created around an already-active Session -- it controls
-  audience-view visibility and tags actions for replay/review. It is not a
-  scheduling primitive and has no notion of "not yet started."
-- A future pre-live scheduling capability (a Director/table/location
-  occurrence planned ahead of time) must be built by EXTENDING the existing
-  Kernel 22 showings table/package (e.g. adding a scheduled/pre-live status)
-  -- not by creating a second, same-named "Showing" concept elsewhere.
-  Kernel 66 does not implement scheduling; this note exists only to prevent
-  that future collision.
+  audience-view visibility and tags actions for replay/review.
+  `showings.session_id` is NOT NULL UNIQUE and lazily created on first
+  action-write; it has no notion of "not yet started" and is not a
+  scheduling primitive.
+- Kernel 66's note in this dictionary previously predicted that future
+  pre-live scheduling would extend the `showings` table. A live code audit
+  for Kernel 67 found that constraint too risky to loosen (20+ call sites
+  in internal/actions/*.go, network/session_control.go, and
+  identity/{discord_mic,join}.go depend on showings.session_id being
+  non-null and unique). Instead, Kernel 67 built a separate `shows`
+  table/package (see "Show (Show Instance)" above) as the scheduling/
+  instance container, and left `showings` completely untouched. Any future
+  kernel should treat `shows`, not `showings`, as the scheduling primitive.
 
 ---
 

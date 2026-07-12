@@ -403,7 +403,7 @@ func TestAudienceCanViewButNotManage(t *testing.T) {
 		t.Fatalf("load show run: %v", err)
 	}
 
-	canView, err := canViewShowRun(context.Background(), pool, audience, sr.LocationID)
+	canView, err := CanViewShowRun(context.Background(), pool, audience, sr.LocationID)
 	if err != nil {
 		t.Fatalf("can view: %v", err)
 	}
@@ -411,7 +411,7 @@ func TestAudienceCanViewButNotManage(t *testing.T) {
 		t.Fatalf("expected audience member to be able to view the show run")
 	}
 
-	canManage, err := canManageShowRun(context.Background(), pool, audience, sr.LocationID)
+	canManage, err := CanManageShowRun(context.Background(), pool, audience, sr.LocationID)
 	if err != nil {
 		t.Fatalf("can manage: %v", err)
 	}

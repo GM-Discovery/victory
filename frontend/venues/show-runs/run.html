@@ -30,6 +30,9 @@
     .status-line { color: var(--muted); min-height: 1.4em; }
     .badge { display: inline-flex; border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border: 1px solid rgba(255,255,255,0.2); color: var(--muted); text-transform: capitalize; }
     .badge.active { color: var(--accent); border-color: rgba(240, 211, 164, 0.4); }
+    .show-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; }
+    .show-row-title { font-weight: 700; color: var(--accent-strong); }
+    .shows-summary { color: var(--muted); font-size: 0.86rem; margin: 0 0 10px; }
   </style>
 </head>
 <body>
@@ -116,6 +119,25 @@
           <button class="chip" type="button" id="unarchive-button" hidden>Unarchive</button>
         </p>
       </section>
+
+      <section class="card" id="shows-card" hidden>
+        <h2 style="margin-top:0;">Shows</h2>
+        <p class="shows-summary" id="shows-summary"></p>
+        <div id="shows-list"></div>
+        <div class="form-grid" id="create-show-form" hidden>
+          <div class="field span-2">
+            <label for="show-title-input">Title</label>
+            <input type="text" id="show-title-input" placeholder="Opening Night" />
+          </div>
+          <div class="field">
+            <label for="show-slug-input">Slug</label>
+            <input type="text" id="show-slug-input" placeholder="opening-night" />
+          </div>
+        </div>
+        <p class="launchbar" id="create-show-actions" hidden>
+          <button class="chip" type="button" id="create-show-button">Create Show</button>
+        </p>
+      </section>
     </main>
   </div>
 
@@ -141,6 +163,48 @@
       document.getElementById("self-join-checkbox").checked = !!run.audience_self_join_enabled;
       document.getElementById("archive-button").hidden = run.status === "archived";
       document.getElementById("unarchive-button").hidden = run.status !== "archived";
+    }
+
+    async function loadShows(runId, canManage) {
+      const list = document.getElementById("shows-list");
+      const summary = document.getElementById("shows-summary");
+      const response = await fetch("/api/show-runs/" + encodeURIComponent(runId) + "/shows", { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        list.textContent = "Could not load Shows.";
+        return;
+      }
+      const shows = payload.data.shows || [];
+      const s = payload.data.summary || {};
+      summary.textContent = `${s.total || 0} total · ${s.live || 0} live · ${s.upcoming || 0} upcoming · ${s.completed || 0} completed`;
+      list.innerHTML = "";
+      if (shows.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "status-line";
+        empty.textContent = "No Shows yet.";
+        list.appendChild(empty);
+        return;
+      }
+      for (const show of shows) {
+        const row = document.createElement("div");
+        row.className = "show-row";
+        const left = document.createElement("div");
+        const title = document.createElement("div");
+        title.className = "show-row-title";
+        title.textContent = show.title;
+        left.appendChild(title);
+        const badge = document.createElement("span");
+        badge.className = "badge" + (show.status === "live" ? " active" : "");
+        badge.textContent = show.status;
+        left.appendChild(badge);
+        row.appendChild(left);
+        const link = document.createElement("a");
+        link.className = "chip";
+        link.href = (canManage ? "/venues/show-runs/show.html?id=" : "/venues/show-runs/show-program.html?id=") + encodeURIComponent(show.id);
+        link.textContent = canManage ? "Manage" : "View";
+        row.appendChild(link);
+        list.appendChild(row);
+      }
     }
 
     async function bootstrap() {
@@ -172,6 +236,36 @@
       const run = payload.data.show_run;
       const canManage = payload.data.can_manage;
       applyRunToForm(run);
+
+      document.getElementById("shows-card").hidden = false;
+      await loadShows(runId, canManage);
+      if (canManage) {
+        document.getElementById("create-show-form").hidden = false;
+        document.getElementById("create-show-actions").hidden = false;
+        document.getElementById("create-show-button").addEventListener("click", async (event) => {
+          event.target.disabled = true;
+          try {
+            const title = document.getElementById("show-title-input").value.trim();
+            const slug = document.getElementById("show-slug-input").value.trim();
+            if (!title || !slug) { alert("Title and slug are required."); return; }
+            const res = await fetch("/api/show-runs/" + encodeURIComponent(runId) + "/shows", {
+              method: "POST", credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title, slug }),
+            });
+            const p = await res.json().catch(() => null);
+            if (!res.ok || !p?.ok) {
+              alert("Could not create Show: " + (p?.data?.error || `HTTP ${res.status}`));
+              return;
+            }
+            document.getElementById("show-title-input").value = "";
+            document.getElementById("show-slug-input").value = "";
+            await loadShows(runId, canManage);
+          } finally {
+            event.target.disabled = false;
+          }
+        });
+      }
 
       if (canManage) {
         document.getElementById("roster-link").hidden = false;

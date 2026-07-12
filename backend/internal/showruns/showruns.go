@@ -73,7 +73,7 @@ func CreateShowRun(ctx context.Context, pool *pgxpool.Pool, actorUserID, product
 		return ShowRun{}, err
 	}
 
-	ok, err := canManageShowRun(ctx, pool, actorUserID, locationID)
+	ok, err := CanManageShowRun(ctx, pool, actorUserID, locationID)
 	if err != nil {
 		return ShowRun{}, err
 	}
@@ -115,7 +115,7 @@ func UpdateShowRun(ctx context.Context, pool *pgxpool.Pool, actorUserID, showRun
 	if err != nil {
 		return ShowRun{}, err
 	}
-	ok, err := canManageShowRun(ctx, pool, actorUserID, sr.LocationID)
+	ok, err := CanManageShowRun(ctx, pool, actorUserID, sr.LocationID)
 	if err != nil {
 		return ShowRun{}, err
 	}
@@ -242,7 +242,7 @@ func ListShowRunsVisibleToUser(ctx context.Context, pool *pgxpool.Pool, viewerUs
 		}
 		canManage := isOperator
 		if !canManage {
-			canManage, err = canManageShowRun(ctx, pool, viewerUserID, sr.LocationID)
+			canManage, err = CanManageShowRun(ctx, pool, viewerUserID, sr.LocationID)
 			if err != nil {
 				return nil, err
 			}

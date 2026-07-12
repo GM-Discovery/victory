@@ -129,6 +129,7 @@ migrations=(
   "$ROOT/database/migrations/037_kernel62_player_relationships.sql"
   "$ROOT/database/migrations/038_kernel65_third_place.sql"
   "$ROOT/database/migrations/039_kernel66_show_runs.sql"
+  "$ROOT/database/migrations/040_kernel67_shows.sql"
 )
 
 for migration in "${migrations[@]}"; do
@@ -724,5 +725,88 @@ for file in \
   fi
 done
 echo "PASS Show Runs page files exist"
+
+# --- Kernel 67: Show Instance Model and Show Run Bridge ---
+# Reuses the fixture Show Run ($show_run_id), Producer A ($raw_session),
+# and Audience B ($second_session) already established by the Kernel 66
+# block above.
+
+anon_shows_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}/shows")"
+if [[ "$anon_shows_status" != "401" ]]; then
+  echo "expected anonymous Shows list to return 401, got $anon_shows_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS Shows list rejects anonymous requests"
+
+create_show_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}/shows" \
+  -d '{"title":"Fresh Install Test Show","slug":"fresh-install-test-show"}')"
+if [[ "$create_show_status" != "200" ]]; then
+  echo "expected Producer A to create a Show, got $create_show_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+show_id="$(grep -o '"id":"[^"]*"' "$BODY_OUT" | head -n1 | sed 's/"id":"//;s/"$//')"
+if [[ -z "$show_id" ]]; then
+  echo "failed to extract show id" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS Producer A created a Show ($show_id)"
+
+show_detail_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" "http://127.0.0.1:${BACKEND_PORT}/api/shows/${show_id}")"
+if [[ "$show_detail_status" != "200" || "$(cat "$BODY_OUT")" != *'"can_manage":true'* ]]; then
+  echo "expected Show detail to return can_manage:true for Producer A, got $show_detail_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS Show detail fetch confirms manage authority"
+
+patch_show_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X PATCH "http://127.0.0.1:${BACKEND_PORT}/api/shows/${show_id}" \
+  -d '{"audience_title":"Opening Night","audience_program_blurb":"A very good show.","status":"scheduled"}')"
+if [[ "$patch_show_status" != "200" || "$(cat "$BODY_OUT")" != *'"audience_title":"Opening Night"'* ]]; then
+  echo "expected Show PATCH to round-trip audience_title, got $patch_show_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS Show PATCH round-trips audience_title/blurb/status (snake_case JSON confirmed)"
+
+show_program_response="$(curl -s -H "Cookie: victory_session=$second_session" "http://127.0.0.1:${BACKEND_PORT}/api/shows/${show_id}/program")"
+if [[ "$show_program_response" != *'"audience_title":"Opening Night"'* ]]; then
+  echo "expected Show Program to include this Show's own audience_title" >&2
+  echo "$show_program_response" >&2
+  exit 1
+fi
+if [[ "$show_program_response" == *'"added_by_user_id"'* ]]; then
+  echo "Show Program payload must not expose internal-only roster fields" >&2
+  echo "$show_program_response" >&2
+  exit 1
+fi
+echo "PASS Show Program is curated and Show-specific"
+
+archive_show_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/shows/${show_id}/archive")"
+if [[ "$archive_show_status" != "200" || "$(cat "$BODY_OUT")" != *'"status":"archived"'* ]]; then
+  echo "expected Show archive to return status:archived, got $archive_show_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS Show archive sets status and archived_at"
+
+for file in \
+  frontend/venues/show-runs/show.html \
+  frontend/venues/show-runs/show-program.html; do
+  if [[ ! -f "$ROOT/$file" ]]; then
+    echo "missing required file: $file" >&2
+    exit 1
+  fi
+done
+echo "PASS Show page files exist"
 
 echo "PASS clean-install smoke complete"

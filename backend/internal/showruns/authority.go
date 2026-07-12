@@ -9,11 +9,11 @@ import (
 	"victory/backend/internal/access"
 )
 
-// canManageShowRun mirrors network/director_console.go's
+// CanManageShowRun mirrors network/director_console.go's
 // canAccessDirectorConsole pattern, substituting the location-scoped role
 // lookup so a Producer/Director at one location cannot manage a Show Run at
 // a different location.
-func canManageShowRun(ctx context.Context, pool *pgxpool.Pool, userID, locationID string) (bool, error) {
+func CanManageShowRun(ctx context.Context, pool *pgxpool.Pool, userID, locationID string) (bool, error) {
 	if ok, err := access.IsOperatorUser(ctx, pool, userID); err != nil {
 		return false, err
 	} else if ok {
@@ -32,9 +32,9 @@ func canManageShowRun(ctx context.Context, pool *pgxpool.Pool, userID, locationI
 	}
 }
 
-// canViewShowRun is any active membership at the run's location, or
+// CanViewShowRun is any active membership at the run's location, or
 // Operator -- the minimum bar to see the Audience Program at all.
-func canViewShowRun(ctx context.Context, pool *pgxpool.Pool, userID, locationID string) (bool, error) {
+func CanViewShowRun(ctx context.Context, pool *pgxpool.Pool, userID, locationID string) (bool, error) {
 	if ok, err := access.IsOperatorUser(ctx, pool, userID); err != nil {
 		return false, err
 	} else if ok {

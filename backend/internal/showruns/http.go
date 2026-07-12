@@ -149,12 +149,12 @@ func HandleByID(pool *pgxpool.Pool) http.HandlerFunc {
 				writeError(w, err)
 				return
 			}
-			canManage, err := canManageShowRun(ctx, pool, userID, sr.LocationID)
+			canManage, err := CanManageShowRun(ctx, pool, userID, sr.LocationID)
 			if err != nil {
 				writeError(w, err)
 				return
 			}
-			canView, err := canViewShowRun(ctx, pool, userID, sr.LocationID)
+			canView, err := CanViewShowRun(ctx, pool, userID, sr.LocationID)
 			if err != nil {
 				writeError(w, err)
 				return
@@ -266,7 +266,7 @@ func HandleRosterCollection(pool *pgxpool.Pool) http.HandlerFunc {
 
 		switch r.Method {
 		case http.MethodGet:
-			canManage, err := canManageShowRun(ctx, pool, userID, sr.LocationID)
+			canManage, err := CanManageShowRun(ctx, pool, userID, sr.LocationID)
 			if err != nil {
 				writeError(w, err)
 				return
@@ -408,7 +408,7 @@ func HandleSelfJoin(pool *pgxpool.Pool) http.HandlerFunc {
 
 // HandleAudienceProgram handles GET /api/show-runs/{id}/audience-program --
 // the curated view, available to any viewer with access to the run
-// (canViewShowRun), not just managers.
+// (CanViewShowRun), not just managers.
 func HandleAudienceProgram(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -428,7 +428,7 @@ func HandleAudienceProgram(pool *pgxpool.Pool) http.HandlerFunc {
 			writeError(w, err)
 			return
 		}
-		canView, err := canViewShowRun(ctx, pool, userID, sr.LocationID)
+		canView, err := CanViewShowRun(ctx, pool, userID, sr.LocationID)
 		if err != nil {
 			writeError(w, err)
 			return

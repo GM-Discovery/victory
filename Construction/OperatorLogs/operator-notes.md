@@ -808,3 +808,19 @@ These are four distinct layers — do not conflate them:
 ### New users get an active Audience location membership automatically
 
 - Observed live, not by reading signup code: a freshly signed-up disposable account could immediately self-join a Show Run as Audience and saw the `show-runs` venue tile with zero manual role grant. This implies signup auto-grants an active `audience` `location_memberships` row at the neutral install location. Kernel 66 relied on this being consistent with `HasActiveLocationMembership`'s semantics but did not investigate or change the signup flow itself — worth confirming explicitly if a future kernel's authority model depends on it.
+
+## Kernel 67 — Show Instance Model and Show Run Bridge
+
+### `showings` was audited and deliberately left untouched — `shows` is a new, separate table
+
+- Kernel 66's own dictionary note predicted that a future pre-live scheduling capability would extend the Kernel 22 `showings` table. Kernel 67 tested that prediction against the real code before trusting it, and found it unsafe: `showings.session_id` is `NOT NULL UNIQUE REFERENCES sessions(id)`, lazily created on first action-write via `EnsureForSession`, and read/written from 20+ call sites (every file in `backend/internal/actions/`, `network/session_control.go`, `identity/discord_mic.go`, `identity/join.go`). Loosening that constraint to let a Show exist before any session does would have touched all of them.
+- **Lesson for future kernels: a prior kernel's own dictionary note is a prediction, not a fact — verify it against the current code before building on it, the same way you'd verify any other assumption.** This is the second time in two kernels this has mattered (Kernel 66 corrected an assumption in the *original* draft spec; Kernel 67 corrected an assumption *Kernel 66itself* had written down).
+- The actual model built: a new `shows` table (`show_run_id → show_runs`, 7-value status enum distinct from Show Run's 5), plus a nullable `sessions.show_id` column. `showings` was not renamed, not schema-altered, and no existing call site referencing it was touched.
+
+### Authority functions were exported, breaking the usual small-helper-duplication convention on purpose
+
+- `backend/internal/showruns/authority.go`'s `canManageShowRun`/`canViewShowRun` were renamed to `CanManageShowRun`/`CanViewShowRun` (exported) specifically so `backend/internal/shows` could call the identical location-scoped authority check Kernel 66 built, rather than writing a second copy. This codebase's usual convention (see Kernel 66's `resolveProfileUserID` comment) is to duplicate tiny helpers per-package rather than introduce cross-package coupling for small things — that convention was deliberately broken here because authority/authorization logic drifting between two near-identical copies is a correctness and security risk, not a stylistic one. If you're searching for the old lowercase names and can't find them, this is why.
+
+### Regression-testing an additive column is still worth doing explicitly
+
+- Adding `sessions.show_id` as a nullable column is about as low-risk as a schema change gets, but Kernel 67 still explicitly re-ran the full `internal/network` and `internal/actions` suites (not just the new `internal/shows` tests) before calling this PASS, rather than assuming "nullable and additive" was self-evidently safe. It was — no regression — but the verification took two extra minutes and removed all doubt from the reportback.

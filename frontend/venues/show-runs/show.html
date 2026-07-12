@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Show — Victory</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    :root { color-scheme: dark; --bg: #17120e; --panel: rgba(27, 21, 17, 0.92); --line: rgba(255, 233, 197, 0.12); --accent: #f0d3a4; --accent-strong: #fff2d7; --muted: #d0bfa6; }
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: linear-gradient(180deg, #17120e 0%, #0e0b09 100%); color: #f6ecdd; }
+    .header { padding: 22px 24px 12px; max-width: 900px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+    .eyebrow { text-transform: uppercase; letter-spacing: 0.18em; color: #d7ab6f; font-size: 0.76rem; margin: 0 0 8px; }
+    h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.4rem); }
+    .launchbar { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
+    .chip { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; text-decoration: none; border: 1px solid var(--line); padding: 11px 16px; color: var(--accent-strong); background: rgba(255, 255, 255, 0.03); font-weight: 700; cursor: pointer; font: inherit; }
+    .chip:disabled { opacity: 0.6; cursor: default; }
+    .chip.danger { border-color: rgba(240, 130, 100, 0.4); color: #ffd6c4; }
+    .stage { max-width: 900px; width: 100%; margin: 0 auto; padding: 8px 24px 48px; box-sizing: border-box; display: grid; gap: 18px; }
+    [hidden] { display: none !important; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 22px; }
+    .form-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
+    .field.span-2 { grid-column: span 2; }
+    @media (max-width: 640px) { .field.span-2 { grid-column: span 1; } }
+    label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); display: block; margin-bottom: 6px; }
+    input[type="text"], input[type="datetime-local"], textarea, select { box-sizing: border-box; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: #211913; color: #fff6e9; padding: 12px 14px; font: inherit; width: 100%; }
+    textarea { resize: vertical; min-height: 60px; }
+    .status-line { color: var(--muted); min-height: 1.4em; }
+    .badge { display: inline-flex; border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border: 1px solid rgba(255,255,255,0.2); color: var(--muted); text-transform: capitalize; }
+    .badge.active { color: var(--accent); border-color: rgba(240, 211, 164, 0.4); }
+    .link-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <header class="header">
+      <p class="eyebrow">Victory / Show Runs / Show</p>
+      <h1 id="show-title">Loading…</h1>
+      <p><span class="badge" id="show-status-badge"></span></p>
+      <div class="launchbar">
+        <a class="chip" id="run-link" href="#">Back to Show Run</a>
+        <a class="chip" id="program-link" href="#">Audience Program</a>
+      </div>
+    </header>
+
+    <main class="stage">
+      <p class="status-line" id="status-line">Loading Show...</p>
+
+      <section class="card" id="readonly-card" hidden>
+        <p id="readonly-description" class="status-line"></p>
+      </section>
+
+      <section class="card" id="manage-card" hidden>
+        <h2 style="margin-top:0;">Manage</h2>
+        <div class="form-grid">
+          <div class="field span-2">
+            <label for="title-input">Title</label>
+            <input type="text" id="title-input" />
+          </div>
+          <div class="field span-2">
+            <label for="description-input">Backstage Description</label>
+            <textarea id="description-input"></textarea>
+          </div>
+          <div class="field span-2">
+            <label for="audience-title-input">Audience Title</label>
+            <input type="text" id="audience-title-input" />
+          </div>
+          <div class="field span-2">
+            <label for="audience-blurb-input">Audience Program Blurb</label>
+            <textarea id="audience-blurb-input"></textarea>
+          </div>
+          <div class="field">
+            <label for="status-select">Status</label>
+            <select id="status-select">
+              <option value="draft">Draft</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="live">Live</option>
+              <option value="paused">Paused</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="scheduled-start-input">Scheduled Start</label>
+            <input type="datetime-local" id="scheduled-start-input" />
+          </div>
+          <div class="field">
+            <label for="scheduled-end-input">Scheduled End</label>
+            <input type="datetime-local" id="scheduled-end-input" />
+          </div>
+        </div>
+        <p class="launchbar">
+          <button class="chip" type="button" id="save-button">Save Changes</button>
+          <button class="chip danger" type="button" id="archive-button">Archive</button>
+        </p>
+      </section>
+
+      <section class="card" id="session-card" hidden>
+        <h2 style="margin-top:0;">Session Link</h2>
+        <p class="status-line">Point a technical live Session at this Show. This does not start or stop a session — it only records the association.</p>
+        <div class="link-row">
+          <div class="field">
+            <label for="session-id-input">Session ID</label>
+            <input type="text" id="session-id-input" placeholder="Paste a session id" />
+          </div>
+          <button class="chip" type="button" id="link-session-button">Link</button>
+          <button class="chip danger" type="button" id="unlink-session-button">Unlink</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/back-to-map.js"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script>
+    function showIdFromQuery() {
+      return new URLSearchParams(window.location.search).get("id") || "";
+    }
+
+    // datetime-local has no timezone; round-trip via ISO strings the way
+    // this app already treats optional text fields (empty string clears).
+    function isoToLocalInputValue(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+    function localInputValueToIso(value) {
+      if (!value) return "";
+      const d = new Date(value);
+      return isNaN(d.getTime()) ? "" : d.toISOString();
+    }
+
+    function applyShowToForm(show) {
+      document.getElementById("show-title").textContent = show.title;
+      const badge = document.getElementById("show-status-badge");
+      badge.textContent = show.status;
+      badge.className = "badge" + (show.status === "live" ? " active" : "");
+      document.getElementById("title-input").value = show.title;
+      document.getElementById("description-input").value = show.description || "";
+      document.getElementById("audience-title-input").value = show.audience_title || "";
+      document.getElementById("audience-blurb-input").value = show.audience_program_blurb || "";
+      document.getElementById("status-select").value = show.status;
+      document.getElementById("scheduled-start-input").value = isoToLocalInputValue(show.scheduled_start_at);
+      document.getElementById("scheduled-end-input").value = isoToLocalInputValue(show.scheduled_end_at);
+    }
+
+    async function bootstrap() {
+      const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
+      const sessionPayload = await sessionResponse.json().catch(() => null);
+      if (!sessionResponse.ok || !sessionPayload?.ok || !sessionPayload.signed_in) {
+        showForbiddenScreen();
+        return;
+      }
+
+      const showId = showIdFromQuery();
+      if (!showId) {
+        document.getElementById("status-line").textContent = "No Show specified.";
+        return;
+      }
+      document.getElementById("program-link").href = "/venues/show-runs/show-program.html?id=" + encodeURIComponent(showId);
+
+      const response = await fetch("/api/shows/" + encodeURIComponent(showId), { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (isForbiddenAccessResponse(response, payload)) { showForbiddenScreen(); return; }
+      if (!response.ok || !payload?.ok) {
+        document.getElementById("status-line").textContent = "Could not load Show.";
+        return;
+      }
+      document.getElementById("status-line").hidden = true;
+
+      const show = payload.data.show;
+      const canManage = payload.data.can_manage;
+      applyShowToForm(show);
+      document.getElementById("run-link").href = "/venues/show-runs/run.html?id=" + encodeURIComponent(show.show_run_id);
+
+      if (!canManage) {
+        document.getElementById("readonly-card").hidden = false;
+        document.getElementById("readonly-description").textContent = show.description || "No description.";
+        return;
+      }
+
+      document.getElementById("manage-card").hidden = false;
+      document.getElementById("session-card").hidden = false;
+
+      async function patch(body) {
+        const res = await fetch("/api/shows/" + encodeURIComponent(showId), {
+          method: "PATCH", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const p = await res.json().catch(() => null);
+        if (!res.ok || !p?.ok) {
+          alert("Could not update Show: " + (p?.data?.error || `HTTP ${res.status}`));
+          return null;
+        }
+        applyShowToForm(p.data.show);
+        return p.data.show;
+      }
+
+      document.getElementById("save-button").addEventListener("click", async (event) => {
+        event.target.disabled = true;
+        try {
+          await patch({
+            title: document.getElementById("title-input").value.trim(),
+            description: document.getElementById("description-input").value.trim(),
+            audience_title: document.getElementById("audience-title-input").value.trim(),
+            audience_program_blurb: document.getElementById("audience-blurb-input").value.trim(),
+            status: document.getElementById("status-select").value,
+            scheduled_start_at: localInputValueToIso(document.getElementById("scheduled-start-input").value),
+            scheduled_end_at: localInputValueToIso(document.getElementById("scheduled-end-input").value),
+          });
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+
+      document.getElementById("archive-button").addEventListener("click", async (event) => {
+        event.target.disabled = true;
+        try {
+          const res = await fetch("/api/shows/" + encodeURIComponent(showId) + "/archive", { method: "POST", credentials: "include" });
+          const p = await res.json().catch(() => null);
+          if (res.ok && p?.ok) applyShowToForm(p.data.show);
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+
+      document.getElementById("link-session-button").addEventListener("click", async (event) => {
+        event.target.disabled = true;
+        try {
+          const sid = document.getElementById("session-id-input").value.trim();
+          if (!sid) { alert("Enter a session id."); return; }
+          const res = await fetch(`/api/shows/${encodeURIComponent(showId)}/sessions/${encodeURIComponent(sid)}/link`, { method: "POST", credentials: "include" });
+          const p = await res.json().catch(() => null);
+          if (!res.ok || !p?.ok) { alert("Could not link session: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+          alert("Session linked.");
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+
+      document.getElementById("unlink-session-button").addEventListener("click", async (event) => {
+        event.target.disabled = true;
+        try {
+          const sid = document.getElementById("session-id-input").value.trim();
+          if (!sid) { alert("Enter a session id."); return; }
+          const res = await fetch(`/api/shows/${encodeURIComponent(showId)}/sessions/${encodeURIComponent(sid)}/unlink`, { method: "POST", credentials: "include" });
+          const p = await res.json().catch(() => null);
+          if (!res.ok || !p?.ok) { alert("Could not unlink session: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+          alert("Session unlinked.");
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+    }
+
+    bootstrap().catch((error) => {
+      console.error("show detail bootstrap failed", error);
+      document.getElementById("status-line").textContent = "Something went wrong loading this Show.";
+    });
+  </script>
+</body>
+</html>

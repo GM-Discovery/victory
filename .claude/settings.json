@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go build *)",
+      "Bash(go test *)",
+      "Bash(go vet *)",
+      "Bash(node --check *)",
+      "Bash(gofmt -l *)",
+      "Bash(go doc *)",
+      "Bash(bash -n *)",
+      "Bash(docker exec victory-backend wget -qO- http://127.0.0.1:8081/health)"
+    ]
+  }
+}

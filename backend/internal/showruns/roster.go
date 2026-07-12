@@ -59,7 +59,7 @@ func AddRosterMember(ctx context.Context, pool *pgxpool.Pool, actorUserID, showR
 	if err != nil {
 		return RosterMember{}, err
 	}
-	ok, err := canManageShowRun(ctx, pool, actorUserID, sr.LocationID)
+	ok, err := CanManageShowRun(ctx, pool, actorUserID, sr.LocationID)
 	if err != nil {
 		return RosterMember{}, err
 	}
@@ -110,7 +110,7 @@ func UpdateRosterMemberRole(ctx context.Context, pool *pgxpool.Pool, actorUserID
 	if err != nil {
 		return RosterMember{}, err
 	}
-	ok, err := canManageShowRun(ctx, pool, actorUserID, sr.LocationID)
+	ok, err := CanManageShowRun(ctx, pool, actorUserID, sr.LocationID)
 	if err != nil {
 		return RosterMember{}, err
 	}
@@ -139,7 +139,7 @@ func RemoveRosterMember(ctx context.Context, pool *pgxpool.Pool, actorUserID, sh
 	if err != nil {
 		return err
 	}
-	ok, err := canManageShowRun(ctx, pool, actorUserID, sr.LocationID)
+	ok, err := CanManageShowRun(ctx, pool, actorUserID, sr.LocationID)
 	if err != nil {
 		return err
 	}

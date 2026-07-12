@@ -30,7 +30,7 @@ func BlockUser(ctx context.Context, pool *pgxpool.Pool, actorUserID, showRunID, 
 	if err != nil {
 		return AudienceBlock{}, err
 	}
-	ok, err := canManageShowRun(ctx, pool, actorUserID, sr.LocationID)
+	ok, err := CanManageShowRun(ctx, pool, actorUserID, sr.LocationID)
 	if err != nil {
 		return AudienceBlock{}, err
 	}
@@ -58,7 +58,7 @@ func UnblockUser(ctx context.Context, pool *pgxpool.Pool, actorUserID, showRunID
 	if err != nil {
 		return err
 	}
-	ok, err := canManageShowRun(ctx, pool, actorUserID, sr.LocationID)
+	ok, err := CanManageShowRun(ctx, pool, actorUserID, sr.LocationID)
 	if err != nil {
 		return err
 	}

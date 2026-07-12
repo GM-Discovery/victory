@@ -39,6 +39,7 @@ import (
 	"victory/backend/internal/profiles"
 	"victory/backend/internal/showings"
 	"victory/backend/internal/showruns"
+	"victory/backend/internal/shows"
 	"victory/backend/internal/thirdplace"
 	"victory/backend/internal/venues"
 	"victory/backend/internal/world"
@@ -190,6 +191,14 @@ func main() {
 	mux.HandleFunc("GET /api/show-runs/{id}/audience-program", showruns.HandleAudienceProgram(pool))
 	mux.HandleFunc("POST /api/show-runs/{id}/blocks", showruns.HandleBlock(pool))
 	mux.HandleFunc("DELETE /api/show-runs/{id}/blocks/{block_id}", showruns.HandleUnblock(pool))
+	mux.HandleFunc("GET /api/show-runs/{show_run_id}/shows", shows.HandleShowRunShows(pool))
+	mux.HandleFunc("POST /api/show-runs/{show_run_id}/shows", shows.HandleShowRunShows(pool))
+	mux.HandleFunc("GET /api/shows/{show_id}", shows.HandleShowByID(pool))
+	mux.HandleFunc("PATCH /api/shows/{show_id}", shows.HandleShowByID(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/archive", shows.HandleShowArchive(pool))
+	mux.HandleFunc("GET /api/shows/{show_id}/program", shows.HandleShowProgram(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/sessions/{session_id}/link", shows.HandleShowSessionLink(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/sessions/{session_id}/unlink", shows.HandleShowSessionUnlink(pool))
 	mux.HandleFunc("GET /api/characters/parentage-chart", characters.HandleParentageChart())
 	mux.HandleFunc("GET /api/characters/chapter2-rules", characters.HandleChapter2Rules())
 	mux.HandleFunc("GET /api/character-cards/me", characters.HandleMyCharacterCards(pool))
