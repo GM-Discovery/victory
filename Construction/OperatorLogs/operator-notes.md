@@ -786,3 +786,25 @@ These are four distinct layers — do not conflate them:
 ### Browser-proof residue
 
 - Disposable accounts `k65_owner_*`, `k65_viewer_*`, `k65_third_*` (one timestamp suffix, the final successful debugging run) remain on the live DB, holding no elevated privileges — left deliberately, per Kernel 62 precedent. Four earlier debugging runs' worth of the same pattern (12 accounts total) were found and deleted before finishing this kernel; if you see more `k65_*` accounts accumulate from a future re-run of `scripts/smoke/kernel65-third-place-browser.js`, the same cleanup is safe (`DELETE FROM users WHERE handle LIKE 'k65_%'` — cascades through the Headshot, relationship, and session rows via `ON DELETE CASCADE`).
+
+## Kernel 66 — Show Run, Audience Program, and Roster MVP
+
+### JSON struct tags are load-bearing, not cosmetic
+
+- A Go struct returned directly through `writeOK(w, map[string]any{"show_run": sr})` must carry `json:"snake_case"` tags on every field, or `encoding/json`'s default (the capitalized Go field name, e.g. `"ID"`, `"ShowFormat"`) ships to the frontend silently wrong. This actually happened: `ShowRun`, `RosterMember`, and `AudienceBlock` in `backend/internal/showruns/types.go` were written without tags, compiled fine, and passed every unit test — because the tests assert on Go struct fields directly, never on marshaled JSON. It only surfaced when `fresh-install.sh --local`'s new HTTP-level assertions tried to parse a real response body. **Lesson: a struct that will ever cross an `http.HandlerFunc` boundary needs `json` tags from the moment it's written, and only an actual HTTP round-trip (fresh-install, live proof, or an HTTP-layer test asserting on raw response bytes) will catch a missing one.**
+
+### `fresh-install.sh`'s migration list is a hardcoded array, not a glob
+
+- `scripts/smoke/fresh-install.sh` applies migrations from a literal bash array (`migrations=(...)`), not by globbing `database/migrations/*.sql`. A new migration file existing on disk is not enough — it must be added to that array explicitly, or fresh-install silently stops one migration short with no error. Kernel 66's migration 039 was missed on the first run this way; caught only because the subsequent Show Run assertions failed with a table-does-not-exist-shaped error.
+
+### No in-app Production-creation flow exists anywhere
+
+- Both `producers-office`'s existing production picker and this kernel's own Show Run creation form only ever *consume* `GET /api/productions` — there is no endpoint or UI anywhere in Victory that creates a `productions` row. `grep -rn "INSERT INTO productions"` across the whole backend only turns up test fixtures. On a genuinely fresh install, `/api/productions` returns an empty list and neither producers-office nor Show Runs' create form has anything to offer. This is a pre-existing gap, not something Kernel 66 introduced; both `fresh-install.sh` and the live proof for this kernel worked around it by inserting a fixture/using a real pre-existing production directly. Worth a future kernel if it starts blocking real onboarding.
+
+### Location-scoped vs. global authority
+
+- `access.CurrentLocationRole(ctx, pool, userID)` (Kernel-16-era) ignores which location is actually in play — it returns the caller's single globally-best active role across *every* location they belong to. This was fine for `network/director_console.go`'s single-location-install use case but would be a real authority bug for Show Runs, where a Producer at one location must not manage a run at a different one. `access.CurrentLocationRoleForLocation(ctx, pool, userID, locationID)` (new) adds the missing `location_id` filter; `access.HasActiveLocationMembership` and `access.HasAnyManageableLocation` round out the set. Any future location-scoped feature should use the new functions, not `CurrentLocationRole`.
+
+### New users get an active Audience location membership automatically
+
+- Observed live, not by reading signup code: a freshly signed-up disposable account could immediately self-join a Show Run as Audience and saw the `show-runs` venue tile with zero manual role grant. This implies signup auto-grants an active `audience` `location_memberships` row at the neutral install location. Kernel 66 relied on this being consistent with `HasActiveLocationMembership`'s semantics but did not investigate or change the signup flow itself — worth confirming explicitly if a future kernel's authority model depends on it.

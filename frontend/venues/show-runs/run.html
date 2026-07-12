@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Show Run — Victory</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    :root { color-scheme: dark; --bg: #17120e; --panel: rgba(27, 21, 17, 0.92); --line: rgba(255, 233, 197, 0.12); --accent: #f0d3a4; --accent-strong: #fff2d7; --muted: #d0bfa6; }
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: linear-gradient(180deg, #17120e 0%, #0e0b09 100%); color: #f6ecdd; }
+    .header { padding: 22px 24px 12px; max-width: 900px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+    .eyebrow { text-transform: uppercase; letter-spacing: 0.18em; color: #d7ab6f; font-size: 0.76rem; margin: 0 0 8px; }
+    h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.4rem); }
+    .launchbar { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
+    .chip { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; text-decoration: none; border: 1px solid var(--line); padding: 11px 16px; color: var(--accent-strong); background: rgba(255, 255, 255, 0.03); font-weight: 700; cursor: pointer; font: inherit; }
+    .chip:disabled { opacity: 0.6; cursor: default; }
+    .chip.danger { border-color: rgba(240, 130, 100, 0.4); color: #ffd6c4; }
+    .stage { max-width: 900px; width: 100%; margin: 0 auto; padding: 8px 24px 48px; box-sizing: border-box; display: grid; gap: 18px; }
+    [hidden] { display: none !important; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 22px; }
+    .form-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
+    .field.span-2 { grid-column: span 2; }
+    @media (max-width: 640px) { .field.span-2 { grid-column: span 1; } }
+    label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); display: block; margin-bottom: 6px; }
+    input[type="text"], input[type="checkbox"], textarea, select { box-sizing: border-box; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: #211913; color: #fff6e9; padding: 12px 14px; font: inherit; }
+    input[type="text"], textarea, select { width: 100%; }
+    textarea { resize: vertical; min-height: 60px; }
+    .checkbox-row { display: flex; align-items: center; gap: 10px; }
+    .status-line { color: var(--muted); min-height: 1.4em; }
+    .badge { display: inline-flex; border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border: 1px solid rgba(255,255,255,0.2); color: var(--muted); text-transform: capitalize; }
+    .badge.active { color: var(--accent); border-color: rgba(240, 211, 164, 0.4); }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <header class="header">
+      <p class="eyebrow">Victory / Show Runs</p>
+      <h1 id="run-title">Loading…</h1>
+      <p><span class="badge" id="run-status-badge"></span></p>
+      <div class="launchbar">
+        <a class="chip" href="/venues/show-runs/">All Show Runs</a>
+        <a class="chip" id="roster-link" href="#" hidden>Manage Roster</a>
+        <a class="chip" id="program-link" href="#">Audience Program</a>
+      </div>
+    </header>
+
+    <main class="stage">
+      <p class="status-line" id="status-line">Loading Show Run...</p>
+
+      <section class="card" id="readonly-card" hidden>
+        <p id="readonly-description" class="status-line"></p>
+        <p class="status-line" id="readonly-meta"></p>
+      </section>
+
+      <section class="card" id="manage-card" hidden>
+        <h2 style="margin-top:0;">Manage</h2>
+        <div class="form-grid">
+          <div class="field span-2">
+            <label for="title-input">Title</label>
+            <input type="text" id="title-input" />
+          </div>
+          <div class="field span-2">
+            <label for="description-input">Description</label>
+            <textarea id="description-input"></textarea>
+          </div>
+          <div class="field">
+            <label for="format-select">Show Format</label>
+            <select id="format-select">
+              <option value="one-shot">One-shot</option>
+              <option value="campaign">Campaign</option>
+              <option value="mini-series">Mini-series</option>
+              <option value="seasonal-release">Seasonal release</option>
+              <option value="random-drop">Random drop</option>
+              <option value="workshop">Workshop</option>
+              <option value="character-making">Character-making</option>
+              <option value="playtest">Playtest</option>
+              <option value="custom">Custom...</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="custom-format-input">Custom format label</label>
+            <input type="text" id="custom-format-input" />
+          </div>
+          <div class="field">
+            <label for="cohort-input">Cohort name</label>
+            <input type="text" id="cohort-input" />
+          </div>
+          <div class="field">
+            <label for="status-select">Status</label>
+            <select id="status-select">
+              <option value="planning">Planning</option>
+              <option value="active">Active</option>
+              <option value="paused">Paused</option>
+              <option value="completed">Completed</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+          <div class="field span-2 checkbox-row">
+            <input type="checkbox" id="self-join-checkbox" />
+            <label for="self-join-checkbox" style="margin:0;">Allow Audience self-join</label>
+          </div>
+        </div>
+        <p class="launchbar">
+          <button class="chip" type="button" id="save-button">Save Changes</button>
+          <button class="chip danger" type="button" id="archive-button">Archive</button>
+          <button class="chip" type="button" id="unarchive-button" hidden>Unarchive</button>
+        </p>
+      </section>
+    </main>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/back-to-map.js"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script>
+    function runIdFromQuery() {
+      return new URLSearchParams(window.location.search).get("id") || "";
+    }
+
+    function applyRunToForm(run) {
+      document.getElementById("run-title").textContent = run.title;
+      const badge = document.getElementById("run-status-badge");
+      badge.textContent = run.status;
+      badge.className = "badge" + (run.status === "active" ? " active" : "");
+      document.getElementById("title-input").value = run.title;
+      document.getElementById("description-input").value = run.description || "";
+      document.getElementById("format-select").value = run.show_format;
+      document.getElementById("custom-format-input").value = run.custom_show_format || "";
+      document.getElementById("cohort-input").value = run.cohort_name || "";
+      document.getElementById("status-select").value = run.status;
+      document.getElementById("self-join-checkbox").checked = !!run.audience_self_join_enabled;
+      document.getElementById("archive-button").hidden = run.status === "archived";
+      document.getElementById("unarchive-button").hidden = run.status !== "archived";
+    }
+
+    async function bootstrap() {
+      const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
+      const sessionPayload = await sessionResponse.json().catch(() => null);
+      if (!sessionResponse.ok || !sessionPayload?.ok || !sessionPayload.signed_in) {
+        showForbiddenScreen();
+        return;
+      }
+
+      const runId = runIdFromQuery();
+      if (!runId) {
+        document.getElementById("status-line").textContent = "No Show Run specified.";
+        return;
+      }
+
+      document.getElementById("roster-link").href = "/venues/show-runs/roster.html?id=" + encodeURIComponent(runId);
+      document.getElementById("program-link").href = "/venues/show-runs/program.html?id=" + encodeURIComponent(runId);
+
+      const response = await fetch("/api/show-runs/" + encodeURIComponent(runId), { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (isForbiddenAccessResponse(response, payload)) { showForbiddenScreen(); return; }
+      if (!response.ok || !payload?.ok) {
+        document.getElementById("status-line").textContent = "Could not load Show Run.";
+        return;
+      }
+      document.getElementById("status-line").hidden = true;
+
+      const run = payload.data.show_run;
+      const canManage = payload.data.can_manage;
+      applyRunToForm(run);
+
+      if (canManage) {
+        document.getElementById("roster-link").hidden = false;
+        document.getElementById("manage-card").hidden = false;
+      } else {
+        document.getElementById("readonly-card").hidden = false;
+        document.getElementById("readonly-description").textContent = run.description || "No description.";
+        document.getElementById("readonly-meta").textContent = (run.show_format === "custom" ? run.custom_show_format : run.show_format) + (run.cohort_name ? " · " + run.cohort_name : "");
+        return;
+      }
+
+      const formatSelect = document.getElementById("format-select");
+
+      async function patch(body) {
+        const res = await fetch("/api/show-runs/" + encodeURIComponent(runId), {
+          method: "PATCH", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const p = await res.json().catch(() => null);
+        if (!res.ok || !p?.ok) {
+          alert("Could not update Show Run: " + (p?.data?.error || `HTTP ${res.status}`));
+          return null;
+        }
+        applyRunToForm(p.data.show_run);
+        return p.data.show_run;
+      }
+
+      document.getElementById("save-button").addEventListener("click", async (event) => {
+        event.target.disabled = true;
+        try {
+          await patch({
+            title: document.getElementById("title-input").value.trim(),
+            description: document.getElementById("description-input").value.trim(),
+            show_format: formatSelect.value,
+            custom_show_format: document.getElementById("custom-format-input").value.trim(),
+            cohort_name: document.getElementById("cohort-input").value.trim(),
+            status: document.getElementById("status-select").value,
+            audience_self_join_enabled: document.getElementById("self-join-checkbox").checked,
+          });
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+
+      document.getElementById("archive-button").addEventListener("click", async (event) => {
+        event.target.disabled = true;
+        try {
+          const res = await fetch("/api/show-runs/" + encodeURIComponent(runId) + "/archive", { method: "POST", credentials: "include" });
+          const p = await res.json().catch(() => null);
+          if (res.ok && p?.ok) applyRunToForm(p.data.show_run);
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+
+      document.getElementById("unarchive-button").addEventListener("click", async (event) => {
+        event.target.disabled = true;
+        try {
+          const res = await fetch("/api/show-runs/" + encodeURIComponent(runId) + "/unarchive", { method: "POST", credentials: "include" });
+          const p = await res.json().catch(() => null);
+          if (res.ok && p?.ok) applyRunToForm(p.data.show_run);
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+    }
+
+    bootstrap().catch((error) => {
+      console.error("show run detail bootstrap failed", error);
+      document.getElementById("status-line").textContent = "Something went wrong loading this Show Run.";
+    });
+  </script>
+</body>
+</html>

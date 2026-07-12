@@ -128,6 +128,7 @@ migrations=(
   "$ROOT/database/migrations/036_kernel61_player_workbook_foundation.sql"
   "$ROOT/database/migrations/037_kernel62_player_relationships.sql"
   "$ROOT/database/migrations/038_kernel65_third_place.sql"
+  "$ROOT/database/migrations/039_kernel66_show_runs.sql"
 )
 
 for migration in "${migrations[@]}"; do
@@ -613,5 +614,115 @@ if [[ ! -f "$ROOT/frontend/venues/third-place/index.html" ]]; then
   exit 1
 fi
 echo "PASS Third Place page file exists"
+
+# --- Kernel 66: Show Run, Audience Program, and Roster MVP ---
+# Reuses producer account A ($raw_session, bootstrapped as producer at the
+# neutral "amurray-family" location above) and account B ($second_session).
+# There is currently no in-app "create a Production" flow anywhere in
+# Victory (producers-office's own production picker shows "No productions
+# available" on a database with none) -- this is a pre-existing gap, not
+# something Kernel 66 is responsible for, so a minimal Production row is
+# inserted directly here, the same way backend/internal/showruns's own
+# tests do, purely so the Show Run creation flow has something to attach to.
+
+anon_showruns_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' "http://127.0.0.1:${BACKEND_PORT}/api/show-runs")"
+if [[ "$anon_showruns_status" != "401" ]]; then
+  echo "expected anonymous Show Runs list to return 401, got $anon_showruns_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS Show Runs list rejects anonymous requests"
+
+docker exec -i "$POSTGRES_CONTAINER" psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$DB_NAME" -c "
+  INSERT INTO productions (location_id, name, slug)
+  SELECT id, 'Fresh Install Test Production', 'fresh-install-test-production'
+  FROM locations WHERE slug = 'amurray-family'
+  ON CONFLICT (location_id, slug) DO NOTHING;
+" >/dev/null
+fresh_install_production_id="$(docker exec -i "$POSTGRES_CONTAINER" psql -tAc "
+  SELECT id FROM productions WHERE slug = 'fresh-install-test-production';
+" -U "$POSTGRES_USER" -d "$DB_NAME" | tr -d '[:space:]')"
+if [[ -z "$fresh_install_production_id" ]]; then
+  echo "failed to insert fixture production for Show Run smoke checks" >&2
+  exit 1
+fi
+echo "PASS fixture production created for Show Run smoke checks ($fresh_install_production_id)"
+
+create_run_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/show-runs" \
+  -d "{\"production_id\":\"$fresh_install_production_id\",\"title\":\"Fresh Install Test Run\",\"slug\":\"fresh-install-test-run\",\"show_format\":\"playtest\"}")"
+if [[ "$create_run_status" != "200" ]]; then
+  echo "expected Producer A to create a Show Run, got $create_run_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+show_run_id="$(grep -o '"id":"[^"]*"' "$BODY_OUT" | head -n1 | sed 's/"id":"//;s/"$//')"
+if [[ -z "$show_run_id" ]]; then
+  echo "failed to extract show run id" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS Producer A created a Show Run ($show_run_id)"
+
+add_member_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}/roster" \
+  -d "{\"target_profile_id\":\"$workbook_id\",\"role\":\"player\"}")"
+if [[ "$add_member_status" != "200" || "$(cat "$BODY_OUT")" != *'"role_label":"Player"'* ]]; then
+  echo "expected roster add to return role_label Player, got $add_member_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+if [[ "$(cat "$BODY_OUT")" == *'"role_label":"Cast"'* ]]; then
+  echo "roster role label must never render as Cast" >&2
+  exit 1
+fi
+echo "PASS roster member added with role_label Player, never Cast"
+
+enable_self_join_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X PATCH "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}" \
+  -d '{"audience_self_join_enabled":true}')"
+if [[ "$enable_self_join_status" != "200" ]]; then
+  echo "expected Producer A to enable audience self-join, got $enable_self_join_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+
+self_join_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$second_session" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}/roster/self-join")"
+if [[ "$self_join_status" != "200" || "$(cat "$BODY_OUT")" != *'"role":"audience"'* ]]; then
+  echo "expected B to self-join as audience, got $self_join_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS B self-joined as Audience once self-join was enabled"
+
+program_response="$(curl -s -H "Cookie: victory_session=$second_session" "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}/audience-program")"
+if [[ "$program_response" != *'"role":"audience"'* ]]; then
+  echo "expected Audience Program to include B's audience entry" >&2
+  echo "$program_response" >&2
+  exit 1
+fi
+if [[ "$program_response" == *'"added_by_user_id"'* ]]; then
+  echo "Audience Program payload must not expose internal-only roster fields" >&2
+  echo "$program_response" >&2
+  exit 1
+fi
+echo "PASS Audience Program is curated and excludes internal-only roster fields"
+
+for file in \
+  frontend/venues/show-runs/index.html \
+  frontend/venues/show-runs/run.html \
+  frontend/venues/show-runs/roster.html \
+  frontend/venues/show-runs/program.html; do
+  if [[ ! -f "$ROOT/$file" ]]; then
+    echo "missing required file: $file" >&2
+    exit 1
+  fi
+done
+echo "PASS Show Runs page files exist"
 
 echo "PASS clean-install smoke complete"

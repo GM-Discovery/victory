@@ -38,6 +38,7 @@ import (
 	"victory/backend/internal/playerrelationships"
 	"victory/backend/internal/profiles"
 	"victory/backend/internal/showings"
+	"victory/backend/internal/showruns"
 	"victory/backend/internal/thirdplace"
 	"victory/backend/internal/venues"
 	"victory/backend/internal/world"
@@ -175,6 +176,20 @@ func main() {
 	mux.HandleFunc("/api/third-place/headshots", thirdplace.HandleCollection(pool))
 	mux.HandleFunc("/api/third-place/headshots/me", thirdplace.HandleMe(pool))
 	mux.HandleFunc("/api/third-place/headshots/me/history", thirdplace.HandleMyHistory(pool))
+	mux.HandleFunc("GET /api/show-runs", showruns.HandleCollection(pool))
+	mux.HandleFunc("POST /api/show-runs", showruns.HandleCollection(pool))
+	mux.HandleFunc("GET /api/show-runs/{id}", showruns.HandleByID(pool))
+	mux.HandleFunc("PATCH /api/show-runs/{id}", showruns.HandleByID(pool))
+	mux.HandleFunc("POST /api/show-runs/{id}/archive", showruns.HandleArchive(pool))
+	mux.HandleFunc("POST /api/show-runs/{id}/unarchive", showruns.HandleUnarchive(pool))
+	mux.HandleFunc("GET /api/show-runs/{id}/roster", showruns.HandleRosterCollection(pool))
+	mux.HandleFunc("POST /api/show-runs/{id}/roster", showruns.HandleRosterCollection(pool))
+	mux.HandleFunc("PATCH /api/show-runs/{id}/roster/{member_id}", showruns.HandleRosterUpdate(pool))
+	mux.HandleFunc("DELETE /api/show-runs/{id}/roster/{member_id}", showruns.HandleRosterRemove(pool))
+	mux.HandleFunc("POST /api/show-runs/{id}/roster/self-join", showruns.HandleSelfJoin(pool))
+	mux.HandleFunc("GET /api/show-runs/{id}/audience-program", showruns.HandleAudienceProgram(pool))
+	mux.HandleFunc("POST /api/show-runs/{id}/blocks", showruns.HandleBlock(pool))
+	mux.HandleFunc("DELETE /api/show-runs/{id}/blocks/{block_id}", showruns.HandleUnblock(pool))
 	mux.HandleFunc("GET /api/characters/parentage-chart", characters.HandleParentageChart())
 	mux.HandleFunc("GET /api/characters/chapter2-rules", characters.HandleChapter2Rules())
 	mux.HandleFunc("GET /api/character-cards/me", characters.HandleMyCharacterCards(pool))

@@ -77,7 +77,7 @@ Later kernels are sequenced by dependency and strategic pairing, but may be reor
 
 The next unused repository kernel number controls the actual filename. This guide assumes Kernel 61 follows Kernel 60. If the repository already used a number, advance the number and update this guide rather than creating collisions or retroactive aliases.
 
-**Collision note (2026-07-11):** the real repository sequence has advanced past this guide's own Socio-track numbering below. Real Kernels 62 (My People), 63 (Discord fixture cleanup + Back to Map), 64 (DB test isolation and live-DB safety gate), and 65 (Third Place Headshot Commons — see `Construction/OperatorLogs/kernel-65-reportback.md`) were all built to real operator briefs, outside this document's own "Kernel 62 — Player Relationship Matrix," "Kernel 64 — Scene Configuration Model," "Kernel 65 — Capture and Atomic Fly Scene," and "Kernel 66 — Scene Transitions" headers further down, which remain *unbuilt Socio-track plans*, not what actually shipped under those numbers. The next real kernel is **66**, regardless of what this document's own section headers below are numbered — do not reuse a document-internal number as a real kernel filename without first checking `Construction/OperatorLogs/*-reportback.md` for the true next-unused number, per §4.3 above.
+**Collision note (2026-07-11, updated 2026-07-12):** the real repository sequence has advanced past this guide's own Socio-track numbering below. Real Kernels 62 (My People), 63 (Discord fixture cleanup + Back to Map), 64 (DB test isolation and live-DB safety gate), 65 (Third Place Headshot Commons — see `Construction/OperatorLogs/kernel-65-reportback.md`), and now **66 (Show Run, Audience Program, and Roster MVP — see `Construction/OperatorLogs/kernel-66-reportback.md`)** were all built to real operator briefs, outside this document's own "Kernel 62 — Player Relationship Matrix," "Kernel 64 — Scene Configuration Model," "Kernel 65 — Capture and Atomic Fly Scene," and "Kernel 66 — Scene Transitions" headers further down, which remain *unbuilt Socio-track plans*, not what actually shipped under those numbers. The next real kernel is **67**, regardless of what this document's own section headers below are numbered — do not reuse a document-internal number as a real kernel filename without first checking `Construction/OperatorLogs/*-reportback.md` for the true next-unused number, per §4.3 above.
 
 ### 4.4 Continuation suffixes
 
@@ -266,6 +266,12 @@ Save an arrangement, alter the stage, fly the saved Scene, verify two connected 
 ---
 
 ## Kernel 66 — Scene Transitions, Cue Groups, and Courtyard Tutorial Beat
+
+**This document-internal number collided with a real kernel.** The real Kernel 66 that
+shipped (2026-07-12) is **Show Run, Audience Program, and Roster MVP** — see
+`Construction/OperatorLogs/kernel-66-reportback.md` and §4.3's collision note above. This
+section's plan (Scene Transitions/Cue Groups/Courtyard Tutorial Beat) remains an unbuilt
+Socio-track idea; it will need a different real kernel number whenever it's actually built.
 
 **Primary tracks:** V4, S3  
 **Complementary payoff:** A1, C3

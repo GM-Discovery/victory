@@ -160,6 +160,21 @@
     @media (max-width: 560px) {
       .headshot-grid { grid-template-columns: 1fr; }
     }
+
+    .show-run-picker-overlay {
+      position: fixed; inset: 0; background: rgba(10, 7, 5, 0.72);
+      display: flex; align-items: center; justify-content: center; z-index: 40; padding: 20px;
+    }
+    .show-run-picker {
+      background: var(--panel-strong); border: 1px solid var(--line); border-radius: 16px;
+      padding: 20px; max-width: 420px; width: 100%; max-height: 80vh; overflow-y: auto;
+    }
+    .show-run-picker h2 { margin: 0 0 12px; font-size: 1.1rem; }
+    .show-run-picker-item {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;
+    }
+    .show-run-picker-empty { color: var(--muted); }
   </style>
 </head>
 <body>
@@ -299,6 +314,77 @@
       }
     }
 
+    // Kernel 66 integration point: a Producer/Director/Operator can add
+    // someone else's Headshot straight to one of their own Show Run
+    // rosters, reusing the existing roster-add endpoint rather than a new
+    // one. The picker only lists runs the viewer already manages -- the
+    // server re-checks authority on submit regardless.
+    async function openShowRunPicker(profileId) {
+      const overlay = document.createElement("div");
+      overlay.className = "show-run-picker-overlay";
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) overlay.remove();
+      });
+
+      const panel = document.createElement("div");
+      panel.className = "show-run-picker";
+      const heading = document.createElement("h2");
+      heading.textContent = "Add to a Show Run";
+      panel.appendChild(heading);
+      const status = document.createElement("p");
+      status.className = "show-run-picker-empty";
+      status.textContent = "Loading your Show Runs...";
+      panel.appendChild(status);
+      overlay.appendChild(panel);
+      document.body.appendChild(overlay);
+
+      const response = await fetch("/api/show-runs", { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        status.textContent = "Could not load your Show Runs.";
+        return;
+      }
+      const runs = (payload.data.show_runs || []).filter((r) => r.can_manage && r.status !== "archived");
+      if (runs.length === 0) {
+        status.textContent = "You don't manage any open Show Runs yet.";
+        return;
+      }
+      status.remove();
+
+      for (const run of runs) {
+        const row = document.createElement("div");
+        row.className = "show-run-picker-item";
+        const label = document.createElement("span");
+        label.textContent = run.title;
+        row.appendChild(label);
+        const addButton = document.createElement("button");
+        addButton.type = "button";
+        addButton.className = "chip";
+        addButton.textContent = "Add as Player";
+        addButton.addEventListener("click", async () => {
+          addButton.disabled = true;
+          try {
+            const res = await fetch(`/api/show-runs/${encodeURIComponent(run.id)}/roster`, {
+              method: "POST", credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ target_profile_id: profileId, role: "player" }),
+            });
+            const p = await res.json().catch(() => null);
+            if (!res.ok || !p?.ok) {
+              alert("Could not add to Show Run: " + (p?.data?.error || `HTTP ${res.status}`));
+              addButton.disabled = false;
+              return;
+            }
+            overlay.remove();
+          } catch (error) {
+            addButton.disabled = false;
+          }
+        });
+        row.appendChild(addButton);
+        panel.appendChild(row);
+      }
+    }
+
     function renderCard(item) {
       const card = document.createElement("div");
       card.className = "headshot-card" + (item.is_you ? " is-you" : "");
@@ -377,6 +463,15 @@
           addButton.textContent = "Add to My People";
           addButton.addEventListener("click", () => addToMyPeople(item.profile_id, addButton));
           actions.appendChild(addButton);
+        }
+
+        if (item.can_add_to_show_run) {
+          const showRunButton = document.createElement("button");
+          showRunButton.type = "button";
+          showRunButton.className = "chip";
+          showRunButton.textContent = "Add to Show Run";
+          showRunButton.addEventListener("click", () => openShowRunPicker(item.profile_id));
+          actions.appendChild(showRunButton);
         }
       }
 

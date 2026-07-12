@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"victory/backend/internal/access"
 	"victory/backend/internal/playerprofile"
 	"victory/backend/internal/playerrelationships"
 )
@@ -207,6 +208,17 @@ func ProjectHeadshot(ctx context.Context, pool *pgxpool.Pool, viewerUserID strin
 			proj.CanOpenMyNotes = true
 			proj.RelationshipID = rel.ID
 		}
+
+		// Kernel 66 integration point: a Producer/Director/Operator viewing
+		// someone else's Headshot can add them to one of their own Show Run
+		// rosters. This only checks whether the viewer manages *some*
+		// location -- the actual run picker (and its own authority check)
+		// happens client-side against GET /api/show-runs.
+		canAdd, err := access.HasAnyManageableLocation(ctx, pool, viewerUserID)
+		if err != nil {
+			return HeadshotProjection{}, err
+		}
+		proj.CanAddToShowRun = canAdd
 	}
 
 	return proj, nil

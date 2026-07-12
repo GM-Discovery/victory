@@ -41,6 +41,7 @@ type HeadshotProjection struct {
 	CanOpenMyNotes             bool           `json:"can_open_my_notes"`
 	RelationshipID             string         `json:"relationship_id,omitempty"`
 	IsYou                      bool           `json:"is_you"`
+	CanAddToShowRun            bool           `json:"can_add_to_show_run"`
 }
 
 // HistoryEntry is one owner-only placement/removal ledger row (Kernel 65

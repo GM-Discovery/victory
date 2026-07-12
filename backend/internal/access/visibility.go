@@ -157,6 +157,21 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 				WHERE cc.owner_user_id = $1
 				  AND cc.is_deleted = FALSE
 			  )
+
+			UNION
+
+			-- Show Runs (Kernel 66): unlike 'trailers'/'third-place' above, this
+			-- surface is visible to Audience too, not just producer/director/
+			-- cast/crew -- the operator's explicit "Audience gets the best
+			-- seats" instruction means Audience must not be excluded from even
+			-- seeing the venue tile that leads to the Audience Program.
+			SELECT v.id, v.slug, v.name, v.kind, 3 AS reason_rank, 'location_member_surface'::text AS visible_because
+			FROM venues v
+			JOIN lots l ON l.id = v.lot_id
+			JOIN location_memberships lm ON lm.location_id = l.location_id
+			WHERE v.slug = 'show-runs'
+			  AND lm.user_id = $1
+			  AND lm.active = TRUE
 		),
 		ranked AS (
 			SELECT

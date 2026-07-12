@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Audience Program — Show Runs — Victory</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    :root { color-scheme: dark; --bg: #17120e; --panel: rgba(27, 21, 17, 0.92); --line: rgba(255, 233, 197, 0.12); --accent: #f0d3a4; --accent-strong: #fff2d7; --muted: #d0bfa6; }
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: linear-gradient(180deg, #17120e 0%, #0e0b09 100%); color: #f6ecdd; }
+    .header { padding: 22px 24px 12px; max-width: 1100px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+    .eyebrow { text-transform: uppercase; letter-spacing: 0.18em; color: #d7ab6f; font-size: 0.76rem; margin: 0 0 8px; }
+    h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.4rem); }
+    .subtitle { margin: 10px 0 0; color: var(--muted); max-width: 72ch; line-height: 1.5; }
+    .launchbar { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
+    .chip { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; text-decoration: none; border: 1px solid var(--line); padding: 11px 16px; color: var(--accent-strong); background: rgba(255, 255, 255, 0.03); font-weight: 700; cursor: pointer; font: inherit; }
+    .chip:disabled { opacity: 0.6; cursor: default; }
+    .stage { max-width: 1100px; width: 100%; margin: 0 auto; padding: 8px 24px 48px; box-sizing: border-box; display: grid; gap: 18px; }
+    [hidden] { display: none !important; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 22px; }
+    .program-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+    .program-card { background: rgba(255,255,255,0.02); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+    .program-card.is-audience { border-color: rgba(240, 211, 164, 0.5); }
+    .name-row { display: flex; align-items: center; gap: 12px; }
+    .thumb { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; border: 1px solid rgba(255,255,255,0.12); background: #241b15; flex-shrink: 0; }
+    .thumb-empty { width: 64px; height: 64px; border-radius: 12px; display: grid; place-items: center; border: 1px dashed rgba(255,255,255,0.16); color: var(--muted); background: #201813; flex-shrink: 0; }
+    .program-name { margin: 0; font-weight: 700; color: var(--accent-strong); }
+    .program-role { margin: 2px 0 0; color: var(--accent); font-size: 0.82rem; font-weight: 700; }
+    .facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; color: var(--muted); font-size: 0.86rem; }
+    .facts .fact-label { color: var(--accent); font-weight: 700; margin-right: 4px; }
+    .status-line { color: var(--muted); min-height: 1.4em; }
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <header class="header">
+      <p class="eyebrow">Victory / Show Runs / Audience Program</p>
+      <h1 id="run-title">Loading…</h1>
+      <p class="subtitle">The curated house view — who's here, without exposing the full internal roster.</p>
+      <div class="launchbar">
+        <a class="chip" href="/venues/show-runs/">All Show Runs</a>
+        <button class="chip" type="button" id="join-button" hidden>Join as Audience</button>
+      </div>
+    </header>
+
+    <main class="stage">
+      <p class="status-line" id="status-line">Loading Audience Program...</p>
+      <div class="program-grid" id="program-grid"></div>
+      <section class="card empty-state" id="empty-state" hidden>
+        <h2 style="color:#f6ecdd;">Nobody's in the program yet</h2>
+        <p>Check back once the run has a published cast and crew.</p>
+      </section>
+    </main>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/back-to-map.js"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script>
+    function runIdFromQuery() {
+      return new URLSearchParams(window.location.search).get("id") || "";
+    }
+
+    function renderProgramCard(entry) {
+      const card = document.createElement("div");
+      card.className = "program-card" + (entry.role === "audience" ? " is-audience" : "");
+
+      const nameRow = document.createElement("div");
+      nameRow.className = "name-row";
+      if (entry.portrait_url) {
+        const img = document.createElement("img");
+        img.className = "thumb";
+        img.src = entry.portrait_url;
+        img.alt = entry.stage_name + " portrait";
+        nameRow.appendChild(img);
+      } else {
+        const placeholder = document.createElement("div");
+        placeholder.className = "thumb-empty";
+        placeholder.textContent = "☺";
+        nameRow.appendChild(placeholder);
+      }
+      const nameCol = document.createElement("div");
+      const name = document.createElement("p");
+      name.className = "program-name";
+      name.textContent = entry.stage_name || "Unnamed Player";
+      nameCol.appendChild(name);
+      const role = document.createElement("p");
+      role.className = "program-role";
+      role.textContent = entry.role_label;
+      nameCol.appendChild(role);
+      nameRow.appendChild(nameCol);
+      card.appendChild(nameRow);
+
+      if (entry.headline_facts && entry.headline_facts.length) {
+        const facts = document.createElement("ul");
+        facts.className = "facts";
+        for (const fact of entry.headline_facts) {
+          const li = document.createElement("li");
+          const label = document.createElement("span");
+          label.className = "fact-label";
+          label.textContent = fact.label + ":";
+          li.appendChild(label);
+          li.appendChild(document.createTextNode(" " + fact.value));
+          facts.appendChild(li);
+        }
+        card.appendChild(facts);
+      }
+
+      const openLink = document.createElement("a");
+      openLink.className = "chip";
+      openLink.href = entry.trailer_url;
+      openLink.textContent = "Open Trailer";
+      card.appendChild(openLink);
+
+      return card;
+    }
+
+    async function bootstrap() {
+      const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
+      const sessionPayload = await sessionResponse.json().catch(() => null);
+      if (!sessionResponse.ok || !sessionPayload?.ok || !sessionPayload.signed_in) {
+        showForbiddenScreen();
+        return;
+      }
+
+      const runId = runIdFromQuery();
+      if (!runId) {
+        document.getElementById("status-line").textContent = "No Show Run specified.";
+        return;
+      }
+
+      const response = await fetch(`/api/show-runs/${encodeURIComponent(runId)}/audience-program`, { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (isForbiddenAccessResponse(response, payload)) { showForbiddenScreen(); return; }
+      if (!response.ok || !payload?.ok) {
+        document.getElementById("status-line").textContent = "Could not load the Audience Program: " + (payload?.data?.error || `HTTP ${response.status}`);
+        return;
+      }
+      document.getElementById("status-line").hidden = true;
+
+      document.getElementById("run-title").textContent = payload.data.show_run.title;
+      const grid = document.getElementById("program-grid");
+      const entries = payload.data.program || [];
+      document.getElementById("empty-state").hidden = entries.length !== 0;
+      for (const entry of entries) grid.appendChild(renderProgramCard(entry));
+
+      if (payload.data.can_self_join) {
+        const joinButton = document.getElementById("join-button");
+        joinButton.hidden = false;
+        joinButton.addEventListener("click", async (event) => {
+          event.target.disabled = true;
+          try {
+            const res = await fetch(`/api/show-runs/${encodeURIComponent(runId)}/roster/self-join`, { method: "POST", credentials: "include" });
+            const p = await res.json().catch(() => null);
+            if (!res.ok || !p?.ok) {
+              alert("Could not join as Audience: " + (p?.data?.error || `HTTP ${res.status}`));
+              return;
+            }
+            window.location.reload();
+          } finally {
+            event.target.disabled = false;
+          }
+        });
+      }
+    }
+
+    bootstrap().catch((error) => {
+      console.error("audience program bootstrap failed", error);
+      document.getElementById("status-line").textContent = "Something went wrong loading the Audience Program.";
+    });
+  </script>
+</body>
+</html>

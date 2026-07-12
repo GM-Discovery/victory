@@ -219,8 +219,28 @@ Session
 - A live instance of a Production
 - Contains active participants and current moment flow
 
-Production Run
-- Repeated Sessions of the same Production
+Show Run (Production Run)
+- Repeated Sessions of the same Production, grouped into one bounded
+  container: a roster, an Audience Program, and a show-format/status label
+  (planning/active/paused/completed/archived).
+- "Show Run" is the product-facing/UI name; "Production Run" is this
+  dictionary's original term for the same concept. They are the same thing,
+  not two competing concepts.
+- Implemented by the show_runs table and backend/internal/showruns
+  (Kernel 66). Showing and Scene are explicitly separate concepts (see
+  below) and are not part of a Show Run's own table.
+
+Showing (live/runtime) vs. future scheduled occurrence
+- "Showing" (Kernel 22, backend/internal/showings) is the live, 1:1 runtime
+  wrapper auto-created around an already-active Session -- it controls
+  audience-view visibility and tags actions for replay/review. It is not a
+  scheduling primitive and has no notion of "not yet started."
+- A future pre-live scheduling capability (a Director/table/location
+  occurrence planned ahead of time) must be built by EXTENDING the existing
+  Kernel 22 showings table/package (e.g. adding a scheduled/pre-live status)
+  -- not by creating a second, same-named "Showing" concept elsewhere.
+  Kernel 66 does not implement scheduling; this note exists only to prevent
+  that future collision.
 
 ---
 
