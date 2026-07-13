@@ -42,3 +42,30 @@ func CanViewShowRun(ctx context.Context, pool *pgxpool.Pool, userID, locationID 
 	}
 	return access.HasActiveLocationMembership(ctx, pool, userID, locationID)
 }
+
+// CanViewBackstage is CanManageShowRun plus an active Show Run crew roster
+// row at this location -- enough to see the Stage Management backstage
+// surface (listing/detail), but not to edit it. Crew edit authority itself
+// is deferred (Kernel 68 §1.5, §3.8); this is visibility only, matching the
+// map tile's own crew exception in access.ResolveVisibleVenues.
+func CanViewBackstage(ctx context.Context, pool *pgxpool.Pool, userID, locationID string) (bool, error) {
+	if ok, err := CanManageShowRun(ctx, pool, userID, locationID); err != nil {
+		return false, err
+	} else if ok {
+		return true, nil
+	}
+
+	var exists bool
+	err := pool.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1
+			FROM show_run_roster_members rm
+			JOIN show_runs sr ON sr.id = rm.show_run_id
+			WHERE sr.location_id = $2
+			  AND rm.user_id = $1
+			  AND rm.role = 'crew'
+			  AND rm.removed_at IS NULL
+		)
+	`, userID, locationID).Scan(&exists)
+	return exists, err
+}

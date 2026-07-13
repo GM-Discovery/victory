@@ -73,7 +73,7 @@ func TestHandleMyHistoryRequiresAuthentication(t *testing.T) {
 func TestHandleMeFullLifecycle(t *testing.T) {
 	pool := openThirdPlaceTestPool(t)
 	userID := insertThirdPlaceTestUser(t, pool, "http_lifecycle")
-	setStageNameAndFace(t, pool, userID, "HTTP Lifecycle Stage Name", "", "")
+	setStageNameAndFace(t, pool, userID, "HTTP Lifecycle Stage Name", "", "Hello from the HTTP lifecycle test")
 
 	// GET before leaving: no active headshot.
 	getReq := newAuthenticatedRequest(t, http.MethodGet, "/api/third-place/headshots/me", userID)
@@ -157,6 +157,7 @@ func TestHandleMeIgnoresClientSuppliedUserID(t *testing.T) {
 	pool := openThirdPlaceTestPool(t)
 	sessionUser := insertThirdPlaceTestUser(t, pool, "session_user")
 	otherUser := insertThirdPlaceTestUser(t, pool, "spoof_target")
+	setStageNameAndFace(t, pool, sessionUser, "Session User Stage Name", "", "Hello from the spoof test")
 
 	// POST with a body naming a different account must never affect that
 	// account -- HandleMe never reads a body at all, the mutation always
@@ -184,6 +185,48 @@ func TestHandleMeIgnoresClientSuppliedUserID(t *testing.T) {
 	}
 	if other != nil {
 		t.Fatalf("client-supplied user_id in body must not affect that account, but it got a headshot: %+v", other)
+	}
+}
+
+// TestHandleMePostRejectsUnreadyTrailerFace is Kernel 68 §3.2: placing a
+// Headshot ("entering" Third Place) requires Trailer Face readiness. GET/
+// DELETE stay open regardless -- only the POST/leave action is gated.
+func TestHandleMePostRejectsUnreadyTrailerFace(t *testing.T) {
+	pool := openThirdPlaceTestPool(t)
+	userID := insertThirdPlaceTestUser(t, pool, "unready_lifecycle")
+
+	postReq := newAuthenticatedRequest(t, http.MethodPost, "/api/third-place/headshots/me", userID)
+	postRec := httptest.NewRecorder()
+	HandleMe(pool).ServeHTTP(postRec, postReq)
+	if postRec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for unready account, got %d: %s", postRec.Code, postRec.Body.String())
+	}
+	if !strings.Contains(postRec.Body.String(), "trailer_face_not_ready") {
+		t.Fatalf("expected trailer_face_not_ready error code, got %s", postRec.Body.String())
+	}
+
+	// GET and DELETE stay open for an unready account.
+	getReq := newAuthenticatedRequest(t, http.MethodGet, "/api/third-place/headshots/me", userID)
+	getRec := httptest.NewRecorder()
+	HandleMe(pool).ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected GET to stay open for an unready account, got %d: %s", getRec.Code, getRec.Body.String())
+	}
+
+	delReq := newAuthenticatedRequest(t, http.MethodDelete, "/api/third-place/headshots/me", userID)
+	delRec := httptest.NewRecorder()
+	HandleMe(pool).ServeHTTP(delRec, delReq)
+	if delRec.Code != http.StatusOK {
+		t.Fatalf("expected DELETE to stay open for an unready account, got %d: %s", delRec.Code, delRec.Body.String())
+	}
+
+	// Once Trailer Face readiness is met, the same account can POST.
+	setStageNameAndFace(t, pool, userID, "Now Ready Stage Name", "", "Now visible for the commons")
+	postAgainReq := newAuthenticatedRequest(t, http.MethodPost, "/api/third-place/headshots/me", userID)
+	postAgainRec := httptest.NewRecorder()
+	HandleMe(pool).ServeHTTP(postAgainRec, postAgainReq)
+	if postAgainRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 once ready, got %d: %s", postAgainRec.Code, postAgainRec.Body.String())
 	}
 }
 

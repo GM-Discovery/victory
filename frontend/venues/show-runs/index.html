@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Show Runs — Victory</title>
+  <title>Stage Management — Victory</title>
   <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
   <style>
     :root {
@@ -80,8 +80,8 @@
 
   <div class="shell">
     <header class="header">
-      <p class="eyebrow">Victory / Show Runs</p>
-      <h1>Show Runs</h1>
+      <p class="eyebrow">Victory / Stage Management</p>
+      <h1>Stage Management</h1>
       <p class="subtitle">
         A bounded run, cohort, campaign, or playtest series of a Production — with a roster and an Audience Program. Audience gets the best seats here, not the leftover ones.
       </p>
@@ -93,6 +93,25 @@
 
     <main class="stage">
       <p class="status-line" id="status-line">Loading Show Runs...</p>
+
+      <section class="card" id="create-production-card" hidden>
+        <h2 style="margin-top:0;">Create a Production</h2>
+        <p class="run-meta" style="margin-top:0;">No Production exists yet for your location — create one first so you can create a Show Run under it.</p>
+        <div class="form-grid">
+          <div class="field span-2">
+            <label for="production-name-input">Production name</label>
+            <input type="text" id="production-name-input" placeholder="Main Production" />
+          </div>
+          <div class="field span-2">
+            <label for="production-slug-input">Slug</label>
+            <input type="text" id="production-slug-input" placeholder="main-production" />
+          </div>
+        </div>
+        <p class="run-actions">
+          <button class="chip" type="button" id="create-production-button">Create Production</button>
+        </p>
+        <p class="status-line" id="create-production-status"></p>
+      </section>
 
       <section class="card" id="create-card" hidden>
         <h2 style="margin-top:0;">Create a Show Run</h2>
@@ -273,6 +292,41 @@
 
       const canCreate = await fetchProductions();
       document.getElementById("create-card").hidden = !canCreate;
+      document.getElementById("create-production-card").hidden = canCreate;
+
+      const productionNameInput = document.getElementById("production-name-input");
+      const productionSlugInput = document.getElementById("production-slug-input");
+      let productionSlugTouched = false;
+      productionSlugInput.addEventListener("input", () => { productionSlugTouched = true; });
+      productionNameInput.addEventListener("input", () => {
+        if (!productionSlugTouched) productionSlugInput.value = slugify(productionNameInput.value);
+      });
+
+      document.getElementById("create-production-button").addEventListener("click", async (event) => {
+        const statusLine = document.getElementById("create-production-status");
+        const name = productionNameInput.value.trim();
+        const slug = productionSlugInput.value.trim();
+        if (!name) { statusLine.textContent = "Name is required."; return; }
+        event.target.disabled = true;
+        try {
+          const response = await fetch("/api/productions", {
+            method: "POST", credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, slug }),
+          });
+          const payload = await response.json().catch(() => null);
+          if (!response.ok || !payload?.ok) {
+            statusLine.textContent = "Could not create Production: " + (payload?.error || `HTTP ${response.status}`);
+            return;
+          }
+          statusLine.textContent = "";
+          const stillEmpty = !(await fetchProductions());
+          document.getElementById("create-production-card").hidden = !stillEmpty;
+          document.getElementById("create-card").hidden = stillEmpty;
+        } finally {
+          event.target.disabled = false;
+        }
+      });
 
       document.getElementById("create-run-button").addEventListener("click", async (event) => {
         event.target.disabled = true;

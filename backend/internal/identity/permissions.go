@@ -127,13 +127,23 @@ func HandleListIncomingPermissionRequests(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func HandleListProductions(pool *pgxpool.Pool) http.HandlerFunc {
+// HandleProductionsCollection handles GET (list) and POST (create,
+// Kernel 68 §3.7) on /api/productions.
+func HandleProductionsCollection(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
+			handleListProductions(pool, w, r)
+		case http.MethodPost:
+			handleCreateProduction(pool, w, r)
+		default:
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method_not_allowed"})
-			return
 		}
+	}
+}
 
+func handleListProductions(pool *pgxpool.Pool, w http.ResponseWriter, r *http.Request) {
+	{
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
@@ -220,6 +230,119 @@ func HandleListProductions(pool *pgxpool.Pool) http.HandlerFunc {
 
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": out})
 	}
+}
+
+type createProductionInput struct {
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	LocationSlug string `json:"location_slug"`
+}
+
+// handleCreateProduction closes the onboarding gap identified in Kernel 66:
+// Show Run creation consumes /api/productions but there was never an
+// in-app create route (Kernel 68 §3.7). Authority: Operator, or a Producer/
+// Director creating for their own resolved location -- location_id is
+// always resolved server-side via resolveInviteAuthorityScope, never taken
+// from client input, except that an Operator may target a specific location
+// by slug (still resolved to an id server-side, not trusted verbatim).
+func handleCreateProduction(pool *pgxpool.Pool, w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	userID, err := currentUserID(ctx, pool, r)
+	if err != nil || strings.TrimSpace(userID) == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "not_authenticated"})
+		return
+	}
+
+	var input createProductionInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid_json"})
+		return
+	}
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "name_required"})
+		return
+	}
+
+	isOperator, err := access.IsOperatorUser(ctx, pool, userID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "operator_lookup_failed"})
+		return
+	}
+
+	var locationID string
+	if isOperator && strings.TrimSpace(input.LocationSlug) != "" {
+		if err := pool.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = $1`, strings.TrimSpace(input.LocationSlug)).Scan(&locationID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "location_not_found"})
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "location_lookup_failed"})
+			return
+		}
+	} else {
+		role, resolvedLocationID, err := resolveInviteAuthorityScope(ctx, pool, userID)
+		if err != nil {
+			writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "forbidden"})
+			return
+		}
+		if !isOperator && role != "producer" && role != "director" {
+			writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "forbidden"})
+			return
+		}
+		locationID = resolvedLocationID
+	}
+
+	slug := slugifyProductionCandidate(input.Slug)
+	if slug == "" {
+		slug = slugifyProductionCandidate(name)
+	}
+	if slug == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "slug_required"})
+		return
+	}
+
+	var row productionRow
+	err = pool.QueryRow(ctx, `
+		INSERT INTO productions (location_id, name, slug, created_by_user_id)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id::text, name, slug
+	`, locationID, name, slug, userID).Scan(&row.ID, &row.Name, &row.Slug)
+	if err != nil {
+		if strings.Contains(err.Error(), "productions_location_id_slug_key") {
+			writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "error": "slug_already_used"})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "insert_failed"})
+		return
+	}
+	if err := pool.QueryRow(ctx, `SELECT slug FROM locations WHERE id = $1`, locationID).Scan(&row.LocationSlug); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "location_lookup_failed"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": row})
+}
+
+func slugifyProductionCandidate(candidate string) string {
+	lower := strings.ToLower(strings.TrimSpace(candidate))
+	var b strings.Builder
+	lastHyphen := false
+	for _, r := range lower {
+		switch {
+		case r >= 'a' && r <= 'z' || r >= '0' && r <= '9':
+			b.WriteRune(r)
+			lastHyphen = false
+		default:
+			if !lastHyphen && b.Len() > 0 {
+				b.WriteRune('-')
+				lastHyphen = true
+			}
+		}
+	}
+	return strings.Trim(b.String(), "-")
 }
 
 func HandleRespondPermissionRequest(pool *pgxpool.Pool) http.HandlerFunc {

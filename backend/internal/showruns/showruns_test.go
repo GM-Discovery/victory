@@ -423,3 +423,72 @@ func TestAudienceCanViewButNotManage(t *testing.T) {
 		t.Fatalf("expected not_authorized for audience trying to manage roster, got %v", err)
 	}
 }
+
+// TestCanViewBackstageExcludesPlainAudienceButIncludesCrew is Kernel 68
+// §3.6/§1.5: Audience-only membership no longer clears the Stage Management
+// backstage bar (CanViewShowRun still does, for the separate Audience
+// Program route), but an active Show Run crew roster row does -- visibility
+// only, not manage authority.
+func TestCanViewBackstageExcludesPlainAudienceButIncludesCrew(t *testing.T) {
+	pool := openShowRunsTestPool(t)
+	ctx := context.Background()
+	producer := insertShowRunTestUser(t, pool, "sr_backstage_producer")
+	audience := insertShowRunTestUser(t, pool, "sr_backstage_audience")
+	crew := insertShowRunTestUser(t, pool, "sr_backstage_crew")
+	locationID, _, showRunID := insertShowRunFixture(t, pool, producer)
+	grantLocationRole(t, pool, locationID, producer, "producer")
+	grantLocationRole(t, pool, locationID, audience, "audience")
+	grantLocationRole(t, pool, locationID, crew, "audience")
+
+	sr, err := LoadShowRunByID(ctx, pool, showRunID)
+	if err != nil {
+		t.Fatalf("load show run: %v", err)
+	}
+
+	canView, err := CanViewBackstage(ctx, pool, audience, sr.LocationID)
+	if err != nil {
+		t.Fatalf("can view backstage (audience): %v", err)
+	}
+	if canView {
+		t.Fatal("expected plain audience-role membership to NOT clear the backstage bar")
+	}
+
+	canView, err = CanViewBackstage(ctx, pool, producer, sr.LocationID)
+	if err != nil {
+		t.Fatalf("can view backstage (producer): %v", err)
+	}
+	if !canView {
+		t.Fatal("expected producer to clear the backstage bar")
+	}
+
+	canView, err = CanViewBackstage(ctx, pool, crew, sr.LocationID)
+	if err != nil {
+		t.Fatalf("can view backstage (crew, before roster row): %v", err)
+	}
+	if canView {
+		t.Fatal("expected a user with no crew roster row to NOT clear the backstage bar")
+	}
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO show_run_roster_members (show_run_id, user_id, role, added_by_user_id, program_visible)
+		VALUES ($1, $2, 'crew', $3, TRUE)
+	`, showRunID, crew, producer); err != nil {
+		t.Fatalf("insert crew roster row: %v", err)
+	}
+
+	canView, err = CanViewBackstage(ctx, pool, crew, sr.LocationID)
+	if err != nil {
+		t.Fatalf("can view backstage (crew, after roster row): %v", err)
+	}
+	if !canView {
+		t.Fatal("expected an active crew roster row to clear the backstage bar")
+	}
+
+	canManage, err := CanManageShowRun(ctx, pool, crew, sr.LocationID)
+	if err != nil {
+		t.Fatalf("can manage (crew): %v", err)
+	}
+	if canManage {
+		t.Fatal("expected crew backstage visibility to NOT grant manage authority")
+	}
+}

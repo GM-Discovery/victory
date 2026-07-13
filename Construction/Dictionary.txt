@@ -230,6 +230,22 @@ Show Run (Production Run)
   (Kernel 66). Showing and Scene are explicitly separate concepts (see
   below) and are not part of a Show Run's own table.
 
+Stage Management (Show Runs backstage surface)
+- User-facing/map name (Kernel 68) for the Show Run backstage venue --
+  internal slug, routes, and package name all remain "show-runs"/
+  `backend/internal/showruns`; only the map tile label and page headings
+  changed, to avoid churn.
+- Visible only to Operator, Producer/Director at the venue's location, or a
+  user with an active `crew` roster row on any Show Run at that location
+  (visibility only -- a crew roster role does not itself grant manage/edit
+  authority; that stayed out of scope for Kernel 68, see its reportback).
+  Plain Audience/Player-only location membership no longer clears this bar
+  (it did before Kernel 68 -- see access.ResolveVisibleVenues).
+- Hiding the map tile does not touch the separate Audience Program route
+  (`GET /api/show-runs/{id}/audience-program`, `GET /api/shows/{id}/program`)
+  -- those stay reachable via their own direct link regardless of whether
+  the viewer can see the Stage Management tile.
+
 Show (Show Instance)
 - The concrete playable/viewable instance of a Show Run: a planned future
   occurrence (no session yet), a live occurrence, a multi-session arc, or a
@@ -263,6 +279,31 @@ Showing (live/runtime) vs. Show (scheduling/instance container)
   table/package (see "Show (Show Instance)" above) as the scheduling/
   instance container, and left `showings` completely untouched. Any future
   kernel should treat `shows`, not `showings`, as the scheduling primitive.
+
+Trailer Face Ready
+- A computed (not stored/durable) readiness verdict on whether a user has
+  intentionally set up a usable Trailer Face: a stage name plus at least one
+  visible Face field beyond bare defaults (Kernel 68 §1.1, §3.1).
+- Computed live from the existing Kernel 61 projection
+  (playerprofile.ProjectTrailerFace/TrailerFaceReady) -- no new "published"
+  boolean or timestamp was added; a fact only ever exists if the owner
+  explicitly committed it, so field-presence is a reliable readiness signal
+  on its own.
+- reason_code values: face_ready, missing_face_commit (no stage name),
+  missing_visible_face_field (stage name set but zero visible facts),
+  not_authenticated.
+- Third Place unlock rule: the Third Place venue tile is hidden from the map
+  until Trailer Face Ready is true for the viewer (access.
+  ResolveVisibleVenues, `trailer_face_ready` visibility reason). This
+  *replaced* Third Place's (and Trailers') prior producer/director/cast/crew
+  role restriction -- Kernel 68 found that restriction was a stale carryover
+  from the old Trailers-only rule that pre-dated Kernel 65's actual intent
+  (a general social space for anyone with a Face, not a staff-only one).
+  Trailers itself is now open to any authenticated user regardless of role.
+  Direct Third Place API access (leaving a Headshot) is separately gated the
+  same way and returns a clean 403 `trailer_face_not_ready` for an unready
+  caller; viewing the Headshot Commons list/history stays open to any
+  authenticated user, since nothing not-yet-ready is ever placed into it.
 
 ---
 

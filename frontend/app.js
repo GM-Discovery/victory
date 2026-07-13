@@ -150,6 +150,18 @@ function initSoilExpertsModal() {
   soilExpertsState.close = closeSoilExperts;
 }
 
+// User-facing label overrides (Kernel 68 §3.5): internal slug/routes stay
+// "show-runs" to avoid churn across the API and existing links -- only the
+// map tile/menu label changes to "Stage Management".
+const venueDisplayNameOverrides = {
+  "show-runs": "Stage Management",
+};
+
+function venueDisplayName(venue) {
+  if (!venue) return "Unknown Venue";
+  return venueDisplayNameOverrides[venue.slug] || venue.name || venue.slug || "Unknown Venue";
+}
+
 function venueHref(slug) {
   switch (slug) {
     case "library":
@@ -212,7 +224,7 @@ function openVisibleVenue(venue) {
     window.location.href = href;
     return;
   }
-  alert(`Venue "${venue.name || venue.slug}" is not built yet.`);
+  alert(`Venue "${venueDisplayName(venue)}" is not built yet.`);
 }
 
 function createVenuePin(venue, assetURL, fallbackPositions) {
@@ -223,7 +235,7 @@ function createVenuePin(venue, assetURL, fallbackPositions) {
     pin.classList.add("venue-pin--theater");
   }
   pin.type = "button";
-  pin.setAttribute("aria-label", venue.name || venue.slug || "Unknown Venue");
+  pin.setAttribute("aria-label", venueDisplayName(venue));
 
   const fallback = fallbackPositions[venue.slug] || { x: 50, y: 50 };
   const x = typeof venue.map_x === "number" ? venue.map_x : fallback.x;
@@ -260,7 +272,7 @@ function createVenuePin(venue, assetURL, fallbackPositions) {
 
   const label = document.createElement("span");
   label.className = "venue-label";
-  label.textContent = venue.name || venue.slug || "Unknown Venue";
+  label.textContent = venueDisplayName(venue);
 
   if (Number(venue.notification_count || 0) > 0) {
     const badge = document.createElement("span");
@@ -300,6 +312,9 @@ function renderMapMenu() {
     location_role: "Location role",
     production_role: "Production role",
     delayed_lot_surface: "Delayed surface",
+    backstage_authority_surface: "Backstage authority",
+    show_run_crew_surface: "Show Run crew",
+    trailer_face_ready: "Trailer Face ready",
   };
 
   const groups = new Map();
@@ -377,13 +392,13 @@ function renderMapMenu() {
       if (target && target !== "#") {
         const link = document.createElement("a");
         link.href = target;
-        link.textContent = venue.name || venue.slug || "Unknown Venue";
+        link.textContent = venueDisplayName(venue);
         link.addEventListener("click", () => mapMenuState.close?.());
         item.appendChild(link);
       } else {
         const button = document.createElement("button");
         button.type = "button";
-        button.textContent = venue.name || venue.slug || "Unknown Venue";
+        button.textContent = venueDisplayName(venue);
         button.addEventListener("click", () => {
           mapMenuState.close?.();
           openVisibleVenue(venue);
@@ -398,6 +413,42 @@ function renderMapMenu() {
     }
     group.appendChild(list);
     outlineEl.appendChild(group);
+  }
+}
+
+// Gateable venues (Kernel 68 §1.3, §3.4): map positions are known even when
+// a venue is hidden (fallbackPositions is fixed per slug), so a cloud puff
+// can sit exactly over where the tile will appear once unlocked. The base
+// fog layer separately recedes with overall visible-venue count -- the
+// "simpler cloud-level model" the spec allows in place of full per-venue
+// exploration state.
+const GATEABLE_VENUE_SLUGS = ["third-place", "show-runs"];
+
+function renderMapFog(venues, fallbackPositions) {
+  const fogLayer = document.getElementById("map-fog-layer");
+  const fogBase = document.getElementById("map-fog-base");
+  if (!fogLayer) return;
+
+  const visibleSlugs = new Set(venues.map((v) => v.slug));
+
+  if (fogBase) {
+    const opacity = Math.max(0.15, 0.55 - venues.length * 0.02);
+    fogBase.style.opacity = String(opacity);
+  }
+
+  fogLayer.querySelectorAll(".map-fog-puff").forEach((el) => el.remove());
+
+  for (const slug of GATEABLE_VENUE_SLUGS) {
+    const pos = fallbackPositions[slug];
+    if (!pos) continue;
+    const puff = document.createElement("div");
+    puff.className = "map-fog-puff";
+    if (visibleSlugs.has(slug)) {
+      puff.classList.add("map-fog-puff--receded");
+    }
+    puff.style.left = `${pos.x}%`;
+    puff.style.top = `${pos.y}%`;
+    fogLayer.appendChild(puff);
   }
 }
 
@@ -440,24 +491,24 @@ async function loadVenues() {
     statusEl.textContent = `${venues.length} venue${venues.length === 1 ? "" : "s"} visible`;
 
     const fallbackPositions = {
-      library: { x: 67, y: 87 },
-      "first-theater": { x: 70, y: 61 },
-      "middle-school-stage": { x: 101, y: 50 },
+      library: { x: 70, y: 87 },
+      "first-theater": { x: 70, y: 62 },
+      "middle-school-stage": { x: 105, y: 50 },
       "the-cave": { x: 22, y: 23 },
       "grants-cabin": { x: 28, y: 21 },
       "audition-hall": { x: 29, y: 37 },
-      "producers-office": { x: 39, y: 14 },
+      "producers-office": { x: 38, y: 14 },
       "directors-chair": { x: 55, y: 23 },
-      greenroom: { x: 86, y: 47 },
-      trailers: { x: 68, y: 15 },
+      greenroom: { x: 88, y: 47 },
+      trailers: { x: 69, y: 13 },
       "third-place": { x: 50, y: 50 },
-      "show-runs": { x: 52, y: 10 },
-      catharsis: { x: 36, y: 69 },
-      "victory-theater": { x: 82, y: 75 },
+      "show-runs": { x: 52, y: 11 },
+      catharsis: { x: 37, y: 69 },
+      "victory-theater": { x: 83, y: 77 },
       workshop: { x: 75, y: 33 },
       warehouse: { x: 75, y: 27 },
       "soil-experts": { x: 4, y: 65 },
-      construction: { x: 30, y: 58 },
+      construction: { x: 29, y: 57 },
       "info-booth": { x: 50, y: 93 },
     };
 
@@ -481,6 +532,7 @@ async function loadVenues() {
     );
     venueIconsEl.appendChild(infoBoothPin);
 
+    renderMapFog(venues, fallbackPositions);
     renderMapMenu();
   } catch (error) {
     statusEl.textContent = "Failed to load venues.";

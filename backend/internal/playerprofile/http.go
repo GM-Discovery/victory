@@ -290,6 +290,33 @@ func HandleFacePriority(pool *pgxpool.Pool, notify ProjectionChangeNotifier) htt
 	}
 }
 
+// HandleFaceReadiness handles GET /api/player-profile/me/face-readiness
+// (Kernel 68 §3.1, §3.3) -- lets Trailers show the unready/ready prompt
+// without duplicating the readiness computation client-side.
+func HandleFaceReadiness(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+
+		result, err := TrailerFaceReady(ctx, pool, userID)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeOK(w, result)
+	}
+}
+
 type stageNameRequest struct {
 	StageName string `json:"stage_name"`
 }

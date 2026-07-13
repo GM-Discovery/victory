@@ -81,7 +81,8 @@ func HandleShowRunShows(pool *pgxpool.Pool) http.HandlerFunc {
 
 		switch r.Method {
 		case http.MethodGet:
-			canView, err := showruns.CanViewShowRun(ctx, pool, userID, sr.LocationID)
+			// Backstage listing (Kernel 68 §3.6), not the Audience Program bar.
+			canView, err := showruns.CanViewBackstage(ctx, pool, userID, sr.LocationID)
 			if err != nil {
 				writeError(w, err)
 				return
@@ -160,7 +161,8 @@ func HandleShowByID(pool *pgxpool.Pool) http.HandlerFunc {
 				writeError(w, err)
 				return
 			}
-			canView, err := showruns.CanViewShowRun(ctx, pool, userID, sr.LocationID)
+			// Backstage detail (Kernel 68 §3.6), not the Audience Program bar.
+			canView, err := showruns.CanViewBackstage(ctx, pool, userID, sr.LocationID)
 			if err != nil {
 				writeError(w, err)
 				return

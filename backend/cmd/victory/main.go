@@ -109,6 +109,14 @@ func main() {
 
 	go network.RunDiscordGatewayWorker(context.Background(), pool, hub, discordAudioPresenceStore, discordServerLinkConfig, discordGatewayConfig)
 
+	access.SetThirdPlaceReadinessChecker(func(ctx context.Context, pool *pgxpool.Pool, userID string) (bool, error) {
+		result, err := playerprofile.TrailerFaceReady(ctx, pool, userID)
+		if err != nil {
+			return false, err
+		}
+		return result.Ready, nil
+	})
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -150,7 +158,7 @@ func main() {
 	mux.HandleFunc("/api/requests/mine", identity.HandleListMyPermissionRequests(pool))
 	mux.HandleFunc("/api/requests/incoming", identity.HandleListIncomingPermissionRequests(pool))
 	mux.HandleFunc("/api/requests/respond", identity.HandleRespondPermissionRequest(pool))
-	mux.HandleFunc("/api/productions", identity.HandleListProductions(pool))
+	mux.HandleFunc("/api/productions", identity.HandleProductionsCollection(pool))
 	mux.HandleFunc("/api/account/me", identity.HandleAccountMe(pool))
 	mux.HandleFunc("/api/account/email", identity.HandleUpdateAccountEmail(pool))
 	mux.HandleFunc("/api/session/me", identity.HandleMe(pool))
@@ -165,6 +173,7 @@ func main() {
 	}
 	mux.HandleFunc("/api/player-profile/catalogue", playerprofile.HandleCatalogue(pool))
 	mux.HandleFunc("/api/player-profile/me", playerprofile.HandleOwnerWorkbook(pool))
+	mux.HandleFunc("/api/player-profile/me/face-readiness", playerprofile.HandleFaceReadiness(pool))
 	mux.HandleFunc("/api/player-profile/face-visibility", playerprofile.HandleFaceVisibility(pool, playerProfileNotify))
 	mux.HandleFunc("/api/player-profile/face-priority", playerprofile.HandleFacePriority(pool, playerProfileNotify))
 	mux.HandleFunc("/api/player-profile/stage-name", playerprofile.HandleStageName(pool, playerProfileNotify))

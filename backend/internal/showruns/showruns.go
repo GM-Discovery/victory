@@ -217,6 +217,10 @@ func ListShowRunsVisibleToUser(ctx context.Context, pool *pgxpool.Pool, viewerUs
 			ORDER BY created_at DESC
 		`)
 	} else {
+		// Backstage listing (Kernel 68 §3.6): Producer/Director at the run's
+		// location, or an active Show Run crew roster row -- not plain
+		// Audience/Player membership. The separate Audience Program route
+		// stays reachable through its own direct link regardless.
 		rows, err = pool.Query(ctx, `
 			SELECT `+showRunColumns+`
 			FROM show_runs sr
@@ -225,6 +229,14 @@ func ListShowRunsVisibleToUser(ctx context.Context, pool *pgxpool.Pool, viewerUs
 				WHERE lm.location_id = sr.location_id
 				  AND lm.user_id = $1
 				  AND lm.active = TRUE
+				  AND lm.role IN ('producer', 'director')
+			)
+			OR EXISTS (
+				SELECT 1 FROM show_run_roster_members rm
+				WHERE rm.show_run_id = sr.id
+				  AND rm.user_id = $1
+				  AND rm.role = 'crew'
+				  AND rm.removed_at IS NULL
 			)
 			ORDER BY created_at DESC
 		`, viewerUserID)

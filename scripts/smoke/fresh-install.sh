@@ -130,6 +130,7 @@ migrations=(
   "$ROOT/database/migrations/038_kernel65_third_place.sql"
   "$ROOT/database/migrations/039_kernel66_show_runs.sql"
   "$ROOT/database/migrations/040_kernel67_shows.sql"
+  "$ROOT/database/migrations/041_kernel68_productions_created_by.sql"
 )
 
 for migration in "${migrations[@]}"; do
@@ -538,6 +539,36 @@ echo "PASS My People page files exist"
 # --- Kernel 65: Third Place Headshot Commons ---
 # Reuses fresh accounts A ($raw_session, $workbook_id) and B ($second_session)
 # already created above for the Kernel 62 checks.
+#
+# Kernel 68 gates leaving a Headshot on Trailer Face readiness (stage name
+# plus at least one visible Face field). A committed a visible
+# identity_presentation fact (real_name) during the Kernel 61 checks above,
+# but that same block immediately deleted it again to test ordinary History
+# deletion -- so no visible fact survives from there. Set a stage name and a
+# fresh, un-deleted fact now so A is Face-ready before this block's own
+# "leave a Headshot" assertions, and so this fixture doubles as the
+# Kernel 68 "account becomes ready" setup reused below.
+
+stage_name_commit_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H 'Content-Type: application/json' \
+  -X POST -d '{"stage_name":"Fresh Install Test Stage Name"}' \
+  "http://127.0.0.1:${BACKEND_PORT}/api/player-profile/stage-name")"
+if [[ "$stage_name_commit_status" != "200" ]]; then
+  echo "expected stage name commit to return 200, got $stage_name_commit_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+
+face_field_commit_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H 'Content-Type: application/json' \
+  -X POST -d '{"answers":{"short_intro":"Fresh Install Test Intro"}}' \
+  "http://127.0.0.1:${BACKEND_PORT}/api/player-profile/pages/identity_presentation/commit")"
+if [[ "$face_field_commit_status" != "200" ]]; then
+  echo "expected a visible Face field commit to return 200, got $face_field_commit_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS fresh account can set a stage name"
 
 anon_headshots_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' "http://127.0.0.1:${BACKEND_PORT}/api/third-place/headshots")"
 if [[ "$anon_headshots_status" != "401" ]]; then
@@ -808,5 +839,109 @@ for file in \
   fi
 done
 echo "PASS Show page files exist"
+
+# --- Kernel 68: Venue Visibility Gates, Stage Management, Production Onboarding ---
+# Reuses Producer A ($raw_session, now Trailer-Face-ready via the stage name
+# commit added to the Kernel 65 block above) and Audience B ($second_session,
+# still Face-unready and never granted producer/director role at any
+# location) plus the fixture Show Run ($show_run_id) from the Kernel 66
+# block.
+
+map_visibility_a="$(curl -s -H "Cookie: victory_session=$raw_session" "http://127.0.0.1:${BACKEND_PORT}/api/map/visibility")"
+if [[ "$map_visibility_a" != *'"slug":"third-place"'* ]]; then
+  echo "expected Face-ready account A to see third-place on the map" >&2
+  echo "$map_visibility_a" >&2
+  exit 1
+fi
+if [[ "$map_visibility_a" != *'"slug":"show-runs"'* ]]; then
+  echo "expected Producer A to see show-runs (Stage Management) on the map" >&2
+  echo "$map_visibility_a" >&2
+  exit 1
+fi
+echo "PASS Face-ready Producer A sees both Third Place and Stage Management on the map"
+
+map_visibility_b="$(curl -s -H "Cookie: victory_session=$second_session" "http://127.0.0.1:${BACKEND_PORT}/api/map/visibility")"
+if [[ "$map_visibility_b" == *'"slug":"third-place"'* ]]; then
+  echo "expected Face-unready account B to NOT see third-place on the map" >&2
+  echo "$map_visibility_b" >&2
+  exit 1
+fi
+if [[ "$map_visibility_b" == *'"slug":"show-runs"'* ]]; then
+  echo "expected Audience-only account B to NOT see show-runs (Stage Management) on the map" >&2
+  echo "$map_visibility_b" >&2
+  exit 1
+fi
+if [[ "$map_visibility_b" != *'"slug":"trailers"'* ]]; then
+  echo "expected plain audience-role account B to still see Trailers on the map" >&2
+  echo "$map_visibility_b" >&2
+  exit 1
+fi
+echo "PASS Face-unready Audience-only account B sees Trailers but not Third Place or Stage Management"
+
+third_place_post_unready_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$second_session" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/third-place/headshots/me")"
+if [[ "$third_place_post_unready_status" != "403" || "$(cat "$BODY_OUT")" != *'"trailer_face_not_ready"'* ]]; then
+  echo "expected direct Third Place POST to reject a Face-unready account with 403, got $third_place_post_unready_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS direct Third Place API access cleanly rejects a Face-unready authenticated user"
+
+show_runs_backstage_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$second_session" "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}")"
+if [[ "$show_runs_backstage_status" != "403" ]]; then
+  echo "expected direct Show Run backstage detail fetch to reject Audience-only B with 403, got $show_runs_backstage_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS direct Stage Management backstage API access rejects a user without backstage authority"
+
+audience_program_still_works_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$second_session" "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}/audience-program")"
+if [[ "$audience_program_still_works_status" != "200" ]]; then
+  echo "expected curated Audience Program access to remain open to Audience B despite Stage Management being hidden, got $audience_program_still_works_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS curated Audience Program access is not broken by the Stage Management visibility gate"
+
+anon_create_production_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/productions" \
+  -H "Content-Type: application/json" -d '{"name":"Anon Production"}')"
+if [[ "$anon_create_production_status" != "401" ]]; then
+  echo "expected anonymous Create Production to return 401, got $anon_create_production_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS Create Production rejects anonymous requests"
+
+create_production_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/productions" \
+  -d '{"name":"Fresh Install Kernel 68 Production"}')"
+if [[ "$create_production_status" != "200" ]]; then
+  echo "expected Producer A to create a Production via the new route, got $create_production_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+new_production_id="$(grep -o '"id":"[^"]*"' "$BODY_OUT" | head -n1 | sed 's/"id":"//;s/"$//')"
+if [[ -z "$new_production_id" ]]; then
+  echo "failed to extract newly created production id" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS Create Production route works end-to-end ($new_production_id)"
+
+create_run_from_new_production_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/show-runs" \
+  -d "{\"production_id\":\"$new_production_id\",\"title\":\"Run From New Production\",\"slug\":\"run-from-new-production\",\"show_format\":\"playtest\"}")"
+if [[ "$create_run_from_new_production_status" != "200" ]]; then
+  echo "expected a Show Run to be creatable from the newly created Production, got $create_run_from_new_production_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS newly created Production can be used to create a Show Run"
 
 echo "PASS clean-install smoke complete"

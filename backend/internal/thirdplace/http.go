@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/access"
+	"victory/backend/internal/playerprofile"
 )
 
 type response struct {
@@ -47,6 +48,8 @@ func writeError(w http.ResponseWriter, err error) {
 	switch {
 	case code == "not_authenticated":
 		status = http.StatusUnauthorized
+	case code == "trailer_face_not_ready":
+		status = http.StatusForbidden
 	case strings.HasSuffix(code, "_not_found"):
 		status = http.StatusNotFound
 	}
@@ -130,6 +133,20 @@ func HandleMe(pool *pgxpool.Pool) http.HandlerFunc {
 			writeOK(w, map[string]any{"headshot": proj})
 
 		case http.MethodPost:
+			// Placing a Headshot is the "enter Third Place" action -- gated on
+			// Trailer Face readiness (Kernel 68 §3.2). Viewing the commons list,
+			// one's own current Headshot, or history is left open; nothing not
+			// already ready ever gets placed into the commons to begin with.
+			ready, err := playerprofile.TrailerFaceReady(ctx, pool, userID)
+			if err != nil {
+				writeError(w, err)
+				return
+			}
+			if !ready.Ready {
+				writeError(w, errors.New("trailer_face_not_ready"))
+				return
+			}
+
 			h, created, err := LeaveHeadshot(ctx, pool, userID)
 			if err != nil {
 				writeError(w, err)

@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"sort"
 	"strings"
 
 	"victory/backend/internal/sessions"
@@ -21,6 +22,23 @@ var hiddenMainMapVenueSlugs = map[string]struct{}{
 	"gateway-thread":         {},
 	"gateway-thread-fixture": {},
 	"gateway-thread-venue":   {},
+}
+
+// VenueReadinessChecker resolves whether userID meets some venue-specific
+// readiness condition. access sits below playerprofile in the import graph
+// (playerprofile already imports access), so main.go injects this callback
+// at startup instead of access importing playerprofile directly -- the same
+// avoid-import-cycle shape as playerprofile.ProjectionChangeNotifier
+// (Kernel 68 §3.2).
+type VenueReadinessChecker func(ctx context.Context, pool *pgxpool.Pool, userID string) (bool, error)
+
+var thirdPlaceReadinessChecker VenueReadinessChecker
+
+// SetThirdPlaceReadinessChecker wires the Trailer Face readiness check used
+// to gate the Third Place venue tile (Kernel 68 §3.2). Must be called once
+// at startup before any request is served.
+func SetThirdPlaceReadinessChecker(fn VenueReadinessChecker) {
+	thirdPlaceReadinessChecker = fn
 }
 
 func CurrentLocationRole(ctx context.Context, pool *pgxpool.Pool, userID string) (string, error) {
@@ -118,7 +136,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 		WITH visible AS (
 			SELECT v.id, v.slug, v.name, v.kind, 1 AS reason_rank, 'authenticated_surface'::text AS visible_because
 			FROM venues v
-			WHERE v.slug IN ('audition-hall')
+			WHERE v.slug IN ('audition-hall', 'trailers')
 
 			UNION
 
@@ -137,17 +155,6 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			SELECT v.id, v.slug, v.name, v.kind, 3 AS reason_rank, 'performer_surface'::text AS visible_because
-			FROM venues v
-			JOIN lots l ON l.id = v.lot_id
-			JOIN location_memberships lm ON lm.location_id = l.location_id
-			WHERE v.slug IN ('trailers', 'third-place')
-			  AND lm.user_id = $1
-			  AND lm.active = TRUE
-			  AND lm.role IN ('producer', 'director', 'cast', 'crew')
-
-			UNION
-
 			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'owned_workbook_surface'::text AS visible_because
 			FROM venues v
 			WHERE v.slug = 'greenroom'
@@ -160,18 +167,40 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
-			-- Show Runs (Kernel 66): unlike 'trailers'/'third-place' above, this
-			-- surface is visible to Audience too, not just producer/director/
-			-- cast/crew -- the operator's explicit "Audience gets the best
-			-- seats" instruction means Audience must not be excluded from even
-			-- seeing the venue tile that leads to the Audience Program.
-			SELECT v.id, v.slug, v.name, v.kind, 3 AS reason_rank, 'location_member_surface'::text AS visible_because
+			-- Stage Management (Kernel 68, internal slug still 'show-runs'):
+			-- backstage authority only -- Operator/Producer/Director at the
+			-- venue's own location. Audience/Player no longer see this tile;
+			-- curated Audience Program access happens through its own direct
+			-- link/route, unaffected by map-tile visibility (Kernel 68 §1.4,
+			-- §3.6).
+			SELECT v.id, v.slug, v.name, v.kind, 3 AS reason_rank, 'backstage_authority_surface'::text AS visible_because
 			FROM venues v
 			JOIN lots l ON l.id = v.lot_id
 			JOIN location_memberships lm ON lm.location_id = l.location_id
 			WHERE v.slug = 'show-runs'
 			  AND lm.user_id = $1
 			  AND lm.active = TRUE
+			  AND lm.role IN ('producer', 'director')
+
+			UNION
+
+			-- Stage Management crew exception: a Show Run crew roster row at
+			-- this venue's location also unlocks the tile, without granting
+			-- any elevated edit authority (Kernel 68 §1.4, §3.8 -- visibility
+			-- only, deferred edit authority documented in the reportback).
+			SELECT v.id, v.slug, v.name, v.kind, 3 AS reason_rank, 'show_run_crew_surface'::text AS visible_because
+			FROM venues v
+			JOIN lots l ON l.id = v.lot_id
+			WHERE v.slug = 'show-runs'
+			  AND EXISTS (
+				SELECT 1
+				FROM show_run_roster_members rm
+				JOIN show_runs sr ON sr.id = rm.show_run_id
+				WHERE sr.location_id = l.location_id
+				  AND rm.user_id = $1
+				  AND rm.role = 'crew'
+				  AND rm.removed_at IS NULL
+			  )
 		),
 		ranked AS (
 			SELECT
@@ -208,6 +237,23 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+
+	if thirdPlaceReadinessChecker != nil {
+		if ready, err := thirdPlaceReadinessChecker(ctx, pool, userID); err == nil && ready {
+			var v VisibleVenue
+			err := pool.QueryRow(ctx, `
+				SELECT slug, name, kind
+				FROM venues
+				WHERE slug = 'third-place'
+				LIMIT 1
+			`).Scan(&v.Slug, &v.Name, &v.Kind)
+			if err == nil && !isHiddenMainMapVenueSlug(v.Slug) {
+				v.VisibleBecause = "trailer_face_ready"
+				out = append(out, v)
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Slug < out[j].Slug })
 
 	if counts, err := resolveVenueNotificationCounts(ctx, pool); err == nil {
 		for i := range out {

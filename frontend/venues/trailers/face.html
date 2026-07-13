@@ -353,9 +353,9 @@
   <div class="shell">
     <header class="header">
       <p class="eyebrow">Venue / My Trailer</p>
-      <h1>My Face</h1>
+      <h1>My Trailer - All about Me</h1>
       <p class="subtitle">
-        This is the compiled, curated view of your Player Workbook that other signed-in Victory members see. Facts you haven't added yet simply don't appear here — there's no "not set" wall.
+        Trailers is about YOU and how YOU present to the other people here. If you're looking for a character, please see the Greenroom.
       </p>
       <div class="launchbar">
         <a class="chip" href="/venues/trailers/workbook.html">Edit My Workbook</a>
@@ -367,6 +367,8 @@
 
     <main class="stage">
       <p class="status-line" id="status-line">Loading your Face...</p>
+
+      <section class="card" id="third-place-banner" hidden></section>
 
       <section class="card identity-card" id="identity-card" hidden>
         <div id="portrait-wrap"></div>
@@ -737,6 +739,24 @@
       renderIdentity(facePreview);
       renderRegions(facePreview);
       renderCompiler(latestMe);
+      loadThirdPlaceReadiness().catch((error) => console.error("third place readiness refresh failed", error));
+    }
+
+    async function loadThirdPlaceReadiness() {
+      const banner = document.getElementById("third-place-banner");
+      const response = await fetch("/api/player-profile/me/face-readiness", { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        banner.hidden = true;
+        return;
+      }
+      const ready = payload.data && payload.data.ready;
+      banner.hidden = false;
+      if (ready) {
+        banner.innerHTML = '<p><strong>Third Place unlocked.</strong> Your Headshot is composed and ready for sharing at the Third Place. <a href="/venues/third-place/">visit Third Place</a>.</p>';
+      } else {
+        banner.innerHTML = "<p><strong>To access the 'Third Place' venue -</strong> Add a stage name below and select 'Edit my Workbook' to set at least one visible fact about you, the actual person.</p>";
+      }
     }
 
     document.getElementById("toggle-compiler-button").addEventListener("click", () => {
@@ -776,6 +796,8 @@
       document.getElementById("identity-card").hidden = false;
       document.getElementById("toggle-compiler-button").hidden = false;
       statusLine.textContent = "";
+
+      loadThirdPlaceReadiness().catch((error) => console.error("third place readiness load failed", error));
 
       if (latestMe.workbook && latestMe.workbook.id) {
         watchPlayerProfile(latestMe.workbook.id, () => {

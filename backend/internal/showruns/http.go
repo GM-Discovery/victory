@@ -154,12 +154,16 @@ func HandleByID(pool *pgxpool.Pool) http.HandlerFunc {
 				writeError(w, err)
 				return
 			}
-			canView, err := CanViewShowRun(ctx, pool, userID, sr.LocationID)
+			// Backstage detail (Kernel 68 §3.6) -- stricter than the plain
+			// Audience Program bar (CanViewShowRun, used by the dedicated
+			// /audience-program route). Audience/Player-only users get a
+			// clean rejection here rather than backstage fields.
+			canViewBackstage, err := CanViewBackstage(ctx, pool, userID, sr.LocationID)
 			if err != nil {
 				writeError(w, err)
 				return
 			}
-			if !canView {
+			if !canViewBackstage {
 				writeError(w, errors.New("not_authorized"))
 				return
 			}
