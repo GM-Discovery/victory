@@ -131,6 +131,7 @@ migrations=(
   "$ROOT/database/migrations/039_kernel66_show_runs.sql"
   "$ROOT/database/migrations/040_kernel67_shows.sql"
   "$ROOT/database/migrations/041_kernel68_productions_created_by.sql"
+  "$ROOT/database/migrations/042_kernel69_scenes.sql"
 )
 
 for migration in "${migrations[@]}"; do
@@ -943,5 +944,164 @@ if [[ "$create_run_from_new_production_status" != "200" ]]; then
   exit 1
 fi
 echo "PASS newly created Production can be used to create a Show Run"
+
+# --- Kernel 69: Scene Library and Show Staging Model ---
+# Reuses Producer A ($raw_session), Audience B ($second_session), the
+# fixture Production ($fresh_install_production_id), and the fixture Show
+# Run ($show_run_id) from the Kernel 66 block. $show_id from the Kernel 67
+# block is now archived, so this section creates its own two fresh Shows
+# under the same Show Run to prove one Scene can be staged in more than one
+# Show.
+
+anon_scenes_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' "http://127.0.0.1:${BACKEND_PORT}/api/scenes?production_id=${fresh_install_production_id}")"
+if [[ "$anon_scenes_status" != "401" ]]; then
+  echo "expected anonymous Scenes list to return 401, got $anon_scenes_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS Scenes list rejects anonymous requests"
+
+create_scene_show_a_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}/shows" \
+  -d '{"title":"Fresh Install Scene Show A","slug":"fresh-install-scene-show-a"}')"
+scene_show_a_id="$(grep -o '"id":"[^"]*"' "$BODY_OUT" | head -n1 | sed 's/"id":"//;s/"$//')"
+create_scene_show_b_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}/shows" \
+  -d '{"title":"Fresh Install Scene Show B","slug":"fresh-install-scene-show-b"}')"
+scene_show_b_id="$(grep -o '"id":"[^"]*"' "$BODY_OUT" | head -n1 | sed 's/"id":"//;s/"$//')"
+if [[ "$create_scene_show_a_status" != "200" || "$create_scene_show_b_status" != "200" || -z "$scene_show_a_id" || -z "$scene_show_b_id" ]]; then
+  echo "expected Producer A to create two fresh Shows for Scene staging" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS created two fresh Shows for Scene staging ($scene_show_a_id, $scene_show_b_id)"
+
+create_scene_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/scenes" \
+  -d "{\"production_id\":\"$fresh_install_production_id\",\"slug\":\"fresh-install-character-making-opening\",\"title\":\"Socio- : Character Making — Opening\",\"audience_title\":\"Character Making\",\"audience_summary\":\"Come make a character with us.\",\"director_notes\":\"backstage only\"}")"
+if [[ "$create_scene_status" != "200" ]]; then
+  echo "expected Producer A to create a Scene, got $create_scene_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+scene_id="$(grep -o '"id":"[^"]*"' "$BODY_OUT" | head -n1 | sed 's/"id":"//;s/"$//')"
+if [[ -z "$scene_id" ]]; then
+  echo "failed to extract scene id" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS Producer A created a reusable Scene ($scene_id)"
+
+audience_create_scene_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$second_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/scenes" \
+  -d "{\"production_id\":\"$fresh_install_production_id\",\"title\":\"Sneaky Scene\",\"slug\":\"sneaky-scene\"}")"
+if [[ "$audience_create_scene_status" != "403" ]]; then
+  echo "expected Audience-only B to be rejected creating a Scene, got $audience_create_scene_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS Audience-only account cannot create a Scene"
+
+place_a_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/shows/${scene_show_a_id}/scenes" \
+  -d "{\"scene_id\":\"$scene_id\",\"sort_order\":1}")"
+placement_a_id="$(grep -o '"id":"[^"]*"' "$BODY_OUT" | head -n1 | sed 's/"id":"//;s/"$//')"
+place_b_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/shows/${scene_show_b_id}/scenes" \
+  -d "{\"scene_id\":\"$scene_id\",\"sort_order\":1}")"
+if [[ "$place_a_status" != "200" || "$place_b_status" != "200" || -z "$placement_a_id" ]]; then
+  echo "expected the same Scene to be stageable in two different Shows under the same Production" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS the same reusable Scene was staged in two different Shows"
+
+ready_placement_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X PATCH "http://127.0.0.1:${BACKEND_PORT}/api/shows/${scene_show_a_id}/scenes/${placement_a_id}" \
+  -d '{"status":"ready"}')"
+if [[ "$ready_placement_status" != "200" ]]; then
+  echo "expected Producer A to mark the placement ready, got $ready_placement_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+
+scene_program_response="$(curl -s -H "Cookie: victory_session=$second_session" "http://127.0.0.1:${BACKEND_PORT}/api/shows/${scene_show_a_id}/scenes/program")"
+if [[ "$scene_program_response" != *'"title":"Character Making"'* ]]; then
+  echo "expected curated Scene Program to include the ready placement's audience title" >&2
+  echo "$scene_program_response" >&2
+  exit 1
+fi
+if [[ "$scene_program_response" == *'"backstage only"'* || "$scene_program_response" == *'director_notes'* ]]; then
+  echo "curated Scene Program must never expose director_notes" >&2
+  echo "$scene_program_response" >&2
+  exit 1
+fi
+echo "PASS curated Scene Program shows only audience-safe fields"
+
+backstage_scene_list_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$second_session" "http://127.0.0.1:${BACKEND_PORT}/api/shows/${scene_show_a_id}/scenes")"
+if [[ "$backstage_scene_list_status" != "403" ]]; then
+  echo "expected Audience-only B to be rejected viewing the backstage Scene list, got $backstage_scene_list_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS backstage Scene list rejects a user without backstage authority"
+
+remove_placement_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/shows/${scene_show_a_id}/scenes/${placement_a_id}/archive")"
+if [[ "$remove_placement_status" != "200" ]]; then
+  echo "expected Producer A to remove the Scene placement from Show A, got $remove_placement_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+scene_after_placement_removed="$(curl -s -H "Cookie: victory_session=$raw_session" "http://127.0.0.1:${BACKEND_PORT}/api/scenes/${scene_id}")"
+if [[ "$scene_after_placement_removed" == *'"status":"archived"'* ]]; then
+  echo "removing a Show's Scene placement must not archive the reusable Scene" >&2
+  echo "$scene_after_placement_removed" >&2
+  exit 1
+fi
+show_b_scenes_after_removal="$(curl -s -H "Cookie: victory_session=$raw_session" "http://127.0.0.1:${BACKEND_PORT}/api/shows/${scene_show_b_id}/scenes")"
+if [[ "$show_b_scenes_after_removal" != *"\"scene_id\":\"$scene_id\""* ]]; then
+  echo "expected Show B's independent placement of the same Scene to remain untouched" >&2
+  echo "$show_b_scenes_after_removal" >&2
+  exit 1
+fi
+echo "PASS archiving one Show's placement neither archives the Scene nor affects the other Show's placement"
+
+archive_scene_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/scenes/${scene_id}/archive")"
+if [[ "$archive_scene_status" != "200" ]]; then
+  echo "expected Producer A to archive the reusable Scene, got $archive_scene_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+new_placement_of_archived_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/shows/${scene_show_a_id}/scenes" \
+  -d "{\"scene_id\":\"$scene_id\"}")"
+if [[ "$new_placement_of_archived_status" != "400" || "$(cat "$BODY_OUT")" != *'"scene_archived"'* ]]; then
+  echo "expected a new placement of an archived Scene to be rejected with scene_archived, got $new_placement_of_archived_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS archiving a Scene blocks new placements while preserving existing ones"
+
+for file in \
+  frontend/venues/show-runs/scenes.html; do
+  if [[ ! -f "$ROOT/$file" ]]; then
+    echo "missing required file: $file" >&2
+    exit 1
+  fi
+done
+echo "PASS Scene Library page file exists"
 
 echo "PASS clean-install smoke complete"

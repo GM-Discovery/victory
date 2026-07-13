@@ -29,6 +29,11 @@
     .badge { display: inline-flex; border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border: 1px solid rgba(255,255,255,0.2); color: var(--muted); text-transform: capitalize; }
     .badge.active { color: var(--accent); border-color: rgba(240, 211, 164, 0.4); }
     .link-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+    .scene-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; }
+    .scene-row-title { font-weight: 700; color: var(--accent-strong); }
+    .scene-row-meta { color: var(--muted); font-size: 0.82rem; margin: 2px 0 0; }
+    .scene-row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip.small { padding: 8px 12px; font-size: 0.82rem; }
   </style>
 </head>
 <body>
@@ -117,6 +122,30 @@
           <button class="chip danger" type="button" id="unlink-session-button">Unlink</button>
         </div>
       </section>
+
+      <section class="card" id="scenes-card" hidden>
+        <h2 style="margin-top:0;">Scenes in this Show</h2>
+        <p class="status-line" id="scenes-status-line">Loading Scenes...</p>
+        <div id="scenes-list"></div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="scene-select">Add existing Scene</label>
+            <select id="scene-select"></select>
+          </div>
+          <div class="field">
+            <label for="scene-venue-input">Venue override</label>
+            <input type="text" id="scene-venue-input" placeholder="Optional — paste a venue id" />
+          </div>
+          <div class="field">
+            <label for="scene-sort-input">Sort order</label>
+            <input type="text" id="scene-sort-input" placeholder="0" />
+          </div>
+        </div>
+        <p class="launchbar">
+          <button class="chip" type="button" id="add-scene-button">Add Scene to Show</button>
+          <a class="chip" id="scene-library-link" href="#">Scene Library (create new)</a>
+        </p>
+      </section>
     </main>
   </div>
 
@@ -193,6 +222,133 @@
 
       document.getElementById("manage-card").hidden = false;
       document.getElementById("session-card").hidden = false;
+      document.getElementById("scenes-card").hidden = false;
+
+      const productionId = payload.data.production_id;
+      document.getElementById("scene-library-link").href = "/venues/show-runs/scenes.html?production_id=" + encodeURIComponent(productionId);
+
+      function renderScenePlacement(detail) {
+        const row = document.createElement("div");
+        row.className = "scene-row";
+        const left = document.createElement("div");
+        const title = document.createElement("div");
+        title.className = "scene-row-title";
+        title.textContent = detail.scene.title;
+        left.appendChild(title);
+        const meta = document.createElement("p");
+        meta.className = "scene-row-meta";
+        meta.textContent = "Order " + detail.placement.sort_order + " · " + detail.placement.status +
+          (detail.placement.venue_id ? " · Venue override: " + detail.placement.venue_id : "");
+        left.appendChild(meta);
+        row.appendChild(left);
+
+        const actions = document.createElement("div");
+        actions.className = "scene-row-actions";
+
+        const readySelect = document.createElement("select");
+        for (const status of ["draft", "ready", "retired", "archived"]) {
+          const option = document.createElement("option");
+          option.value = status;
+          option.textContent = status;
+          if (status === detail.placement.status) option.selected = true;
+          readySelect.appendChild(option);
+        }
+        readySelect.addEventListener("change", async () => {
+          const res = await fetch(`/api/shows/${encodeURIComponent(showId)}/scenes/${encodeURIComponent(detail.placement.id)}`, {
+            method: "PATCH", credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: readySelect.value }),
+          });
+          const p = await res.json().catch(() => null);
+          if (!res.ok || !p?.ok) { alert("Could not update placement: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+          await loadScenes();
+        });
+        actions.appendChild(readySelect);
+
+        const removeButton = document.createElement("button");
+        removeButton.className = "chip danger small";
+        removeButton.type = "button";
+        removeButton.textContent = "Remove from Show";
+        removeButton.addEventListener("click", async () => {
+          removeButton.disabled = true;
+          try {
+            const res = await fetch(`/api/shows/${encodeURIComponent(showId)}/scenes/${encodeURIComponent(detail.placement.id)}/archive`, { method: "POST", credentials: "include" });
+            const p = await res.json().catch(() => null);
+            if (!res.ok || !p?.ok) { alert("Could not remove Scene from Show: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+            await loadScenes();
+          } finally {
+            removeButton.disabled = false;
+          }
+        });
+        actions.appendChild(removeButton);
+
+        row.appendChild(actions);
+        return row;
+      }
+
+      async function loadAvailableScenes() {
+        const select = document.getElementById("scene-select");
+        select.innerHTML = "";
+        const response = await fetch("/api/scenes?production_id=" + encodeURIComponent(productionId), { credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) return;
+        for (const scene of (payload.data.scenes || [])) {
+          if (scene.status === "archived") continue;
+          const option = document.createElement("option");
+          option.value = scene.id;
+          option.textContent = scene.title;
+          select.appendChild(option);
+        }
+      }
+
+      async function loadScenes() {
+        const list = document.getElementById("scenes-list");
+        const statusLine = document.getElementById("scenes-status-line");
+        const response = await fetch(`/api/shows/${encodeURIComponent(showId)}/scenes`, { credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          statusLine.textContent = "Could not load Scenes for this Show.";
+          statusLine.hidden = false;
+          return;
+        }
+        const placements = payload.data.placements || [];
+        list.innerHTML = "";
+        if (placements.length === 0) {
+          statusLine.textContent = "No Scenes staged in this Show yet.";
+          statusLine.hidden = false;
+        } else {
+          statusLine.hidden = true;
+          for (const detail of placements) list.appendChild(renderScenePlacement(detail));
+        }
+      }
+
+      document.getElementById("add-scene-button").addEventListener("click", async (event) => {
+        const sceneId = document.getElementById("scene-select").value;
+        if (!sceneId) { alert("Create a Scene in the Scene Library first."); return; }
+        event.target.disabled = true;
+        try {
+          const sortOrderRaw = document.getElementById("scene-sort-input").value.trim();
+          const res = await fetch(`/api/shows/${encodeURIComponent(showId)}/scenes`, {
+            method: "POST", credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              scene_id: sceneId,
+              venue_id: document.getElementById("scene-venue-input").value.trim(),
+              sort_order: sortOrderRaw ? parseInt(sortOrderRaw, 10) : 0,
+            }),
+          });
+          const p = await res.json().catch(() => null);
+          if (!res.ok || !p?.ok) { alert("Could not add Scene to Show: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+          document.getElementById("scene-venue-input").value = "";
+          document.getElementById("scene-sort-input").value = "";
+          await loadScenes();
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+
+      await loadAvailableScenes();
+      await loadScenes();
 
       async function patch(body) {
         const res = await fetch("/api/shows/" + encodeURIComponent(showId), {

@@ -53,6 +53,7 @@
       <div class="launchbar">
         <a class="chip" href="/venues/show-runs/">All Show Runs</a>
         <a class="chip" id="roster-link" href="#" hidden>Manage Roster</a>
+        <a class="chip" id="scene-library-link" href="#" hidden>Scene Library</a>
         <a class="chip" id="program-link" href="#">Audience Program</a>
       </div>
     </header>
@@ -269,6 +270,9 @@
 
       if (canManage) {
         document.getElementById("roster-link").hidden = false;
+        const sceneLibraryLink = document.getElementById("scene-library-link");
+        sceneLibraryLink.href = "/venues/show-runs/scenes.html?production_id=" + encodeURIComponent(run.production_id);
+        sceneLibraryLink.hidden = false;
         document.getElementById("manage-card").hidden = false;
       } else {
         document.getElementById("readonly-card").hidden = false;

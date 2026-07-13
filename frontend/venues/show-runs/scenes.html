@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Scene Library — Victory</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    :root { color-scheme: dark; --bg: #17120e; --panel: rgba(27, 21, 17, 0.92); --line: rgba(255, 233, 197, 0.12); --accent: #f0d3a4; --accent-strong: #fff2d7; --muted: #d0bfa6; }
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: linear-gradient(180deg, #17120e 0%, #0e0b09 100%); color: #f6ecdd; }
+    .header { padding: 22px 24px 12px; max-width: 1100px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+    .eyebrow { text-transform: uppercase; letter-spacing: 0.18em; color: #d7ab6f; font-size: 0.76rem; margin: 0 0 8px; }
+    h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.4rem); }
+    .subtitle { margin: 10px 0 0; color: var(--muted); max-width: 72ch; line-height: 1.5; }
+    .launchbar { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
+    .chip { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; text-decoration: none; border: 1px solid var(--line); padding: 11px 16px; color: var(--accent-strong); background: rgba(255, 255, 255, 0.03); font-weight: 700; cursor: pointer; font: inherit; }
+    .chip:disabled { opacity: 0.6; cursor: default; }
+    .chip.danger { border-color: rgba(240, 130, 100, 0.4); color: #ffd6c4; }
+    .stage { max-width: 1100px; width: 100%; margin: 0 auto; padding: 8px 24px 48px; box-sizing: border-box; display: grid; gap: 18px; }
+    [hidden] { display: none !important; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 22px; }
+    .form-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
+    .field.span-2 { grid-column: span 2; }
+    @media (max-width: 640px) { .field.span-2 { grid-column: span 1; } }
+    label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); display: block; margin-bottom: 6px; }
+    input[type="text"], textarea, select { box-sizing: border-box; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: #211913; color: #fff6e9; padding: 12px 14px; font: inherit; width: 100%; }
+    textarea { resize: vertical; min-height: 60px; }
+    .status-line { color: var(--muted); min-height: 1.4em; }
+    .badge { display: inline-flex; border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border: 1px solid rgba(255,255,255,0.2); color: var(--muted); width: fit-content; text-transform: capitalize; }
+    .badge.active { color: var(--accent); border-color: rgba(240, 211, 164, 0.4); }
+    .scene-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+    .scene-card { background: rgba(255,255,255,0.02); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+    .scene-title { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--accent-strong); }
+    .scene-meta { color: var(--muted); font-size: 0.86rem; margin: 0; }
+    .scene-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+    .scene-actions .chip { padding: 9px 14px; font-size: 0.86rem; }
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+    .empty-state h2 { color: #f6ecdd; margin: 0 0 8px; }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <header class="header">
+      <p class="eyebrow">Victory / Stage Management / Scene Library</p>
+      <h1>Scene Library</h1>
+      <p class="subtitle">Reusable Scenes for this Production. A Scene can be staged in one or more Shows — build it once here, then add it to a Show from the Show's own page.</p>
+      <div class="launchbar">
+        <a class="chip" href="/venues/show-runs/">Stage Management</a>
+      </div>
+    </header>
+
+    <main class="stage">
+      <p class="status-line" id="status-line">Loading Scene Library...</p>
+
+      <section class="card" id="create-card" hidden>
+        <h2 style="margin-top:0;">Create a Scene</h2>
+        <div class="form-grid">
+          <div class="field span-2">
+            <label for="title-input">Title</label>
+            <input type="text" id="title-input" placeholder="Socio- : Character Making — Opening" />
+          </div>
+          <div class="field">
+            <label for="slug-input">Slug</label>
+            <input type="text" id="slug-input" placeholder="character-making-opening" />
+          </div>
+          <div class="field">
+            <label for="short-title-input">Short title</label>
+            <input type="text" id="short-title-input" placeholder="Optional" />
+          </div>
+          <div class="field">
+            <label for="default-venue-input">Default venue ID</label>
+            <input type="text" id="default-venue-input" placeholder="Optional — paste a venue id" />
+          </div>
+          <div class="field">
+            <label for="source-ref-input">Source ref</label>
+            <input type="text" id="source-ref-input" placeholder="Optional — future script link placeholder" />
+          </div>
+          <div class="field span-2">
+            <label for="audience-title-input">Audience title</label>
+            <input type="text" id="audience-title-input" placeholder="Optional" />
+          </div>
+          <div class="field span-2">
+            <label for="audience-summary-input">Audience summary</label>
+            <textarea id="audience-summary-input" placeholder="Optional — shown on the Audience Program if this Scene is staged and ready"></textarea>
+          </div>
+          <div class="field span-2">
+            <label for="player-brief-input">Player brief</label>
+            <textarea id="player-brief-input" placeholder="Optional"></textarea>
+          </div>
+          <div class="field span-2">
+            <label for="director-notes-input">Director notes</label>
+            <textarea id="director-notes-input" placeholder="Optional — backstage only"></textarea>
+          </div>
+        </div>
+        <p class="launchbar">
+          <button class="chip" type="button" id="create-scene-button">Create Scene</button>
+        </p>
+        <p class="status-line" id="create-status"></p>
+      </section>
+
+      <div class="scene-grid" id="scene-grid"></div>
+
+      <section class="card empty-state" id="empty-state" hidden>
+        <h2>No Scenes yet</h2>
+        <p>Create the first reusable Scene for this Production above.</p>
+      </section>
+    </main>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/back-to-map.js"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script>
+    function productionIdFromQuery() {
+      return new URLSearchParams(window.location.search).get("production_id") || "";
+    }
+
+    function slugify(text) {
+      return text.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "";
+      try { return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }); }
+      catch (e) { return iso; }
+    }
+
+    function renderSceneCard(scene, canManage) {
+      const card = document.createElement("div");
+      card.className = "scene-card";
+
+      const title = document.createElement("p");
+      title.className = "scene-title";
+      title.textContent = scene.title;
+      card.appendChild(title);
+
+      const badge = document.createElement("span");
+      badge.className = "badge" + (scene.status === "ready" ? " active" : "");
+      badge.textContent = scene.status;
+      card.appendChild(badge);
+
+      const meta = document.createElement("p");
+      meta.className = "scene-meta";
+      meta.textContent = "Slug: " + scene.slug + " · Created " + formatDate(scene.created_at);
+      card.appendChild(meta);
+
+      if (scene.default_venue_id) {
+        const venue = document.createElement("p");
+        venue.className = "scene-meta";
+        venue.textContent = "Default venue: " + scene.default_venue_id;
+        card.appendChild(venue);
+      }
+
+      if (canManage) {
+        const actions = document.createElement("div");
+        actions.className = "scene-actions";
+
+        const editButton = document.createElement("button");
+        editButton.className = "chip";
+        editButton.type = "button";
+        editButton.textContent = "Edit";
+        editButton.addEventListener("click", () => openEditor(scene));
+        actions.appendChild(editButton);
+
+        if (scene.status !== "archived") {
+          const archiveButton = document.createElement("button");
+          archiveButton.className = "chip danger";
+          archiveButton.type = "button";
+          archiveButton.textContent = "Archive";
+          archiveButton.addEventListener("click", async () => {
+            archiveButton.disabled = true;
+            try {
+              const res = await fetch("/api/scenes/" + encodeURIComponent(scene.id) + "/archive", { method: "POST", credentials: "include" });
+              const p = await res.json().catch(() => null);
+              if (!res.ok || !p?.ok) { alert("Could not archive Scene: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+              await fetchScenes();
+            } finally {
+              archiveButton.disabled = false;
+            }
+          });
+          actions.appendChild(archiveButton);
+        }
+
+        card.appendChild(actions);
+      }
+
+      return card;
+    }
+
+    async function openEditor(scene) {
+      const newTitle = prompt("Title", scene.title);
+      if (newTitle === null) return;
+      const res = await fetch("/api/scenes/" + encodeURIComponent(scene.id), {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newTitle.trim() }),
+      });
+      const p = await res.json().catch(() => null);
+      if (!res.ok || !p?.ok) { alert("Could not update Scene: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+      await fetchScenes();
+    }
+
+    let productionId = "";
+    let scenesCanManage = false;
+
+    function renderGrid(scenes, canManage) {
+      const grid = document.getElementById("scene-grid");
+      grid.innerHTML = "";
+      document.getElementById("empty-state").hidden = scenes.length !== 0;
+      for (const scene of scenes) grid.appendChild(renderSceneCard(scene, canManage));
+    }
+
+    async function fetchScenes() {
+      const response = await fetch("/api/scenes?production_id=" + encodeURIComponent(productionId), { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (isForbiddenAccessResponse(response, payload)) { showForbiddenScreen(); return; }
+      if (!response.ok || !payload?.ok) {
+        document.getElementById("status-line").textContent = "Could not load Scenes.";
+        document.getElementById("status-line").hidden = false;
+        return;
+      }
+      document.getElementById("status-line").hidden = true;
+      scenesCanManage = !!payload.data.can_manage;
+      document.getElementById("create-card").hidden = !scenesCanManage;
+      renderGrid(payload.data.scenes || [], scenesCanManage);
+    }
+
+    async function bootstrap() {
+      const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
+      const sessionPayload = await sessionResponse.json().catch(() => null);
+      if (!sessionResponse.ok || !sessionPayload?.ok || !sessionPayload.signed_in) {
+        showForbiddenScreen();
+        return;
+      }
+
+      productionId = productionIdFromQuery();
+      if (!productionId) {
+        document.getElementById("status-line").textContent = "No Production specified.";
+        return;
+      }
+
+      const titleInput = document.getElementById("title-input");
+      const slugInput = document.getElementById("slug-input");
+      let slugTouched = false;
+      slugInput.addEventListener("input", () => { slugTouched = true; });
+      titleInput.addEventListener("input", () => {
+        if (!slugTouched) slugInput.value = slugify(titleInput.value);
+      });
+
+      document.getElementById("create-scene-button").addEventListener("click", async (event) => {
+        const statusLine = document.getElementById("create-status");
+        const title = titleInput.value.trim();
+        const slug = slugInput.value.trim();
+        if (!title || !slug) { statusLine.textContent = "Title and slug are required."; return; }
+        event.target.disabled = true;
+        try {
+          const body = {
+            production_id: productionId,
+            title, slug,
+            short_title: document.getElementById("short-title-input").value.trim(),
+            default_venue_id: document.getElementById("default-venue-input").value.trim(),
+            source_ref: document.getElementById("source-ref-input").value.trim(),
+            audience_title: document.getElementById("audience-title-input").value.trim(),
+            audience_summary: document.getElementById("audience-summary-input").value.trim(),
+            player_brief: document.getElementById("player-brief-input").value.trim(),
+            director_notes: document.getElementById("director-notes-input").value.trim(),
+          };
+          const response = await fetch("/api/scenes", {
+            method: "POST", credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const payload = await response.json().catch(() => null);
+          if (!response.ok || !payload?.ok) {
+            statusLine.textContent = "Could not create Scene: " + (payload?.data?.error || `HTTP ${response.status}`);
+            return;
+          }
+          statusLine.textContent = "";
+          titleInput.value = ""; slugInput.value = ""; slugTouched = false;
+          document.getElementById("short-title-input").value = "";
+          document.getElementById("default-venue-input").value = "";
+          document.getElementById("source-ref-input").value = "";
+          document.getElementById("audience-title-input").value = "";
+          document.getElementById("audience-summary-input").value = "";
+          document.getElementById("player-brief-input").value = "";
+          document.getElementById("director-notes-input").value = "";
+          await fetchScenes();
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+
+      await fetchScenes();
+    }
+
+    bootstrap().catch((error) => {
+      console.error("scene library bootstrap failed", error);
+      document.getElementById("status-line").textContent = "Something went wrong loading the Scene Library.";
+    });
+  </script>
+</body>
+</html>

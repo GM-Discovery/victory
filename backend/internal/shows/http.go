@@ -189,7 +189,11 @@ func HandleShowByID(pool *pgxpool.Pool) http.HandlerFunc {
 				}
 			}
 
-			writeOK(w, map[string]any{"show": s, "can_manage": canManage, "roster": roster})
+			// production_id is surfaced here (not a Show field itself) so
+			// callers -- e.g. the Scenes section on the Show detail page,
+			// Kernel 69 -- can fetch the Production-scoped Scene Library
+			// without a second round trip through the Show Run.
+			writeOK(w, map[string]any{"show": s, "can_manage": canManage, "roster": roster, "production_id": sr.ProductionID})
 
 		case http.MethodPatch:
 			var body struct {

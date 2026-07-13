@@ -30,6 +30,10 @@
     .facts .fact-label { color: var(--accent); font-weight: 700; margin-right: 4px; }
     .status-line { color: var(--muted); min-height: 1.4em; }
     .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+    .scene-list { display: grid; gap: 12px; margin: 0; }
+    .scene-list-item { background: rgba(255,255,255,0.02); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; }
+    .scene-list-title { margin: 0; font-weight: 700; color: var(--accent-strong); }
+    .scene-list-summary { margin: 6px 0 0; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
   </style>
 </head>
 <body>
@@ -55,6 +59,10 @@
 
     <main class="stage">
       <p class="status-line" id="status-line">Loading Audience Program...</p>
+      <section class="card" id="scenes-section" hidden>
+        <h2 style="margin-top:0;">Scenes</h2>
+        <div class="scene-list" id="scene-list"></div>
+      </section>
       <div class="program-grid" id="program-grid"></div>
       <section class="card empty-state" id="empty-state" hidden>
         <h2 style="color:#f6ecdd;">Nobody's in the program yet</h2>
@@ -154,6 +162,31 @@
         document.getElementById("show-blurb").textContent = show.audience_program_blurb;
       }
       document.getElementById("run-link").href = "/venues/show-runs/run.html?id=" + encodeURIComponent(show.show_run_id);
+
+      const sceneProgramResponse = await fetch(`/api/shows/${encodeURIComponent(showId)}/scenes/program`, { credentials: "include" });
+      const sceneProgramPayload = await sceneProgramResponse.json().catch(() => null);
+      if (sceneProgramResponse.ok && sceneProgramPayload?.ok) {
+        const sceneEntries = sceneProgramPayload.data.scenes || [];
+        if (sceneEntries.length > 0) {
+          const sceneList = document.getElementById("scene-list");
+          for (const scene of sceneEntries) {
+            const item = document.createElement("div");
+            item.className = "scene-list-item";
+            const title = document.createElement("p");
+            title.className = "scene-list-title";
+            title.textContent = scene.title;
+            item.appendChild(title);
+            if (scene.audience_summary) {
+              const summary = document.createElement("p");
+              summary.className = "scene-list-summary";
+              summary.textContent = scene.audience_summary;
+              item.appendChild(summary);
+            }
+            sceneList.appendChild(item);
+          }
+          document.getElementById("scenes-section").hidden = false;
+        }
+      }
 
       const grid = document.getElementById("program-grid");
       const entries = payload.data.program || [];

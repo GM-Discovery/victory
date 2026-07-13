@@ -37,6 +37,7 @@ import (
 	"victory/backend/internal/playerprofile"
 	"victory/backend/internal/playerrelationships"
 	"victory/backend/internal/profiles"
+	"victory/backend/internal/scenes"
 	"victory/backend/internal/showings"
 	"victory/backend/internal/showruns"
 	"victory/backend/internal/shows"
@@ -208,6 +209,16 @@ func main() {
 	mux.HandleFunc("GET /api/shows/{show_id}/program", shows.HandleShowProgram(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/sessions/{session_id}/link", shows.HandleShowSessionLink(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/sessions/{session_id}/unlink", shows.HandleShowSessionUnlink(pool))
+	mux.HandleFunc("GET /api/scenes", scenes.HandleScenesCollection(pool))
+	mux.HandleFunc("POST /api/scenes", scenes.HandleScenesCollection(pool))
+	mux.HandleFunc("GET /api/scenes/{scene_id}", scenes.HandleSceneByID(pool))
+	mux.HandleFunc("PATCH /api/scenes/{scene_id}", scenes.HandleSceneByID(pool))
+	mux.HandleFunc("POST /api/scenes/{scene_id}/archive", scenes.HandleSceneArchive(pool))
+	mux.HandleFunc("GET /api/shows/{show_id}/scenes", scenes.HandleShowScenesCollection(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/scenes", scenes.HandleShowScenesCollection(pool))
+	mux.HandleFunc("PATCH /api/shows/{show_id}/scenes/{placement_id}", scenes.HandleShowScenePlacementByID(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/scenes/{placement_id}/archive", scenes.HandleShowScenePlacementArchive(pool))
+	mux.HandleFunc("GET /api/shows/{show_id}/scenes/program", scenes.HandleShowSceneProgram(pool))
 	mux.HandleFunc("GET /api/characters/parentage-chart", characters.HandleParentageChart())
 	mux.HandleFunc("GET /api/characters/chapter2-rules", characters.HandleChapter2Rules())
 	mux.HandleFunc("GET /api/character-cards/me", characters.HandleMyCharacterCards(pool))

@@ -250,7 +250,8 @@ Show (Show Instance)
 - The concrete playable/viewable instance of a Show Run: a planned future
   occurrence (no session yet), a live occurrence, a multi-session arc, or a
   completed/cancelled/archived one. Hierarchy: Production -> Show Run ->
-  Show -> Session(s) -> (later) Scene Configurations.
+  Show -> Session(s), with reusable Scenes (see below) staged into a Show
+  via Show Scene Placements, not owned by it.
 - Not the same as a Session (technical live runtime window, `sessions`
   table) and not the same as a Showing (Kernel 22's live 1:1
   audience-visibility wrapper around an active session, `showings` table)
@@ -262,6 +263,56 @@ Show (Show Instance)
 - `sessions.show_id` is a nullable, manually-set link (not wired into the
   `/session start` command flow) so a Session can optionally point back at
   the Show it belongs to.
+
+Scene
+- A reusable, Production-scoped authored/configured playable or viewable
+  unit -- the first real reusable play object (Kernel 69). A Scene is
+  deliberately NOT a child row of one Show: the same Scene may be staged in
+  zero, one, or many Shows under its Production (e.g. a recurring
+  "Character Making - Opening" Scene reused across several one-shots).
+- Implemented by the `scenes` table (`production_id NOT NULL REFERENCES
+  productions(id) ON DELETE RESTRICT`) and backend/internal/scenes. Slug
+  uniqueness is scoped to the Production, not global.
+- Statuses: draft, ready, retired, archived -- deliberately no `live` status
+  in Kernel 69; that belongs to a later Fly Scene / Capture / Session
+  integration kernel. Archiving a Scene blocks *new* Show Scene Placements
+  (CreatePlacement rejects an archived Scene) but never touches existing
+  placements, which remain exactly as staged.
+- Has both audience-facing fields (audience_title, audience_summary) and
+  backstage-only fields (player_brief, director_notes, operator_notes) --
+  only the audience fields (with a Show placement's own override applied
+  first) ever reach a curated Audience Program view.
+- `source_ref` and `config_json` exist only to reserve room for a future
+  script/hyperlink system -- Kernel 69 explicitly does not build a script
+  editor, hyperlink graph, or line-anchor system. Treat any future Script
+  concept as linking *to* Scenes, not replacing them.
+- Not to be confused with `frontend/venues/{first-theater,catharsis}/
+  runtime/scene-nodes.js`, a PIXI.js canvas scene-graph helper predating
+  this kernel and unrelated to the Scene domain object -- same word,
+  different meaning (rendering "scene" vs. the playable-unit "Scene").
+
+Show Scene Placement (Show Scene)
+- The use of one reusable Scene inside one specific Show -- ordering
+  (sort_order), an optional Venue override, and a small set of
+  audience/director text overrides, none of which mutate the underlying
+  Scene. UI calls this "Scenes in this Show" / "Add Scene to Show" /
+  "Remove Scene from Show" and never surfaces the word "placement."
+- Implemented by the `show_scene_placements` table (`UNIQUE(show_id,
+  scene_id)` -- a Scene may be staged at most once per Show, but the same
+  Scene can have a separate placement row in any number of other Shows).
+  `scene_id` is `ON DELETE RESTRICT`: removing/archiving a placement is a
+  status change, never a delete, so a Scene can never be silently orphaned
+  out from under a Show's history.
+- Statuses mirror Scene's own (draft/ready/retired/archived, no `live`). A
+  placement's Audience Program visibility requires status = 'ready' and
+  archived_at IS NULL -- draft-staged Scenes never leak to Audience.
+- Curated Audience Program addition lives at `GET /api/shows/{id}/scenes/
+  program`, deliberately a separate route from `GET /api/shows/{id}/
+  program` (Kernel 66/67's roster-based Audience Program) rather than a
+  merged response, to avoid backend/internal/shows importing
+  backend/internal/scenes (which itself imports `shows` to resolve a
+  Show's parent Show Run/Production) -- an import cycle. The Show detail
+  page's frontend calls both routes and renders them together.
 
 Showing (live/runtime) vs. Show (scheduling/instance container)
 - "Showing" (Kernel 22, backend/internal/showings) is the live, 1:1 runtime
