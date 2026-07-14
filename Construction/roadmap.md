@@ -1,116 +1,72 @@
 # Victory Roadmap
 
 ## Purpose
-This roadmap reflects current priorities after Kernel 52.
 
-Kernel numbers are labels, but from here they should remain stable once assigned so planning, reportbacks, and future agents all refer to the same landmarks.
+This is the current forward-looking roadmap after **Kernel 70**. The chronological record of shipped kernels lives in `Construction/OperatorLogs/operator-log.md`; older kernel specs and the large track roadmaps remain design history, not the source for the next unused kernel number.
 
-## Near Roadmap: Kernels 26–52
-- `27 — Showing Review v1`
-  - review chat, stage speech, reactions, reveal/hide, overlays, cards, and persona changes
-- `28 — Director Console v1`
-  - live control surface for the current showing
-- `29 — PixiJS Stage Spike v1`
-  - complete proving-ground spike for PixiJS as the stage/worldspace renderer
-- `30 — Cave Organization + Renderer Containment`
-  - keep Pixi experimental but usable, and organize Cave tools into clearer containers
-- `31 — Middle School Stage + Edge Drawer Layout v1`
-  - build the first clean copyable stage shell without turning The Cave into the template
-- `32 — Discord OAuth Primary Login v1`
-  - add Discord OAuth as the primary login path while preserving Victory identity and operator fallback
-- `33 — Operator Bootstrap + Canon Capture v1`
-  - add a safe operator bootstrap path for producer authority and capture Kernel 32 plus follow-on live-site work into canon
-- `34 — Stage Navigation / View Resolver v1`
-  - better view/surface routing inside venue runtime
-- `35 — Map/Object Movement v1`
-  - more formal object movement and navigation behavior
-- `36 — Venue Policy Console v1`
-  - clearer venue-level policy toggles and controls
-- `37 — Asset Browser / Library v1`
-  - browse and select reusable assets/library elements
-- `38 — Warehouse / Asset Storage Surface v1`
-  - durable storage and browsing surface for reusable assets
-- `39 — Library / Script Surface v1`
-  - browse scripts and reusable reference material by ruleset or sheet type
-- `40 — Catharsis Prep Kernel`
-  - prep surfaces for the catharsis flow without building the full experience yet
-- `41 — Socio/Catharsis v1`
-  - first public-facing catharsis experience surface
-- `42 — Documentation + Hardening Pass`
-  - reconcile docs, tighten errors, and stabilize the kernel trail
-- `43 — Discord Audio Left Tray Foundation v1`
-  - add shared Discord audio status/control surface without building Victory audio transport
-- `44 — Discord Audio Presence / Speaker Feasibility v1`
-  - show live Discord voice-channel participants in the tray, prove speaker-indicator feasibility, and document why volume controls are deferred in the current architecture
-- `45 — Venue Shell Rebase + Shared Helper Extraction v1`
-  - extract reusable venue shell helpers, tighten the map shell, and make First Theater / Middle School Stage cleaner source patterns for future venues
-- `46 — Pixi Map Layer + Workshop Map Upload v1`
-  - First Theater now uploads/replaces a single active map as a Workshop asset, stores the crop/fit state server-side, and renders the map on its own Pixi layer without replacing the older stage façade
-- `47 — Pixi Grid Primitive + Map Alignment v1`
-  - First Theater now supports a persistent, server-backed square or hex grid rendered above the active map and below stage elements, with a Configure Grid context-menu surface for live-preview alignment, save/cancel, hide/show, and reset; visual-only, no snapping or pan/zoom yet
-- `48 — Personal Stage Camera + Card Pinning v1`
-  - First Theater now has a browser-local personal pan/zoom camera with cursor-centered wheel zoom, middle-mouse pan, edge scrolling, bounded Fit controls, and shared index-card pin/unpin state between world-space and fixed overlay rendering
-- `48.1 — Card Attachment Repair + Director Focus Ping`
-  - First Theater now defaults new cards to screen pinning, lets cards Attach to Map or Pin to Screen without jumping, repairs floating drag behavior, and adds Director-and-above Shift+Ping focus broadcasts with a ~250ms camera transition inside the current venue
-- `49 — Workshop Token Ingestion + Warehouse Storage v1`
-  - Workshop token preparation now uploads circle, square, hex, and raw token assets into the installation-wide Warehouse, with configurable storage policy, generated variants, and tombstone-safe deletion that falls back to the construction asset
-- `50 — First Theater Token Placement + Grid Snapping v1`
-  - First Theater now consumes Warehouse token assets through an `Add Token` picker and places them persistently on stage with grid-aware sizing and snap/free placement
-- `50+ — First Theater Token Persistence Hardening`
-  - token moves survive refresh and nameplate visibility now persists through reloads and hover interactions
-- `51A — First Theater Runtime Decomposition + Capacity Guardrails v1`
-  - Kernel 51A hardens the projected First Theater runtime and Grant's Cabin diagnostics path, while the broader runtime decomposition and operator-console work remain intentionally deferred
-- `52 — Canonical Dice Actions v1`
-  - Victory now owns canonical server-generated dice rolls, persists `roll/dice` as an append-only action, and exposes a simple First Theater Dice tray that submits `/roll` requests without client-side random generation
-- `53 — Character Workbook Foundation + Socio Parentage v1.1`
-  - extend the canonical character root into workbook metadata, add the first owned Catharsis Socio draft, private journals, Greenroom visibility on first workbook ownership, and the Stage 1 Parentage foundation that will consume the versioned parentage chart once it is supplied
+## Shipped Foundation
 
-Ordering note:
-- Showing Review comes before polish-only work
-- Director Console lands immediately after review
-- Cave polish and organization belongs around Kernel 30
-- Middle School Stage follows the organization pass and proves the first clean shell
-- Discord OAuth now lands immediately after the shell work so identity work can become the primary login path without replacing Victory authorization
-- Operator bootstrap lands immediately after Discord OAuth so producers still come from Victory authority, not the Discord login itself
-- Discord audio lands as a shared surface after the hardening pass, while actual audio remains in Discord
-- Voice-state presence can follow the user/session without turning Victory into an audio router
-- Venue shell extraction follows the audio pass so the reusable shell contract can capture the live patterns already proved in First Theater, The Cave, and Middle School Stage
-- The First Theater Pixi pass now follows shell extraction as a dedicated map-layer workflow instead of a backdrop swap, and the older stage composition remains the preferred live presentation around that layer
-- The grid primitive follows the map-layer pass directly so alignment tooling has a real map to align against; stage navigation (pan/zoom) is deferred to a later kernel so the grid first ships as a fixed-viewport visual layer
-- Kernel 48 closes that stage-navigation gap for First Theater only, while keeping the camera reusable for later venues without making it global
-- Kernel 48.1 tightens the card attachment model and adds the one-time venue focus ping without turning the camera into a shared persistent state
-- Kernel 49 extends the existing asset system into a Warehouse model for reusable token and map assets, while Kernel 50 adds First Theater token placement and grid snapping on top of that warehouse model
-- Kernel 51A hardens the First Theater projected runtime, adds cabin-facing warehouse policy plus filesystem diagnostics, and lowers the warehouse cap to 8 GB with an 8 GB physical reserve check instead of adding another major VTT feature
-- Kernel 52 adds the canonical dice path, server-side randomness, and a tray presentation for readable roll results without introducing a visual dice renderer
+- Kernels 1–52: identity, authority, actions, presence, venues, Showing review, Director Console, stage/Pixi proving ground, Discord, maps/grids/camera/cards/tokens, warehouse, and canonical dice.
+- Kernels 53–60: Character Workbook and Socio progression, Face projection/overrides, commands, skills, and game-event foundation.
+- Kernels 61–65: Trailer Player Workbook, My People, DB-test safety, and Third Place.
+- Kernels 66–69: Show Runs, Shows, production onboarding, Scene Library, and Show Scene Placements.
+- Kernel 70: location-scoped reusable Scenes, persistent Show-owned stage state, current Scene, Show variables, Cues, idempotent GO, rehearsal metadata, and curated player stage buttons.
 
-## Medium Roadmap: Kernels 38–62
-- strengthen showing/review surfaces and auditability
-- richer director controls and venue policy tools
-- asset pipeline improvements beyond first browser/library pass
-- better movement, layout, and stage-state authoring tools
-- cleaner audience segmentation and view resolution
-- character-to-playable-sheet bridge once references stop being enough
-- template venue hardening and first descendant venue builds
-- production management and run coordination surfaces
+## Recommended Near Horizon
 
-## Long Roadmap: 60+
-- multiple polished descendant venues built from the Cave-derived template
-- deeper production tooling and institutional workflows
-- more formal review, rehearsal, and run-state lifecycle support
-- advanced asset systems and reusable venue packages
-- optional future recording/capture work only after Showing Review is mature
+### Visual Scene Composition And Capture
 
-## Strategy Notes
-- The Cave remains the full-feature proving-ground venue.
-- New runtime tools may appear visibly in The Cave first.
-- Stable tools should later disappear into cleaner UI structures.
-- Future venues should inherit from a cleaned template, not fork the current proving-ground clutter.
+- Define one canonical mapping between a Base Scene and the existing stage-object system.
+- Preserve a clear Base Scene versus This Show's Version override boundary.
+- Capture/replay composition without copying state into a second element model.
+- Keep Session as runtime window and Show as durable owner.
+- Prove distinct Show overrides and persistence across Session replacement.
 
-## Explicit Non-Goals Right Now
-- no near-term video recording work
-- no analytics implementation in this kernel range by default
-- no premature template extraction before the Cave organization pass
+### Scene-Aware Cue Expansion
 
-## Recording Language
-- **Showing Review** is near-term and means action/chat/reaction/log review.
-- **Video Recording** is future-facing and not a current priority.
+- Add `reveal_object`, `hide_object`, `enable_interaction`, and `disable_interaction` only after the visual object identity model exists.
+- Keep action execution ordered, idempotent, auditable, and fail-stop.
+- Preserve Audience exclusion and Crew's non-destructive boundary.
+
+### Kernel 70 Evidence And Frontend Reliability
+
+- Add browser acceptance/screenshots for rehearsal messaging, current-Scene changes, and player Cue buttons in First Theater and Catharsis.
+- Repair the nine pre-existing `tests/first-theater/dice.test.js` failures.
+- Extract shared contracts from the parallel First Theater/Catharsis runtimes where behavior is genuinely identical.
+
+### Product Journey Proof
+
+- Prove account → Trailer Face → Production/roster → Show → staged Scene → linked Session → GO → durable aftermath.
+- Observe non-developer users and record operator interventions, vocabulary confusion, and privacy misunderstandings.
+- Turn that path into the short public demonstration of Victory.
+
+## Medium Horizon
+
+- Richer rehearsal editing and Scene version/diff presentation.
+- Ruleset/module boundary so Socio is the first owned implementation rather than a permanent hardcode.
+- Stronger director controls, admission/scheduling, and post-Show history.
+- Accessibility: keyboard, touch, reduced motion, zoom, contrast, and non-spatial navigation.
+- Security: CSRF, response headers/CSP, rate limits, upload limits, WebSocket origin policy, and authority audit logs.
+- One-command release gate covering test DB setup, Go/frontend tests, migration replay, fresh install, privacy checks, and browser journeys.
+
+## Long Horizon
+
+- Multiple rulesets and anthology/integration proofs.
+- Portable community/character archives and installation recovery.
+- Convention, actual-play, school, or multi-director community workflows.
+- Audiovisual capture only as a distinct future subsystem, never conflated with Showing Review or Scene capture.
+
+## Current Non-Goals
+
+- Microservices or a framework rewrite.
+- A second stage-object authority model solely for Scenes.
+- Victory-hosted Discord audio transport.
+- Client-authored canonical dice, identity, authority, or durable stage truth.
+- Broad marketplace work before one complete user journey is independently usable.
+
+## Kernel Selection Rules
+
+- Kernel numbers are stable labels; check the operator log before assigning one.
+- Prefer the smallest end-to-end slice that proves a user outcome.
+- Alternate capability work with integration, evidence, and consolidation work.
+- A kernel is not complete until migrations, authority, privacy, projections, tests, fresh-install behavior, documentation, and known gaps agree.

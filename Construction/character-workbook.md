@@ -36,10 +36,17 @@
 - Stage 1 rolls now append workbook entries and persist progress through the workbook event route.
 - Operator test accounts can now clear the Catharsis first-appearance browser flags from the account hub to replay the onboarding flow without changing production permissions.
 
-## Implementation-Ready Next Slice
-- Surface a real Socio ruleset selector when the draft flow asks for one.
-- Move the staged parentage/build sequence onto a reusable ruleset model rather than hardcoding it into Catharsis UI.
-- Keep the operator reset as a browser-only test utility until the ruleset model exists.
+## Current Status After Kernel 70
+- The Character Workbook foundation and private journal shipped in Kernel 53.
+- Socio character creation now covers parentage, Chapter 2, Chapter 3 archetypes, and Chapter 4 group/skill selection.
+- Character Face curation and venue projection shipped through Kernels 59A/60.
+- The separate real-person Trailer Player Workbook and Face Compiler shipped in Kernel 61/61A; it must not be confused with this fictional-character workbook.
+- A reusable multi-ruleset boundary is still not implemented. Socio remains the owned character-flow implementation.
+
+## Next Character Slice
+- Define the ruleset/module contract before adding a second ruleset.
+- Keep playable sheet state distinct from `sheet_links` references.
+- Integrate mechanics with Show/Scene play only through canonical commands/events and server authority.
 
 ## Journal Command
 - `/journal <text>` bypasses venue chat.

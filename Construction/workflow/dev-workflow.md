@@ -64,7 +64,7 @@ GOCACHE=/tmp/victory-gocache TEST_DATABASE_URL="postgres://victory:REDACTED@127.
 git diff --check
 ```
 
-As of Kernel 64, `TEST_DATABASE_URL` is required for `go test ./...` to fully pass - `internal/identity`, `internal/network`, and `internal/assets` open a real database connection in their tests and hard-fail without it (by design, not a bug). See "Database Changes" below for one-time setup of the dedicated `victory_test` database, and `Construction/kernel-maker-field-guide.md`'s "Backend Test Commands" / "Kernel 64 Notes" for the full story. Never point `TEST_DATABASE_URL` at the live `victory` database - both the Go and shell safety gates will refuse to run against it, but don't rely on that as your only line of defense.
+As of Kernel 64, `TEST_DATABASE_URL` is required for `go test ./...` to fully pass. Later access, social, Show Run, Show, Scene, Cue, Third Place, and world tests joined the original identity/network/assets DB-backed suites and hard-fail without it (by design, not a bug). See "Database Changes" below for one-time setup. Never point `TEST_DATABASE_URL` at the live `victory` database.
 
 ## Current Route Checks Worth Knowing
 - Discord OAuth start: `/auth/discord/start`
@@ -78,6 +78,14 @@ As of Kernel 64, `TEST_DATABASE_URL` is required for `go test ./...` to fully pa
 - Greenroom character cards: `/api/character-cards/me`
 - Trailers profile draft: `/api/profiles/me`
 - Mailbox: `/api/messages`
+- Stage Management: `/venues/show-runs/`
+- Show Runs: `/api/show-runs`
+- Shows: `/api/shows/{show_id}`
+- Scene Library: `/api/scenes`
+- Show Scene placements: `/api/shows/{show_id}/scenes`
+- Placement Cues: `/api/shows/{show_id}/scenes/{placement_id}/cues`
+- Player Cue buttons: `/api/shows/{show_id}/scenes/{placement_id}/player-cues`
+- Cue GO: `/api/cues/{cue_id}/go`
 
 ## Database Changes
 Apply migrations manually:
@@ -111,6 +119,8 @@ CONFIRM_TEST_DB_RESET=1 \
 ```
 Both scripts refuse to run against anything that isn't clearly a dedicated test database (see `scripts/test/require-isolated-database.sh`). `scripts/smoke/fresh-install.sh --local` is unrelated to this - it manages its own fully disposable database per run.
 
+Migration replay matters: these scripts reapply all migration files and do not use a migrations ledger. A column rename/drop must be safe when the entire sequence is replayed over an already-migrated database, not only on an empty database. See the Kernel 70 operator notes.
+
 ## Browser Proof Scripts (Playwright)
 Playwright is not vendored in the repo. The working install lives at `/tmp/node_modules` (browsers in `/root/.cache/ms-playwright`), so run proof scripts as:
 ```bash
@@ -127,6 +137,8 @@ Do:
 - hard refresh venue pages after frontend changes
 - test both HTTP and WebSocket surfaces for Cave-facing kernels
 - treat PixiJS as a renderer-only experiment unless a kernel explicitly proves otherwise
+- test both First Theater and Catharsis when changing their parallel stage runtime trees
+- keep Show-owned durable state separate from Session-local runtime state
 
 Do not:
 - assume the backend serving `8081` is the newest process

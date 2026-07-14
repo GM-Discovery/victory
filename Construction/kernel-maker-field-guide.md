@@ -242,7 +242,7 @@ node --check "$tmp"
 ## Backend Test Commands
 Run from `/opt/victory/backend`.
 
-**As of Kernel 64, DB-touching tests require `TEST_DATABASE_URL` and will hard-fail (not skip) without it.** Three packages open a real Postgres pool in tests: `internal/identity`, `internal/network`, `internal/assets`. Every other package is pure/unit (no DB). Point `TEST_DATABASE_URL` at a dedicated test database whose name contains `test` (e.g. `victory_test`) - never at the live `victory` database. The safety gate lives in `backend/internal/dbtest` (Go) and `scripts/test/require-isolated-database.sh` (shell); both reject a missing, live-looking, or production-looking URL with a clear error instead of silently running against the wrong database.
+**As of Kernel 64, DB-touching tests require `TEST_DATABASE_URL` and will hard-fail (not skip) without it.** This now extends beyond the original identity/network/assets packages: access, social, Show Run, Show, Scene, Cue, Third Place, and world tests also use PostgreSQL. Treat the full suite as DB-requiring unless running a deliberately selected pure package. Point `TEST_DATABASE_URL` at a dedicated test database whose name contains `test` (e.g. `victory_test`) - never at the live `victory` database. The safety gate lives in `backend/internal/dbtest` (Go) and `scripts/test/require-isolated-database.sh` (shell); both reject a missing, live-looking, or production-looking URL with a clear error instead of silently running against the wrong database.
 
 One-time (or after a schema change) setup of the dedicated test database:
 ```bash
@@ -263,7 +263,7 @@ GOCACHE=/tmp/victory-gocache go test ./internal/actions ./internal/network ./int
 GOCACHE=/tmp/victory-gocache go test ./internal/characters
 GOCACHE=/tmp/victory-gocache go test ./internal/profiles ./internal/access
 ```
-(Add `TEST_DATABASE_URL=...` to any of these that touch `internal/network`, `internal/identity`, or `internal/assets`.)
+(Add `TEST_DATABASE_URL=...` to any focused suite containing a DB-backed test. When uncertain, include it.)
 
 Use `GOCACHE=/tmp/victory-gocache` because agents often run in restricted environments where the default Go cache location is not writable.
 
@@ -329,6 +329,18 @@ For Third Place / Headshot Commons:
 - "One active row per user, enforced by a partial unique index the upsert targets directly" (`uq_third_place_headshots_active_user`) plus the `(xmax = 0)` `RETURNING` trick to detect insert-vs-update in one round trip is a reusable pattern - reach for it before writing a read-then-write existence check anywhere else in the codebase.
 - The live-update mechanism (`frontend/lib/player-profile-ws.js`'s `watchPlayerProfile`) is generic and reusable - Third Place's grid just opens one watcher per visible card. No backend change was needed to reuse it for a second UI surface beyond Trailer viewing.
 
+## Kernel 66–70 Production And Stage Notes
+
+- Canonical hierarchy: `Location → Production → Show Run → Show → Show Scene Placement`; Sessions are runtime windows and Showings are live/review wrappers.
+- Scheduling belongs to `shows`, not the older `showings` table.
+- Scene scope changed in Kernel 70: `scenes.location_id` is ownership scope and `source_production_id` is optional provenance.
+- The Show owns persistent stage state. World snapshots fold Session actions plus linked Show actions while preserving identical behavior for an unlinked Session.
+- Audience responses must be curated. Before adding a JSON-tagged field to a shared struct, inspect every handler that serializes it and the weakest authority gate among them.
+- Cue GO requires an idempotency key. Ordered actions are fail-stop and commit independently. Implemented actions are `go_to_scene`, `emit_game_event`, and `set_show_variable`.
+- Object reveal/hide/interaction Cues remain blocked on a canonical visual Scene-object mapping.
+- `frontend/venues/{first-theater,catharsis}/runtime.js` is the dynamically loaded entry point for each sibling `runtime/` module tree. Check both venues and their Node tests before classifying code as unused.
+- Column renames must be replay-tested against all earlier migrations; `CREATE INDEX IF NOT EXISTS` still resolves stale column references.
+
 ## Kernel Implementation Checklist
 1. Read `Construction/OperatorLogs/operator-notes.md` and the newest relevant kernel docs.
 2. Check `git status --short`.
@@ -339,7 +351,7 @@ For Third Place / Headshot Commons:
 7. Preserve append-only actions.
 8. Update snapshots and live broadcasts together when a live state changes.
 9. Keep The Cave live-session focused; move drafting/admin workflows to the right venue.
-10. Run Go tests with `GOCACHE=/tmp/victory-gocache` and, if touching `internal/identity`/`internal/network`/`internal/assets`, `TEST_DATABASE_URL` pointed at a dedicated test database (see "Backend Test Commands" above) - never the live app database.
+10. Run Go tests with `GOCACHE=/tmp/victory-gocache` and `TEST_DATABASE_URL` pointed at a dedicated test database for the full suite or any DB-backed package (see "Backend Test Commands" above) - never the live app database.
 11. Run `node --check` for edited inline venue scripts.
 12. Run `git diff --check`.
 13. Record the important result in Construction notes when the kernel changes system behavior.

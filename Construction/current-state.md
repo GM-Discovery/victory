@@ -1,366 +1,177 @@
 # Victory Current State
 
 ## Purpose
-This document is the current-state canon for Victory as of Kernel 53.
 
-Older notes in `Construction/OperatorLogs/` and older kernel docs remain useful as history, but this file is the current source of truth when they disagree.
+This document is the current-state canon for Victory as of **Kernel 70**. Historical kernel specifications and reportbacks describe what was true when they were written; this file wins when an older current-tense statement conflicts with the implemented repository.
+
+For detailed vocabulary use `Construction/Dictionary.txt`. For durable implementation traps use `Construction/OperatorLogs/operator-notes.md`. For chronological kernel history use `Construction/OperatorLogs/operator-log.md`.
 
 ## Kernel State
-- Current kernel label: **Kernel 53**
-- Current kernel purpose: **Character Workbook Foundation, Catharsis Socio Drafts, and Private Journals**
-- Product state: **Kernel 53 is in progress; Kernel 52 remains complete and Kernel 51A/51B remain historical runtime hardening milestones**
-- Important note: kernel numbers are labels, but from this point forward they should stay stable once assigned.
+
+- Current completed kernel: **Kernel 70 — Persistent Show Stage, Rehearsal Workspace, and Go Cue Foundation**
+- Completion date: **2026-07-14**
+- Commit: **`920aeb7`**
+- Product state: Kernels 53–70 are implemented through the persistent Show-stage and Cue foundation. Visual Scene-composition/capture remains future work.
+- Kernel numbers are stable historical labels. Always check the operator log before assigning the next number.
+
+## Product Shape
+
+Victory is a persistent, theatrical TTRPG community platform. Its current spine is:
+
+`Location → Production → Show Run → Show → Show Scene Placement → Session / Showing`
+
+- A **Location** is the authority and venue boundary.
+- A **Production** organizes work at one Location.
+- A **Show Run** owns roster, audience-program, and admission context.
+- A **Show** is one schedulable/playable instance of a Show Run.
+- A reusable **Scene** belongs to a Location and may retain optional source-Production provenance.
+- A **Show Scene Placement** is one Show's staged use and override layer for a Scene.
+- A **Session** is a temporary live runtime window and may link to a Show.
+- A **Showing** is the reviewable live wrapper around one active Session, not the scheduling primitive.
+- The **Show owns persistent stage state**. Linked Sessions project and add to that state; they do not become its durable owner.
 
 ## Current Stack
-- Frontend: static HTML, CSS, and inline JavaScript under `/opt/victory/frontend`
-- Shared frontend shell helper: `frontend/venues/shared/venue-shell.js`
-- Shared Pixi helper: `frontend/lib/victory-pixi-stage.js`
-- Shared Pixi grid helper: `frontend/lib/victory-pixi-grid.js`
-- Shared First Theater camera helper: `frontend/lib/victory-stage-camera.js`
-- First Theater runtime modules:
-  - `frontend/venues/first-theater/runtime/state.js`
-  - `frontend/venues/first-theater/runtime/socket.js`
-  - `frontend/venues/first-theater/runtime/dice.js`
-- Backend: Go `1.25` in `/opt/victory/backend`
-- Reverse proxy/static serving: Caddy. Repo config lives at `/opt/victory/Caddyfile`; the current live shared Caddy container mounts `/opt/bread-exchange/Caddyfile` and serves Victory from `/opt/victory/frontend`.
-- Database: PostgreSQL `16-alpine`
+
+- Frontend: static HTML, CSS, and JavaScript under `frontend/`
+- Stage rendering: PixiJS plus DOM overlays and controls
+- Shared frontend helpers: `frontend/lib/` and `frontend/venues/shared/venue-shell.js`
+- First Theater and Catharsis runtime entry points: sibling `runtime.js` files backed by modules in each venue's `runtime/` directory
+- Backend: Go 1.25 modular monolith under `backend/`
+- Database: PostgreSQL 16
+- Live transport: Gorilla WebSocket
+- Reverse proxy/static serving: Caddy
 - Container orchestration: Docker Compose
-- Key Go dependencies:
-  - `github.com/gorilla/websocket`
-  - `github.com/jackc/pgx/v5`
-  - `golang.org/x/crypto`
-  - `golang.org/x/image`
+- Durable uploads: filesystem warehouse plus PostgreSQL metadata
+- Discord: OAuth, server bootstrap, Gateway presence/chat integration, and voice-state/mic control; Victory does not transport Discord audio
 
 ## Runtime Modes
-- Dev mode:
-  - Postgres in Docker
-  - backend run on host with `go run ./cmd/victory`
-  - common ports: `8081` and sometimes `18081`
-- Install mode:
-  - backend in Docker as `victory-backend`
-  - Postgres in Docker as `victory-postgres`
-  - Caddy proxies `/api/*` and `/ws/*` to backend `8081`
 
-## Current Venue List
-Live venue rows currently present:
-- `the-cave` - presentation venue
-- `greenroom` - profile/character venue
-- `trailers` - profile drafting venue
-- `first-theater` - stage venue with a dedicated map layer
-- `stage-template` - hidden internal shell scaffold, not map-visible
-- `workshop` - workshop venue
-- `info-booth` - public info venue
-- `producers-office` - office venue
-- `directors-chair` - plaza venue
-- `grants-cabin` - cabin venue
-- `catharsis` - plaza venue
-- `construction` - public construction venue
-- `victory-theater` - venue
-- `audition-hall` - audition venue
-- `library` - public reference venue
-- `warehouse` - restricted storage venue
-- `soil-experts` - public placeholder venue
+- Dev: PostgreSQL in Docker; backend on the host, normally port `8081` or `18081`
+- Install: `victory-backend` and `victory-postgres` in Docker; Caddy proxies `/api/*`, `/ws/*`, and `/auth/*`
+- Test: dedicated `victory_test` database selected only through `TEST_DATABASE_URL`
+- Fresh-install proof: `scripts/smoke/fresh-install.sh --local` creates and destroys its own disposable database
 
-## Current Route / API Surface
-Auth and identity:
-- `GET /api/auth/providers`
-- `GET /auth/discord/start`
-- `GET /auth/discord/callback`
-- `GET /api/auth/discord/start`
-- `GET /api/auth/discord/callback`
-- `POST /api/auth/signup`
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
-- `POST /api/auth/password-reset/request`
-- `POST /api/auth/password-reset/confirm`
-- `GET /api/session/me`
+## Current Major Surfaces
 
-Operator bootstrap:
-- `go run ./cmd/victory-bootstrap producer --discord-user-id <discord_user_id>`
-- `go run ./cmd/victory-bootstrap producer --user-id <victory_user_id>`
-- `go run ./cmd/victory-bootstrap producer --handle <victory_handle>`
+Identity and community:
 
-Invites, requests, and production access:
-- `POST /api/invites`
-- `POST /api/invites/accept`
-- `POST /api/requests/create`
-- `GET /api/requests/mine`
-- `GET /api/requests/incoming`
-- `POST /api/requests/respond`
-- `GET /api/productions`
-- `GET /api/map/visibility`
+- Local and Discord authentication, sessions, password reset, invites, authority requests, and operator bootstrap
+- Trailer Player Workbook and projected Trailer Face
+- Private, directional My People relationships, notes, follow-ups, and shared context
+- Third Place opt-in Headshot commons
+- Mailbox and note cards
 
-Profiles:
-- `GET /api/profiles/me`
-- `GET /api/profiles/public`
-- `PATCH /api/profiles/me/save`
-- `POST /api/profiles/me/publish`
-- `POST /api/profiles/admin/save`
-- `POST /api/profiles/admin/publish`
+Character and rules:
 
-Character cards:
-- `GET /api/character-cards/me`
-- `POST /api/character-cards`
-- `PATCH /api/character-cards/{id}`
-- `GET /api/characters/venue-sheet`
-- `POST /api/character-workbooks/{id}/face-visibility`
-- `POST /api/character-workbooks/{id}/face-priority`
-- `POST /api/character-workbooks/{id}/face-lock`
-- `POST /api/character-workbooks/{id}/face-value`
-- `POST /api/character-journals`
-- Legacy/dormant authority routes still exist, but current product behavior does not rely on them:
-  - `POST /api/character-card-permissions`
-  - `POST /api/character-card-permissions/revoke`
+- Character Workbook rooted at `character_cards`
+- Active-character selection and venue character-sheet projection
+- Face visibility, priority, Director locks, and displayed-value overrides
+- Private character journals
+- Socio character flow through parentage, Chapter 2, archetype selection, and Chapter 4 skill/group selection
+- Command registry, canonical dice, and game-event mirroring
 
-Mailbox and note cards:
-- `GET /api/messages`
-- `GET /api/messages/{id}`
-- `POST /api/messages`
-- `POST /api/note-cards`
+Production and performance:
 
-World, session, and venue runtime:
-- `GET /api/world/the-cave`
-- `POST /api/session/the-cave/join`
-- `GET /api/workshop/venues`
-- `GET /api/workshop/assets?asset_type=map`
-- `POST /api/workshop/assets/token`
-- `POST /api/index-cards`
-- `POST /api/workshop/assets`
-- `GET /api/assets/{id}`
-- `GET /api/assets/{id}/content`
-- `GET /api/warehouse/storage`
-- `PATCH /api/warehouse/storage/settings`
-- `GET /api/warehouse/assets`
-- `GET /api/warehouse/assets/{id}`
-- `DELETE /api/warehouse/assets/{id}`
-- `GET /api/showings`
-- `GET /api/showings/{id}/review`
-- `GET /api/director-console/current`
-- `POST /api/showings/{id}/audience-view`
-- `POST /api/showings/{id}/close`
-- `POST /api/showings/start`
-- `POST /api/venues/{slug}/chat-policy`
-- `GET /api/venues/{slug}/map`
-- `POST /api/venues/{slug}/map`
-- `DELETE /api/venues/{slug}/map`
+- Production creation and location-scoped authority
+- Show Runs, rosters, self-join, audience blocks, and curated audience programs
+- Shows with scheduling/status fields and optional Session links
+- Location-scoped reusable Scenes and per-Show Scene Placements
+- Current-Scene pointer and Show variables
+- Persistent Show-owned action/state replay across linked Sessions
+- Cues with ordered actions, idempotent GO execution, execution ledger, crew/player trigger boundaries, and curated player-facing stage buttons
+- Showing review and Director Console controls
 
-Character projection runtime:
-- Venue sheets are derived from the shared backend character projector and include a `projection_version`.
-- Server-authored websocket messages of type `character/projection_updated` are invalidation notices only; clients refetch `/api/characters/venue-sheet`.
-- First Theater and Catharsis character trays have separate Face and Mechanics tabs.
-- `GET /api/venues/{slug}/grid`
-- `PUT /api/venues/{slug}/grid`
-- `GET /api/discord/audio/status`
-- `GET /health`
+Stage and assets:
 
-Discord audio remains a Discord pass-through surface. Victory does not capture or stream audio.
-Voice-state participant presence is tracked from Discord Gateway events. Active speaker detection and per-user volume controls remain deferred because the current bot/Gateway path cannot truthfully provide them.
-Venue shells now share reusable helper methods for slug normalization, slot registration, presence preview rendering, and safe refresh hooks.
-Greenroom now renders a workbook-first surface with Face, History, Mechanics, Journal, and module pages instead of the old card editor.
-Catharsis and First Theater now project the active character from session identity into the shell chrome so the user can jump back to Greenroom.
-The account hub now exposes an operator-only test harness that resets the Catharsis first-appearance browser flags so the onboarding can be replayed on demand.
-First Theater keeps its original stage façade; the active map renders in the shared world layer and does not replace the façade or the existing DOM controls. The map can be removed via the map editor's Remove Map action, and supports a `display_mode` of `theater` (masked to the proscenium opening) or `fullscreen` (stretched to the full canvas, façade hidden).
-A persistent square/hex grid renders in that same world layer, aligned with the active map and pinned cards, while unpinned cards stay in the fixed overlay layer above the interactive view. Grid configuration (type, hex orientation, cell size, offsets, opacity, line width, line style, visibility) is server-persisted per venue in `venue_grid_configs` and is visual-only — no snapping or measurement. Configured via a "Configure Grid" stage context-menu item and callout panel with live preview, Save, Close (reverts to last saved), Reset, and Hide/Show.
-First Theater now has a personal browser camera over that shared map/grid world. Middle-mouse drag pans, wheel zoom centers toward the cursor, edge scrolling respects the playable stage rectangle, and the visible `− / 100% / + / Fit` control stays fixed in the safe interface region. Camera state is personal and browser-local, keyed by user/browser plus venue and active map, and `Fit` resets to 100%.
-Index cards default to Pin to Screen. Cards may Attach to Map or Pin to Screen without jumping, Floating is a temporary drag state, map-attached cards move/scale with the world, screen-pinned cards keep a stable viewport size, overlay cards stay readable above the interactive view, and the card update path now carries optional pin metadata for `world_x`, `world_y`, `screen_x`, `screen_y`, and `pin_mode`. Move Here and Duplicate now respect that same placement mode so cards stay in the correct space without accidental extra copies.
-Shift+Ping broadcasts a Director-and-above focus ping within the current venue, animates the recipient camera in about 250ms, and leaves the browser's personal camera persistent afterward.
-The First Theater map editor now activates existing map assets directly from the asset list, and the grid renderer follows the rendered map bounds so larger maps stay fully covered when zoomed out.
-Workshop token preparation now lives in The Cave's `mode=workshop` surface, with circle/square/hex/raw previews, token uploads, and installation-wide warehouse storage policy wired to the Producer's Office.
-First Theater now consumes reusable Warehouse token assets through an `Add Token` picker, and placed tokens persist through refresh with grid-aware sizing and snap/free placement.
-Warehouse asset reads still resolve deleted or missing assets to the construction fallback image instead of leaving placements blank.
-First Theater now includes a canonical dice tray that submits `/roll` requests to the backend, renders canonical roll actions from the session stream, and keeps the browser out of result generation. Kernel 51 runtime decomposition and Grant's Cabin diagnostics remain in place, and the installation hard limit still defaults to 8 GB with an 8 GB physical reserve check on uploads.
-Director focus/broadcast and touch controls remain deferred.
-The next implementation-ready kernel slice is the Socio ruleset surface: the staged Catharsis build exists, but the actual ruleset picker and reusable ruleset model have not been introduced yet.
+- Maps, square/hex grids, camera, index cards, token assets, snapping, and persistent placements
+- Warehouse storage policy, generated token variants, tombstone-safe asset reads, and capacity guardrails
+- First Theater and Catharsis receive Show/current-Scene snapshot context, rehearsal-availability messaging, and player Cue controls
 
-WebSocket:
-- `GET /ws/the-cave`
+## Current API Families
 
-## Current WebSocket Actions And Events
-Client-to-server actions currently handled in The Cave:
-- `ping`
-- `react/emote`
-- `chat/message`
-- `perform/speak`
-- `act/reveal_element`
-- `act/hide_element`
-- `act/show_overlay`
-- `act/hide_overlay`
-- `act/place_element`
-- `create/index_card`
-- `update/index_card`
-- `delete/index_card`
-- `persona/equip`
-- `persona/unequip`
-- `roll/dice`
+The canonical registrations live in `backend/cmd/victory/main.go`. Major route families are:
 
-`update/index_card` and `act/duplicate_element` now also accept optional pin metadata for First Theater card attachment behavior.
+- `/api/auth/*`, `/auth/discord/*`, `/api/account/*`, `/api/session/me`
+- `/api/discord/*`, `/api/requests/*`, `/api/invites*`, `/api/productions`
+- `/api/player-profile/*`, `/api/player-relationships*`, `/api/third-place/headshots*`
+- `/api/character-cards*`, `/api/character-workbooks/*`, `/api/character-journals`, `/api/characters/*`
+- `/api/commands/*`, `/api/messages*`, `/api/note-cards`, `/api/index-cards`
+- `/api/show-runs*`, `/api/shows*`, `/api/scenes*`, `/api/cues/*`
+- `/api/showings*`, `/api/director-console/current`
+- `/api/world/{venue}`, `/api/session/{venue}/join`, `/api/venues/*`
+- `/api/workshop/*`, `/api/warehouse/*`, `/api/assets/*`
+- `/ws/the-cave`, `/ws/catharsis`, `/ws/player-profile`, `/health`
 
-Server-to-client event shapes currently emitted:
-- `snapshot`
-- `action`
-- `error`
-- `pong`
-- `venue/focus_ping`
-- `presence/snapshot`
-- `presence/join`
-- `presence/leave`
-- `presence/update`
-- `showing/update`
-- `venue/update`
+Kernel 70 route additions:
 
-## Current Database / Domain Concepts
-Identity and access:
-- `users`
-- `auth.sessions`
-- `auth.password_credentials`
-- `character_cards` remains the canonical workbook root with workbook metadata
-- `active_user_characters`
-- `character_workbook_modules`
-- `character_workbook_entries`
-- `character_journals`
-- `backend/internal/characters/parentage_chart.go` supplies the Stage 1 Parentage v1.1 chart, including the normalized organizational band for rolls 100-120
-- `auth.password_reset_tokens`
-- `auth.discord_identities`
-- `auth.oauth_states`
-- `invites`
-- `memberships`
-- `location_memberships`
+- `POST /api/shows/{show_id}/current-scene`
+- `GET|POST /api/shows/{show_id}/scenes/{placement_id}/cues`
+- `GET /api/shows/{show_id}/scenes/{placement_id}/player-cues`
+- `GET|PATCH /api/cues/{cue_id}`
+- `POST /api/cues/{cue_id}/go`
 
-Current live-site support:
-- Terms of Service page exists at `/legal/terms/`
-- Privacy Policy page exists at `/legal/privacy/`
-- Favicon asset exists at `frontend/assets/favicon.png`
-- Favicon is wired into the main site, login/account/mailbox, legal pages, and venue shells
-- Victory Theater map icon uses the same favicon asset
-- `/auth/*` live proxy routing is fixed so Discord OAuth reaches Victory
-- Discord environment wiring is present in Docker Compose and `.env`
-- `.env` stays local and is ignored by git
+## Authority And Privacy Rules
 
-World model:
-- `locations`
-- `lots`
-- `venues`
-- `libraries`
-- `elements`
-- `placements`
-- `sessions`
-- session participants and runtime identity links
-- `venue_active_maps` - one active map placement per venue (asset, fit, crop, scale, safe margin, `display_mode`)
-- `venue_grid_configs` - one grid configuration per venue (type, hex orientation, cell size, offsets, opacity, line width, line style, visibility)
-- `warehouse_storage_settings` - installation storage policy for hard cap, upload cap, warning thresholds, retention default, and token variant sizes
-- `assets` now also carries durable warehouse metadata such as `name`, `shape`, `default_grid_width`, `default_grid_height`, `retain_original`, `status`, `crop_x`, `crop_y`, `zoom`, `stored_bytes`, `last_used_at`, and `deleted_at`
+- Discord authenticates; Victory authorizes.
+- Operator is installation authority. Producer is the highest normal in-app role.
+- Production, Show Run, Show, Scene, and Cue authority is resolved against the relevant Location; do not use a globally best role for location-scoped decisions.
+- Audience endpoints use curated response types or explicit field exclusion. Backstage Show variables and current-placement identifiers must not serialize through the audience Show Program.
+- My People is private and directional. Non-owner access returns `404`, not `403`, so record existence is not disclosed.
+- Player-facing Cue lists contain only `{id, label}` for enabled Cues the viewer can currently trigger. Audience can never trigger a Cue.
+- Client identity, role, current character, dice results, and stage authority are requests to the server, never client-authored facts.
 
-Runtime history and review backbone:
-- `actions`
-- `showings`
-- `messages`
+## Kernel 70 Stage And Cue Semantics
 
-Profile and character surfaces:
-- `performer_profiles`
-- `character_cards`
-- `current_session_personas`
-- `permission_grants` still exists in schema, but current Greenroom drafting no longer depends on it
+- `scenes.location_id` is canonical scope. `source_production_id` is nullable provenance, not an ownership restriction.
+- `shows.current_show_scene_placement_id` identifies the Show's active staged Scene.
+- `shows.variables_json` is a denormalized backstage cache updated by canonical Show-scoped actions.
+- `actions.show_id` permits Show-owned state to survive Session replacement.
+- World snapshots fold both the current Session's actions and linked Show actions. An unlinked Session retains pre-Kernel-70 behavior.
+- Implemented Cue actions: `go_to_scene`, `emit_game_event`, `set_show_variable`.
+- Cue actions run in order, one transaction per action, and fail stop. Earlier successful actions are not rolled back if a later action fails.
+- GO idempotency is enforced by `UNIQUE(cue_id, idempotency_key)` and recorded in `cue_executions`.
+- Crew may create/edit non-destructive Cues and press GO, but cannot directly change the current Scene, edit a Base Scene, archive a Show, or perform destructive management.
 
-Important language:
-- **auth session** means the cookie-backed authenticated account session
-- **connection/presence** means live WebSocket state, not durable history
-- **showing** means the reviewable run-state record attached to a session
-- **production run** is not the same thing as video capture
-- **production** means production-scoped world/authority context
-- **venue** means a surfaced experience and rules context
+## Current Database Spine
 
-Operator rule:
-- Discord OAuth authenticates a person
-- Victory authorizes the person
-- operator/bootstrap authority can grant producer authority after identity exists
-- producer remains the highest normal in-app authority
+- Identity/social: users and auth tables, memberships, Player Workbook/events/facts, player relationships/journal/follow-ups, Third Place Headshots
+- Character/rules: character cards, active characters, workbook entries/modules, journals, skills, Face overrides
+- Production/runtime: locations, venues, productions, Show Runs/rosters/blocks, Shows, Scenes, Show Scene Placements, Sessions, Showings, actions, Cues, Cue executions
+- Stage/assets: elements, placements, venue layout elements, maps, grids, assets, warehouse policy
 
-## Current Live-Table Behavior
-The Cave is the full-feature proving-ground venue.
+## Known Working End-To-End Flows
 
-Current visible behavior in The Cave:
-- signed-in, access-checked session join
-- live snapshot load
-- presence roster
-- audience-view curtain when the director turns audience view off
-- stage speech
-- venue chat
-- reactions
-- index card editing and placement
-- reveal/hide and overlay actions
-- persona equip/unequip from existing character cards
-- history replay through snapshot + action stream
+- Signup/login → Trailer Workbook → publish a Face → leave a Third Place Headshot
+- Create and privately maintain a My People relationship without exposing it to the subject
+- Create a Production → Show Run → roster/audience program → Show
+- Create a reusable Scene → stage independent versions in Shows at the same Location
+- Link a Session to a Show and project Show-owned stage actions across Session replacement
+- Select or clear a Show's current Scene
+- Author a Cue, press GO idempotently, change Scene / emit an event / set a Show variable, and inspect the execution outcome
+- Render curated player Cue buttons in First Theater and Catharsis without exposing backstage actions
+- Create and project a character through Greenroom, Catharsis, and First Theater
+- Upload/reuse maps and tokens, configure grids, move stage objects, and submit canonical dice rolls
+- Start/control/close a Showing and review its durable action history
 
-Current Pixi proving-ground behavior:
-- First Theater is the PixiJS stage spike venue
-- PixiJS is experimental unless proven otherwise; it is renderer-only, not app authority
-- live Cave snapshot and session actions can be used to judge renderer coexistence
-- DOM overlays remain separate from the Pixi canvas so controls stay outside the stage layer
-- the portable overlay panel is now mounted from the shared venue shell helper so First Theater can compare Pixi and overlay together
-- the overlay proof marker is smoke-only; it is hidden in normal First Theater mode and only appears when explicitly running smoke tests
-- Kernel 29 is complete as a proving-ground spike
-- Kernel 30 organized the proving-ground UI and cleaned up the remaining affordances
+## Known Gaps And Deferred Work
 
-Strategy:
-- tools may be built visibly in The Cave first
-- once stable, they should be hidden into overlays, drawers, context menus, or cleaner surfaces
-- a clean template venue was extracted from the organized stage shell as `stage-template`
-- future venues should descend from that cleaned template rather than re-inventing runtime behavior separately
-- Middle School Stage remains the source shell and proves the edge-drawer grammar without dragging The Cave clutter along
-- First Theater now shows the portable overlay over Pixi so renderer and overlay can be compared side by side
+- **Visual Scene composition/capture is not implemented.** Base Scene versus This Show's Version currently covers metadata/configuration, not a bound visual composition over `elements`, `venue_layout_elements`, and stage actions.
+- `reveal_object`, `hide_object`, `enable_interaction`, and `disable_interaction` Cue actions are deferred until that object/state mapping is designed.
+- Kernel 70 lacks browser screenshot evidence for rehearsal messaging and Cue buttons; code paths, syntax, backend tests, and existing Node tests were used instead.
+- The First Theater Node suite has 46 passing tests and 9 pre-existing `dice.test.js` failures; do not describe that suite as wholly green until repaired.
+- First Theater and Catharsis retain parallel runtime trees. Changes to shared stage behavior must inspect and test both.
+- The Cave remains a dense proving-ground UI rather than a polished player product.
+- Some older consolidated roadmaps contain superseded kernel numbers; their collision notes are historical planning records, not the actual kernel sequence.
+- Provider-only accounts still lack a provider step-up path for secure email change.
+- Discord active-speaker detection and per-user audio volume are not truthfully available through the current integration.
+- Video recording/capture does not exist and is not implied by Showing Review or Scene capture.
 
-## Current Greenroom / Trailers Split
-- Greenroom:
-  - public profile display
-  - character dressing room
-  - character creation and editing
-  - sheet links as metadata references on character cards
-- Trailers:
-  - performer profile drafting/publishing
-  - editor hidden until revealed
-  - public-facing de-anonymization/profile surface
+## Next Recommended Direction
 
-## Current Known Working Flows
-- Sign in and resolve a session-backed account identity
-- Load map visibility
-- Open The Cave, load snapshot, join the active session, receive presence
-- Open Middle School Stage as a producer-only shell with top bar, edge drawers, and collapsed chat drawer
-- Send stage speech with server-resolved actor attribution
-- Send venue chat with server-side storage and authority checks
-- Send reactions and see them broadcast and persisted
-- Create and update index cards
-- Place workshop cards into enabled venues
-- Create mailbox messages and note cards
-- Draft and publish performer profile fields in Trailers
-- Draft and edit character cards in Greenroom
-- Curate character Face facts in Greenroom with show/hide/inferred visibility, manual priority, Director locks, and Director displayed-value overrides
-- View the same curated character projection in Catharsis and First Theater venue trays with live `character/projection_updated` refetch, Face/Mechanics tabs, readable Bio/Quote presentation, and mechanics skills
-- Attach `sheet_links` metadata to character cards
-- Equip and unequip an existing character persona in The Cave
-- Open the Director's Chair and control the current showing with live audience-view, chat-policy, presence, and overlay controls
-- Review closed showings in the Director's Chair with readable event cards
-- Add/replace/remove the First Theater stage map, including `theater` and `fullscreen` display modes
-- Configure, preview, align, save, hide, show, and reset a persistent square or hex grid over the First Theater map
-- Submit `/roll` expressions in First Theater and see canonical dice results in the Dice tray
-
-## Current Known Gaps
-- Video recording does not exist and is not a near-term priority
-- Cave UI still exposes proving-ground tool density and needs later organization
-- Template venue extraction has not happened yet
-- Middle School Stage is shell-first, not a full theater product
-- Showing Review currently covers closed showings only
-- Kernel 30.2 was a consolidation pass for scraps, drift, and unfinished work; it documented more than it invented
-- Character sheets are links/references only, not playable sheet records
-- First Theater grid (Kernel 47) is visual-only; no rules-engine execution, dice, stats, HP, initiative, snap-to-grid, tokens, fog, or pan/zoom yet
-- First Theater dice is canonical but textual only; no visual dice renderer, physics, or client-side random generation yet
-- Collapsed header blur may visually overlap the top edge of the First Theater map (known deferred layout issue, not addressed in Kernel 47)
-- Browser-level character-sheet save confusion still needs direct front-end reproduction even though live authenticated create and PATCH both succeed against the backend
-- Starting a brand-new showing is still deferred; the live console can close a showing and control the current one, but it does not yet create a fresh run on demand
-- Some older docs still describe earlier kernel truths and are now historical
-- `/quote` is still singleton Featured Quote storage; `/quote add` / multi-quote collection is a future feature, not part of the completed Kernel 59A pass
+The natural next kernel is **visual Scene composition/capture**: define how reusable Base Scene content and a Show Placement's overrides bind to the existing stage-object/action model without creating a second renderer authority system. A smaller independent closure pass can add browser screenshots for Kernel 70's GO controls and repair the nine pre-existing frontend dice-test failures.
 
 ## Recording Language
-- **Showing Review** means review of actions, chat, reactions, notes, and showing/session history
-- **Video Recording** means future capture of rendered audiovisual output
 
-Victory is currently pursuing **Director Console / Showing Review / proving-ground hardening**, not near-term video recording.
+- **Showing Review**: review of durable Session/showing actions and history.
+- **Scene capture/composition**: authoring reusable stage content and its Show-specific overrides.
+- **Video recording**: audiovisual output capture; still future work and a separate concept.

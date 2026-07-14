@@ -94,8 +94,10 @@ The same value change made through UI and slash command produces the same canoni
 
 ## V3. Scene configuration and activation
 
+**Status after Kernel 70:** Partially shipped. Stable location-scoped Scenes, per-Show placements, current-Scene activation, linked-Session persistence, and Cue-driven `go_to_scene` exist. Visual composition capture, revisioning, preview, and atomic restoration of a saved arrangement remain open.
+
 ### Goal
-A Scene becomes a reusable, versioned, production-owned configuration that can be atomically projected into a live Session.
+A Scene becomes a reusable, versioned, Location-owned configuration with optional source-Production provenance that can be atomically projected into a linked Show/Session runtime.
 
 ### Required capabilities
 
@@ -116,6 +118,8 @@ Arrange a stage, save it, alter the live arrangement, activate the saved Scene, 
 ---
 
 ## V4. Scene cues, sets, and transitions
+
+**Status after Kernel 70:** Foundation shipped. Stable Cues, ordered actions, trigger scopes, idempotent GO, execution records, current-Scene changes, game events, Show variables, and player-facing buttons exist. Coordinated object reveal/hide, interaction gates, transitions, acts, and sequence navigation remain open.
 
 ### Goal
 Directors can perform scenes rather than merely load maps.
@@ -160,13 +164,15 @@ A Director prepares a Scene, moves and groups placements, a player moves an auth
 
 ## V6. Production, showing, and admission spine
 
+**Status after Kernel 70:** Substantially shipped under the corrected model `Production → Show Run → Show → Session`, with roster, audience program, Production creation, Show scheduling/status, Session linking, Scene staging, and existing Showing review. Default ruleset, fuller staffing/invitations, will-call/admission records, and end-to-end scheduling UX remain open. Scene ownership is Location-scoped with optional source-Production provenance, correcting this track's older production-owned assumption.
+
 ### Goal
 Creative ownership, scheduling, performance occurrences, live sessions, and audience access are distinct but connected.
 
 ### Required capabilities
 
 - Production creation, ownership, staffing, and default ruleset;
-- Scene ownership by Production;
+- Location-scoped Scene ownership with optional source-Production provenance;
 - production runs;
 - Showing lifecycle;
 - Showing configuration and duplication;
@@ -696,4 +702,3 @@ Before drafting a kernel, identify:
 5. the required **Operational Integrity proof**.
 
 A kernel may advance only one product track when necessary, but repeated single-track kernels require explicit justification in the master guide.
-

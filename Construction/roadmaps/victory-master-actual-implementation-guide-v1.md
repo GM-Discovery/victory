@@ -58,6 +58,9 @@ The repository must be rechecked, but the current reported state is approximatel
 | Kernel 60 | Backend vertical largely proven | Browser-level sheet/click/event proof and trusted `game/event` authority still need verification; venue/session identity issue was reported |
 | Kernel 61 / 61A | PASS (per `kernel-61A-reportback.md`, 2026-07-09) | Trailer Player Workbook, Face Compiler, and legacy `performer_profiles` migration (real-user identity, track V8 — unrelated to the stale "Kernel 61" planning entry below). Single-account Workbook/History/Face-Compiler/Stage-Name UI, cross-user Face viewing via a copyable link, targeted websocket live updates, password-reauthenticated email change, and legacy-route closure are done and browser-proven. Global Trailer discovery still deliberately does not exist; provider-only email step-up remains a known deferred gap. |
 | Kernel 62 | PASS (per `kernel-62-reportback.md`, 2026-07-09) | Player Relationship Matrix / My People (track V8 continuation): private, directional relationship records about other real users — relationship workbook (events→facts), qualitative dropdowns, categories, private journal, stored follow-ups (no notifications), archive/unarchive, verified-shared-productions context panel, and hard subject-invisibility (all non-owner access 404s). First persistent cross-user surface, built on the Kernel 61A opaque profile-ID contract. |
+| Kernels 63–65 | PASS | Discord fixture/navigation repair, dedicated DB-test safety, and Third Place Headshot Commons. |
+| Kernels 66–69 | PASS | Show Runs, Shows, Production onboarding, location authority, Scene Library, and Show Scene Placements. |
+| Kernel 70 | PASS (`920aeb7`, 2026-07-14) | Location-scoped reusable Scenes, persistent Show-owned stage state, current Scene/variables, Cues and idempotent GO, rehearsal metadata, and curated player stage buttons. Visual Scene composition/capture remains open. |
 
 No future kernel may silently call these items complete merely because a later feature depends on them.
 
@@ -75,9 +78,9 @@ Later kernels are sequenced by dependency and strategic pairing, but may be reor
 
 ### 4.3 Numbering
 
-The next unused repository kernel number controls the actual filename. This guide assumes Kernel 61 follows Kernel 60. If the repository already used a number, advance the number and update this guide rather than creating collisions or retroactive aliases.
+The next unused repository kernel number controls the actual filename. The repository has now advanced through Kernel 70; consult the operator log rather than the superseded numbered headings below.
 
-**Collision note (2026-07-11, updated 2026-07-12):** the real repository sequence has advanced past this guide's own Socio-track numbering below. Real Kernels 62 (My People), 63 (Discord fixture cleanup + Back to Map), 64 (DB test isolation and live-DB safety gate), 65 (Third Place Headshot Commons — see `Construction/OperatorLogs/kernel-65-reportback.md`), and now **66 (Show Run, Audience Program, and Roster MVP — see `Construction/OperatorLogs/kernel-66-reportback.md`)** were all built to real operator briefs, outside this document's own "Kernel 62 — Player Relationship Matrix," "Kernel 64 — Scene Configuration Model," "Kernel 65 — Capture and Atomic Fly Scene," and "Kernel 66 — Scene Transitions" headers further down, which remain *unbuilt Socio-track plans*, not what actually shipped under those numbers. The next real kernel is **67**, regardless of what this document's own section headers below are numbered — do not reuse a document-internal number as a real kernel filename without first checking `Construction/OperatorLogs/*-reportback.md` for the true next-unused number, per §4.3 above.
+**Collision note (updated 2026-07-14):** the real repository sequence has advanced through **Kernel 70**. The document-internal Kernel 61–66 sections below are superseded Socio-track plans, not the features actually shipped under those numbers. Real Kernels 62–70 are recorded in `Construction/OperatorLogs/operator-log.md`; do not reuse a number or infer the next kernel from a heading in this guide.
 
 ### 4.4 Continuation suffixes
 
