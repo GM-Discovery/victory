@@ -27,6 +27,22 @@ type GameEventRequest struct {
 }
 
 func StoreGameEvent(ctx context.Context, pool *pgxpool.Pool, req GameEventRequest) (*StoredAction, error) {
+	return storeGameEvent(ctx, pool, req, true)
+}
+
+// StoreGameEventTrusted is StoreGameEvent without the CanAct participant
+// gate -- used exclusively by cues.ExecuteCue's emit_game_event action,
+// whose own cues.CanTriggerCue check has already authorized the whole GO
+// press (including for Crew, who may not otherwise be a session
+// participant with director/producer role and would incorrectly fail
+// CanAct's game/event branch). Re-running CanAct here would add no
+// security value once Cue-trigger authority has already gated the call,
+// and would incorrectly reject legitimate Crew-triggered events.
+func StoreGameEventTrusted(ctx context.Context, pool *pgxpool.Pool, req GameEventRequest) (*StoredAction, error) {
+	return storeGameEvent(ctx, pool, req, false)
+}
+
+func storeGameEvent(ctx context.Context, pool *pgxpool.Pool, req GameEventRequest, requireCanAct bool) (*StoredAction, error) {
 	req.SessionID = strings.TrimSpace(req.SessionID)
 	req.ActorID = strings.TrimSpace(req.ActorID)
 	req.EventKind = strings.TrimSpace(req.EventKind)
@@ -50,12 +66,14 @@ func StoreGameEvent(ctx context.Context, pool *pgxpool.Pool, req GameEventReques
 	}
 	defer tx.Rollback(ctx)
 
-	decision, err := CanAct(ctx, tx, req.ActorID, "game/event", req.SessionID, ActionTarget{Kind: "session"})
-	if err != nil {
-		return nil, err
-	}
-	if !decision.Allowed {
-		return nil, &ActionDeniedError{Reason: decision.Reason}
+	if requireCanAct {
+		decision, err := CanAct(ctx, tx, req.ActorID, "game/event", req.SessionID, ActionTarget{Kind: "session"})
+		if err != nil {
+			return nil, err
+		}
+		if !decision.Allowed {
+			return nil, &ActionDeniedError{Reason: decision.Reason}
+		}
 	}
 
 	showing, err := showings.EnsureForSession(ctx, tx, req.SessionID, req.ActorID)

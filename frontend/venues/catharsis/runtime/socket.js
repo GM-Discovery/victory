@@ -78,6 +78,10 @@
         return { kind: "venue_update", message: msg };
       }
 
+      if (msg.type === "show/stage_updated") {
+        return { kind: "show_stage_updated", showId: String(msg.show_id || ""), message: msg };
+      }
+
       if (msg.type === "character/projection_updated") {
         return {
           kind: "character_projection_updated",

@@ -597,6 +597,104 @@
       if (smokeLine) smokeLine.textContent = text || "";
     }
 
+    // Kernel 70: a minimal, self-contained (no index.html changes needed)
+    // floating panel showing a Rehearsal-availability banner and any Cue
+    // stage buttons this viewer is currently eligible to press. Deferred
+    // scope note: this is a simple fixed-position overlay, not deep Pixi-
+    // canvas integration -- full in-venue Rehearsal composition (editing
+    // Scene content live on the stage) is out of scope this kernel, since
+    // Scenes have no visual/Pixi binding yet (see reportback).
+    let stageCueControlsEl = null;
+    let stageCueControlsRequestSerial = 0;
+
+    function ensureStageCueControlsElement() {
+      if (stageCueControlsEl) return stageCueControlsEl;
+      const el = document.createElement("div");
+      el.id = "kernel70-stage-cue-controls";
+      el.style.cssText = "position:fixed;right:16px;bottom:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:flex-end;font-family:Arial,Helvetica,sans-serif;pointer-events:none;";
+      document.body.appendChild(el);
+      stageCueControlsEl = el;
+      return el;
+    }
+
+    function renderRehearsalBanner(container, snapshot) {
+      const enabled = Boolean(snapshot?.venue?.config?.scene_rehearsal_enabled);
+      let banner = container.querySelector("#kernel70-rehearsal-banner");
+      if (!enabled) {
+        if (banner) banner.remove();
+        return;
+      }
+      if (!banner) {
+        banner = document.createElement("a");
+        banner.id = "kernel70-rehearsal-banner";
+        banner.href = "/venues/show-runs/";
+        banner.textContent = "Rehearsal available — open Stage Management";
+        banner.title = "Update Base Scene changes the reusable standing set wherever it is used. Save to This Show changes only this Show's dressing and configuration.";
+        banner.style.cssText = "pointer-events:auto;background:rgba(20,15,10,0.92);border:1px solid rgba(255,233,197,0.25);color:#f0d3a4;padding:8px 14px;border-radius:999px;text-decoration:none;font-size:0.8rem;font-weight:700;";
+        container.appendChild(banner);
+      }
+    }
+
+    async function pressStageGoCue(cueId, button) {
+      button.disabled = true;
+      try {
+        const key = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : ("k" + Date.now() + "-" + Math.random().toString(16).slice(2));
+        const res = await fetch(`/api/cues/${encodeURIComponent(cueId)}/go`, {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idempotency_key: key }),
+        });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.ok) {
+          console.error("cue go failed", payload?.data?.error || res.status);
+        }
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function renderStageCueButtons(container, snapshot) {
+      const showId = snapshot?.session?.show_id || "";
+      const placementId = snapshot?.session?.current_show_scene_placement_id || "";
+      let list = container.querySelector("#kernel70-cue-buttons");
+      if (!showId || !placementId) {
+        if (list) list.remove();
+        return;
+      }
+      const serial = ++stageCueControlsRequestSerial;
+      try {
+        const res = await fetch(`/api/shows/${encodeURIComponent(showId)}/scenes/${encodeURIComponent(placementId)}/player-cues`, { credentials: "include" });
+        const payload = await res.json().catch(() => null);
+        if (serial !== stageCueControlsRequestSerial) return; // a newer snapshot superseded this request
+        if (!res.ok || !payload?.ok) return;
+        const cuesList = payload.data.cues || [];
+        if (!list) {
+          list = document.createElement("div");
+          list.id = "kernel70-cue-buttons";
+          list.style.cssText = "pointer-events:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;";
+          container.appendChild(list);
+        }
+        list.innerHTML = "";
+        for (const cue of cuesList) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = cue.label;
+          button.style.cssText = "background:#f0d3a4;color:#241a10;border:none;padding:10px 18px;border-radius:999px;font-weight:700;cursor:pointer;font-size:0.86rem;";
+          button.addEventListener("click", () => pressStageGoCue(cue.id, button));
+          list.appendChild(button);
+        }
+        if (cuesList.length === 0) list.remove();
+      } catch (err) {
+        console.error("failed to load player-eligible cues", err);
+      }
+    }
+
+    function updateStageCueControls(snapshot) {
+      const container = ensureStageCueControlsElement();
+      renderRehearsalBanner(container, snapshot);
+      renderStageCueButtons(container, snapshot);
+    }
+
     function setLastStagePoint(point) {
       if (!point) return;
       lastStagePoint = {
@@ -2168,6 +2266,7 @@
       sendAction: (...args) => sendAction(...args),
       placeCreatedIndexCard: (action) => sessionSync?.placeCreatedIndexCard?.(action),
       setStageStatus: (...args) => setStageStatus(...args),
+      updateStageCueControls: (...args) => updateStageCueControls(...args),
     }) || null;
 
     editors = firstTheaterEditorsModule?.createEditorControllers?.({

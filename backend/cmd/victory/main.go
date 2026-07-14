@@ -30,6 +30,7 @@ import (
 	"victory/backend/internal/access"
 	"victory/backend/internal/assets"
 	"victory/backend/internal/characters"
+	"victory/backend/internal/cues"
 	"victory/backend/internal/db"
 	"victory/backend/internal/identity"
 	"victory/backend/internal/messages"
@@ -209,6 +210,7 @@ func main() {
 	mux.HandleFunc("GET /api/shows/{show_id}/program", shows.HandleShowProgram(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/sessions/{session_id}/link", shows.HandleShowSessionLink(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/sessions/{session_id}/unlink", shows.HandleShowSessionUnlink(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/current-scene", shows.HandleShowCurrentScene(pool))
 	mux.HandleFunc("GET /api/scenes", scenes.HandleScenesCollection(pool))
 	mux.HandleFunc("POST /api/scenes", scenes.HandleScenesCollection(pool))
 	mux.HandleFunc("GET /api/scenes/{scene_id}", scenes.HandleSceneByID(pool))
@@ -219,6 +221,12 @@ func main() {
 	mux.HandleFunc("PATCH /api/shows/{show_id}/scenes/{placement_id}", scenes.HandleShowScenePlacementByID(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/scenes/{placement_id}/archive", scenes.HandleShowScenePlacementArchive(pool))
 	mux.HandleFunc("GET /api/shows/{show_id}/scenes/program", scenes.HandleShowSceneProgram(pool))
+	mux.HandleFunc("GET /api/shows/{show_id}/scenes/{placement_id}/cues", cues.HandlePlacementCuesCollection(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/scenes/{placement_id}/cues", cues.HandlePlacementCuesCollection(pool))
+	mux.HandleFunc("GET /api/shows/{show_id}/scenes/{placement_id}/player-cues", cues.HandlePlacementPlayerCues(pool))
+	mux.HandleFunc("GET /api/cues/{cue_id}", cues.HandleCueByID(pool))
+	mux.HandleFunc("PATCH /api/cues/{cue_id}", cues.HandleCueByID(pool))
+	mux.HandleFunc("POST /api/cues/{cue_id}/go", cues.HandleCueGo(pool, hub))
 	mux.HandleFunc("GET /api/characters/parentage-chart", characters.HandleParentageChart())
 	mux.HandleFunc("GET /api/characters/chapter2-rules", characters.HandleChapter2Rules())
 	mux.HandleFunc("GET /api/character-cards/me", characters.HandleMyCharacterCards(pool))

@@ -218,6 +218,12 @@ Production
 Session
 - A live instance of a Production
 - Contains active participants and current moment flow
+- A Session is a temporary runtime window, not a state owner (Kernel 70
+  §1.4). When linked to a Show (`sessions.show_id`), it projects that
+  Show's persistent current Scene and state; ending the Session never
+  resets the Show, and a later Session linked to the same Show resumes
+  exactly where it left off. See "Show" and "Persistent Show Stage Fold"
+  below.
 
 Show Run (Production Run)
 - Repeated Sessions of the same Production, grouped into one bounded
@@ -263,33 +269,101 @@ Show (Show Instance)
 - `sessions.show_id` is a nullable, manually-set link (not wired into the
   `/session start` command flow) so a Session can optionally point back at
   the Show it belongs to.
+- The Show, not the Session, owns the stage (Kernel 70 §4.1). A Show has a
+  persistent `current_show_scene_placement_id` pointer and a
+  `variables_json` key-value cache, both of which survive Session end --
+  ending or rotating a Session never resets them. A later Session linked to
+  the same Show resumes the same current Scene and state automatically,
+  via `world.LoadVenueSnapshot` folding `actions` rows tagged with the
+  Show's id (persistent) alongside the active session's own rows (see
+  "Persistent Show Stage Fold" below) -- no synthetic copy/re-insertion
+  step exists or is needed. Both fields are deliberately excluded from
+  Show's own JSON serialization (`json:"-"`) since `HandleShowProgram` (the
+  Audience-viewable endpoint) reuses the same struct; backstage callers
+  read them from an explicit response field instead.
+
+Persistent Show Stage Fold
+- The mechanism behind "the Show owns the stage" (Kernel 70 §2, §4.3). The
+  `actions` table gained a nullable `show_id` column alongside its existing
+  `session_id`. A Cue's `go_to_scene`/`set_show_variable` actions write one
+  action row with BOTH columns populated when an active session exists for
+  the Show (not two rows), so the existing per-session action feed and the
+  new persistent Show-scoped feed never double-count the same event.
+- `world.LoadVenueSnapshot`'s stage-object replay
+  (`reconcilePlacedElementsFromActions`) and its raw action feed both query
+  `WHERE a.session_id = $1 OR ($2 <> '' AND a.show_id::text = $2)` --
+  when a session has no linked Show, `$2` is empty and this reduces to
+  exactly the pre-Kernel-70 `a.session_id = $1` filter, byte-for-byte.
+  Ordering switched from `moment_id` (only unique/comparable within one
+  session) to `ts` (comparable across sessions and Show-scoped rows alike).
+- None of Kernel 70's three required Cue action types actually write
+  stage-object-shaped actions (`act/place_element` etc.) -- `go_to_scene`
+  writes a `cue/go_to_scene` marker row, `set_show_variable` writes
+  `cue/set_show_variable`. The fold's *element-reconciliation* pass exists
+  as forward-looking infrastructure for a future kernel's
+  `reveal_object`/`hide_object` Cue actions (deferred this kernel, see
+  "Cue" below); it is proven independently in
+  `backend/internal/world/snapshot_test.go` using hand-inserted
+  `act/place_element` rows, not by any action type Kernel 70 itself emits.
 
 Scene
-- A reusable, Production-scoped authored/configured playable or viewable
-  unit -- the first real reusable play object (Kernel 69). A Scene is
-  deliberately NOT a child row of one Show: the same Scene may be staged in
-  zero, one, or many Shows under its Production (e.g. a recurring
-  "Character Making - Opening" Scene reused across several one-shots).
-- Implemented by the `scenes` table (`production_id NOT NULL REFERENCES
-  productions(id) ON DELETE RESTRICT`) and backend/internal/scenes. Slug
-  uniqueness is scoped to the Production, not global.
-- Statuses: draft, ready, retired, archived -- deliberately no `live` status
-  in Kernel 69; that belongs to a later Fly Scene / Capture / Session
-  integration kernel. Archiving a Scene blocks *new* Show Scene Placements
-  (CreatePlacement rejects an archived Scene) but never touches existing
-  placements, which remain exactly as staged.
+- A reusable, location-scoped authored/configured playable or viewable
+  unit -- comparable to a standing set on a studio lot (Kernel 69, scope
+  corrected by Kernel 70). A Scene is deliberately NOT a child row of one
+  Show or one Production: the same Scene may be staged in zero, one, or
+  many Shows under ANY Production at the same Victory location (e.g. a
+  recurring "Character Making - Opening" Scene reused across one-shots run
+  by different Producers at the same location). Cross-location reuse
+  remains rejected.
+- Implemented by the `scenes` table (`location_id NOT NULL REFERENCES
+  locations(id) ON DELETE RESTRICT`) and backend/internal/scenes. Slug
+  uniqueness is scoped to the location, not the originating Production.
+  `source_production_id` (optional, nullable) remembers which Production
+  the Scene originated under as provenance only -- it never gates reuse.
+  Kernel 69 originally scoped this column as `production_id NOT NULL`;
+  Kernel 70's migration (043) renamed and loosened it, backfilling
+  `location_id` from each Scene's Production without deleting or
+  duplicating any row.
+- Statuses: draft, ready, retired, archived -- deliberately no `live`
+  status; a Show's *current* Scene is tracked by `shows.
+  current_show_scene_placement_id` (see "Show" below), not by a Scene- or
+  placement-level status value. Archiving a Scene blocks *new* Show Scene
+  Placements (CreatePlacement rejects an archived Scene) but never touches
+  existing placements, which remain exactly as staged.
 - Has both audience-facing fields (audience_title, audience_summary) and
   backstage-only fields (player_brief, director_notes, operator_notes) --
   only the audience fields (with a Show placement's own override applied
   first) ever reach a curated Audience Program view.
 - `source_ref` and `config_json` exist only to reserve room for a future
-  script/hyperlink system -- Kernel 69 explicitly does not build a script
-  editor, hyperlink graph, or line-anchor system. Treat any future Script
-  concept as linking *to* Scenes, not replacing them.
+  script/hyperlink system -- no script editor, hyperlink graph, or
+  line-anchor system exists yet. Treat any future Script concept as linking
+  *to* Scenes, not replacing them. Kernel 70 deliberately does not bind a
+  Scene's `config_json` to the live PIXI stage-object system either (see
+  "Base Scene" below) -- Scene composition remains metadata-level.
 - Not to be confused with `frontend/venues/{first-theater,catharsis}/
   runtime/scene-nodes.js`, a PIXI.js canvas scene-graph helper predating
   this kernel and unrelated to the Scene domain object -- same word,
   different meaning (rendering "scene" vs. the playable-unit "Scene").
+
+Base Scene vs. This Show's Version
+- Two distinct editing targets Kernel 70 introduces for a reusable Scene.
+  "Base Scene" is the shared `scenes` row itself -- editing it (via
+  `PATCH /api/scenes/{id}`, Crew-eligible only for non-destructive fields)
+  changes the standing set wherever it is used, across every Show/
+  Production staging it. "This Show's Version" is a specific Show Scene
+  Placement's own override fields (audience_title_override,
+  audience_summary_override, director_notes_override, config_json) --
+  editing it (via `PATCH /api/shows/{show_id}/scenes/{placement_id}`)
+  changes only that one Show's dressing, never the shared Base Scene or any
+  other Show's placement of the same Scene.
+- Kernel 70 did not build a unified in-venue "Rehearsal editor" UI that
+  visually composes Scene content on the live PIXI stage -- Scenes have no
+  binding to the `elements`/`venue_layout_elements`/`actions` stage-object
+  system. The Base-vs-This-Show distinction exists today at the
+  metadata/text-field level (Scene Library page for Base Scene edits,
+  Show detail page's placement rows for This-Show overrides); a future
+  kernel would need to design how visual stage composition maps onto this
+  two-layer model before building deeper Rehearsal tooling.
 
 Show Scene Placement (Show Scene)
 - The use of one reusable Scene inside one specific Show -- ordering
@@ -313,6 +387,58 @@ Show Scene Placement (Show Scene)
   backend/internal/scenes (which itself imports `shows` to resolve a
   Show's parent Show Run/Production) -- an import cycle. The Show detail
   page's frontend calls both routes and renders them together.
+
+Cue / GO
+- A stable, Show-Scene-Placement-scoped backstage control (Kernel 70 §6).
+  Each Cue has a required internal/backstage name, an optional
+  player-facing stage-button label, a trigger-permission scope, and an
+  ordered JSON array of actions. The visible stage-button label is NEVER
+  the Cue's identity -- a button always triggers the underlying Cue by id,
+  so relabeling a button never breaks anything referencing the Cue.
+- "GO" (or "Go Cue") is the act of executing a Cue's action list --
+  `POST /api/cues/{id}/go`, client-idempotency-keyed per press (a repeated
+  press with the same key replays the original result rather than
+  re-executing; a genuinely concurrent duplicate press loses a DB unique-
+  index race on `(cue_id, idempotency_key)` and receives
+  `cue_execution_in_progress` rather than silently double-applying).
+- Implemented by `cues` and `cue_executions` (migration 045) and
+  `backend/internal/cues` (Kernel 70). Each action in a Cue's list executes
+  in its own transaction, fail-stop (a failure does not roll back earlier
+  actions in the same Cue, nor attempt the remaining ones) -- recorded
+  outcomes are `succeeded`, `partial_failure`, or `failed`, never silently
+  swallowed.
+- Three action types are implemented this kernel: `go_to_scene` (sets the
+  Show's current-Scene pointer, rejecting a target placement from another
+  Show), `emit_game_event` (reuses `actions.StoreGameEventTrusted`, the
+  existing Kernel 60 game-event mirror, minus its participant-role gate --
+  Cue-trigger authority already gated the whole GO press) and
+  `set_show_variable` (writes the canonical show_id-scoped actions row plus
+  a `shows.variables_json` denormalized cache). `reveal_object`,
+  `hide_object`, `enable_interaction`, and `disable_interaction` are
+  explicitly deferred -- they would require extending the per-session
+  visibility-layer derivation in `world/snapshot.go` to a second show-
+  scoped source, which is the "second object model" this kernel's
+  data-restraint requirement says to avoid without a fuller renderer pass.
+- Trigger scopes: `director_crew_only` (default), `players_may_trigger`,
+  `any_roster_member`. Audience can never trigger any Cue under any scope
+  -- enforced as a hard floor in `cues.CanTriggerCue` independent of
+  trigger_scope, not merely by omission from the roster-role checks.
+- Crew may create/edit non-destructive Cues and press GO (including a GO
+  that changes the current Scene) via
+  `showruns.CanCrewPerformNonDestructiveEdit` -- the same underlying check
+  as `CanViewBackstage`, reused rather than duplicated; the distinction
+  that matters is which *write* endpoints call it, not a separate boolean.
+  Crew cannot call the current-Scene-pointer endpoint
+  (`POST /api/shows/{id}/current-scene`) directly outside Cue execution,
+  cannot edit a Base Scene, and cannot archive/delete anything.
+- Player-facing stage buttons: `GET /api/shows/{show_id}/scenes/
+  {placement_id}/player-cues` returns a curated `{id, label}` list --
+  only enabled Cues the calling viewer can actually trigger right now
+  (Audience always gets an empty list). No trigger_scope, action payload,
+  or internal_name of a Cue the viewer can't see leaks through this route.
+  Rendered in First Theater/Catharsis as a small fixed-position button
+  panel wired through the existing `session-sync.js` snapshot-apply
+  pipeline (`updateStageCueControls`), not a deep PIXI-canvas integration.
 
 Showing (live/runtime) vs. Show (scheduling/instance container)
 - "Showing" (Kernel 22, backend/internal/showings) is the live, 1:1 runtime

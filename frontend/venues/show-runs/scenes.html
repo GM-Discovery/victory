@@ -53,7 +53,7 @@
     <header class="header">
       <p class="eyebrow">Victory / Stage Management / Scene Library</p>
       <h1>Scene Library</h1>
-      <p class="subtitle">Reusable Scenes for this Production. A Scene can be staged in one or more Shows — build it once here, then add it to a Show from the Show's own page.</p>
+      <p class="subtitle">Reusable Scenes at this Victory location. A Scene may originate under one Production but can be staged in any Show at the same location — build it once here, then add it to a Show from the Show's own page. Each card notes which Production it originated under, for context only.</p>
       <div class="launchbar">
         <a class="chip" href="/venues/show-runs/">Stage Management</a>
       </div>
@@ -84,6 +84,10 @@
           <div class="field">
             <label for="source-ref-input">Source ref</label>
             <input type="text" id="source-ref-input" placeholder="Optional — future script link placeholder" />
+          </div>
+          <div class="field">
+            <label for="source-production-input">Source Production ID</label>
+            <input type="text" id="source-production-input" placeholder="Optional — provenance only, never restricts reuse" />
           </div>
           <div class="field span-2">
             <label for="audience-title-input">Audience title</label>
@@ -121,8 +125,8 @@
   <script src="/lib/back-to-map.js"></script>
   <script src="/lib/venue-account-badge.js?v=nav-1"></script>
   <script>
-    function productionIdFromQuery() {
-      return new URLSearchParams(window.location.search).get("production_id") || "";
+    function locationIdFromQuery() {
+      return new URLSearchParams(window.location.search).get("location_id") || "";
     }
 
     function slugify(text) {
@@ -153,6 +157,13 @@
       meta.className = "scene-meta";
       meta.textContent = "Slug: " + scene.slug + " · Created " + formatDate(scene.created_at);
       card.appendChild(meta);
+
+      if (scene.source_production_id) {
+        const provenance = document.createElement("p");
+        provenance.className = "scene-meta";
+        provenance.textContent = "Originated under Production: " + scene.source_production_id;
+        card.appendChild(provenance);
+      }
 
       if (scene.default_venue_id) {
         const venue = document.createElement("p");
@@ -210,7 +221,7 @@
       await fetchScenes();
     }
 
-    let productionId = "";
+    let locationId = "";
     let scenesCanManage = false;
 
     function renderGrid(scenes, canManage) {
@@ -221,7 +232,7 @@
     }
 
     async function fetchScenes() {
-      const response = await fetch("/api/scenes?production_id=" + encodeURIComponent(productionId), { credentials: "include" });
+      const response = await fetch("/api/scenes?location_id=" + encodeURIComponent(locationId), { credentials: "include" });
       const payload = await response.json().catch(() => null);
       if (isForbiddenAccessResponse(response, payload)) { showForbiddenScreen(); return; }
       if (!response.ok || !payload?.ok) {
@@ -243,9 +254,9 @@
         return;
       }
 
-      productionId = productionIdFromQuery();
-      if (!productionId) {
-        document.getElementById("status-line").textContent = "No Production specified.";
+      locationId = locationIdFromQuery();
+      if (!locationId) {
+        document.getElementById("status-line").textContent = "No location specified.";
         return;
       }
 
@@ -265,7 +276,8 @@
         event.target.disabled = true;
         try {
           const body = {
-            production_id: productionId,
+            location_id: locationId,
+            source_production_id: document.getElementById("source-production-input").value.trim(),
             title, slug,
             short_title: document.getElementById("short-title-input").value.trim(),
             default_venue_id: document.getElementById("default-venue-input").value.trim(),
@@ -290,6 +302,7 @@
           document.getElementById("short-title-input").value = "";
           document.getElementById("default-venue-input").value = "";
           document.getElementById("source-ref-input").value = "";
+          document.getElementById("source-production-input").value = "";
           document.getElementById("audience-title-input").value = "";
           document.getElementById("audience-summary-input").value = "";
           document.getElementById("player-brief-input").value = "";

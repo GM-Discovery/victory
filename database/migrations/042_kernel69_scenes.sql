@@ -43,7 +43,22 @@ CREATE TABLE IF NOT EXISTS scenes (
   UNIQUE (production_id, slug)
 );
 
-CREATE INDEX IF NOT EXISTS idx_scenes_production_id ON scenes(production_id);
+-- idx_scenes_production_id used to be created here, indexing what was then
+-- called scenes.production_id. Kernel 70 (043_kernel70_scene_location_
+-- scoping.sql) renamed that column to source_production_id; PostgreSQL
+-- keeps an existing index's definition pointing at a renamed column
+-- automatically, so on a database that already has this index nothing
+-- needs to happen here. But this repo's setup/deploy scripts replay every
+-- migration file from scratch on every run (no migrations-tracking
+-- table), and CREATE INDEX IF NOT EXISTS still fully resolves its column
+-- list even when the name already exists -- so on replay, a line
+-- referencing the pre-rename column name would fail with "column
+-- production_id does not exist" even though nothing would have been
+-- created. That line is removed here rather than kept and guarded, since
+-- migration 043 already creates the location-scoped equivalent this Scene
+-- reuse correction actually needs (idx_scenes_location_id); a first-run
+-- database simply never gets a same-purpose provenance index, which is an
+-- acceptable, non-destructive omission.
 CREATE INDEX IF NOT EXISTS idx_scenes_status ON scenes(status);
 
 -- A Show Scene Placement targets a specific Show; removal/archival of a

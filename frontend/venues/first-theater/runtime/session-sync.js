@@ -79,6 +79,7 @@
     const normalizeOverlayPoint = typeof deps.normalizeOverlayPoint === "function" ? deps.normalizeOverlayPoint : (point) => ({ screen_x: Number(point?.x || 0), screen_y: Number(point?.y || 0) });
     const setRecentPlacementMarker = typeof deps.setRecentPlacementMarker === "function" ? deps.setRecentPlacementMarker : () => {};
     const getVenueSlug = typeof deps.getVenueSlug === "function" ? deps.getVenueSlug : () => "";
+    const updateStageCueControls = typeof deps.updateStageCueControls === "function" ? deps.updateStageCueControls : () => {};
     const smokeMode = Boolean(deps.smokeMode);
 
     let currentSnapshot = null;
@@ -144,6 +145,15 @@
       syncTokenEditorWithSelection();
       syncDiceTrayFromSnapshot(snapshot);
       renderPixiScene();
+
+      // Kernel 70: a Rehearsal-availability banner (venue.config.
+      // scene_rehearsal_enabled) and any Cue stage buttons this viewer is
+      // currently eligible to press (session.show_id +
+      // session.current_show_scene_placement_id, when linked). Neither
+      // Cue definitions nor Show variables are ever part of this
+      // snapshot -- updateStageCueControls fetches only the curated
+      // player-cues listing.
+      updateStageCueControls(snapshot);
     }
 
     function applyVenueFocusPingWrapper(data) {
@@ -479,6 +489,16 @@
       if (msg.kind === "showing_update") {
         await refreshWorld();
         updateChatPresentation();
+        return msg;
+      }
+
+      // Kernel 70: a Cue execution or current-Scene change on the Show
+      // this session is linked to. refreshWorld() re-fetches the full
+      // snapshot, which applySnapshot() already threads through to
+      // updateStageCueControls -- no separate handling needed here beyond
+      // triggering the refetch.
+      if (msg.kind === "show_stage_updated") {
+        await refreshWorld();
         return msg;
       }
 

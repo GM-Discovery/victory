@@ -37,6 +37,14 @@ type Session struct {
 	ID        string `json:"id"`
 	Status    string `json:"status"`
 	StartedAt string `json:"started_at"`
+	// ShowID and CurrentShowScenePlacementID are the minimum Kernel 70
+	// linkage a client needs to look up its own eligible Cue stage
+	// buttons (GET /api/shows/{show_id}/scenes/{placement_id}/player-
+	// cues) -- deliberately NOT Show variables or Cue definitions
+	// themselves, which stay backstage-only. Empty when this session
+	// isn't linked to a Show, or the Show has no current placement.
+	ShowID                      string `json:"show_id,omitempty"`
+	CurrentShowScenePlacementID string `json:"current_show_scene_placement_id,omitempty"`
 }
 
 type Showing = showings.Showing
@@ -102,6 +110,7 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, venu
 
 	var venueConfig []byte
 	var startedAt time.Time
+	var showID string
 
 	err := pool.QueryRow(ctx, `
 		SELECT
@@ -115,6 +124,7 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, venu
 			s.id,
 			s.status,
 			s.started_at,
+			COALESCE(s.show_id::text, ''),
 			COALESCE(sh.id::text, ''),
 			COALESCE(sh.production_id::text, ''),
 			COALESCE(sh.venue_id::text, ''),
@@ -144,6 +154,7 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, venu
 		&snap.Session.ID,
 		&snap.Session.Status,
 		&startedAt,
+		&showID,
 		&snap.Showing.ID,
 		&snap.Showing.ProductionID,
 		&snap.Showing.VenueID,
@@ -160,6 +171,18 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, venu
 	}
 
 	snap.Session.StartedAt = startedAt.UTC().Format(time.RFC3339)
+	snap.Session.ShowID = showID
+	if showID != "" {
+		var currentPlacementID *string
+		if err := pool.QueryRow(ctx, `
+			SELECT current_show_scene_placement_id::text FROM shows WHERE id = $1
+		`, showID).Scan(&currentPlacementID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return nil, err
+		}
+		if currentPlacementID != nil {
+			snap.Session.CurrentShowScenePlacementID = *currentPlacementID
+		}
+	}
 
 	if err := json.Unmarshal(venueConfig, &snap.Venue.Config); err != nil {
 		return nil, err
@@ -230,7 +253,14 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, venu
 		placementIndex[placedElementKey(el)] = i
 	}
 
-	if err := reconcilePlacedElementsFromActions(ctx, pool, snap.Session.ID, &snap.Elements, placementIndex); err != nil {
+	// showID (the active session's linked Show, if any -- Kernel 70 SS4.3)
+	// folds persistent show_id-scoped actions in alongside this session's
+	// own session_id-scoped actions, so a Show's state set by a Cue in an
+	// earlier, now-ended session is still replayed here. When showID is
+	// "" (no linked Show, the pre-Kernel-70 case), the query below reduces
+	// to exactly the old `WHERE a.session_id = $1` filter -- byte-identical
+	// behavior for every session not linked to a Show.
+	if err := reconcilePlacedElementsFromActions(ctx, pool, snap.Session.ID, showID, &snap.Elements, placementIndex); err != nil {
 		return nil, err
 	}
 	compactElements := snap.Elements[:0]
@@ -246,6 +276,13 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, venu
 		return nil, fmt.Errorf("no active session found for %s", venueSlug)
 	}
 
+	// The WHERE clause folds in show_id-scoped actions (persistent, may
+	// have been recorded in a different, now-ended session) alongside
+	// this session's own session_id-scoped actions. When showID is ""
+	// this reduces to exactly `a.session_id = $1`, matching pre-Kernel-70
+	// behavior byte-for-byte. Ordering switches from moment_id (only
+	// unique/comparable within one session) to ts, which is comparable
+	// across sessions and Show-scoped rows alike.
 	actionRows, err := pool.Query(ctx, `
 		SELECT
 			a.id,
@@ -264,9 +301,9 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, venu
 		FROM actions a
 		LEFT JOIN users u ON u.id = a.actor_id
 		LEFT JOIN session_participants sp ON sp.session_id = a.session_id AND sp.user_id = a.actor_id
-		WHERE a.session_id = $1
-		ORDER BY a.moment_id DESC
-	`, snap.Session.ID)
+		WHERE a.session_id = $1 OR ($2 <> '' AND a.show_id IS NOT NULL AND a.show_id::text = $2)
+		ORDER BY a.ts DESC, a.moment_id DESC
+	`, snap.Session.ID, showID)
 	if err != nil {
 		return nil, err
 	}
@@ -402,17 +439,25 @@ func decodeJSONMap(raw []byte) map[string]any {
 	return out
 }
 
-func reconcilePlacedElementsFromActions(ctx context.Context, pool *pgxpool.Pool, sessionID string, elements *[]PlacedElement, placementIndex map[string]int) error {
+// reconcilePlacedElementsFromActions replays stage-object actions onto the
+// persisted default layout. showID (Kernel 70 SS4.3) folds in persistent
+// show_id-scoped actions -- recorded under any session ever linked to this
+// Show, not just the current one -- alongside this session's own
+// session_id-scoped actions, replayed in a single chronological (ts ASC)
+// pass so a later action always wins regardless of which session recorded
+// it. When showID is "" (no linked Show), the query reduces to exactly
+// `a.session_id = $1`, matching pre-Kernel-70 behavior byte-for-byte.
+func reconcilePlacedElementsFromActions(ctx context.Context, pool *pgxpool.Pool, sessionID, showID string, elements *[]PlacedElement, placementIndex map[string]int) error {
 	rows, err := pool.Query(ctx, `
 		SELECT
 			a.type,
 			a.target,
 			a.payload
 		FROM actions a
-		WHERE a.session_id = $1
+		WHERE (a.session_id = $1 OR ($2 <> '' AND a.show_id IS NOT NULL AND a.show_id::text = $2))
 		  AND a.type IN ('act/place_element', 'act/remove_element', 'create/token', 'update/token', 'act/duplicate_element', 'delete/index_card')
-		ORDER BY a.moment_id ASC, a.ts ASC
-	`, sessionID)
+		ORDER BY a.ts ASC, a.moment_id ASC
+	`, sessionID, showID)
 	if err != nil {
 		return err
 	}

@@ -5,31 +5,36 @@ import (
 	"time"
 )
 
-// Scene is one row of scenes -- a reusable, Production-scoped
-// authored/configured playable or viewable unit. A Scene may be staged
-// (placed) in zero, one, or many Shows under the same Production; it is
-// never a child row of a single Show (Kernel 69 SS1.2, SS1.3). Script/
-// hyperlink systems are future work -- SourceRef and ConfigJSON only
-// reserve room for that, they do not implement it (Kernel 69 SS1.6).
+// Scene is one row of scenes -- a reusable, location-scoped
+// authored/configured playable or viewable unit, comparable to a standing
+// set on a studio lot. A Scene may be staged (placed) in zero, one, or many
+// Shows under any Production at the same Victory location; it is never a
+// child row of a single Show or a single Production (Kernel 70 SS1.2,
+// SS3.1, correcting Kernel 69 SS1.2/SS1.3's Production-exclusive rule).
+// SourceProductionID remembers where a Scene originated as provenance only
+// -- it never gates reuse. Script/hyperlink systems are future work --
+// SourceRef and ConfigJSON only reserve room for that, they do not
+// implement it (Kernel 69 SS1.6).
 type Scene struct {
-	ID              string          `json:"id"`
-	ProductionID    string          `json:"production_id"`
-	Slug            string          `json:"slug"`
-	Title           string          `json:"title"`
-	ShortTitle      string          `json:"short_title,omitempty"`
-	DefaultVenueID  *string         `json:"default_venue_id,omitempty"`
-	AudienceTitle   string          `json:"audience_title,omitempty"`
-	AudienceSummary string          `json:"audience_summary,omitempty"`
-	PlayerBrief     string          `json:"player_brief,omitempty"`
-	DirectorNotes   string          `json:"director_notes,omitempty"`
-	OperatorNotes   string          `json:"operator_notes,omitempty"`
-	SourceRef       string          `json:"source_ref,omitempty"`
-	Status          string          `json:"status"`
-	ConfigJSON      json.RawMessage `json:"config_json,omitempty"`
-	CreatedByUserID *string         `json:"created_by_user_id,omitempty"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
-	ArchivedAt      *time.Time      `json:"archived_at,omitempty"`
+	ID                 string          `json:"id"`
+	LocationID         string          `json:"location_id"`
+	SourceProductionID *string         `json:"source_production_id,omitempty"`
+	Slug               string          `json:"slug"`
+	Title              string          `json:"title"`
+	ShortTitle         string          `json:"short_title,omitempty"`
+	DefaultVenueID     *string         `json:"default_venue_id,omitempty"`
+	AudienceTitle      string          `json:"audience_title,omitempty"`
+	AudienceSummary    string          `json:"audience_summary,omitempty"`
+	PlayerBrief        string          `json:"player_brief,omitempty"`
+	DirectorNotes      string          `json:"director_notes,omitempty"`
+	OperatorNotes      string          `json:"operator_notes,omitempty"`
+	SourceRef          string          `json:"source_ref,omitempty"`
+	Status             string          `json:"status"`
+	ConfigJSON         json.RawMessage `json:"config_json,omitempty"`
+	CreatedByUserID    *string         `json:"created_by_user_id,omitempty"`
+	CreatedAt          time.Time       `json:"created_at"`
+	UpdatedAt          time.Time       `json:"updated_at"`
+	ArchivedAt         *time.Time      `json:"archived_at,omitempty"`
 }
 
 // CreateSceneInput is the caller-supplied subset of a new Scene. ProductionID
@@ -64,17 +69,19 @@ type UpdateScenePatch struct {
 	Status          *string
 }
 
-// SceneSummary is the list-view shape returned by ListScenesForProduction --
+// SceneSummary is the list-view shape returned by ListScenesForLocation --
 // omits backstage-only long-form text fields to keep the library listing
 // light.
 type SceneSummary struct {
-	ID             string    `json:"id"`
-	Slug           string    `json:"slug"`
-	Title          string    `json:"title"`
-	ShortTitle     string    `json:"short_title,omitempty"`
-	DefaultVenueID *string   `json:"default_venue_id,omitempty"`
-	Status         string    `json:"status"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID                 string    `json:"id"`
+	LocationID         string    `json:"location_id"`
+	SourceProductionID *string   `json:"source_production_id,omitempty"`
+	Slug               string    `json:"slug"`
+	Title              string    `json:"title"`
+	ShortTitle         string    `json:"short_title,omitempty"`
+	DefaultVenueID     *string   `json:"default_venue_id,omitempty"`
+	Status             string    `json:"status"`
+	CreatedAt          time.Time `json:"created_at"`
 }
 
 // ShowScenePlacement is one row of show_scene_placements -- the use of a

@@ -69,7 +69,9 @@ func grantLocationRole(t *testing.T, pool *pgxpool.Pool, locationID, userID, rol
 // productionFixture creates a fresh Production for the shared
 // amurray-family location, since a fresh database has none of these
 // (Kernel 64's lesson: raw migrations alone don't fully seed runtime-shaped
-// data).
+// data). Two calls to this fixture return two different Productions at the
+// SAME location -- used to prove Scene reuse is location-scoped, not
+// Production-scoped (Kernel 70 SS3.1).
 func productionFixture(t *testing.T, pool *pgxpool.Pool, creatorUserID string) (locationID, productionID string) {
 	t.Helper()
 	ctx := context.Background()
@@ -79,7 +81,7 @@ func productionFixture(t *testing.T, pool *pgxpool.Pool, creatorUserID string) (
 	}
 	grantLocationRole(t, pool, locationID, creatorUserID, "producer")
 
-	suffix := testSuffix(t)
+	suffix := testSuffix(t) + "_" + time.Now().UTC().Format("150405.000000000")
 	if err := pool.QueryRow(ctx, `
 		INSERT INTO productions (location_id, name, slug)
 		VALUES ($1, $2, $3)
@@ -88,7 +90,41 @@ func productionFixture(t *testing.T, pool *pgxpool.Pool, creatorUserID string) (
 		t.Fatalf("insert production: %v", err)
 	}
 	t.Cleanup(func() {
-		_, _ = pool.Exec(context.Background(), `DELETE FROM scenes WHERE production_id = $1`, productionID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM scenes WHERE source_production_id = $1`, productionID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM productions WHERE id = $1`, productionID)
+	})
+	return locationID, productionID
+}
+
+// productionFixtureAtFreshLocation creates a brand new Victory location
+// plus a Production under it, granting the creator producer authority
+// there -- used by tests that must prove behavior differs across two
+// distinct locations (e.g. Scene reuse/uniqueness is location-scoped, not
+// global, and cross-location placement remains rejected).
+func productionFixtureAtFreshLocation(t *testing.T, pool *pgxpool.Pool, creatorUserID string) (locationID, productionID string) {
+	t.Helper()
+	ctx := context.Background()
+	suffix := testSuffix(t) + "_" + time.Now().UTC().Format("150405.000000000")
+
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO locations (name, slug) VALUES ($1, $2) RETURNING id::text
+	`, "Fresh Location "+suffix, "fresh-location-"+suffix).Scan(&locationID); err != nil {
+		t.Fatalf("insert fresh location: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM locations WHERE id = $1`, locationID)
+	})
+	grantLocationRole(t, pool, locationID, creatorUserID, "producer")
+
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO productions (location_id, name, slug)
+		VALUES ($1, $2, $3)
+		RETURNING id::text
+	`, locationID, "Fresh Production "+suffix, "fresh-production-"+suffix).Scan(&productionID); err != nil {
+		t.Fatalf("insert fresh production: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM scenes WHERE source_production_id = $1`, productionID)
 		_, _ = pool.Exec(context.Background(), `DELETE FROM productions WHERE id = $1`, productionID)
 	})
 	return locationID, productionID
@@ -117,73 +153,75 @@ func showFixture(t *testing.T, pool *pgxpool.Pool, creatorUserID, productionID s
 
 func strPtr(s string) *string { return &s }
 
-func TestCreateSceneRequiresManageAuthorityAtProductionLocation(t *testing.T) {
+func TestCreateSceneRequiresManageAuthorityAtLocation(t *testing.T) {
 	pool := openScenesTestPool(t)
 	producer := insertScenesTestUser(t, pool, "sc_producer")
-	_, productionID := productionFixture(t, pool, producer)
+	locationID, productionID := productionFixture(t, pool, producer)
 	suffix := testSuffix(t)
 
-	if _, err := CreateScene(context.Background(), pool, producer, productionID, CreateSceneInput{
+	if _, err := CreateScene(context.Background(), pool, producer, locationID, productionID, CreateSceneInput{
 		Title: "Opening", Slug: "opening-" + suffix,
 	}); err != nil {
 		t.Fatalf("expected producer to create scene: %v", err)
 	}
 
-	var otherLocationID string
-	if err := pool.QueryRow(context.Background(), `
-		INSERT INTO locations (name, slug) VALUES ($1, $2) RETURNING id::text
-	`, "Elsewhere "+suffix, "elsewhere-"+suffix).Scan(&otherLocationID); err != nil {
-		t.Fatalf("insert other location: %v", err)
-	}
-	t.Cleanup(func() {
-		_, _ = pool.Exec(context.Background(), `DELETE FROM locations WHERE id = $1`, otherLocationID)
-	})
+	_, elsewhereProductionID := productionFixtureAtFreshLocation(t, pool, insertScenesTestUser(t, pool, "sc_elsewhere_owner"))
 	elsewhereProducer := insertScenesTestUser(t, pool, "sc_elsewhere_producer")
-	grantLocationRole(t, pool, otherLocationID, elsewhereProducer, "producer")
-	if _, err := CreateScene(context.Background(), pool, elsewhereProducer, productionID, CreateSceneInput{
+	// elsewhereProducer has no role at locationID (only, if anything, at
+	// elsewhereLocationID via a different fixture owner) -- attempting to
+	// create a Scene at locationID must be rejected.
+	if _, err := CreateScene(context.Background(), pool, elsewhereProducer, locationID, productionID, CreateSceneInput{
 		Title: "Cross Location Scene", Slug: "cross-location-" + suffix,
 	}); err == nil || err.Error() != "not_authorized" {
-		t.Fatalf("expected not_authorized for producer at a different location, got %v", err)
+		t.Fatalf("expected not_authorized for a producer with no role at this location, got %v", err)
 	}
 
 	outsider := insertScenesTestUser(t, pool, "sc_outsider")
-	if _, err := CreateScene(context.Background(), pool, outsider, productionID, CreateSceneInput{
+	if _, err := CreateScene(context.Background(), pool, outsider, locationID, productionID, CreateSceneInput{
 		Title: "Outsider Scene", Slug: "outsider-" + suffix,
 	}); err == nil || err.Error() != "not_authorized" {
 		t.Fatalf("expected not_authorized for outsider, got %v", err)
 	}
+	_ = elsewhereProductionID
 }
 
-func TestSceneSlugUniquenessIsScopedToProduction(t *testing.T) {
+func TestSceneSlugUniquenessIsScopedToLocation(t *testing.T) {
 	pool := openScenesTestPool(t)
 	producer := insertScenesTestUser(t, pool, "sc_slug_producer")
-	_, productionA := productionFixture(t, pool, producer)
-	_, productionB := productionFixture(t, pool, producer)
+	locationA, productionA := productionFixture(t, pool, producer)
+	_, productionA2 := productionFixture(t, pool, producer) // second Production, SAME location
+	locationB, productionB := productionFixtureAtFreshLocation(t, pool, producer)
+	suffix := testSuffix(t)
+	slug := "opening-" + suffix
 
-	if _, err := CreateScene(context.Background(), pool, producer, productionA, CreateSceneInput{
-		Title: "Opening", Slug: "opening",
+	if _, err := CreateScene(context.Background(), pool, producer, locationA, productionA, CreateSceneInput{
+		Title: "Opening", Slug: slug,
 	}); err != nil {
-		t.Fatalf("create scene in production A: %v", err)
+		t.Fatalf("create scene at location A under production A: %v", err)
 	}
-	if _, err := CreateScene(context.Background(), pool, producer, productionA, CreateSceneInput{
-		Title: "Opening Again", Slug: "opening",
+	// Same location, DIFFERENT Production -> still a slug collision, since
+	// uniqueness is now location-scoped (Kernel 70 SS3.3), not
+	// Production-scoped.
+	if _, err := CreateScene(context.Background(), pool, producer, locationA, productionA2, CreateSceneInput{
+		Title: "Opening Again", Slug: slug,
 	}); err == nil || err.Error() != "slug_already_used" {
-		t.Fatalf("expected slug_already_used within the same production, got %v", err)
+		t.Fatalf("expected slug_already_used within the same location even under a different production, got %v", err)
 	}
-	if _, err := CreateScene(context.Background(), pool, producer, productionB, CreateSceneInput{
-		Title: "Opening In B", Slug: "opening",
+	// Different location -> the same slug is fine.
+	if _, err := CreateScene(context.Background(), pool, producer, locationB, productionB, CreateSceneInput{
+		Title: "Opening At A Different Location", Slug: slug,
 	}); err != nil {
-		t.Fatalf("expected the same slug to be usable in a different production: %v", err)
+		t.Fatalf("expected the same slug to be usable at a different location: %v", err)
 	}
 }
 
 func TestSceneCanBeStagedInMultipleShowsUnderSameProduction(t *testing.T) {
 	pool := openScenesTestPool(t)
 	producer := insertScenesTestUser(t, pool, "sc_multi_producer")
-	_, productionID := productionFixture(t, pool, producer)
+	locationID, productionID := productionFixture(t, pool, producer)
 	suffix := testSuffix(t)
 
-	scene, err := CreateScene(context.Background(), pool, producer, productionID, CreateSceneInput{
+	scene, err := CreateScene(context.Background(), pool, producer, locationID, productionID, CreateSceneInput{
 		Title: "Character Making - Opening", Slug: "char-making-opening-" + suffix,
 	})
 	if err != nil {
@@ -221,30 +259,58 @@ func TestSceneCanBeStagedInMultipleShowsUnderSameProduction(t *testing.T) {
 	}
 }
 
-func TestScenePlacementRejectsCrossProductionScene(t *testing.T) {
+// TestSceneCanBeStagedAcrossProductionsAtSameLocation is the direct Kernel
+// 70 correction proof: a Scene created under one Production must now be
+// stageable in a Show under a DIFFERENT Production, as long as both share
+// the same Victory location (correcting Kernel 69 SS1.4's Production-
+// exclusive rule).
+func TestSceneCanBeStagedAcrossProductionsAtSameLocation(t *testing.T) {
 	pool := openScenesTestPool(t)
-	producer := insertScenesTestUser(t, pool, "sc_cross_producer")
-	_, productionA := productionFixture(t, pool, producer)
-	_, productionB := productionFixture(t, pool, producer)
+	producer := insertScenesTestUser(t, pool, "sc_cross_prod_producer")
+	locationID, productionA := productionFixture(t, pool, producer)
+	_, productionB := productionFixture(t, pool, producer) // same location, different Production
 	suffix := testSuffix(t)
 
-	sceneInB, err := CreateScene(context.Background(), pool, producer, productionB, CreateSceneInput{
-		Title: "Scene In B", Slug: "scene-in-b-" + suffix,
+	sceneUnderB, err := CreateScene(context.Background(), pool, producer, locationID, productionB, CreateSceneInput{
+		Title: "Scene Originated Under B", Slug: "scene-under-b-" + suffix,
 	})
 	if err != nil {
-		t.Fatalf("create scene in production B: %v", err)
+		t.Fatalf("create scene under production B: %v", err)
 	}
-	_, showInA := showFixture(t, pool, producer, productionA)
+	_, showUnderA := showFixture(t, pool, producer, productionA)
 
-	if _, err := CreatePlacement(context.Background(), pool, producer, showInA, CreatePlacementInput{SceneID: sceneInB.ID}); err == nil || err.Error() != "scene_production_mismatch" {
-		t.Fatalf("expected scene_production_mismatch, got %v", err)
+	if _, err := CreatePlacement(context.Background(), pool, producer, showUnderA, CreatePlacementInput{SceneID: sceneUnderB.ID}); err != nil {
+		t.Fatalf("expected a Scene originating under a different Production at the same location to be stageable, got %v", err)
+	}
+}
+
+// TestScenePlacementRejectsCrossLocationScene proves cross-location
+// placement remains rejected -- only Production-exclusivity was corrected,
+// not location boundaries (Kernel 70 SS3.1).
+func TestScenePlacementRejectsCrossLocationScene(t *testing.T) {
+	pool := openScenesTestPool(t)
+	producer := insertScenesTestUser(t, pool, "sc_cross_loc_producer")
+	_, productionA := productionFixture(t, pool, producer)
+	locationB, productionB := productionFixtureAtFreshLocation(t, pool, producer)
+	suffix := testSuffix(t)
+
+	sceneAtLocationB, err := CreateScene(context.Background(), pool, producer, locationB, productionB, CreateSceneInput{
+		Title: "Scene At Location B", Slug: "scene-at-b-" + suffix,
+	})
+	if err != nil {
+		t.Fatalf("create scene at location B: %v", err)
+	}
+	_, showAtLocationA := showFixture(t, pool, producer, productionA)
+
+	if _, err := CreatePlacement(context.Background(), pool, producer, showAtLocationA, CreatePlacementInput{SceneID: sceneAtLocationB.ID}); err == nil || err.Error() != "scene_location_mismatch" {
+		t.Fatalf("expected scene_location_mismatch across locations, got %v", err)
 	}
 }
 
 func TestPlacementVenueOverrideDoesNotMutateScene(t *testing.T) {
 	pool := openScenesTestPool(t)
 	producer := insertScenesTestUser(t, pool, "sc_venue_producer")
-	_, productionID := productionFixture(t, pool, producer)
+	locationID, productionID := productionFixture(t, pool, producer)
 	suffix := testSuffix(t)
 
 	var venueA, venueB string
@@ -255,7 +321,7 @@ func TestPlacementVenueOverrideDoesNotMutateScene(t *testing.T) {
 		t.Fatalf("load venue B: %v", err)
 	}
 
-	scene, err := CreateScene(context.Background(), pool, producer, productionID, CreateSceneInput{
+	scene, err := CreateScene(context.Background(), pool, producer, locationID, productionID, CreateSceneInput{
 		Title: "Venue Scene", Slug: "venue-scene-" + suffix, DefaultVenueID: venueA,
 	})
 	if err != nil {
@@ -285,10 +351,10 @@ func TestPlacementVenueOverrideDoesNotMutateScene(t *testing.T) {
 func TestArchivingPlacementDoesNotArchiveScene(t *testing.T) {
 	pool := openScenesTestPool(t)
 	producer := insertScenesTestUser(t, pool, "sc_archive_placement_producer")
-	_, productionID := productionFixture(t, pool, producer)
+	locationID, productionID := productionFixture(t, pool, producer)
 	suffix := testSuffix(t)
 
-	scene, err := CreateScene(context.Background(), pool, producer, productionID, CreateSceneInput{
+	scene, err := CreateScene(context.Background(), pool, producer, locationID, productionID, CreateSceneInput{
 		Title: "Reusable Scene", Slug: "reusable-scene-" + suffix,
 	})
 	if err != nil {
@@ -320,10 +386,10 @@ func TestArchivingPlacementDoesNotArchiveScene(t *testing.T) {
 func TestArchivingSceneBlocksNewPlacementsButPreservesExisting(t *testing.T) {
 	pool := openScenesTestPool(t)
 	producer := insertScenesTestUser(t, pool, "sc_archive_scene_producer")
-	_, productionID := productionFixture(t, pool, producer)
+	locationID, productionID := productionFixture(t, pool, producer)
 	suffix := testSuffix(t)
 
-	scene, err := CreateScene(context.Background(), pool, producer, productionID, CreateSceneInput{
+	scene, err := CreateScene(context.Background(), pool, producer, locationID, productionID, CreateSceneInput{
 		Title: "Soon Retired Scene", Slug: "soon-retired-" + suffix,
 	})
 	if err != nil {
@@ -358,10 +424,10 @@ func TestArchivingSceneBlocksNewPlacementsButPreservesExisting(t *testing.T) {
 func TestAudienceScenceProgramOnlyShowsReadyPlacementsWithCuratedFields(t *testing.T) {
 	pool := openScenesTestPool(t)
 	producer := insertScenesTestUser(t, pool, "sc_program_producer")
-	_, productionID := productionFixture(t, pool, producer)
+	locationID, productionID := productionFixture(t, pool, producer)
 	suffix := testSuffix(t)
 
-	scene, err := CreateScene(context.Background(), pool, producer, productionID, CreateSceneInput{
+	scene, err := CreateScene(context.Background(), pool, producer, locationID, productionID, CreateSceneInput{
 		Title: "Character Making - Opening", Slug: "cm-opening-" + suffix,
 		AudienceTitle: "Character Making", AudienceSummary: "Come make a character with us.",
 		DirectorNotes: "Backstage only note that must never leak to Audience.",
@@ -427,10 +493,10 @@ func TestAudienceScenceProgramOnlyShowsReadyPlacementsWithCuratedFields(t *testi
 func TestPlacementRequiresManageAuthorityAtShowLocation(t *testing.T) {
 	pool := openScenesTestPool(t)
 	producer := insertScenesTestUser(t, pool, "sc_placement_auth_producer")
-	_, productionID := productionFixture(t, pool, producer)
+	locationID, productionID := productionFixture(t, pool, producer)
 	suffix := testSuffix(t)
 
-	scene, err := CreateScene(context.Background(), pool, producer, productionID, CreateSceneInput{
+	scene, err := CreateScene(context.Background(), pool, producer, locationID, productionID, CreateSceneInput{
 		Title: "Auth Scene", Slug: "auth-scene-" + suffix,
 	})
 	if err != nil {
@@ -447,10 +513,10 @@ func TestPlacementRequiresManageAuthorityAtShowLocation(t *testing.T) {
 func TestScenePatchClearsOptionalFieldsWithEmptyString(t *testing.T) {
 	pool := openScenesTestPool(t)
 	producer := insertScenesTestUser(t, pool, "sc_patch_producer")
-	_, productionID := productionFixture(t, pool, producer)
+	locationID, productionID := productionFixture(t, pool, producer)
 	suffix := testSuffix(t)
 
-	scene, err := CreateScene(context.Background(), pool, producer, productionID, CreateSceneInput{
+	scene, err := CreateScene(context.Background(), pool, producer, locationID, productionID, CreateSceneInput{
 		Title: "Patchable Scene", Slug: "patchable-" + suffix, ShortTitle: "Patchy",
 	})
 	if err != nil {
@@ -472,10 +538,10 @@ func TestScenePatchClearsOptionalFieldsWithEmptyString(t *testing.T) {
 func TestSceneStatusCheckRejectsInvalidValue(t *testing.T) {
 	pool := openScenesTestPool(t)
 	producer := insertScenesTestUser(t, pool, "sc_status_producer")
-	_, productionID := productionFixture(t, pool, producer)
+	locationID, productionID := productionFixture(t, pool, producer)
 	suffix := testSuffix(t)
 
-	scene, err := CreateScene(context.Background(), pool, producer, productionID, CreateSceneInput{
+	scene, err := CreateScene(context.Background(), pool, producer, locationID, productionID, CreateSceneInput{
 		Title: "Status Scene", Slug: "status-scene-" + suffix,
 	})
 	if err != nil {

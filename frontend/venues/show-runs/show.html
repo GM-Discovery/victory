@@ -34,6 +34,15 @@
     .scene-row-meta { color: var(--muted); font-size: 0.82rem; margin: 2px 0 0; }
     .scene-row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .chip.small { padding: 8px 12px; font-size: 0.82rem; }
+    .badge.current { color: #baffb0; border-color: rgba(140, 240, 130, 0.5); }
+    .cue-panel { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 10px; flex-basis: 100%; }
+    .cue-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0; }
+    .cue-row-title { font-weight: 700; }
+    .cue-row-meta { color: var(--muted); font-size: 0.8rem; }
+    .cue-create-form { display: grid; gap: 8px; margin-top: 10px; grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .cue-create-form .field.span-2 { grid-column: span 2; }
+    @media (max-width: 640px) { .cue-create-form { grid-template-columns: 1fr; } .cue-create-form .field.span-2 { grid-column: span 1; } }
+    .help-text { color: var(--muted); font-size: 0.8rem; margin: 4px 0 0; }
   </style>
 </head>
 <body>
@@ -54,6 +63,7 @@
       <div class="launchbar">
         <a class="chip" id="run-link" href="#">Back to Show Run</a>
         <a class="chip" id="program-link" href="#">Audience Program</a>
+        <a class="chip" id="roster-link" href="#">Assign Crew / Roster</a>
       </div>
     </header>
 
@@ -224,8 +234,200 @@
       document.getElementById("session-card").hidden = false;
       document.getElementById("scenes-card").hidden = false;
 
-      const productionId = payload.data.production_id;
-      document.getElementById("scene-library-link").href = "/venues/show-runs/scenes.html?production_id=" + encodeURIComponent(productionId);
+      const locationId = payload.data.location_id;
+      document.getElementById("scene-library-link").href = "/venues/show-runs/scenes.html?location_id=" + encodeURIComponent(locationId);
+      document.getElementById("roster-link").href = "/venues/show-runs/roster.html?id=" + encodeURIComponent(show.show_run_id);
+      let currentShowScenePlacementId = payload.data.current_show_scene_placement_id || null;
+
+      function newIdempotencyKey() {
+        if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+        return "k" + Date.now() + "-" + Math.random().toString(16).slice(2);
+      }
+
+      async function reloadCurrentScenePointer() {
+        const res = await fetch("/api/shows/" + encodeURIComponent(showId), { credentials: "include" });
+        const p = await res.json().catch(() => null);
+        if (res.ok && p?.ok) currentShowScenePlacementId = p.data.current_show_scene_placement_id || null;
+      }
+
+      async function pressGo(cueId, button) {
+        const key = newIdempotencyKey();
+        button.disabled = true;
+        try {
+          const res = await fetch(`/api/cues/${encodeURIComponent(cueId)}/go`, {
+            method: "POST", credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idempotency_key: key }),
+          });
+          const p = await res.json().catch(() => null);
+          if (!res.ok || !p?.ok) { alert("Could not press GO: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+          const execution = p.data.execution;
+          if (execution.status !== "succeeded") {
+            alert("Cue finished with status: " + execution.status + (execution.action_results?.length ? "\n" + execution.action_results.map(r => r.type + ": " + r.status + (r.error ? " (" + r.error + ")" : "")).join("\n") : ""));
+          }
+          await reloadCurrentScenePointer();
+          await loadScenes();
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      function renderCue(cue) {
+        const row = document.createElement("div");
+        row.className = "cue-row";
+        const left = document.createElement("div");
+        const title = document.createElement("div");
+        title.className = "cue-row-title";
+        title.textContent = cue.stage_button_label || cue.internal_name;
+        left.appendChild(title);
+        const meta = document.createElement("div");
+        meta.className = "cue-row-meta";
+        meta.textContent = cue.internal_name + " · " + cue.trigger_scope + (cue.enabled ? "" : " · disabled");
+        left.appendChild(meta);
+        row.appendChild(left);
+
+        const goButton = document.createElement("button");
+        goButton.className = "chip small";
+        goButton.type = "button";
+        goButton.textContent = "GO";
+        goButton.disabled = !cue.enabled;
+        goButton.addEventListener("click", () => pressGo(cue.id, goButton));
+        row.appendChild(goButton);
+        return row;
+      }
+
+      async function loadCuesForPlacement(placementId, container) {
+        container.innerHTML = "Loading Cues...";
+        const response = await fetch(`/api/shows/${encodeURIComponent(showId)}/scenes/${encodeURIComponent(placementId)}/cues`, { credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) { container.textContent = "Could not load Cues."; return; }
+        container.innerHTML = "";
+        const cues = payload.data.cues || [];
+        if (cues.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "help-text";
+          empty.textContent = "No Cues yet.";
+          container.appendChild(empty);
+        }
+        for (const cue of cues) container.appendChild(renderCue(cue));
+      }
+
+      function renderCueCreateForm(placementId, cueListContainer) {
+        const wrap = document.createElement("div");
+        wrap.className = "cue-create-form";
+
+        const nameField = document.createElement("div");
+        nameField.className = "field span-2";
+        const nameLabel = document.createElement("label");
+        nameLabel.textContent = "Internal name";
+        const nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.placeholder = "Backstage name, e.g. Advance to Scene B";
+        nameField.append(nameLabel, nameInput);
+
+        const labelField = document.createElement("div");
+        labelField.className = "field";
+        const labelLabel = document.createElement("label");
+        labelLabel.textContent = "Stage button label (optional)";
+        const labelInput = document.createElement("input");
+        labelInput.type = "text";
+        labelInput.placeholder = "Next →";
+        labelField.append(labelLabel, labelInput);
+
+        const scopeField = document.createElement("div");
+        scopeField.className = "field";
+        const scopeLabel = document.createElement("label");
+        scopeLabel.textContent = "Who may trigger";
+        const scopeSelect = document.createElement("select");
+        for (const [value, text] of [["director_crew_only", "Director / Crew only"], ["players_may_trigger", "Players may trigger"], ["any_roster_member", "Any roster member (never Audience)"]]) {
+          const opt = document.createElement("option");
+          opt.value = value; opt.textContent = text;
+          scopeSelect.appendChild(opt);
+        }
+        scopeField.append(scopeLabel, scopeSelect);
+
+        const actionField = document.createElement("div");
+        actionField.className = "field span-2";
+        const actionLabel = document.createElement("label");
+        actionLabel.textContent = "Action";
+        const actionSelect = document.createElement("select");
+        for (const [value, text] of [["go_to_scene", "Go to Scene"], ["emit_game_event", "Emit Game Event"], ["set_show_variable", "Set Show Variable"]]) {
+          const opt = document.createElement("option");
+          opt.value = value; opt.textContent = text;
+          actionSelect.appendChild(opt);
+        }
+        actionField.append(actionLabel, actionSelect);
+
+        const actionTargetField = document.createElement("div");
+        actionTargetField.className = "field span-2";
+        const actionTargetLabel = document.createElement("label");
+        const actionTargetInput = document.createElement("input");
+        actionTargetInput.type = "text";
+        function refreshActionTargetField() {
+          if (actionSelect.value === "go_to_scene") {
+            actionTargetLabel.textContent = "Target Show Scene Placement ID";
+            actionTargetInput.placeholder = "Paste the target placement id (see Scenes in this Show above)";
+          } else if (actionSelect.value === "emit_game_event") {
+            actionTargetLabel.textContent = "Event kind";
+            actionTargetInput.placeholder = "e.g. announcement/scene_change";
+          } else {
+            actionTargetLabel.textContent = "Variable key = value";
+            actionTargetInput.placeholder = "e.g. mood=tense";
+          }
+        }
+        refreshActionTargetField();
+        actionSelect.addEventListener("change", refreshActionTargetField);
+        actionTargetField.append(actionTargetLabel, actionTargetInput);
+
+        const createButton = document.createElement("button");
+        createButton.className = "chip small";
+        createButton.type = "button";
+        createButton.textContent = "Create Cue";
+        createButton.addEventListener("click", async () => {
+          const internalName = nameInput.value.trim();
+          if (!internalName) { alert("Internal name is required."); return; }
+          let action;
+          if (actionSelect.value === "go_to_scene") {
+            const targetId = actionTargetInput.value.trim();
+            if (!targetId) { alert("Target placement id is required."); return; }
+            action = { type: "go_to_scene", go_to_scene: { show_scene_placement_id: targetId } };
+          } else if (actionSelect.value === "emit_game_event") {
+            const kind = actionTargetInput.value.trim();
+            if (!kind) { alert("Event kind is required."); return; }
+            action = { type: "emit_game_event", emit_game_event: { event_kind: kind } };
+          } else {
+            const raw = actionTargetInput.value.trim();
+            const eq = raw.indexOf("=");
+            if (eq < 1) { alert("Enter key=value."); return; }
+            action = { type: "set_show_variable", set_show_variable: { key: raw.slice(0, eq).trim(), value: raw.slice(eq + 1).trim() } };
+          }
+          createButton.disabled = true;
+          try {
+            const res = await fetch(`/api/shows/${encodeURIComponent(showId)}/scenes/${encodeURIComponent(placementId)}/cues`, {
+              method: "POST", credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                internal_name: internalName,
+                stage_button_label: labelInput.value.trim(),
+                trigger_scope: scopeSelect.value,
+                actions: [action],
+              }),
+            });
+            const p = await res.json().catch(() => null);
+            if (!res.ok || !p?.ok) { alert("Could not create Cue: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+            nameInput.value = ""; labelInput.value = ""; actionTargetInput.value = "";
+            await loadCuesForPlacement(placementId, cueListContainer);
+          } finally {
+            createButton.disabled = false;
+          }
+        });
+
+        wrap.append(nameField, labelField, scopeField, actionField, actionTargetField);
+        const formWrap = document.createElement("div");
+        formWrap.appendChild(wrap);
+        formWrap.appendChild(createButton);
+        return formWrap;
+      }
 
       function renderScenePlacement(detail) {
         const row = document.createElement("div");
@@ -235,15 +437,53 @@
         title.className = "scene-row-title";
         title.textContent = detail.scene.title;
         left.appendChild(title);
+
+        const isCurrent = currentShowScenePlacementId === detail.placement.id;
+        if (isCurrent) {
+          const currentBadge = document.createElement("span");
+          currentBadge.className = "badge current";
+          currentBadge.textContent = "Current Scene";
+          title.appendChild(document.createTextNode(" "));
+          title.appendChild(currentBadge);
+        }
+
         const meta = document.createElement("p");
         meta.className = "scene-row-meta";
         meta.textContent = "Order " + detail.placement.sort_order + " · " + detail.placement.status +
           (detail.placement.venue_id ? " · Venue override: " + detail.placement.venue_id : "");
         left.appendChild(meta);
+        const idMeta = document.createElement("p");
+        idMeta.className = "scene-row-meta";
+        idMeta.textContent = "Placement ID: " + detail.placement.id;
+        left.appendChild(idMeta);
         row.appendChild(left);
 
         const actions = document.createElement("div");
         actions.className = "scene-row-actions";
+
+        if (!isCurrent && detail.placement.status !== "archived") {
+          const setCurrentButton = document.createElement("button");
+          setCurrentButton.className = "chip small";
+          setCurrentButton.type = "button";
+          setCurrentButton.textContent = "Set as Current Scene";
+          setCurrentButton.addEventListener("click", async () => {
+            setCurrentButton.disabled = true;
+            try {
+              const res = await fetch(`/api/shows/${encodeURIComponent(showId)}/current-scene`, {
+                method: "POST", credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ show_scene_placement_id: detail.placement.id }),
+              });
+              const p = await res.json().catch(() => null);
+              if (!res.ok || !p?.ok) { alert("Could not set current Scene: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+              currentShowScenePlacementId = detail.placement.id;
+              await loadScenes();
+            } finally {
+              setCurrentButton.disabled = false;
+            }
+          });
+          actions.appendChild(setCurrentButton);
+        }
 
         const readySelect = document.createElement("select");
         for (const status of ["draft", "ready", "retired", "archived"]) {
@@ -283,13 +523,27 @@
         actions.appendChild(removeButton);
 
         row.appendChild(actions);
+
+        const cuePanel = document.createElement("div");
+        cuePanel.className = "cue-panel";
+        const cueHeading = document.createElement("p");
+        cueHeading.className = "scene-row-title";
+        cueHeading.style.marginBottom = "4px";
+        cueHeading.textContent = "Cues";
+        cuePanel.appendChild(cueHeading);
+        const cueList = document.createElement("div");
+        cuePanel.appendChild(cueList);
+        cuePanel.appendChild(renderCueCreateForm(detail.placement.id, cueList));
+        row.appendChild(cuePanel);
+        loadCuesForPlacement(detail.placement.id, cueList);
+
         return row;
       }
 
       async function loadAvailableScenes() {
         const select = document.getElementById("scene-select");
         select.innerHTML = "";
-        const response = await fetch("/api/scenes?production_id=" + encodeURIComponent(productionId), { credentials: "include" });
+        const response = await fetch("/api/scenes?location_id=" + encodeURIComponent(locationId), { credentials: "include" });
         const payload = await response.json().catch(() => null);
         if (!response.ok || !payload?.ok) return;
         for (const scene of (payload.data.scenes || [])) {

@@ -11,7 +11,7 @@ import (
 )
 
 const sceneColumns = `
-	id::text, production_id::text, slug, title, COALESCE(short_title, ''),
+	id::text, location_id::text, source_production_id::text, slug, title, COALESCE(short_title, ''),
 	default_venue_id::text, COALESCE(audience_title, ''), COALESCE(audience_summary, ''),
 	COALESCE(player_brief, ''), COALESCE(director_notes, ''), COALESCE(operator_notes, ''),
 	COALESCE(source_ref, ''), status, config_json::text, created_by_user_id::text,
@@ -20,10 +20,10 @@ const sceneColumns = `
 
 func scanScene(row pgx.Row) (Scene, error) {
 	var s Scene
-	var defaultVenueID, createdByUserID *string
+	var sourceProductionID, defaultVenueID, createdByUserID *string
 	var configText string
 	if err := row.Scan(
-		&s.ID, &s.ProductionID, &s.Slug, &s.Title, &s.ShortTitle,
+		&s.ID, &s.LocationID, &sourceProductionID, &s.Slug, &s.Title, &s.ShortTitle,
 		&defaultVenueID, &s.AudienceTitle, &s.AudienceSummary,
 		&s.PlayerBrief, &s.DirectorNotes, &s.OperatorNotes,
 		&s.SourceRef, &s.Status, &configText, &createdByUserID,
@@ -34,6 +34,7 @@ func scanScene(row pgx.Row) (Scene, error) {
 		}
 		return Scene{}, err
 	}
+	s.SourceProductionID = sourceProductionID
 	s.DefaultVenueID = defaultVenueID
 	s.CreatedByUserID = createdByUserID
 	if configText != "" {
@@ -42,14 +43,20 @@ func scanScene(row pgx.Row) (Scene, error) {
 	return s, nil
 }
 
-// CreateScene authority-checks the actor against the Production (resolved
-// server-side, never trusted from the client) and inserts a new Scene
-// defaulting to status "draft". Slug uniqueness is scoped to the
-// Production, enforced by the DB's UNIQUE(production_id, slug) constraint.
-func CreateScene(ctx context.Context, pool *pgxpool.Pool, actorUserID, productionID string, in CreateSceneInput) (Scene, error) {
+// CreateScene authority-checks the actor against the target location
+// (resolved server-side, never trusted from the client) and inserts a new
+// Scene defaulting to status "draft". Slug uniqueness is scoped to the
+// location, enforced by the DB's UNIQUE(location_id, slug) constraint.
+// sourceProductionID is optional provenance only -- it never gates reuse
+// (Kernel 70 SS1.2, SS3.1).
+func CreateScene(ctx context.Context, pool *pgxpool.Pool, actorUserID, locationID, sourceProductionID string, in CreateSceneInput) (Scene, error) {
 	actorUserID = strings.TrimSpace(actorUserID)
 	if actorUserID == "" {
 		return Scene{}, errors.New("not_authenticated")
+	}
+	locationID = strings.TrimSpace(locationID)
+	if locationID == "" {
+		return Scene{}, errors.New("location_id_required")
 	}
 	if strings.TrimSpace(in.Title) == "" {
 		return Scene{}, errors.New("title_required")
@@ -58,7 +65,7 @@ func CreateScene(ctx context.Context, pool *pgxpool.Pool, actorUserID, productio
 		return Scene{}, errors.New("slug_required")
 	}
 
-	ok, err := CanManageScenesForProduction(ctx, pool, actorUserID, productionID)
+	ok, err := CanManageScenesForLocation(ctx, pool, actorUserID, locationID)
 	if err != nil {
 		return Scene{}, err
 	}
@@ -70,21 +77,25 @@ func CreateScene(ctx context.Context, pool *pgxpool.Pool, actorUserID, productio
 	if v := strings.TrimSpace(in.DefaultVenueID); v != "" {
 		defaultVenueID = &v
 	}
+	var sourceProductionPtr *string
+	if v := strings.TrimSpace(sourceProductionID); v != "" {
+		sourceProductionPtr = &v
+	}
 
 	row := pool.QueryRow(ctx, `
 		INSERT INTO scenes (
-			production_id, slug, title, short_title, default_venue_id,
+			location_id, source_production_id, slug, title, short_title, default_venue_id,
 			audience_title, audience_summary, player_brief, director_notes,
 			operator_notes, source_ref, created_by_user_id
 		)
-		VALUES ($1, $2, $3, NULLIF($4, ''), $5, NULLIF($6, ''), NULLIF($7, ''),
-			NULLIF($8, ''), NULLIF($9, ''), NULLIF($10, ''), NULLIF($11, ''), $12)
+		VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, NULLIF($7, ''), NULLIF($8, ''),
+			NULLIF($9, ''), NULLIF($10, ''), NULLIF($11, ''), NULLIF($12, ''), $13)
 		RETURNING `+sceneColumns,
-		productionID, in.Slug, in.Title, in.ShortTitle, defaultVenueID,
+		locationID, sourceProductionPtr, in.Slug, in.Title, in.ShortTitle, defaultVenueID,
 		in.AudienceTitle, in.AudienceSummary, in.PlayerBrief, in.DirectorNotes,
 		in.OperatorNotes, in.SourceRef, actorUserID)
 	scene, err := scanScene(row)
-	if err != nil && strings.Contains(err.Error(), "scenes_production_id_slug_key") {
+	if err != nil && strings.Contains(err.Error(), "scenes_location_id_slug_key") {
 		return Scene{}, errors.New("slug_already_used")
 	}
 	return scene, err
@@ -102,14 +113,14 @@ func LoadSceneByID(ctx context.Context, pool *pgxpool.Pool, sceneID string) (Sce
 	return scanScene(row)
 }
 
-// UpdateScene authority-checks against the Scene's Production, then applies
+// UpdateScene authority-checks against the Scene's location, then applies
 // only the fields present in the patch.
 func UpdateScene(ctx context.Context, pool *pgxpool.Pool, actorUserID, sceneID string, patch UpdateScenePatch) (Scene, error) {
 	s, err := LoadSceneByID(ctx, pool, sceneID)
 	if err != nil {
 		return Scene{}, err
 	}
-	ok, err := CanManageScenesForProduction(ctx, pool, actorUserID, s.ProductionID)
+	ok, err := CanManageScenesForLocation(ctx, pool, actorUserID, s.LocationID)
 	if err != nil {
 		return Scene{}, err
 	}
@@ -190,16 +201,19 @@ func ArchiveScene(ctx context.Context, pool *pgxpool.Pool, actorUserID, sceneID 
 	return UpdateScene(ctx, pool, actorUserID, sceneID, UpdateScenePatch{Status: &status})
 }
 
-// ListScenesForProduction returns every Scene under one Production. Callers
-// must already have passed a Scenes visibility check for this Production
-// before calling.
-func ListScenesForProduction(ctx context.Context, pool *pgxpool.Pool, productionID string) ([]SceneSummary, error) {
+// ListScenesForLocation returns every Scene reusable at one Victory
+// location, regardless of which Production originated it (Kernel 70
+// SS3.4 -- the Scene Library and Show Scene picker expose reusable Scenes
+// from the Show's location, not only its Production). Callers must already
+// have passed a Scenes visibility check for this location before calling.
+func ListScenesForLocation(ctx context.Context, pool *pgxpool.Pool, locationID string) ([]SceneSummary, error) {
 	rows, err := pool.Query(ctx, `
-		SELECT id::text, slug, title, COALESCE(short_title, ''), default_venue_id::text, status, created_at
+		SELECT id::text, location_id::text, source_production_id::text, slug, title,
+		       COALESCE(short_title, ''), default_venue_id::text, status, created_at
 		FROM scenes
-		WHERE production_id = $1
+		WHERE location_id = $1
 		ORDER BY created_at DESC
-	`, productionID)
+	`, locationID)
 	if err != nil {
 		return nil, err
 	}
@@ -208,10 +222,11 @@ func ListScenesForProduction(ctx context.Context, pool *pgxpool.Pool, production
 	var out []SceneSummary
 	for rows.Next() {
 		var s SceneSummary
-		var defaultVenueID *string
-		if err := rows.Scan(&s.ID, &s.Slug, &s.Title, &s.ShortTitle, &defaultVenueID, &s.Status, &s.CreatedAt); err != nil {
+		var sourceProductionID, defaultVenueID *string
+		if err := rows.Scan(&s.ID, &s.LocationID, &sourceProductionID, &s.Slug, &s.Title, &s.ShortTitle, &defaultVenueID, &s.Status, &s.CreatedAt); err != nil {
 			return nil, err
 		}
+		s.SourceProductionID = sourceProductionID
 		s.DefaultVenueID = defaultVenueID
 		out = append(out, s)
 	}

@@ -58,9 +58,11 @@ func showRunForShow(ctx context.Context, pool *pgxpool.Pool, showID string) (sho
 }
 
 // CreatePlacement authority-checks the actor against the Show's parent Show
-// Run location, validates the target Scene belongs to the same Production
-// as the Show (a Scene may only be staged in Shows under its own
-// Production, Kernel 69 SS1.4), and rejects staging an archived Scene.
+// Run location, validates the target Scene is reusable at the same
+// location as the Show (a Scene may be staged in any Show at the same
+// Victory location regardless of source Production, Kernel 70 SS3.1,
+// correcting Kernel 69 SS1.4's Production-exclusive rule; cross-location
+// placement remains rejected), and rejects staging an archived Scene.
 func CreatePlacement(ctx context.Context, pool *pgxpool.Pool, actorUserID, showID string, in CreatePlacementInput) (ShowScenePlacement, error) {
 	actorUserID = strings.TrimSpace(actorUserID)
 	if actorUserID == "" {
@@ -87,8 +89,8 @@ func CreatePlacement(ctx context.Context, pool *pgxpool.Pool, actorUserID, showI
 	if err != nil {
 		return ShowScenePlacement{}, err
 	}
-	if scene.ProductionID != sr.ProductionID {
-		return ShowScenePlacement{}, errors.New("scene_production_mismatch")
+	if scene.LocationID != sr.LocationID {
+		return ShowScenePlacement{}, errors.New("scene_location_mismatch")
 	}
 	if scene.Status == "archived" {
 		return ShowScenePlacement{}, errors.New("scene_archived")
@@ -190,7 +192,27 @@ func UpdatePlacement(ctx context.Context, pool *pgxpool.Pool, actorUserID, place
 		RETURNING `+placementColumns,
 		placementID, venueID, sortOrder, status,
 		audienceTitleOverride, audienceSummaryOverride, directorNotesOverride)
-	return scanPlacement(row)
+	updated, err := scanPlacement(row)
+	if err != nil {
+		return ShowScenePlacement{}, err
+	}
+
+	// A Show's persistent current-Scene pointer (Kernel 70 SS4.1) must
+	// never point at an archived or retired placement. This is plain SQL
+	// against the shows table rather than a call into
+	// backend/internal/shows, avoiding a package import cycle (shows
+	// already imports showruns, and scenes already imports shows) for a
+	// narrow, well-understood side effect -- the same pattern showings
+	// already uses when it writes to actions.showing_id.
+	if updated.Status == "archived" || updated.Status == "retired" {
+		if _, err := pool.Exec(ctx, `
+			UPDATE shows SET current_show_scene_placement_id = NULL, updated_at = NOW()
+			WHERE id = $1 AND current_show_scene_placement_id = $2
+		`, updated.ShowID, updated.ID); err != nil {
+			return ShowScenePlacement{}, err
+		}
+	}
+	return updated, nil
 }
 
 // ArchivePlacement ("Remove Scene from Show" in the UI) is a thin wrapper

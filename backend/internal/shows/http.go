@@ -193,7 +193,18 @@ func HandleShowByID(pool *pgxpool.Pool) http.HandlerFunc {
 			// callers -- e.g. the Scenes section on the Show detail page,
 			// Kernel 69 -- can fetch the Production-scoped Scene Library
 			// without a second round trip through the Show Run.
-			writeOK(w, map[string]any{"show": s, "can_manage": canManage, "roster": roster, "production_id": sr.ProductionID})
+			//
+			// current_show_scene_placement_id and variables_json are
+			// deliberately excluded from Show's own JSON serialization
+			// (Kernel 70 SS9) and added explicitly here instead, since this
+			// whole response is already gated behind the CanViewBackstage
+			// check above -- never reachable by Audience.
+			writeOK(w, map[string]any{
+				"show": s, "can_manage": canManage, "roster": roster,
+				"production_id": sr.ProductionID, "location_id": sr.LocationID,
+				"current_show_scene_placement_id": s.CurrentShowScenePlacementID,
+				"variables_json":                  s.VariablesJSON,
+			})
 
 		case http.MethodPatch:
 			var body struct {
@@ -332,6 +343,51 @@ func HandleShowProgram(pool *pgxpool.Pool) http.HandlerFunc {
 			"program":       entries,
 			"can_self_join": canSelfJoin,
 		})
+	}
+}
+
+// HandleShowCurrentScene handles POST /api/shows/{show_id}/current-scene --
+// sets (body: {"show_scene_placement_id": "..."}) or clears (body: {} or
+// null placement id) the Show's persistent current-Scene pointer (Kernel
+// 70 SS4.1). Director/Producer/Operator authority only -- Crew reaches
+// this indirectly via a Cue's go_to_scene action, which uses
+// shows.SetCurrentScenePlacementTrusted after its own authority check.
+func HandleShowCurrentScene(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		showID := strings.TrimSpace(r.PathValue("show_id"))
+
+		var body struct {
+			ShowScenePlacementID string `json:"show_scene_placement_id"`
+		}
+		if r.ContentLength != 0 {
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeError(w, errors.New("invalid_request_body"))
+				return
+			}
+		}
+
+		var s Show
+		if strings.TrimSpace(body.ShowScenePlacementID) == "" {
+			s, err = ClearCurrentScenePlacement(ctx, pool, userID, showID)
+		} else {
+			s, err = SetCurrentScenePlacement(ctx, pool, userID, showID, body.ShowScenePlacementID)
+		}
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeOK(w, map[string]any{"show": s})
 	}
 }
 

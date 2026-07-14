@@ -69,3 +69,23 @@ func CanViewBackstage(ctx context.Context, pool *pgxpool.Pool, userID, locationI
 	`, userID, locationID).Scan(&exists)
 	return exists, err
 }
+
+// CanCrewPerformNonDestructiveEdit is CanViewBackstage's crew-roster-row
+// check, reused (not duplicated) as the authority gate for the exact
+// non-destructive action list Kernel 70 §1.8 grants Crew: enter rehearsal,
+// edit This Show's Version of a Scene (never the base reusable Scene),
+// create/edit non-destructive Cues, press GO, and update Scene
+// configuration. It does NOT grant Director/Producer-level authority
+// (archive, current-Scene-pointer changes outside Cue execution, base
+// Scene edits, roster management) -- callers needing those must still gate
+// through CanManageShowRun. This is deliberately a single boolean, not a
+// permission matrix (Kernel 68 §1.5/§3.8's explicit warning against that
+// shape): every write endpoint that calls this is itself one of the
+// specific narrow actions Crew is allowed, so the boolean answers "is this
+// user a Crew member or above at this location," and the endpoint's own
+// scope is what keeps the action non-destructive -- do not "simplify" this
+// into a duplicate of CanViewBackstage; the distinction that matters is
+// which endpoints call which function, not the check itself.
+func CanCrewPerformNonDestructiveEdit(ctx context.Context, pool *pgxpool.Pool, userID, locationID string) (bool, error) {
+	return CanViewBackstage(ctx, pool, userID, locationID)
+}

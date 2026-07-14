@@ -132,6 +132,9 @@ migrations=(
   "$ROOT/database/migrations/040_kernel67_shows.sql"
   "$ROOT/database/migrations/041_kernel68_productions_created_by.sql"
   "$ROOT/database/migrations/042_kernel69_scenes.sql"
+  "$ROOT/database/migrations/043_kernel70_scene_location_scoping.sql"
+  "$ROOT/database/migrations/044_kernel70_show_stage_and_variables.sql"
+  "$ROOT/database/migrations/045_kernel70_cues.sql"
 )
 
 for migration in "${migrations[@]}"; do
@@ -681,6 +684,14 @@ if [[ -z "$fresh_install_production_id" ]]; then
 fi
 echo "PASS fixture production created for Show Run smoke checks ($fresh_install_production_id)"
 
+fresh_install_location_id="$(docker exec -i "$POSTGRES_CONTAINER" psql -tAc "
+  SELECT id FROM locations WHERE slug = 'amurray-family';
+" -U "$POSTGRES_USER" -d "$DB_NAME" | tr -d '[:space:]')"
+if [[ -z "$fresh_install_location_id" ]]; then
+  echo "failed to resolve amurray-family location id for Kernel 70 Scene smoke checks" >&2
+  exit 1
+fi
+
 create_run_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
   -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
   -X POST "http://127.0.0.1:${BACKEND_PORT}/api/show-runs" \
@@ -953,7 +964,7 @@ echo "PASS newly created Production can be used to create a Show Run"
 # under the same Show Run to prove one Scene can be staged in more than one
 # Show.
 
-anon_scenes_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' "http://127.0.0.1:${BACKEND_PORT}/api/scenes?production_id=${fresh_install_production_id}")"
+anon_scenes_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' "http://127.0.0.1:${BACKEND_PORT}/api/scenes?location_id=${fresh_install_location_id}")"
 if [[ "$anon_scenes_status" != "401" ]]; then
   echo "expected anonymous Scenes list to return 401, got $anon_scenes_status" >&2
   cat "$BODY_OUT" >&2 || true
@@ -981,7 +992,7 @@ echo "PASS created two fresh Shows for Scene staging ($scene_show_a_id, $scene_s
 create_scene_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
   -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
   -X POST "http://127.0.0.1:${BACKEND_PORT}/api/scenes" \
-  -d "{\"production_id\":\"$fresh_install_production_id\",\"slug\":\"fresh-install-character-making-opening\",\"title\":\"Socio- : Character Making — Opening\",\"audience_title\":\"Character Making\",\"audience_summary\":\"Come make a character with us.\",\"director_notes\":\"backstage only\"}")"
+  -d "{\"location_id\":\"$fresh_install_location_id\",\"source_production_id\":\"$fresh_install_production_id\",\"slug\":\"fresh-install-character-making-opening\",\"title\":\"Socio- : Character Making — Opening\",\"audience_title\":\"Character Making\",\"audience_summary\":\"Come make a character with us.\",\"director_notes\":\"backstage only\"}")"
 if [[ "$create_scene_status" != "200" ]]; then
   echo "expected Producer A to create a Scene, got $create_scene_status" >&2
   cat "$BODY_OUT" >&2 || true
@@ -998,7 +1009,7 @@ echo "PASS Producer A created a reusable Scene ($scene_id)"
 audience_create_scene_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
   -H "Cookie: victory_session=$second_session" -H "Content-Type: application/json" \
   -X POST "http://127.0.0.1:${BACKEND_PORT}/api/scenes" \
-  -d "{\"production_id\":\"$fresh_install_production_id\",\"title\":\"Sneaky Scene\",\"slug\":\"sneaky-scene\"}")"
+  -d "{\"location_id\":\"$fresh_install_location_id\",\"title\":\"Sneaky Scene\",\"slug\":\"sneaky-scene\"}")"
 if [[ "$audience_create_scene_status" != "403" ]]; then
   echo "expected Audience-only B to be rejected creating a Scene, got $audience_create_scene_status" >&2
   cat "$BODY_OUT" >&2 || true

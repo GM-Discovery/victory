@@ -2,6 +2,7 @@ package shows
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -15,22 +16,30 @@ import (
 const showColumns = `
 	id::text, show_run_id::text, slug, title, COALESCE(description, ''),
 	COALESCE(audience_title, ''), COALESCE(audience_program_blurb, ''),
-	status, scheduled_start_at, scheduled_end_at, actual_start_at, actual_end_at,
+	status, current_show_scene_placement_id::text, variables_json::text,
+	scheduled_start_at, scheduled_end_at, actual_start_at, actual_end_at,
 	created_by_user_id::text, created_at, updated_at, archived_at
 `
 
 func scanShow(row pgx.Row) (Show, error) {
 	var s Show
+	var currentPlacementID *string
+	var variablesText string
 	if err := row.Scan(
 		&s.ID, &s.ShowRunID, &s.Slug, &s.Title, &s.Description,
 		&s.AudienceTitle, &s.AudienceProgramBlurb,
-		&s.Status, &s.ScheduledStartAt, &s.ScheduledEndAt, &s.ActualStartAt, &s.ActualEndAt,
+		&s.Status, &currentPlacementID, &variablesText,
+		&s.ScheduledStartAt, &s.ScheduledEndAt, &s.ActualStartAt, &s.ActualEndAt,
 		&s.CreatedByUserID, &s.CreatedAt, &s.UpdatedAt, &s.ArchivedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Show{}, errors.New("show_not_found")
 		}
 		return Show{}, err
+	}
+	s.CurrentShowScenePlacementID = currentPlacementID
+	if variablesText != "" {
+		s.VariablesJSON = json.RawMessage(variablesText)
 	}
 	return s, nil
 }

@@ -2,6 +2,7 @@ package shows
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -299,6 +300,46 @@ func TestAudienceProgramIsShowSpecificAndExcludesBackstageFields(t *testing.T) {
 	}
 	if sA.AudienceProgramBlurb == second.AudienceProgramBlurb {
 		t.Fatalf("expected distinct per-show blurbs, both are %q", sA.AudienceProgramBlurb)
+	}
+}
+
+// TestShowJSONNeverExposesVariablesOrCurrentScenePointer is the Kernel 70
+// SS9 tripwire proof: HandleShowProgram (Audience-viewable, gated only by
+// CanViewShowRun) serializes the Show struct wholesale, so
+// current_show_scene_placement_id and variables_json must never be
+// JSON-serializable fields on Show at all -- a struct-reuse leak, not a
+// per-handler filtering bug, would otherwise be invisible to a
+// per-endpoint review. Uses an obviously-secret tripwire string, matching
+// Kernel 69's own reportback technique for director_notes.
+func TestShowJSONNeverExposesVariablesOrCurrentScenePointer(t *testing.T) {
+	pool := openShowsTestPool(t)
+	producer := insertShowsTestUser(t, pool, "sh_tripwire_producer")
+	_, _, showID := insertShowFixture(t, pool, producer)
+
+	tripwire := "BACKSTAGE-ONLY-VARIABLE-SECRET-4f9c"
+	if _, err := pool.Exec(context.Background(), `
+		UPDATE shows SET variables_json = $2::jsonb, current_show_scene_placement_id = NULL WHERE id = $1
+	`, showID, `{"mood":"`+tripwire+`"}`); err != nil {
+		t.Fatalf("seed tripwire variable: %v", err)
+	}
+
+	s, err := LoadShowByID(context.Background(), pool, showID)
+	if err != nil {
+		t.Fatalf("load show: %v", err)
+	}
+	if s.VariablesJSON == nil || !strings.Contains(string(s.VariablesJSON), tripwire) {
+		t.Fatalf("expected the Go struct to still carry the variable internally, got %s", s.VariablesJSON)
+	}
+
+	marshaled, err := json.Marshal(s)
+	if err != nil {
+		t.Fatalf("marshal show: %v", err)
+	}
+	if strings.Contains(string(marshaled), tripwire) {
+		t.Fatalf("Show's JSON serialization leaked variables_json content: %s", marshaled)
+	}
+	if strings.Contains(string(marshaled), "variables_json") || strings.Contains(string(marshaled), "current_show_scene_placement_id") {
+		t.Fatalf("Show's JSON serialization must never include these field names at all: %s", marshaled)
 	}
 }
 

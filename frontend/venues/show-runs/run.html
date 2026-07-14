@@ -271,7 +271,7 @@
       if (canManage) {
         document.getElementById("roster-link").hidden = false;
         const sceneLibraryLink = document.getElementById("scene-library-link");
-        sceneLibraryLink.href = "/venues/show-runs/scenes.html?production_id=" + encodeURIComponent(run.production_id);
+        sceneLibraryLink.href = "/venues/show-runs/scenes.html?location_id=" + encodeURIComponent(run.location_id);
         sceneLibraryLink.hidden = false;
         document.getElementById("manage-card").hidden = false;
       } else {

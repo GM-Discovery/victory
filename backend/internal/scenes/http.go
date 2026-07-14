@@ -59,9 +59,11 @@ func methodNotAllowed(w http.ResponseWriter) {
 	writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false})
 }
 
-// HandleScenesCollection handles GET /api/scenes?production_id=... (list,
-// backstage-visibility-gated) and POST /api/scenes (create, manage-
-// authorized inside CreateScene).
+// HandleScenesCollection handles GET /api/scenes?location_id=... (list,
+// backstage-visibility-gated -- the Scene Library, showing every reusable
+// Scene at that Victory location regardless of source Production, Kernel
+// 70 SS3.4) and POST /api/scenes (create, manage-authorized inside
+// CreateScene).
 func HandleScenesCollection(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
@@ -75,12 +77,12 @@ func HandleScenesCollection(pool *pgxpool.Pool) http.HandlerFunc {
 
 		switch r.Method {
 		case http.MethodGet:
-			productionID := strings.TrimSpace(r.URL.Query().Get("production_id"))
-			if productionID == "" {
-				writeError(w, errors.New("production_id_required"))
+			locationID := strings.TrimSpace(r.URL.Query().Get("location_id"))
+			if locationID == "" {
+				writeError(w, errors.New("location_id_required"))
 				return
 			}
-			canView, err := CanViewScenesBackstage(ctx, pool, userID, productionID)
+			canView, err := CanViewScenesForLocation(ctx, pool, userID, locationID)
 			if err != nil {
 				writeError(w, err)
 				return
@@ -89,12 +91,12 @@ func HandleScenesCollection(pool *pgxpool.Pool) http.HandlerFunc {
 				writeError(w, errors.New("not_authorized"))
 				return
 			}
-			list, err := ListScenesForProduction(ctx, pool, productionID)
+			list, err := ListScenesForLocation(ctx, pool, locationID)
 			if err != nil {
 				writeError(w, err)
 				return
 			}
-			canManage, err := CanManageScenesForProduction(ctx, pool, userID, productionID)
+			canManage, err := CanManageScenesForLocation(ctx, pool, userID, locationID)
 			if err != nil {
 				writeError(w, err)
 				return
@@ -103,23 +105,24 @@ func HandleScenesCollection(pool *pgxpool.Pool) http.HandlerFunc {
 
 		case http.MethodPost:
 			var body struct {
-				ProductionID    string `json:"production_id"`
-				Slug            string `json:"slug"`
-				Title           string `json:"title"`
-				ShortTitle      string `json:"short_title"`
-				DefaultVenueID  string `json:"default_venue_id"`
-				AudienceTitle   string `json:"audience_title"`
-				AudienceSummary string `json:"audience_summary"`
-				PlayerBrief     string `json:"player_brief"`
-				DirectorNotes   string `json:"director_notes"`
-				OperatorNotes   string `json:"operator_notes"`
-				SourceRef       string `json:"source_ref"`
+				LocationID         string `json:"location_id"`
+				SourceProductionID string `json:"source_production_id"`
+				Slug               string `json:"slug"`
+				Title              string `json:"title"`
+				ShortTitle         string `json:"short_title"`
+				DefaultVenueID     string `json:"default_venue_id"`
+				AudienceTitle      string `json:"audience_title"`
+				AudienceSummary    string `json:"audience_summary"`
+				PlayerBrief        string `json:"player_brief"`
+				DirectorNotes      string `json:"director_notes"`
+				OperatorNotes      string `json:"operator_notes"`
+				SourceRef          string `json:"source_ref"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				writeError(w, errors.New("invalid_request_body"))
 				return
 			}
-			s, err := CreateScene(ctx, pool, userID, body.ProductionID, CreateSceneInput{
+			s, err := CreateScene(ctx, pool, userID, body.LocationID, body.SourceProductionID, CreateSceneInput{
 				Slug: body.Slug, Title: body.Title, ShortTitle: body.ShortTitle,
 				DefaultVenueID: body.DefaultVenueID, AudienceTitle: body.AudienceTitle,
 				AudienceSummary: body.AudienceSummary, PlayerBrief: body.PlayerBrief,
@@ -159,7 +162,7 @@ func HandleSceneByID(pool *pgxpool.Pool) http.HandlerFunc {
 				writeError(w, err)
 				return
 			}
-			canView, err := CanViewScenesBackstage(ctx, pool, userID, s.ProductionID)
+			canView, err := CanViewScenesForLocation(ctx, pool, userID, s.LocationID)
 			if err != nil {
 				writeError(w, err)
 				return
@@ -168,7 +171,7 @@ func HandleSceneByID(pool *pgxpool.Pool) http.HandlerFunc {
 				writeError(w, errors.New("not_authorized"))
 				return
 			}
-			canManage, err := CanManageScenesForProduction(ctx, pool, userID, s.ProductionID)
+			canManage, err := CanManageScenesForLocation(ctx, pool, userID, s.LocationID)
 			if err != nil {
 				writeError(w, err)
 				return
