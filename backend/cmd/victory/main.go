@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/access"
@@ -35,6 +34,7 @@ import (
 	"victory/backend/internal/identity"
 	"victory/backend/internal/messages"
 	"victory/backend/internal/network"
+	"victory/backend/internal/participation"
 	"victory/backend/internal/playerprofile"
 	"victory/backend/internal/playerrelationships"
 	"victory/backend/internal/profiles"
@@ -838,38 +838,17 @@ func main() {
 	}
 }
 
+// lookupVenueRole resolves the viewer's role at venueSlug for the
+// /api/world/* snapshot handlers. Kernel 71: this used to query the legacy
+// memberships table only, which meant a Producer/Director whose sole grant
+// was a location_memberships row (the normal shape for anyone bootstrapped
+// or signed up after Kernel 66) resolved as "none" at their own venue. It
+// now delegates to the canonical participation resolver, which tries
+// location_memberships and show_run_roster_members first and only falls
+// back to this same legacy memberships query as a last resort. See
+// backend/internal/participation/resolver.go.
 func lookupVenueRole(ctx context.Context, pool *pgxpool.Pool, userID string, venueSlug string) (string, error) {
-	var role string
-
-	err := pool.QueryRow(ctx, `
-		SELECT lower(role_text) FROM (
-			-- exact venue membership first
-			SELECT m.role::text AS role_text, 1 AS priority
-			FROM memberships m
-			JOIN venues v ON v.id = m.venue_id
-			WHERE m.user_id = $1
-			  AND v.slug = $2
-
-			UNION ALL
-
-			-- fallback: global producer membership
-			SELECT m.role::text AS role_text, 2 AS priority
-			FROM memberships m
-			WHERE m.user_id = $1
-			  AND m.venue_id IS NULL
-			  AND m.role::text = 'producer'
-		) ranked
-		ORDER BY priority
-		LIMIT 1
-	`, userID, venueSlug).Scan(&role)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return "none", nil
-		}
-		return "", err
-	}
-
-	return role, nil
+	return participation.LegacyLookupVenueRole(ctx, pool, userID, venueSlug)
 }
 
 func getenv(key, fallback string) string {
