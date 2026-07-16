@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/dbtest"
-	"victory/backend/internal/playerprofile"
 	"victory/backend/internal/showruns"
 )
 
@@ -349,14 +348,13 @@ func TestShowRosterInheritsShowRunVisibilityWithNoOwnRosterTable(t *testing.T) {
 	player := insertShowsTestUser(t, pool, "sh_roster_player")
 	_, showRunID, showID := insertShowFixture(t, pool, producer)
 
-	if _, err := playerprofile.EnsureWorkbook(context.Background(), pool, player); err != nil {
-		t.Fatalf("ensure workbook: %v", err)
-	}
-	var profileID string
-	if err := pool.QueryRow(context.Background(), `SELECT id::text FROM player_profile_workbooks WHERE user_id = $1`, player).Scan(&profileID); err != nil {
-		t.Fatalf("load profile id: %v", err)
-	}
-	if _, err := showruns.AddRosterMember(context.Background(), pool, producer, showRunID, profileID, "player", "", true); err != nil {
+	// Inserted directly, not via showruns.AddRosterMember (Kernel 71 gates
+	// role="player" behind a ticket) -- this test's subject is Show/Show-Run
+	// roster inheritance, not add-authority.
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO show_run_roster_members (show_run_id, user_id, role, added_by_user_id)
+		VALUES ($1, $2, 'player', $3)
+	`, showRunID, player, producer); err != nil {
 		t.Fatalf("add roster member to show run: %v", err)
 	}
 

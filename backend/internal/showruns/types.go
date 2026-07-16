@@ -41,6 +41,10 @@ type RosterMember struct {
 	AddedByUserID   string     `json:"added_by_user_id"`
 	AddedAt         time.Time  `json:"added_at"`
 	RemovedAt       *time.Time `json:"removed_at,omitempty"`
+	// CharacterCardID is the Character this Player is currently presenting
+	// as for this Show Run (Kernel 71) -- "" when none selected yet, or
+	// for any non-player role, which never has one.
+	CharacterCardID string `json:"character_card_id,omitempty"`
 }
 
 // AudienceBlock is one row of show_run_audience_blocks -- run-scoped only,
@@ -67,17 +71,18 @@ type HeadlineFact struct {
 // name/portrait/headline facts are always re-derived live from the member's
 // current Trailer Face -- never stored on the roster row.
 type RosterMemberProjection struct {
-	MemberID       string         `json:"member_id"`
-	ProfileID      string         `json:"profile_id"`
-	Role           string         `json:"role"`
-	RoleLabel      string         `json:"role_label"`
-	ProgramVisible bool           `json:"program_visible"`
-	AddedAt        time.Time      `json:"added_at"`
-	StageName      string         `json:"stage_name"`
-	PortraitURL    string         `json:"portrait_url,omitempty"`
-	HeadlineFacts  []HeadlineFact `json:"headline_facts"`
-	TrailerURL     string         `json:"trailer_url"`
-	IsYou          bool           `json:"is_you"`
+	MemberID        string         `json:"member_id"`
+	ProfileID       string         `json:"profile_id"`
+	Role            string         `json:"role"`
+	RoleLabel       string         `json:"role_label"`
+	ProgramVisible  bool           `json:"program_visible"`
+	AddedAt         time.Time      `json:"added_at"`
+	StageName       string         `json:"stage_name"`
+	PortraitURL     string         `json:"portrait_url,omitempty"`
+	HeadlineFacts   []HeadlineFact `json:"headline_facts"`
+	TrailerURL      string         `json:"trailer_url"`
+	IsYou           bool           `json:"is_you"`
+	CharacterCardID string         `json:"character_card_id,omitempty"`
 }
 
 // AudienceProgramEntry is the curated Audience-facing shape -- deliberately

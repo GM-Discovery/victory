@@ -51,6 +51,8 @@ func writeError(w http.ResponseWriter, err error) {
 		status = http.StatusForbidden
 	case strings.HasSuffix(code, "_not_found"):
 		status = http.StatusNotFound
+	case code == "short_code_taken" || code == "show_code_ambiguous":
+		status = http.StatusConflict
 	}
 	writeJSON(w, status, response{Ok: false, Data: map[string]any{"error": code}})
 }
@@ -493,6 +495,79 @@ func HandleShowSessionStart(pool *pgxpool.Pool) http.HandlerFunc {
 			"session_status": result.SessionStatus,
 			"showing_id":     result.ShowingID,
 			"was_resumed":    result.WasResumed,
+		})
+	}
+}
+
+// HandleUpdateShortCode handles PATCH /api/shows/{show_id}/short-code.
+func HandleUpdateShortCode(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			methodNotAllowed(w)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		var body struct {
+			ShortCode string `json:"short_code"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeError(w, errors.New("invalid_request_body"))
+			return
+		}
+		s, err := UpdateShortCode(ctx, pool, userID, strings.TrimSpace(r.PathValue("show_id")), body.ShortCode)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeOK(w, map[string]any{"show": s})
+	}
+}
+
+// HandleResolveByShortCode handles GET /api/shows/by-code/{code} -- used by
+// both Audition Hall's "Join a Show" lookup and /showtime. The response is
+// deliberately narrow: show/show-run/location identifiers only, never
+// backstage state, Cue internals, or roster data (spec §11 "Show code
+// lookup does not expose backstage data").
+func HandleResolveByShortCode(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		s, err := LoadShowByCode(ctx, pool, userID, r.URL.Query().Get("code"))
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		sr, err := showruns.LoadShowRunByID(ctx, pool, s.ShowRunID)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeOK(w, map[string]any{
+			"show": map[string]any{
+				"id":          s.ID,
+				"title":       s.Title,
+				"short_code":  s.ShortCode,
+				"show_run_id": s.ShowRunID,
+			},
+			"show_run": map[string]any{
+				"id":    sr.ID,
+				"title": sr.Title,
+			},
 		})
 	}
 }

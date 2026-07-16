@@ -2,18 +2,18 @@
 
 ## Purpose
 
-This document is the current-state canon for Victory as of **Kernel 70A**. Historical kernel specifications and reportbacks describe what was true when they were written; this file wins when an older current-tense statement conflicts with the implemented repository.
+This document is the current-state canon for Victory as of **Kernel 71**. Historical kernel specifications and reportbacks describe what was true when they were written; this file wins when an older current-tense statement conflicts with the implemented repository.
 
 For detailed vocabulary use `Construction/Dictionary.txt`. For durable implementation traps use `Construction/OperatorLogs/operator-notes.md`. For chronological kernel history use `Construction/OperatorLogs/operator-log.md`.
 
 ## Kernel State
 
-- Current completed kernel: **Kernel 70A — Live Stage Closure and Alpha Path Alignment**
+- Current completed kernel: **Kernel 71 — Two-Punch Show Tickets, Character Participation, and Showtime**
 - Completion date: **2026-07-16**
-- Commit: **`2611840`**
-- Live deployment date: **2026-07-16**. Applying Kernel 70A's own code was a container rebuild only (no new migrations), but the deploy surfaced that **Kernel 70's three migrations (`043`–`045`) had never actually reached the live `victory` database** despite being committed since `920aeb7` on 2026-07-14 — `actions.show_id`, `cues`, and `cue_executions` did not exist in production until this deploy. A `pg_dump` backup was taken first (`backups/victory_pre_kernel70a_migrations_20260716_031420.dump`); all 46 migration files were then replayed against the live database (idempotent, `ON_ERROR_STOP=1`, zero errors) before the backend restart. Verified clean post-deploy: `/health`, `/ws/catharsis`, and `/api/director-console/current` all succeeded with no schema errors.
-- Product state: Kernels 53–70A are implemented and live. Visual Scene-composition/capture remains future work.
+- Status: **PASS, uncommitted** — implemented and verified (full `go test ./...` green, `scripts/smoke/fresh-install.sh --local` and `scripts/test/alpha-gate.sh` both PASS end-to-end) but not yet committed or deployed; pending review.
+- Product state: Kernels 53–71 are implemented. Visual Scene-composition/capture remains future work.
 - Kernel numbers are stable historical labels. Always check the operator log before assigning the next number.
+- Previous completed/live kernel: **Kernel 70A — Live Stage Closure and Alpha Path Alignment**, deployed live 2026-07-16, commit `2611840`. That deploy also retroactively applied Kernel 70's own migrations (`043`–`045`), which had never reached the live database despite being committed since `920aeb7` on 2026-07-14.
 
 ## Product Shape
 
@@ -35,8 +35,18 @@ This is the **Domain Hierarchy** — the production/scheduling spine above. A se
 
 - **Operator**: global installation authority (`access.IsOperatorUser`), independent of any Location.
 - **Location role** (`location_memberships`): per-user, per-Location role — `producer`, `director`, `cast`, `crew`, or `audience`. This is the primary authority scope for Production/Show Run/Show/Scene/Cue decisions; do not substitute a user's best role at any other Location.
-- **Show Run roster role** (`show_run_roster_members`): per-user, per-Show-Run role — `producer`, `director`, `player`, `crew`, `audience`, `guest`, `observer`, or `custom`. This is a distinct fact from Location role and can diverge from it: a Location Producer need not be on a given Show Run's roster at all, and a roster `crew` member need not hold any Location membership.
-- **Equipped Character** (`current_session_personas`): per-user, per-**Session** — which Character this user is currently playing, if any. This is ephemeral (`ON DELETE CASCADE` from `sessions`, primary key `(session_id, user_id)`), reset every time a Session ends. There is currently no durable link from a Character to a Show, Show Run, or roster entry; see "No durable Character-to-Show/Show-Run/Session linkage exists" below.
+- **Show Run roster role** (`show_run_roster_members`): per-user, per-Show-Run role — `producer`, `director`, `player`, `crew`, `audience`, `guest`, `observer`, or `custom`. This is a distinct fact from Location role and can diverge from it: a Location Producer need not be on a given Show Run's roster at all, and a roster `crew` member need not hold any Location membership. **As of Kernel 71, an active Player roster row is the canonical, sole reason a Player may participate in a Show Run — see "Kernel 71 Participation Model" below.**
+- **Selected Character** (`show_run_roster_members.character_card_id`): per-user, per-**Show Run** — which Character this Player is presenting as for that Show Run, freely switchable, no Director approval required (Kernel 71). This superseded the old Session-scoped `current_session_personas` as the canonical "has this Player chosen a Character" signal (`world.LoadVenueSnapshot`'s `TheaterContext` now reads this column); `current_session_personas` and the separate, site-wide `active_user_characters` table both still exist and are read by other, unrelated code paths (persona-equip actions, Greenroom's own "current Character" concept), but neither is authoritative for Show Run participation.
+
+## Kernel 71 Participation Model
+
+Kernel 71 closed two gaps: there was no mutual-consent path onto a Show Run's roster (a Director could unilaterally add anyone as Player), and a real authority-resolution bug meant a Producer/Director whose only grant was a `location_memberships` row could resolve as `viewerRole = "none"` at their own venue (see the former "Known Gaps" entries below, now resolved).
+
+- **Canonical participation resolver** (`backend/internal/participation`, `ResolveParticipationContext`): the one function venue-role/theater-entry/backstage-gate call sites should converge on. Precedence: Operator → `location_memberships` → `show_run_roster_members` → any active `location_memberships` row (audience) → legacy `memberships`/`access_grants` (last-resort upgrade only, never a downgrade). `main.go`'s `lookupVenueRole` (feeding `/api/world/*`'s `viewerRole`) now delegates here instead of querying `memberships` alone — this is the fix for the "none" bug.
+- **Two-punch Show tickets** (`show_run_tickets`, `backend/internal/tickets`): the only ordinary path to an active Player roster row. Either side may punch first (Player requests via Audition Hall, or a Director invites); one punch grants nothing; the second punch is one atomic transaction (`tickets.SecondPunch`) that marks the ticket valid and creates/reactivates exactly one Player roster row, reusing `show_run_roster_members`'s existing partial-unique-index `ON CONFLICT` so a duplicate row or a double-processed concurrent punch is structurally impossible. `showruns.AddRosterMember` and `UpdateRosterMemberRole` both reject a direct/promoted `role="player"` for non-Operator actors — the two-punch ticket is the only ordinary route to that role; Operator retains an explicit, auditable override.
+- **Character selection**: `POST /api/show-runs/{id}/roster/me/character` (always acts on the caller's own roster row). Character must be active (`is_deleted = FALSE`) and owned by the caller.
+- **Show short codes**: every Show gets an auto-generated, human-typeable, location-scoped-unique code (`shows.short_code`, confusable-excluding charset) at creation, editable by Director/Producer/Operator.
+- **`/showtime`**: one Director action (`POST /api/showtime/control`, in-app legacy command matching `/session`'s precedent) that resolves a Show by short code, derives its venue from staged Scene Placements (asking only if none or multiple distinct venues are staged), and starts/resumes the live Session via the unmodified Kernel 70A `shows.StartShowSession` — no manual venue slug, Session ID, or separate Production/Show-Run/Show start steps. Mic always starts off; the response suggests `/mic hot`. `/showtime end` ends only the technical Session — current Scene, roster, and Character selections are untouched by construction (no write path in `showtime.End` reaches them).
 
 ## Current Stack
 
@@ -82,7 +92,10 @@ Production and performance:
 
 - Production creation and location-scoped authority
 - Show Runs, rosters, self-join, audience blocks, and curated audience programs
-- Shows with scheduling/status fields and optional Session links
+- Two-punch Show tickets (Audition Hall Player-request and Director-invitation directions) as the sole ordinary path to active Player roster participation
+- Per-Show-Run Character selection and free switching among a Player's own active Characters
+- Shows with scheduling/status fields, auto-generated editable short codes, and optional Session links
+- `/showtime <code>` one-action start/resume/status/end orchestration
 - Location-scoped reusable Scenes and per-Show Scene Placements
 - Current-Scene pointer and Show variables
 - Persistent Show-owned action/state replay across linked Sessions
@@ -123,6 +136,14 @@ Kernel 70A route additions:
 - `GET /api/world/first-theater`, `POST /api/session/first-theater/join` — First Theater's own independent venue wiring, additive alongside the-cave and Catharsis (the-cave's own routes are untouched)
 - `POST /api/shows/{show_id}/sessions/start` — Start Show Session: starts-or-resumes a venue's live Session and links it to a Show server-side, with no manual Session ID handling by the caller
 
+Kernel 71 route additions:
+
+- `POST /api/show-runs/{id}/tickets/request`, `POST /api/show-runs/{id}/tickets/invite`, `GET /api/show-runs/{id}/tickets/incoming` — two-punch ticket first-punch/inbox
+- `POST /api/tickets/{ticket_id}/punch|decline|withdraw`, `GET /api/tickets/mine` — second punch and a Player's own ticket list
+- `GET /api/show-runs/{id}/roster/me`, `POST /api/show-runs/{id}/roster/me/character` — a Player's own roster status and Character selection
+- `PATCH /api/shows/{show_id}/short-code`, `GET /api/shows/by-code?code=` — short-code edit and lookup (the latter deliberately narrow: show/show-run/location identifiers only, no backstage data)
+- `POST /api/showtime/control` — the bespoke endpoint the in-app `/showtime` legacy command is bound to (`{short_code, action: start|status|end, force_reattach, venue_slug}`)
+
 ## Authority And Privacy Rules
 
 - Discord authenticates; Victory authorizes.
@@ -132,6 +153,8 @@ Kernel 70A route additions:
 - My People is private and directional. Non-owner access returns `404`, not `403`, so record existence is not disclosed.
 - Player-facing Cue lists contain only `{id, label}` for enabled Cues the viewer can currently trigger. Audience can never trigger a Cue.
 - Client identity, role, current character, dice results, and stage authority are requests to the server, never client-authored facts.
+- Player Show Run participation is granted only by a valid two-punch ticket's atomic second punch (`tickets.SecondPunch`), never by a direct roster insert/promotion outside Operator's explicit override. A client-supplied user ID, roster role, or Character ID is never trusted where it can be derived server-side instead (a Player can only punch/select for themselves; a Director's punch authority is re-checked against the locked ticket row's own Show Run, not a client-supplied one).
+- Show short-code lookup (`GET /api/shows/by-code`) returns only show/show-run/location identifiers — never roster, variables, or other backstage state.
 
 ## Kernel 70 Stage And Cue Semantics
 
@@ -149,7 +172,7 @@ Kernel 70A route additions:
 
 - Identity/social: users and auth tables, memberships, Player Workbook/events/facts, player relationships/journal/follow-ups, Third Place Headshots
 - Character/rules: character cards, active characters, workbook entries/modules, journals, skills, Face overrides
-- Production/runtime: locations, venues, productions, Show Runs/rosters/blocks, Shows, Scenes, Show Scene Placements, Sessions, Showings, actions, Cues, Cue executions
+- Production/runtime: locations, venues, productions, Show Runs/rosters/blocks, Shows (with `short_code`), Scenes, Show Scene Placements, Sessions, Showings, actions, Cues, Cue executions, `show_run_tickets`
 - Stage/assets: elements, placements, venue layout elements, maps, grids, assets, warehouse policy
 
 ## Known Working End-To-End Flows
@@ -165,6 +188,9 @@ Kernel 70A route additions:
 - Create and project a character through Greenroom, Catharsis, and First Theater
 - Upload/reuse maps and tokens, configure grids, move stage objects, and submit canonical dice rolls
 - Start/control/close a Showing and review its durable action history
+- Player requests to join a Show Run via Audition Hall, a Director approves, and the Player selects a Character and enters the linked theater with no manual access grant (Player-request direction)
+- Director invites a specific Player to a Show Run, the Player accepts in Audition Hall, and the same participation/Character-selection/theater-entry flow follows (Director-invitation direction)
+- Director types a Show's short code into `/showtime` and the venue Session starts or resumes with the venue auto-derived, mic off, and the Show's persistent current Scene intact; `/showtime end` closes only the technical Session
 
 ## Known Gaps And Deferred Work
 
@@ -180,14 +206,18 @@ Kernel 70A route additions:
 - Video recording/capture does not exist and is not implied by Showing Review or Scene capture.
 - **The campus entry funnel is not the aspirational one-path journey.** Info Booth (a map-tile modal in `frontend/app.js`/`index.html`) and Audition Hall (`frontend/venues/audition-hall/`) are both real, shipped surfaces, but they are general orientation/onboarding points, not a guided "join a Show" flow. A registered participant reaching their Show today still depends on Stage Management/roster setup done ahead of time, not a single campus path from map to stage.
 - **First Theater gained its own independent, real venue wiring in Kernel 70A** (`GET /api/world/first-theater`, `POST /api/session/first-theater/join`, `/ws/first-theater`, plus widened stage-action authority) rather than remaining a themed skin over the-cave's backend. It is still investor/demo-only — no participant-facing map-visibility work targets it, and the-cave itself (a deliberate, permanently hidden, DOM-only test harness) was left completely untouched.
-- **No durable Character-to-Show/Show-Run/Session linkage exists.** Audited (Kernel 70A, schema + Go-type check, no build): `character_cards` carries `owner_user_id`/`location_id`/optional `production_id` provenance only, no Show/Show-Run/Session foreign key. `show_run_roster_members` is account-level (`user_id`), with no `character_card_id` column. `current_session_personas` is the only table connecting a Character to live play, and it is session-scoped/ephemeral (`ON DELETE CASCADE` from `sessions`, primary key `(session_id, user_id)`) — it answers "who is this user playing right now" for one live Session, not "which Character is this roster member's Character for this Show." A Show's roster and its participants' Characters are today two unconnected facts a Director must reconcile by memory. Greenroom's own unlock condition is unrelated to this gap: it checks only `EXISTS(character_cards WHERE owner_user_id = $1 AND is_deleted = FALSE)` (`backend/internal/access/visibility.go`) — any owned, non-deleted Character card unlocks it, regardless of workbook completion. Recommended smallest attachment point for Kernel 71, not built here: a nullable `character_card_id` on `show_run_roster_members`, letting a roster entry optionally declare its Character without touching the session-scoped persona-equip mechanism.
-- **Two independent, non-interchangeable membership tables both claim to answer "what is this user's role."** Discovered live during Kernel 70A's manual checklist walkthrough (a fresh Producer, correctly set up via `location_memberships`, was rejected as `viewerRole = "none"` at their own Catharsis snapshot). `location_memberships` (per-Location, used by `access.CurrentLocationRole*`, `showruns.CanManageShowRun`, and everything Show-Run/Show/Scene/Cue-authority-related) is the current, Kernel-66+ system. `memberships` (per-venue-or-production-or-location, used only by `main.go`'s `lookupVenueRole` to compute the `viewerRole` passed into `world.LoadVenueSnapshot`) is an older, still-live table that drives both the pre-Kernel-70 stage-element-visibility filtering and Kernel 70A's new `theater_context` "backstage" classification. A user can hold the correct `location_memberships` producer/director role and still be treated as role `"none"` for live-venue viewing purposes if nobody separately granted them a `memberships` row. Reaching Catharsis's live snapshot at all additionally requires an `access_grants` row (`venue_access`, tied to `location_memberships` role IN producer/director/cast/crew) — a third, also-separate gate. Not fixed here (a real authority-model unification, out of Kernel 70A's approved scope); flagged so Kernel 71+ treats `lookupVenueRole`/`memberships` as a known trap, not an oversight.
+- **Resolved in Kernel 71** (documented here for history, no longer a gap): Character-to-Show/Show-Run linkage now exists via `show_run_roster_members.character_card_id`, and the `location_memberships`/`memberships`/`viewerRole="none"` bug is fixed by the canonical `participation.ResolveParticipationContext` resolver — see "Kernel 71 Participation Model" above.
+- **Audience tickets are not implemented.** Kernel 71's two-punch ticket (`show_run_tickets.requested_role`) is CHECK-locked to `'player'` only. A future Audience-ticket kernel is expected to be an additive migration (widen the CHECK), not a redesign; Audience tickets would be single-Show-scoped (not Show-Run-scoped like Player tickets) and acquired through a future audience/marketing venue, not Audition Hall.
+- **Legacy `memberships`/`access_grants` tables are not removed.** Kernel 71 deliberately did not do a wholesale deletion; they remain read as a last-resort compatibility upgrade inside the canonical resolver, and the ticket second-punch writes a compatibility `access_grants` row for any not-yet-migrated reader. Several packages (`characters`, `assets/read.go`, `showings/review.go`) still independently UNION `location_memberships`+`memberships` rather than calling a shared helper — left as-is this kernel (already-correct, just duplicated) rather than risking a broader refactor; `assets/upload.go`'s `resolveProducerScope` is the one reader that does not union both tables at all, flagged but not changed (no demonstrated bug against it).
+- **No casting/attendance system.** A valid ticket is a one-time mutual-consent event; there is no recurring-attendance tracking, no "who's coming to Thursday's Show" roster distinct from the Show Run roster itself.
+- **No real Discord-native `/showtime` slash command.** `/showtime` is an in-app "legacy" command (`commands/registry.go`, matching `/session`'s existing precedent) reachable from Victory's own command UI/Stage Management button, not typeable directly into a Discord channel the way `/mic` is — a deliberate, confirmed scope decision, not an oversight.
+- **No browser/screenshot proof for Kernel 71's UI** (Audition Hall panels, Stage Management's Invite/Incoming-Tickets panels, the Character-selection page). No browser automation tooling exists in this environment; verification was full HTTP-level proof against a real compiled backend (`scripts/smoke/fresh-install.sh`/`scripts/test/alpha-gate.sh`), the same substitution used since Kernel 65.
 
 ## Next Recommended Direction
 
-**Kernel 70A (Live Stage Closure and Alpha Path Alignment)** shipped and is now live in production (2026-07-16): a server-side Start Show Session action (no manual Session ID handling), proof that Show-owned stage state survives a full start/end/resume cycle at Catharsis with no rebuild step, `go_to_scene`/`set_show_variable` working with no active session while `emit_game_event` fails cleanly and visibly, a closed Audience-facing leak (Rehearsal banner/Cue buttons were previously visible regardless of role), backend-computed theater-context empty states with the exact required strings, honest Scene/Cue setup labels, First Theater's own independent (still investor/demo-only) venue wiring, a Character-to-Show linkage audit (no build), and a `tests/catharsis/` mirror plus a scene-nodes contract test. The live deploy also retroactively applied Kernel 70's own migrations, which had never reached production despite being committed since 2026-07-14 — see Kernel State above. **Still deferred, by explicit scope decision**: the first playable Socio show; a casting/attendance system; and any participant-facing First Theater work, since First Theater remains investor/demo-only for this pass.
+**Kernel 71 (Two-Punch Show Tickets, Character Participation, and Showtime)** is implemented and verified (PASS, uncommitted, pending review): the canonical participation resolver closing Kernel 70A's `viewerRole="none"` bug; the `show_run_tickets` two-punch model with an atomic, concurrency-safe second punch; `AddRosterMember`/`UpdateRosterMemberRole` both gated against direct/promoted Player roster rows; Audition Hall's request/invite/accept/decline/withdraw UI; Stage Management's Invite-Player and Incoming-Tickets panels; free per-Show-Run Character selection with an archived-Character fallback; auto-generated editable Show short codes; and `/showtime`'s one-action start/status/end orchestration with automatic venue derivation and a mic-stays-off guarantee. **Explicitly deferred, by locked scope**: Audience tickets, a casting/attendance system, wholesale legacy-table deletion, and a real Discord-native `/showtime` slash command (confirmed as out of scope with the user before Phase E).
 
-The natural next kernel is **visual Scene composition/capture**: define how reusable Base Scene content and a Show Placement's overrides bind to the existing stage-object/action model without creating a second renderer authority system. A smaller independent closure pass can add browser screenshots for Kernel 70/70A's GO and Start Show Session controls and repair the nine pre-existing frontend dice-test failures (now duplicated in both `tests/first-theater/` and `tests/catharsis/`). A good practice to establish going forward: confirm each kernel's migrations actually reached the live database as part of closing it out, not just that they're committed — this gap sat unnoticed for two days.
+The natural next kernel is still **visual Scene composition/capture**: define how reusable Base Scene content and a Show Placement's overrides bind to the existing stage-object/action model without creating a second renderer authority system. Before or alongside that, a smaller closure pass could: repair the nine pre-existing frontend dice-test failures (duplicated in both `tests/first-theater/` and `tests/catharsis/`); add browser screenshot evidence for Kernel 70/70A/71's stage and participation controls; and finish deduplicating the three packages (`characters`, `assets/read.go`, `showings/review.go`) that each independently UNION `location_memberships`+`memberships` instead of calling one shared helper. This kernel has not been deployed live — a live deployment pass should explicitly re-verify migrations `046`–`048` actually reach production, per the lesson recorded after Kernel 70A's gap.
 
 ## Recording Language
 

@@ -14,7 +14,7 @@ import (
 )
 
 const showColumns = `
-	id::text, show_run_id::text, slug, title, COALESCE(description, ''),
+	id::text, show_run_id::text, slug, COALESCE(short_code, ''), title, COALESCE(description, ''),
 	COALESCE(audience_title, ''), COALESCE(audience_program_blurb, ''),
 	status, current_show_scene_placement_id::text, variables_json::text,
 	scheduled_start_at, scheduled_end_at, actual_start_at, actual_end_at,
@@ -26,7 +26,7 @@ func scanShow(row pgx.Row) (Show, error) {
 	var currentPlacementID *string
 	var variablesText string
 	if err := row.Scan(
-		&s.ID, &s.ShowRunID, &s.Slug, &s.Title, &s.Description,
+		&s.ID, &s.ShowRunID, &s.Slug, &s.ShortCode, &s.Title, &s.Description,
 		&s.AudienceTitle, &s.AudienceProgramBlurb,
 		&s.Status, &currentPlacementID, &variablesText,
 		&s.ScheduledStartAt, &s.ScheduledEndAt, &s.ActualStartAt, &s.ActualEndAt,
@@ -71,11 +71,19 @@ func CreateShow(ctx context.Context, pool *pgxpool.Pool, actorUserID, showRunID 
 		return Show{}, errors.New("not_authorized")
 	}
 
+	// Kernel 71: every Show gets a short, human-typeable code at creation,
+	// no client input required (spec §1.7/§8.1) -- used by /showtime and
+	// Audition Hall's "Join a Show" lookup.
+	shortCode, err := generateUniqueShortCode(ctx, pool, sr.LocationID)
+	if err != nil {
+		return Show{}, err
+	}
+
 	row := pool.QueryRow(ctx, `
-		INSERT INTO shows (show_run_id, slug, title, description, audience_title, audience_program_blurb, created_by_user_id)
-		VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, ''), NULLIF($6, ''), $7)
+		INSERT INTO shows (show_run_id, slug, short_code, title, description, audience_title, audience_program_blurb, created_by_user_id)
+		VALUES ($1, $2, $3, $4, NULLIF($5, ''), NULLIF($6, ''), NULLIF($7, ''), $8)
 		RETURNING `+showColumns,
-		showRunID, in.Slug, in.Title, in.Description, in.AudienceTitle, in.AudienceProgramBlurb, actorUserID)
+		showRunID, in.Slug, shortCode, in.Title, in.Description, in.AudienceTitle, in.AudienceProgramBlurb, actorUserID)
 	return scanShow(row)
 }
 

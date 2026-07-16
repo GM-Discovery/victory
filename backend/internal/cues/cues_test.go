@@ -139,17 +139,20 @@ func buildCueFixture(t *testing.T, pool *pgxpool.Pool, producerUserID string) cu
 	return f
 }
 
+// addRoster inserts a roster row directly rather than through
+// showruns.AddRosterMember -- Kernel 71 gates that function's role="player"
+// path behind a ticket, and this helper is fixture setup for Cue-authority
+// tests, not a test of roster-add authority itself.
 func addRoster(t *testing.T, pool *pgxpool.Pool, actorUserID, showRunID, targetUserID, role string) {
 	t.Helper()
 	ctx := context.Background()
 	if err := ensureProfile(ctx, pool, targetUserID); err != nil {
 		t.Fatalf("ensure profile for roster member: %v", err)
 	}
-	var profileID string
-	if err := pool.QueryRow(ctx, `SELECT id::text FROM player_profile_workbooks WHERE user_id = $1`, targetUserID).Scan(&profileID); err != nil {
-		t.Fatalf("load profile id: %v", err)
-	}
-	if _, err := showruns.AddRosterMember(ctx, pool, actorUserID, showRunID, profileID, role, "", true); err != nil {
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO show_run_roster_members (show_run_id, user_id, role, added_by_user_id)
+		VALUES ($1, $2, $3, $4)
+	`, showRunID, targetUserID, role, actorUserID); err != nil {
 		t.Fatalf("add roster member role %q: %v", role, err)
 	}
 }

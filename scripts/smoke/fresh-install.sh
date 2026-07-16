@@ -135,6 +135,9 @@ migrations=(
   "$ROOT/database/migrations/043_kernel70_scene_location_scoping.sql"
   "$ROOT/database/migrations/044_kernel70_show_stage_and_variables.sql"
   "$ROOT/database/migrations/045_kernel70_cues.sql"
+  "$ROOT/database/migrations/046_kernel71_show_tickets.sql"
+  "$ROOT/database/migrations/047_kernel71_roster_character_selection.sql"
+  "$ROOT/database/migrations/048_kernel71_show_short_codes.sql"
 )
 
 for migration in "${migrations[@]}"; do
@@ -709,20 +712,194 @@ if [[ -z "$show_run_id" ]]; then
 fi
 echo "PASS Producer A created a Show Run ($show_run_id)"
 
-add_member_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
-  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
-  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}/roster" \
-  -d "{\"target_profile_id\":\"$workbook_id\",\"role\":\"player\"}")"
-if [[ "$add_member_status" != "200" || "$(cat "$BODY_OUT")" != *'"role_label":"Player"'* ]]; then
-  echo "expected roster add to return role_label Player, got $add_member_status" >&2
+# --- Kernel 71: two-punch Show tickets are now the only ordinary path to
+# an active Player roster row. First prove the old direct-add-as-player
+# path is closed for an ORDINARY Director, then prove both ticket
+# directions end-to-end. Producer A ($raw_session) is this script's
+# bootstrap Operator account (OPERATOR_HANDLE matches its handle), so
+# testing the rejection against A would exercise the explicit Operator
+# override instead -- a disposable non-operator producer account is used
+# here so the rejection check is genuine, without leaking a location grant
+# into A's or B's fixture state that later map-visibility assertions rely on.
+ordinary_director_handle="fresh_install_ordinary_director"
+ORDINARY_DIRECTOR_HEADERS="${TMPDIR:-/tmp}/victory-fresh-install-ordinary-director.headers"
+ordinary_director_signup_status="$(
+  curl -s -D "$ORDINARY_DIRECTOR_HEADERS" -o "$BODY_OUT" -w '%{http_code}' \
+    -H 'Content-Type: application/json' \
+    -X POST \
+    -d "{\"email\":\"${ordinary_director_handle}@example.com\",\"handle\":\"$ordinary_director_handle\",\"password\":\"$login_password\",\"display_name\":\"Fresh Install Ordinary Director\"}" \
+    "http://127.0.0.1:${BACKEND_PORT}/api/auth/signup"
+)"
+if [[ "$ordinary_director_signup_status" != "200" ]]; then
+  echo "expected ordinary-director signup to return 200, got $ordinary_director_signup_status" >&2
   cat "$BODY_OUT" >&2 || true
   exit 1
 fi
-if [[ "$(cat "$BODY_OUT")" == *'"role_label":"Cast"'* ]]; then
+ordinary_director_session="$(tr -d '\r' < "$ORDINARY_DIRECTOR_HEADERS" | sed -n 's/^Set-Cookie: victory_session=\([^;]*\).*/\1/p' | tail -n1)"
+ordinary_director_user_id="$(docker exec -i "$POSTGRES_CONTAINER" psql -tAc "
+  SELECT id FROM users WHERE handle = '$ordinary_director_handle';
+" -U "$POSTGRES_USER" -d "$DB_NAME" | tr -d '[:space:]')"
+docker exec -i "$POSTGRES_CONTAINER" psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$DB_NAME" -c "
+  INSERT INTO location_memberships (location_id, user_id, role, active)
+  VALUES ('$fresh_install_location_id', '$ordinary_director_user_id', 'director', TRUE);
+" >/dev/null
+echo "PASS disposable ordinary-Director account provisioned (not Operator)"
+
+direct_add_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$ordinary_director_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}/roster" \
+  -d "{\"target_profile_id\":\"$workbook_id\",\"role\":\"player\"}")"
+if [[ "$direct_add_status" != "400" || "$(cat "$BODY_OUT")" != *'"player_requires_ticket"'* ]]; then
+  echo "expected an ordinary Director's direct role=player roster add to be rejected with player_requires_ticket, got $direct_add_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS an ordinary Director's direct role=player roster add is rejected (player_requires_ticket)"
+
+# Player-request direction. Uses a dedicated fresh account (D), not B --
+# B is reused as an Audience-only fixture much later in this script (map
+# visibility, curated program checks), and this ticket flow would leave B
+# as an active Player instead, which would break those later assertions.
+requester_handle="fresh_install_requester"
+REQUESTER_HEADERS="${TMPDIR:-/tmp}/victory-fresh-install-requester.headers"
+requester_signup_status="$(
+  curl -s -D "$REQUESTER_HEADERS" -o "$BODY_OUT" -w '%{http_code}' \
+    -H 'Content-Type: application/json' \
+    -X POST \
+    -d "{\"email\":\"${requester_handle}@example.com\",\"handle\":\"$requester_handle\",\"password\":\"$login_password\",\"display_name\":\"Fresh Install Requester\"}" \
+    "http://127.0.0.1:${BACKEND_PORT}/api/auth/signup"
+)"
+if [[ "$requester_signup_status" != "200" ]]; then
+  echo "expected requester signup to return 200, got $requester_signup_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+requester_session="$(tr -d '\r' < "$REQUESTER_HEADERS" | sed -n 's/^Set-Cookie: victory_session=\([^;]*\).*/\1/p' | tail -n1)"
+requester_me="$(curl -s -H "Cookie: victory_session=$requester_session" "http://127.0.0.1:${BACKEND_PORT}/api/player-profile/me")"
+requester_workbook_id="$(printf '%s' "$requester_me" | grep -o '"id":"[^"]*"' | head -n1 | sed 's/"id":"//;s/"$//')"
+echo "PASS dedicated ticket-requester account (D) signed up ($requester_workbook_id)"
+
+player_request_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$requester_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}/tickets/request" \
+  -d '{"message":"let me in"}')"
+if [[ "$player_request_status" != "200" || "$(cat "$BODY_OUT")" != *'"status":"pending_director"'* ]]; then
+  echo "expected D's ticket request to return pending_director, got $player_request_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+ticket_id="$(grep -o '"id":"[^"]*"' "$BODY_OUT" | head -n1 | sed 's/"id":"//;s/"$//')"
+echo "PASS D requested to join the Show Run ($ticket_id), one punch grants nothing"
+
+roster_after_one_punch="$(curl -s -H "Cookie: victory_session=$raw_session" "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}/roster")"
+if [[ "$roster_after_one_punch" == *"$requester_workbook_id"* ]]; then
+  echo "expected D to have no roster row after only one punch" >&2
+  echo "$roster_after_one_punch" >&2
+  exit 1
+fi
+echo "PASS one punch creates no roster row"
+
+ticket_punch_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/tickets/${ticket_id}/punch")"
+if [[ "$ticket_punch_status" != "200" || "$(cat "$BODY_OUT")" != *'"status":"valid"'* ]]; then
+  echo "expected Producer A's approval punch to validate the ticket, got $ticket_punch_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS Producer A approved D's request; ticket is valid"
+
+roster_after_valid="$(curl -s -H "Cookie: victory_session=$raw_session" "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}/roster")"
+if [[ "$roster_after_valid" != *'"role_label":"Player"'* ]]; then
+  echo "expected D's valid ticket to produce a role_label Player roster row" >&2
+  echo "$roster_after_valid" >&2
+  exit 1
+fi
+if [[ "$roster_after_valid" == *'"role_label":"Cast"'* ]]; then
   echo "roster role label must never render as Cast" >&2
   exit 1
 fi
-echo "PASS roster member added with role_label Player, never Cast"
+echo "PASS valid ticket created a Player (never Cast) roster row"
+
+# Character selection: D picks an active Character for this Show Run.
+requester_user_id="$(docker exec -i "$POSTGRES_CONTAINER" psql -tAc "
+  SELECT user_id FROM player_profile_workbooks WHERE id = '$requester_workbook_id';
+" -U "$POSTGRES_USER" -d "$DB_NAME" | tr -d '[:space:]')"
+requester_character_id="$(docker exec -i "$POSTGRES_CONTAINER" psql -tAc "
+  INSERT INTO character_cards (owner_user_id, location_id, name)
+  VALUES ('$requester_user_id', '$fresh_install_location_id', 'Fresh Install Ticket Character')
+  RETURNING id;
+" -U "$POSTGRES_USER" -d "$DB_NAME" | head -n1 | tr -d '[:space:]')"
+select_character_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$requester_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}/roster/me/character" \
+  -d "{\"character_card_id\":\"$requester_character_id\"}")"
+if [[ "$select_character_status" != "200" || "$(cat "$BODY_OUT")" != *"\"character_card_id\":\"$requester_character_id\""* ]]; then
+  echo "expected D to select their own Character, got $select_character_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS D selected a Character for this Show Run"
+
+# Director-invitation direction: Producer A invites a fresh third account C.
+third_handle="fresh_install_third"
+THIRD_HEADERS="${TMPDIR:-/tmp}/victory-fresh-install-third.headers"
+third_signup_status="$(
+  curl -s -D "$THIRD_HEADERS" -o "$BODY_OUT" -w '%{http_code}' \
+    -H 'Content-Type: application/json' \
+    -X POST \
+    -d "{\"email\":\"${third_handle}@example.com\",\"handle\":\"$third_handle\",\"password\":\"$login_password\",\"display_name\":\"Fresh Install Third\"}" \
+    "http://127.0.0.1:${BACKEND_PORT}/api/auth/signup"
+)"
+if [[ "$third_signup_status" != "200" ]]; then
+  echo "expected third signup to return 200, got $third_signup_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+third_session="$(tr -d '\r' < "$THIRD_HEADERS" | sed -n 's/^Set-Cookie: victory_session=\([^;]*\).*/\1/p' | tail -n1)"
+third_me="$(curl -s -H "Cookie: victory_session=$third_session" "http://127.0.0.1:${BACKEND_PORT}/api/player-profile/me")"
+third_workbook_id="$(printf '%s' "$third_me" | grep -o '"id":"[^"]*"' | head -n1 | sed 's/"id":"//;s/"$//')"
+echo "PASS third fresh account (C) signed up ($third_workbook_id)"
+
+invite_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}/tickets/invite" \
+  -d "{\"target_profile_id\":\"$third_workbook_id\",\"message\":\"join us\"}")"
+if [[ "$invite_status" != "200" || "$(cat "$BODY_OUT")" != *'"status":"pending_player"'* ]]; then
+  echo "expected Producer A's invitation to return pending_player, got $invite_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+invite_ticket_id="$(grep -o '"id":"[^"]*"' "$BODY_OUT" | head -n1 | sed 's/"id":"//;s/"$//')"
+echo "PASS Producer A invited C to the Show Run ($invite_ticket_id), one punch grants nothing"
+
+invite_accept_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$third_session" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/tickets/${invite_ticket_id}/punch")"
+if [[ "$invite_accept_status" != "200" || "$(cat "$BODY_OUT")" != *'"status":"valid"'* ]]; then
+  echo "expected C's acceptance punch to validate the ticket, got $invite_accept_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS C accepted Producer A's invitation; ticket is valid"
+
+# B (otherwise untouched by this Kernel 71 block) submits a request that
+# gets declined -- proving decline grants nothing, and confirming B still
+# has no active roster row afterward for the later Audience-only checks.
+second_request_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$second_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/show-runs/${show_run_id}/tickets/request" \
+  -d '{}')"
+decline_ticket_id="$(grep -o '"id":"[^"]*"' "$BODY_OUT" | head -n1 | sed 's/"id":"//;s/"$//')"
+decline_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/tickets/${decline_ticket_id}/decline")"
+if [[ "$decline_status" != "200" || "$(cat "$BODY_OUT")" != *'"status":"declined"'* ]]; then
+  echo "expected decline to mark the ticket declined, got $decline_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS declined ticket grants nothing and stays auditable"
 
 enable_self_join_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
   -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
@@ -798,6 +975,100 @@ if [[ -z "$show_id" ]]; then
   exit 1
 fi
 echo "PASS Producer A created a Show ($show_id)"
+
+# --- Kernel 71: /showtime end-to-end -- a short code was generated
+# automatically at Show creation; stage one Scene at Catharsis so Showtime
+# can derive the venue without asking, then start/end it.
+show_short_code="$(grep -o '"short_code":"[^"]*"' "$BODY_OUT" | head -n1 | sed 's/"short_code":"//;s/"$//')"
+if [[ -z "$show_short_code" ]]; then
+  echo "expected Show creation to include an auto-generated short_code" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS Show received an auto-generated short code ($show_short_code)"
+
+catharsis_venue_id="$(docker exec -i "$POSTGRES_CONTAINER" psql -tAc "
+  SELECT id FROM venues WHERE slug = 'catharsis';
+" -U "$POSTGRES_USER" -d "$DB_NAME" | tr -d '[:space:]')"
+
+create_showtime_scene_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/scenes" \
+  -d "{\"location_id\":\"$fresh_install_location_id\",\"title\":\"Showtime Test Scene\",\"slug\":\"fresh-install-showtime-scene\",\"default_venue_id\":\"$catharsis_venue_id\"}")"
+showtime_scene_id="$(grep -o '"id":"[^"]*"' "$BODY_OUT" | head -n1 | sed 's/"id":"//;s/"$//')"
+if [[ "$create_showtime_scene_status" != "200" || -z "$showtime_scene_id" ]]; then
+  echo "expected Showtime test Scene creation to succeed, got $create_showtime_scene_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+
+stage_showtime_scene_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/shows/${show_id}/scenes" \
+  -d "{\"scene_id\":\"$showtime_scene_id\"}")"
+if [[ "$stage_showtime_scene_status" != "200" ]]; then
+  echo "expected staging the Scene onto the Show to succeed, got $stage_showtime_scene_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS staged one Scene at Catharsis for Showtime venue derivation"
+
+showtime_start_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/showtime/control" \
+  -d "{\"short_code\":\"$show_short_code\",\"action\":\"start\"}")"
+if [[ "$showtime_start_status" != "200" || "$(cat "$BODY_OUT")" != *'"venue_slug":"catharsis"'* ]]; then
+  echo "expected /showtime to derive Catharsis and start, got $showtime_start_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+if [[ "$(cat "$BODY_OUT")" == *'"mic_on":true'* ]]; then
+  echo "/showtime must never turn the mic on automatically" >&2
+  exit 1
+fi
+if [[ "$(cat "$BODY_OUT")" != *'/mic hot'* ]]; then
+  echo "expected /showtime's response to suggest /mic hot" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS /showtime <code> resolved the venue automatically, started the Session, and left the mic off"
+
+showtime_status_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/showtime/control" \
+  -d "{\"short_code\":\"$show_short_code\",\"action\":\"status\"}")"
+if [[ "$showtime_status_status" != "200" ]]; then
+  echo "expected /showtime status to succeed, got $showtime_status_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS /showtime status"
+
+showtime_end_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$raw_session" -H "Content-Type: application/json" \
+  -X POST "http://127.0.0.1:${BACKEND_PORT}/api/showtime/control" \
+  -d "{\"short_code\":\"$show_short_code\",\"action\":\"end\"}")"
+if [[ "$showtime_end_status" != "200" ]]; then
+  echo "expected /showtime end to succeed, got $showtime_end_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS /showtime end ended the technical Session only"
+
+by_code_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
+  -H "Cookie: victory_session=$third_session" \
+  "http://127.0.0.1:${BACKEND_PORT}/api/shows/by-code?code=${show_short_code}")"
+if [[ "$by_code_status" != "200" || "$(cat "$BODY_OUT")" != *"\"show_run_id\":\"$show_run_id\""* ]]; then
+  echo "expected Audition Hall's by-code lookup to resolve the Show Run, got $by_code_status" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+if [[ "$(cat "$BODY_OUT")" == *'"roster"'* || "$(cat "$BODY_OUT")" == *'"variables_json"'* ]]; then
+  echo "Show code lookup must never expose backstage data" >&2
+  cat "$BODY_OUT" >&2 || true
+  exit 1
+fi
+echo "PASS Show code lookup resolves the Show Run without exposing backstage data"
 
 show_detail_status="$(curl -s -o "$BODY_OUT" -w '%{http_code}' \
   -H "Cookie: victory_session=$raw_session" "http://127.0.0.1:${BACKEND_PORT}/api/shows/${show_id}")"

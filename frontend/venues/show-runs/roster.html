@@ -33,6 +33,14 @@
     .roster-role-label { margin: 2px 0 0; color: var(--muted); font-size: 0.82rem; }
     .roster-controls { display: flex; gap: 6px; flex-wrap: wrap; }
     .roster-controls select { flex: 1; min-width: 100px; }
+    .field-note { color: var(--muted); font-size: 0.82rem; margin: 8px 0 0; }
+    .ticket-row {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+      border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px;
+    }
+    .ticket-row .ticket-info p { margin: 0; }
+    .ticket-row .ticket-meta { color: var(--muted); font-size: 0.82rem; }
+    .ticket-actions { display: flex; gap: 8px; }
   </style>
 </head>
 <body>
@@ -58,8 +66,30 @@
     <main class="stage">
       <p class="status-line" id="status-line">Loading roster...</p>
 
+      <section class="card" id="invite-card" hidden>
+        <p class="section-title">Invite a Player</p>
+        <div class="form-row">
+          <div class="field">
+            <label for="invite-profile-input">Profile ID or Trailer link</label>
+            <input type="text" id="invite-profile-input" placeholder="Paste a Trailer link or profile ID" />
+          </div>
+          <div class="field">
+            <label for="invite-message-input">Message (optional)</label>
+            <input type="text" id="invite-message-input" placeholder="Join us for the next Show" />
+          </div>
+          <button class="chip" type="button" id="invite-player-button">Invite Player</button>
+        </div>
+        <p class="field-note">This creates an invitation. They must accept it in Audition Hall before they can participate. Nothing changes for them until they do.</p>
+      </section>
+
+      <section class="card" id="incoming-tickets-card" hidden>
+        <p class="section-title">Incoming Tickets</p>
+        <p class="status-line" id="incoming-tickets-status">Loading...</p>
+        <div id="incoming-tickets-list"></div>
+      </section>
+
       <section class="card" id="add-card" hidden>
-        <p class="section-title">Add to roster</p>
+        <p class="section-title">Add Crew / Production Role</p>
         <div class="form-row">
           <div class="field">
             <label for="profile-input">Profile ID or Trailer link</label>
@@ -68,7 +98,6 @@
           <div class="field">
             <label for="role-select">Role</label>
             <select id="role-select">
-              <option value="player">Player</option>
               <option value="director">Director</option>
               <option value="producer">Producer</option>
               <option value="crew">Crew</option>
@@ -79,6 +108,7 @@
           </div>
           <button class="chip" type="button" id="add-member-button">Add</button>
         </div>
+        <p class="field-note">Player participation is handled through the Invite a Player ticket above, not this control.</p>
       </section>
 
       <section id="roster-sections"></section>
@@ -142,7 +172,16 @@
       const controls = document.createElement("div");
       controls.className = "roster-controls";
       const roleSelect = document.createElement("select");
-      for (const r of ["player", "director", "producer", "crew", "audience", "guest", "observer"]) {
+      // "player" is deliberately omitted here unless the row is already a
+      // Player -- Kernel 71 requires promoting someone to Player to go
+      // through the ticket flow (Invite a Player, above), not this direct
+      // role-change control. The backend enforces this too; leaving
+      // "player" out of the option list avoids offering a choice that
+      // would just error.
+      const roleOptions = member.role === "player"
+        ? ["player", "director", "producer", "crew", "audience", "guest", "observer"]
+        : ["director", "producer", "crew", "audience", "guest", "observer"];
+      for (const r of roleOptions) {
         const opt = document.createElement("option");
         opt.value = r;
         opt.textContent = r.charAt(0).toUpperCase() + r.slice(1);
@@ -181,6 +220,90 @@
 
       card.appendChild(controls);
       return card;
+    }
+
+    function renderTicketRow(ticket, runId, onChange) {
+      const row = document.createElement("div");
+      row.className = "ticket-row";
+
+      const info = document.createElement("div");
+      info.className = "ticket-info";
+      const label = document.createElement("p");
+      const waitingOnDirector = ticket.status === "pending_director";
+      label.textContent = waitingOnDirector
+        ? "Waiting for your approval"
+        : "Waiting for the Player to accept";
+      info.appendChild(label);
+      const meta = document.createElement("p");
+      meta.className = "ticket-meta";
+      meta.textContent = ticket.initiated_by_side === "player"
+        ? "Player requested to join."
+        : "You invited this Player.";
+      info.appendChild(meta);
+      row.appendChild(info);
+
+      const actions = document.createElement("div");
+      actions.className = "ticket-actions";
+
+      if (waitingOnDirector) {
+        const approveButton = document.createElement("button");
+        approveButton.type = "button";
+        approveButton.className = "chip";
+        approveButton.textContent = "Approve Request";
+        approveButton.title = "Approving lets this Player choose a Character and enter this Show Run's Shows immediately. This does not give them Director or Crew access.";
+        approveButton.addEventListener("click", async () => {
+          approveButton.disabled = true;
+          const res = await fetch(`/api/tickets/${encodeURIComponent(ticket.id)}/punch`, { method: "POST", credentials: "include" });
+          const p = await res.json().catch(() => null);
+          if (!res.ok || !p?.ok) { alert("Could not approve: " + (p?.data?.error || `HTTP ${res.status}`)); approveButton.disabled = false; return; }
+          onChange();
+        });
+        actions.appendChild(approveButton);
+      }
+
+      const declineButton = document.createElement("button");
+      declineButton.type = "button";
+      declineButton.className = "chip danger";
+      declineButton.textContent = "Decline Request";
+      declineButton.title = "Closes this pending request without granting access. They may request again later.";
+      declineButton.addEventListener("click", async () => {
+        declineButton.disabled = true;
+        const res = await fetch(`/api/tickets/${encodeURIComponent(ticket.id)}/decline`, { method: "POST", credentials: "include" });
+        const p = await res.json().catch(() => null);
+        if (!res.ok || !p?.ok) { alert("Could not decline: " + (p?.data?.error || `HTTP ${res.status}`)); declineButton.disabled = false; return; }
+        onChange();
+      });
+      actions.appendChild(declineButton);
+
+      row.appendChild(actions);
+      return row;
+    }
+
+    async function loadIncomingTickets(runId) {
+      const card = document.getElementById("incoming-tickets-card");
+      const status = document.getElementById("incoming-tickets-status");
+      const list = document.getElementById("incoming-tickets-list");
+      const response = await fetch(`/api/show-runs/${encodeURIComponent(runId)}/tickets/incoming`, { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        status.textContent = "Could not load incoming tickets.";
+        return;
+      }
+      const items = payload.data.tickets || [];
+      list.innerHTML = "";
+      if (items.length === 0) {
+        status.textContent = "No pending tickets right now.";
+        card.hidden = false;
+        return;
+      }
+      status.hidden = true;
+      card.hidden = false;
+      for (const ticket of items) {
+        list.appendChild(renderTicketRow(ticket, runId, () => {
+          loadIncomingTickets(runId);
+          loadRoster(runId);
+        }));
+      }
     }
 
     async function loadRoster(runId) {
@@ -256,6 +379,28 @@
         return;
       }
 
+      document.getElementById("invite-card").hidden = false;
+      document.getElementById("invite-player-button").addEventListener("click", async (event) => {
+        event.target.disabled = true;
+        try {
+          const profileId = extractProfileId(document.getElementById("invite-profile-input").value);
+          if (!profileId) { alert("Enter a profile ID or Trailer link."); return; }
+          const message = document.getElementById("invite-message-input").value;
+          const res = await fetch(`/api/show-runs/${encodeURIComponent(runId)}/tickets/invite`, {
+            method: "POST", credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ target_profile_id: profileId, message }),
+          });
+          const p = await res.json().catch(() => null);
+          if (!res.ok || !p?.ok) { alert("Could not send the invitation: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+          document.getElementById("invite-profile-input").value = "";
+          document.getElementById("invite-message-input").value = "";
+          await loadIncomingTickets(runId);
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+
       document.getElementById("add-card").hidden = false;
       document.getElementById("add-member-button").addEventListener("click", async (event) => {
         event.target.disabled = true;
@@ -277,6 +422,7 @@
         }
       });
 
+      await loadIncomingTickets(runId);
       await loadRoster(runId);
     }
 

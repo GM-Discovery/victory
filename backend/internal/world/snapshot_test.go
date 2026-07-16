@@ -378,9 +378,12 @@ func insertRosterMember(t *testing.T, pool *pgxpool.Pool, showRunID, userID, rol
 	}
 }
 
-// insertEquippedCharacter inserts a minimal character_cards row and equips
-// it for the given session/user via current_session_personas.
-func insertEquippedCharacter(t *testing.T, pool *pgxpool.Pool, locationID, ownerUserID, sessionID string) {
+// selectRosterCharacter inserts a minimal character_cards row and selects
+// it on the owner's existing show_run_roster_members row -- Kernel 71's
+// Show-Run-scoped replacement for the old Session-scoped
+// current_session_personas equip, which resolveTheaterContext no longer
+// reads.
+func selectRosterCharacter(t *testing.T, pool *pgxpool.Pool, locationID, showRunID, ownerUserID string) {
 	t.Helper()
 	ctx := context.Background()
 	var cardID string
@@ -393,10 +396,10 @@ func insertEquippedCharacter(t *testing.T, pool *pgxpool.Pool, locationID, owner
 	}
 	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM character_cards WHERE id = $1`, cardID) })
 	if _, err := pool.Exec(ctx, `
-		INSERT INTO current_session_personas (session_id, user_id, character_card_id)
-		VALUES ($1, $2, $3)
-	`, sessionID, ownerUserID, cardID); err != nil {
-		t.Fatalf("equip character card: %v", err)
+		UPDATE show_run_roster_members SET character_card_id = $1
+		WHERE show_run_id = $2 AND user_id = $3 AND removed_at IS NULL
+	`, cardID, showRunID, ownerUserID); err != nil {
+		t.Fatalf("select roster character: %v", err)
 	}
 }
 
@@ -416,7 +419,7 @@ func TestLoadVenueSnapshotTheaterContextParticipantAndAudienceMessages(t *testin
 		t.Fatalf("load show_run_id: %v", err)
 	}
 
-	session := insertSession(t, pool, f.venueID, f.showID, "live")
+	insertSession(t, pool, f.venueID, f.showID, "live")
 
 	player := insertWorldTestUser(t, pool, "wd_tc_player")
 	insertRosterMember(t, pool, showRunID, player, "player", producer)
@@ -433,17 +436,20 @@ func TestLoadVenueSnapshotTheaterContextParticipantAndAudienceMessages(t *testin
 		t.Fatalf("expected the exact required no-character message, got %q", playerSnap.TheaterContext.Message)
 	}
 
-	// Same player, now with a Character equipped for this session.
-	insertEquippedCharacter(t, pool, f.locationID, player, session)
+	// Same player, now with a Character selected for this Show Run.
+	selectRosterCharacter(t, pool, f.locationID, showRunID, player)
 	equippedSnap, err := LoadVenueSnapshot(context.Background(), pool, "audience", player, f.venueSlug)
 	if err != nil {
-		t.Fatalf("load snapshot for equipped player: %v", err)
+		t.Fatalf("load snapshot for player with a selected character: %v", err)
 	}
 	if equippedSnap.TheaterContext.Kind != "participant" {
-		t.Fatalf("expected kind = participant once equipped, got %+v", equippedSnap.TheaterContext)
+		t.Fatalf("expected kind = participant once a character is selected, got %+v", equippedSnap.TheaterContext)
 	}
 	if equippedSnap.TheaterContext.Message != "" {
-		t.Fatalf("expected no message once a Character is equipped, got %q", equippedSnap.TheaterContext.Message)
+		t.Fatalf("expected no message once a Character is selected, got %q", equippedSnap.TheaterContext.Message)
+	}
+	if equippedSnap.TheaterContext.SelectedCharacterID == "" {
+		t.Fatalf("expected theater_context.selected_character_id to be set once a character is selected")
 	}
 
 	// A plain Audience viewer, not on the roster at all.
@@ -457,5 +463,57 @@ func TestLoadVenueSnapshotTheaterContextParticipantAndAudienceMessages(t *testin
 	}
 	if audienceSnap.TheaterContext.Message != "You are watching this Show. Player controls are not active." {
 		t.Fatalf("expected the exact required watching message, got %q", audienceSnap.TheaterContext.Message)
+	}
+}
+
+// TestLoadVenueSnapshotTheaterContextTreatsArchivedCharacterAsUnselected is
+// the Kernel 71 §7.2 fallback proof: a Player whose selected Character has
+// since been archived (is_deleted) must be treated exactly like a Player
+// who never selected one -- prompted again, not left pointing at a
+// vanished Character.
+func TestLoadVenueSnapshotTheaterContextTreatsArchivedCharacterAsUnselected(t *testing.T) {
+	pool := openWorldTestPool(t)
+	producer := insertWorldTestUser(t, pool, "wd_tc_archived_producer")
+	f := buildWorldFixture(t, pool, producer)
+
+	var showRunID string
+	if err := pool.QueryRow(context.Background(), `SELECT show_run_id::text FROM shows WHERE id = $1`, f.showID).Scan(&showRunID); err != nil {
+		t.Fatalf("load show_run_id: %v", err)
+	}
+	insertSession(t, pool, f.venueID, f.showID, "live")
+
+	player := insertWorldTestUser(t, pool, "wd_tc_archived_player")
+	insertRosterMember(t, pool, showRunID, player, "player", producer)
+
+	var cardID string
+	if err := pool.QueryRow(context.Background(), `
+		INSERT INTO character_cards (owner_user_id, location_id, name) VALUES ($1, $2, $3) RETURNING id::text
+	`, player, f.locationID, "Archived Test Character").Scan(&cardID); err != nil {
+		t.Fatalf("insert character card: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM character_cards WHERE id = $1`, cardID) })
+	if _, err := pool.Exec(context.Background(), `
+		UPDATE show_run_roster_members SET character_card_id = $1
+		WHERE show_run_id = $2 AND user_id = $3 AND removed_at IS NULL
+	`, cardID, showRunID, player); err != nil {
+		t.Fatalf("select roster character: %v", err)
+	}
+
+	if _, err := pool.Exec(context.Background(), `UPDATE character_cards SET is_deleted = TRUE WHERE id = $1`, cardID); err != nil {
+		t.Fatalf("archive character card: %v", err)
+	}
+
+	snap, err := LoadVenueSnapshot(context.Background(), pool, "audience", player, f.venueSlug)
+	if err != nil {
+		t.Fatalf("load snapshot after character archived: %v", err)
+	}
+	if snap.TheaterContext.Kind != "participant" {
+		t.Fatalf("expected kind = participant, got %+v", snap.TheaterContext)
+	}
+	if snap.TheaterContext.Message != "You are registered for this Show, but you have not chosen a Character yet." {
+		t.Fatalf("expected the archived character to be treated as unselected, got %q", snap.TheaterContext.Message)
+	}
+	if snap.TheaterContext.SelectedCharacterID != "" {
+		t.Fatalf("expected no selected_character_id once the character is archived, got %q", snap.TheaterContext.SelectedCharacterID)
 	}
 }

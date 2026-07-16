@@ -410,6 +410,71 @@ func HandleSelfJoin(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+// HandleMyRosterMember handles GET /api/show-runs/{id}/roster/me.
+func HandleMyRosterMember(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		member, err := LoadMyRosterMember(ctx, pool, userID, strings.TrimSpace(r.PathValue("id")))
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		proj, err := ProjectRosterMember(ctx, pool, userID, member)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeOK(w, map[string]any{"member": proj})
+	}
+}
+
+// HandleSelectCharacter handles POST /api/show-runs/{id}/roster/me/character.
+// Always acts on the caller's own roster row -- the body never carries a
+// target user id.
+func HandleSelectCharacter(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		var body struct {
+			CharacterCardID string `json:"character_card_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeError(w, errors.New("invalid_request_body"))
+			return
+		}
+		member, err := SelectCharacter(ctx, pool, userID, strings.TrimSpace(r.PathValue("id")), body.CharacterCardID)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		proj, err := ProjectRosterMember(ctx, pool, userID, member)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeOK(w, map[string]any{"member": proj})
+	}
+}
+
 // HandleAudienceProgram handles GET /api/show-runs/{id}/audience-program --
 // the curated view, available to any viewer with access to the run
 // (CanViewShowRun), not just managers.

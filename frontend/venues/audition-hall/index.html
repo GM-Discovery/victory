@@ -90,6 +90,51 @@
     .hidden {
       display: none;
     }
+
+    .ticket-row {
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      margin-bottom: 10px;
+      background: #18120e;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .ticket-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .ticket-actions button {
+      width: auto;
+    }
+
+    .distinction-note {
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      padding: 12px 14px;
+      background: #211913;
+      font-size: 0.92rem;
+    }
+
+    .lookup-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .lookup-row input {
+      margin-bottom: 0;
+    }
+
+    .lookup-row button {
+      width: auto;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -100,6 +145,12 @@
         Ticketing for events happens in ticket booth back on the main map. This space is for requesting access to participate in events as cast, crew, or director. If you're here, you likely already have an account and are signed in. If not, please create an account and sign in before requesting access.
       </p>
       <p><a href="/" style="color:#f3d18b;">Back to map</a></p>
+    </div>
+
+    <div class="panel">
+      <p class="distinction-note">
+        <strong>Venue access</strong> (like Catharsis, below) lets you enter a venue to create Characters. A <strong>Show ticket</strong> is a separate, mutual agreement to participate in a specific Show Run — see "Join a Show" further down.
+      </p>
     </div>
 
     <div class="panel">
@@ -148,6 +199,40 @@
       <h2>My Requests</h2>
       <div id="my-requests">
         <div class="muted">No requests loaded yet.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Join a Show</h2>
+      <p class="muted">Enter a Show's code to request to join it. This is not a Director invitation — it starts a request they still have to approve.</p>
+      <div class="lookup-row">
+        <input type="text" id="show-code-input" placeholder="Show code (e.g. RA01)" />
+        <button type="button" id="show-code-lookup-button">Look Up</button>
+      </div>
+      <div id="show-code-result"></div>
+    </div>
+
+    <div class="panel">
+      <h2>My Invitations</h2>
+      <p class="muted">Show Runs a Director has invited you to join. Accepting validates the ticket and adds you as a Player.</p>
+      <div id="my-invitations">
+        <div class="muted">No invitations loaded yet.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>My Pending Requests</h2>
+      <p class="muted">Requests you've sent that are waiting for a Director's approval.</p>
+      <div id="my-pending-requests">
+        <div class="muted">No pending requests loaded yet.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Accepted Show Runs</h2>
+      <p class="muted">Show Runs you're a valid Player on. Choose or change your Character from here.</p>
+      <div id="accepted-show-runs">
+        <div class="muted">No accepted Show Runs loaded yet.</div>
       </div>
     </div>
 
@@ -271,6 +356,148 @@
       }
     });
 
+    const showCodeInput = document.getElementById("show-code-input");
+    const showCodeLookupButton = document.getElementById("show-code-lookup-button");
+    const showCodeResult = document.getElementById("show-code-result");
+    const myInvitations = document.getElementById("my-invitations");
+    const myPendingRequests = document.getElementById("my-pending-requests");
+    const acceptedShowRuns = document.getElementById("accepted-show-runs");
+
+    showCodeLookupButton.addEventListener("click", async () => {
+      const code = showCodeInput.value.trim();
+      if (!code) return;
+      showCodeResult.innerHTML = `<div class="muted">Looking up "${escapeHtml(code)}"...</div>`;
+      try {
+        const res = await fetch(`/api/shows/by-code?code=${encodeURIComponent(code)}`, { credentials: "include" });
+        const text = await res.text();
+        const payload = text ? JSON.parse(text) : {};
+        if (!res.ok || !payload.ok) {
+          throw new Error(payload.data?.error || `Show code not found (HTTP ${res.status})`);
+        }
+        const show = payload.data.show;
+        const showRun = payload.data.show_run;
+        const row = document.createElement("div");
+        row.className = "ticket-row";
+        const info = document.createElement("div");
+        info.innerHTML = `<div>This request is for the Show Run containing <strong>${escapeHtml(show.title)}</strong>.</div><div class="muted">Approval applies to the Show Run, not only this one Show.</div>`;
+        row.appendChild(info);
+        const sendButton = document.createElement("button");
+        sendButton.type = "button";
+        sendButton.textContent = "Send Request";
+        sendButton.addEventListener("click", async () => {
+          sendButton.disabled = true;
+          try {
+            const r = await fetch(`/api/show-runs/${encodeURIComponent(showRun.id)}/tickets/request`, {
+              method: "POST", credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ message: "" }),
+            });
+            const p = await r.json().catch(() => null);
+            if (!r.ok || !p?.ok) { alert("Could not send request: " + (p?.data?.error || `HTTP ${r.status}`)); sendButton.disabled = false; return; }
+            showCodeResult.innerHTML = `<div class="muted">Request sent. It's waiting for the Director's approval.</div>`;
+            await loadMyTickets();
+          } catch (err) {
+            sendButton.disabled = false;
+          }
+        });
+        row.appendChild(sendButton);
+        showCodeResult.innerHTML = "";
+        showCodeResult.appendChild(row);
+      } catch (err) {
+        showCodeResult.innerHTML = `<div class="muted">${escapeHtml(err.message || String(err))}</div>`;
+      }
+    });
+
+    function renderTicketActionRow(ticket, container, actions) {
+      const row = document.createElement("div");
+      row.className = "ticket-row";
+      const info = document.createElement("div");
+      info.innerHTML = `<div><strong>${escapeHtml(ticket.show_run_title || "Show Run")}</strong></div>` +
+        (ticket.message ? `<div class="muted">${escapeHtml(ticket.message)}</div>` : "");
+      row.appendChild(info);
+      const actionsEl = document.createElement("div");
+      actionsEl.className = "ticket-actions";
+      for (const action of actions) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = action.label;
+        button.addEventListener("click", async () => {
+          button.disabled = true;
+          try {
+            const res = await fetch(`/api/tickets/${encodeURIComponent(ticket.id)}/${action.endpoint}`, { method: "POST", credentials: "include" });
+            const p = await res.json().catch(() => null);
+            if (!res.ok || !p?.ok) { alert(`Could not ${action.label.toLowerCase()}: ` + (p?.data?.error || `HTTP ${res.status}`)); button.disabled = false; return; }
+            await loadMyTickets();
+          } catch (err) {
+            button.disabled = false;
+          }
+        });
+        actionsEl.appendChild(button);
+      }
+      row.appendChild(actionsEl);
+      container.appendChild(row);
+    }
+
+    async function loadMyTickets() {
+      try {
+        const res = await fetch("/api/tickets/mine", { credentials: "include" });
+        const text = await res.text();
+        const payload = text ? JSON.parse(text) : {};
+        if (!res.ok || !payload.ok) {
+          throw new Error(payload.data?.error || `Failed to load tickets (HTTP ${res.status})`);
+        }
+        const list = payload.data.tickets || [];
+
+        const invitations = list.filter((t) => t.status === "pending_player");
+        const pendingRequests = list.filter((t) => t.status === "pending_director" && t.initiated_by_side === "player");
+        const accepted = list.filter((t) => t.status === "valid");
+
+        myInvitations.innerHTML = "";
+        if (invitations.length === 0) {
+          myInvitations.innerHTML = `<div class="muted">No invitations right now.</div>`;
+        } else {
+          for (const t of invitations) {
+            renderTicketActionRow(t, myInvitations, [
+              { label: "Accept", endpoint: "punch" },
+              { label: "Decline", endpoint: "decline" },
+            ]);
+          }
+        }
+
+        myPendingRequests.innerHTML = "";
+        if (pendingRequests.length === 0) {
+          myPendingRequests.innerHTML = `<div class="muted">No pending requests right now.</div>`;
+        } else {
+          for (const t of pendingRequests) {
+            renderTicketActionRow(t, myPendingRequests, [
+              { label: "Withdraw", endpoint: "withdraw" },
+            ]);
+          }
+        }
+
+        acceptedShowRuns.innerHTML = "";
+        if (accepted.length === 0) {
+          acceptedShowRuns.innerHTML = `<div class="muted">No accepted Show Runs yet.</div>`;
+        } else {
+          for (const t of accepted) {
+            const row = document.createElement("div");
+            row.className = "ticket-row";
+            const info = document.createElement("div");
+            info.innerHTML = `<div><strong>${escapeHtml(t.show_run_title || "Show Run")}</strong></div>`;
+            row.appendChild(info);
+            const link = document.createElement("a");
+            link.href = "/venues/audition-hall/character.html?show_run_id=" + encodeURIComponent(t.show_run_id);
+            link.textContent = "Choose or Change Character";
+            link.style.color = "#f3d18b";
+            row.appendChild(link);
+            acceptedShowRuns.appendChild(row);
+          }
+        }
+      } catch (err) {
+        myInvitations.innerHTML = `<div class="muted">${escapeHtml(err.message || String(err))}</div>`;
+      }
+    }
+
     function escapeHtml(value) {
       return String(value)
         .replaceAll("&", "&amp;")
@@ -281,6 +508,7 @@
     }
 
     loadMyRequests();
+    loadMyTickets();
   </script>
   <script src="/lib/venue-account-badge.js?v=nav-1"></script>
 </body>

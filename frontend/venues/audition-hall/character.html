@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Choose Your Character — Audition Hall</title>
+  <style>
+    body {
+      margin: 0;
+      background: #14100c;
+      color: #f2e7d0;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .shell {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .panel {
+      background: #1f1812;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    h1 { margin-top: 0; }
+
+    .muted { color: #cdbb9f; }
+
+    .status { min-height: 1.2em; color: #f3d18b; margin-top: 10px; }
+
+    .character-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      margin-bottom: 10px;
+      background: #18120e;
+    }
+
+    .character-row.is-selected { border-color: rgba(240, 211, 164, 0.6); }
+
+    .character-name { font-weight: 700; margin: 0; }
+
+    button {
+      font: inherit;
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 8px;
+      background: #7a4c1f;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:disabled { opacity: 0.6; cursor: default; }
+
+    button:hover:not(:disabled) { background: #955b24; }
+
+    a { color: #f3d18b; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="panel">
+      <h1>Choose Your Character</h1>
+      <p class="muted" id="show-run-line">Loading...</p>
+      <p class="muted">You may switch freely between your own active Characters at any time. No Director approval is required.</p>
+      <p><a href="/venues/audition-hall/">Back to Audition Hall</a></p>
+    </div>
+
+    <div class="panel">
+      <div id="character-list"><div class="muted">Loading your Characters...</div></div>
+      <div id="status-line" class="status"></div>
+    </div>
+  </div>
+
+  <script>
+    function showRunIdFromQuery() {
+      return new URLSearchParams(window.location.search).get("show_run_id") || "";
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    async function selectCharacter(showRunID, characterCardID, statusLine) {
+      statusLine.textContent = "Saving...";
+      try {
+        const res = await fetch(`/api/show-runs/${encodeURIComponent(showRunID)}/roster/me/character`, {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ character_card_id: characterCardID }),
+        });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.ok) {
+          statusLine.textContent = "Could not select Character: " + (payload?.data?.error || `HTTP ${res.status}`);
+          return null;
+        }
+        statusLine.textContent = "Saved.";
+        return payload.data.member;
+      } catch (err) {
+        statusLine.textContent = "Something went wrong.";
+        return null;
+      }
+    }
+
+    async function bootstrap() {
+      const showRunID = showRunIdFromQuery();
+      const list = document.getElementById("character-list");
+      const statusLine = document.getElementById("status-line");
+      const showRunLine = document.getElementById("show-run-line");
+
+      if (!showRunID) {
+        list.innerHTML = "";
+        showRunLine.textContent = "No Show Run specified.";
+        return;
+      }
+
+      const sessionResponse = await fetch("/api/session/me", { credentials: "include" });
+      const sessionPayload = await sessionResponse.json().catch(() => null);
+      if (!sessionResponse.ok || !sessionPayload?.ok || !sessionPayload.signed_in) {
+        window.location.href = "/venues/audition-hall/";
+        return;
+      }
+
+      const [meResponse, cardsResponse] = await Promise.all([
+        fetch(`/api/show-runs/${encodeURIComponent(showRunID)}/roster/me`, { credentials: "include" }),
+        fetch("/api/character-cards/me", { credentials: "include" }),
+      ]);
+      const mePayload = await meResponse.json().catch(() => null);
+      const cardsPayload = await cardsResponse.json().catch(() => null);
+
+      if (!meResponse.ok || !mePayload?.ok) {
+        showRunLine.textContent = "You are not a Player on this Show Run yet.";
+        list.innerHTML = "";
+        return;
+      }
+      if (mePayload.data.member.role !== "player") {
+        showRunLine.textContent = "Character selection is for Players on this Show Run.";
+        list.innerHTML = "";
+        return;
+      }
+      showRunLine.textContent = "Choosing your Character for this Show Run.";
+
+      if (!cardsResponse.ok || !cardsPayload?.ok) {
+        list.innerHTML = `<div class="muted">Could not load your Characters.</div>`;
+        return;
+      }
+
+      const cards = cardsPayload.data.cards || [];
+      let selectedID = mePayload.data.member.character_card_id || "";
+
+      if (cards.length === 0) {
+        list.innerHTML = `<div class="muted">You don't have any Characters yet. Create one in the Greenroom, then come back here.</div>`;
+        return;
+      }
+
+      function render() {
+        list.innerHTML = "";
+        for (const card of cards) {
+          const row = document.createElement("div");
+          row.className = "character-row" + (card.id === selectedID ? " is-selected" : "");
+          const info = document.createElement("div");
+          const name = document.createElement("p");
+          name.className = "character-name";
+          name.textContent = card.name || "Unnamed Character";
+          info.appendChild(name);
+          row.appendChild(info);
+
+          const button = document.createElement("button");
+          button.type = "button";
+          if (card.id === selectedID) {
+            button.textContent = "Currently Presenting";
+            button.disabled = true;
+          } else {
+            button.textContent = "Present as This Character";
+            button.addEventListener("click", async () => {
+              button.disabled = true;
+              const updated = await selectCharacter(showRunID, card.id, statusLine);
+              if (updated) {
+                selectedID = updated.character_card_id || "";
+                render();
+              } else {
+                button.disabled = false;
+              }
+            });
+          }
+          row.appendChild(button);
+          list.appendChild(row);
+        }
+      }
+      render();
+    }
+
+    bootstrap().catch((error) => {
+      console.error("character selection bootstrap failed", error);
+      document.getElementById("status-line").textContent = "Something went wrong loading this page.";
+    });
+  </script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This is the current forward-looking roadmap after **Kernel 70**. The chronological record of shipped kernels lives in `Construction/OperatorLogs/operator-log.md`; older kernel specs and the large track roadmaps remain design history, not the source for the next unused kernel number.
+This is the current forward-looking roadmap after **Kernel 71**. The chronological record of shipped kernels lives in `Construction/OperatorLogs/operator-log.md`; older kernel specs and the large track roadmaps remain design history, not the source for the next unused kernel number.
 
 ## Shipped Foundation
 
@@ -11,6 +11,8 @@ This is the current forward-looking roadmap after **Kernel 70**. The chronologic
 - Kernels 61–65: Trailer Player Workbook, My People, DB-test safety, and Third Place.
 - Kernels 66–69: Show Runs, Shows, production onboarding, Scene Library, and Show Scene Placements.
 - Kernel 70: location-scoped reusable Scenes, persistent Show-owned stage state, current Scene, Show variables, Cues, idempotent GO, rehearsal metadata, and curated player stage buttons.
+- Kernel 70A (live): Start Show Session, theater-context empty states, First Theater's independent venue wiring, and the retroactive Kernel 70 migration deploy.
+- Kernel 71 (PASS, uncommitted): the canonical participation resolver (fixing the `location_memberships`/`memberships` "none" bug), two-punch Show tickets as the sole ordinary path to Player roster participation, per-Show-Run Character selection, Show short codes, and `/showtime` one-action orchestration.
 
 ## Recommended Near Horizon
 
@@ -37,8 +39,14 @@ This is the current forward-looking roadmap after **Kernel 70**. The chronologic
 ### Product Journey Proof
 
 - Prove account → Trailer Face → Production/roster → Show → staged Scene → linked Session → GO → durable aftermath.
+- **Partially closed by Kernel 71**: the Player-arrival half of this journey now has a real, mutual-consent path — Audition Hall request-or-invite → valid ticket → Character selection → `/showtime` → theater entry — proven end-to-end over real HTTP (`scripts/smoke/fresh-install.sh`), not just designed. Still open: a first playable Socio show, a casting/attendance system beyond the one-time ticket event, and browser/screenshot evidence of the new Audition Hall and Stage Management UI.
 - Observe non-developer users and record operator interventions, vocabulary confusion, and privacy misunderstandings.
 - Turn that path into the short public demonstration of Victory.
+
+### Legacy Membership Table Consolidation
+
+- `location_memberships` and the older `memberships` table both still exist; Kernel 71's canonical `participation.ResolveParticipationContext` resolver reconciles them with a strict precedence order but does not remove either table (a wholesale deletion was explicitly out of scope).
+- Three packages (`characters`, `assets/read.go`, `showings/review.go`) each independently UNION both tables in ad hoc helpers rather than calling one shared resolver function — `assets/upload.go` is the one reader that unions neither. A future kernel should route all of these through `participation`'s helpers and only then consider whether `memberships`/`access_grants` can be safely retired.
 
 ## Medium Horizon
 

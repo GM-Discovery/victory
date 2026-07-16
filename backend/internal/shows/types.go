@@ -34,6 +34,7 @@ type Show struct {
 	ID                          string          `json:"id"`
 	ShowRunID                   string          `json:"show_run_id"`
 	Slug                        string          `json:"slug"`
+	ShortCode                   string          `json:"short_code,omitempty"`
 	Title                       string          `json:"title"`
 	Description                 string          `json:"description,omitempty"`
 	AudienceTitle               string          `json:"audience_title,omitempty"`

@@ -185,12 +185,16 @@ func TestAddRosterMemberEnforcesOneActiveRowPerUser(t *testing.T) {
 		}
 	}
 
-	first, err := AddRosterMember(context.Background(), pool, producer, showRunID, memberProfileID, "player", "", true)
+	// Kernel 71: role="player" is gated to Operator-only direct-add (see
+	// TestUpdateRosterMemberRolePromotionToPlayerRequiresOperator and the
+	// AddRosterMember guard) -- this test's actual subject is the ON
+	// CONFLICT single-row mechanism, so it uses two ungated roles instead.
+	first, err := AddRosterMember(context.Background(), pool, producer, showRunID, memberProfileID, "guest", "", true)
 	if err != nil {
 		t.Fatalf("add roster member: %v", err)
 	}
-	if first.Role != "player" {
-		t.Fatalf("expected role player, got %q", first.Role)
+	if first.Role != "guest" {
+		t.Fatalf("expected role guest, got %q", first.Role)
 	}
 
 	// Adding again updates the role of the same row rather than creating a
@@ -230,6 +234,164 @@ func TestAddRosterMemberEnforcesOneActiveRowPerUser(t *testing.T) {
 	}
 	if roleDisplayLabel("player", "") != "Player" || roleDisplayLabel("player", "") == "Cast" {
 		t.Fatalf("expected role_display_label(player) to be Player, never Cast")
+	}
+}
+
+// TestUpdateRosterMemberRolePromotionToPlayerRequiresOperator is the Kernel
+// 71 closure for the "add as guest, then PATCH to player" ticket-bypass
+// gap: an ordinary Director must not be able to promote an existing
+// non-player roster row to Player without going through a ticket.
+// TestAddRosterMemberRejectsDirectPlayerAddForOrdinaryDirector is the
+// Kernel 71 closure for the most direct ticket-bypass path: an ordinary
+// Director calling the generic roster-add endpoint with role="player"
+// directly (rather than through Third Place's picker or Stage
+// Management's old "Add" control, both of which routed here before this
+// kernel) must be rejected, whether the target has no existing row or an
+// existing non-player row (the ON CONFLICT upsert path).
+func TestAddRosterMemberRejectsDirectPlayerAddForOrdinaryDirector(t *testing.T) {
+	pool := openShowRunsTestPool(t)
+	producer := insertShowRunTestUser(t, pool, "sr_directadd_producer")
+	target := insertShowRunTestUser(t, pool, "sr_directadd_target")
+	locationID, _, showRunID := insertShowRunFixture(t, pool, producer)
+	grantLocationRole(t, pool, locationID, producer, "producer")
+
+	if _, err := playerprofile.EnsureWorkbook(context.Background(), pool, target); err != nil {
+		t.Fatalf("ensure workbook: %v", err)
+	}
+	var targetProfileID string
+	if err := pool.QueryRow(context.Background(), `SELECT id::text FROM player_profile_workbooks WHERE user_id = $1`, target).Scan(&targetProfileID); err != nil {
+		t.Fatalf("load target profile id: %v", err)
+	}
+
+	if _, err := AddRosterMember(context.Background(), pool, producer, showRunID, targetProfileID, "player", "", true); err == nil || err.Error() != "player_requires_ticket" {
+		t.Fatalf("expected player_requires_ticket for a fresh direct add, got %v", err)
+	}
+	if role := func() string {
+		var r string
+		_ = pool.QueryRow(context.Background(), `SELECT role FROM show_run_roster_members WHERE show_run_id = $1 AND user_id = $2 AND removed_at IS NULL`, showRunID, target).Scan(&r)
+		return r
+	}(); role != "" {
+		t.Fatalf("expected no roster row to be created by the rejected add, got role %q", role)
+	}
+
+	// Also rejected as an upsert promotion of an existing non-player row.
+	if _, err := AddRosterMember(context.Background(), pool, producer, showRunID, targetProfileID, "guest", "", true); err != nil {
+		t.Fatalf("add as guest: %v", err)
+	}
+	if _, err := AddRosterMember(context.Background(), pool, producer, showRunID, targetProfileID, "player", "", true); err == nil || err.Error() != "player_requires_ticket" {
+		t.Fatalf("expected player_requires_ticket for an upsert promotion, got %v", err)
+	}
+}
+
+func TestUpdateRosterMemberRolePromotionToPlayerRequiresOperator(t *testing.T) {
+	pool := openShowRunsTestPool(t)
+	producer := insertShowRunTestUser(t, pool, "sr_promote_producer")
+	member := insertShowRunTestUser(t, pool, "sr_promote_member")
+	locationID, _, showRunID := insertShowRunFixture(t, pool, producer)
+	grantLocationRole(t, pool, locationID, producer, "producer")
+
+	if _, err := playerprofile.EnsureWorkbook(context.Background(), pool, member); err != nil {
+		t.Fatalf("ensure workbook: %v", err)
+	}
+	var memberProfileID string
+	if err := pool.QueryRow(context.Background(), `SELECT id::text FROM player_profile_workbooks WHERE user_id = $1`, member).Scan(&memberProfileID); err != nil {
+		t.Fatalf("load member profile id: %v", err)
+	}
+
+	guest, err := AddRosterMember(context.Background(), pool, producer, showRunID, memberProfileID, "guest", "", true)
+	if err != nil {
+		t.Fatalf("add roster member as guest: %v", err)
+	}
+
+	if _, err := UpdateRosterMemberRole(context.Background(), pool, producer, showRunID, guest.ID, "player", "", true); err == nil || err.Error() != "player_requires_ticket" {
+		t.Fatalf("expected player_requires_ticket when an ordinary Director promotes to player, got %v", err)
+	}
+
+	var currentRole string
+	if err := pool.QueryRow(context.Background(), `SELECT role FROM show_run_roster_members WHERE id = $1`, guest.ID).Scan(&currentRole); err != nil {
+		t.Fatalf("load current role: %v", err)
+	}
+	if currentRole != "guest" {
+		t.Fatalf("expected role to remain guest after the rejected promotion, got %q", currentRole)
+	}
+
+	// Promoting to a non-player role is unaffected -- only the Player
+	// transition is gated.
+	if _, err := UpdateRosterMemberRole(context.Background(), pool, producer, showRunID, guest.ID, "crew", "", true); err != nil {
+		t.Fatalf("expected ordinary promotion to crew to still work: %v", err)
+	}
+}
+
+// TestSelectCharacterOwnershipAndSwitching covers the Kernel 71 Character
+// selection endpoint: a rostered Player can select and freely switch among
+// their own active Characters, cannot select someone else's, and a
+// non-roster-member is rejected outright.
+func TestSelectCharacterOwnershipAndSwitching(t *testing.T) {
+	pool := openShowRunsTestPool(t)
+	producer := insertShowRunTestUser(t, pool, "sr_char_producer")
+	player := insertShowRunTestUser(t, pool, "sr_char_player")
+	stranger := insertShowRunTestUser(t, pool, "sr_char_stranger")
+	locationID, _, showRunID := insertShowRunFixture(t, pool, producer)
+	grantLocationRole(t, pool, locationID, producer, "producer")
+
+	if _, err := playerprofile.EnsureWorkbook(context.Background(), pool, player); err != nil {
+		t.Fatalf("ensure workbook: %v", err)
+	}
+	var playerProfileID string
+	if err := pool.QueryRow(context.Background(), `SELECT id::text FROM player_profile_workbooks WHERE user_id = $1`, player).Scan(&playerProfileID); err != nil {
+		t.Fatalf("load player profile id: %v", err)
+	}
+	// Player-role adds are ticket-gated (see AddRosterMember's guard) --
+	// insert the roster row directly here, matching this codebase's
+	// established fixture convention for test-only setup that isn't the
+	// thing under test (e.g. world/snapshot_test.go's insertRosterMember).
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO show_run_roster_members (show_run_id, user_id, role, added_by_user_id)
+		VALUES ($1, $2, 'player', $3)
+	`, showRunID, player, producer); err != nil {
+		t.Fatalf("add player to roster: %v", err)
+	}
+
+	insertCharacterCard := func(ownerUserID, name string) string {
+		var cardID string
+		if err := pool.QueryRow(context.Background(), `
+			INSERT INTO character_cards (owner_user_id, location_id, name) VALUES ($1, $2, $3) RETURNING id::text
+		`, ownerUserID, locationID, name).Scan(&cardID); err != nil {
+			t.Fatalf("insert character card: %v", err)
+		}
+		t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM character_cards WHERE id = $1`, cardID) })
+		return cardID
+	}
+
+	characterA := insertCharacterCard(player, "Character A")
+	characterB := insertCharacterCard(player, "Character B")
+	strangersCharacter := insertCharacterCard(stranger, "Stranger's Character")
+
+	member, err := SelectCharacter(context.Background(), pool, player, showRunID, characterA)
+	if err != nil {
+		t.Fatalf("select character A: %v", err)
+	}
+	if member.CharacterCardID != characterA {
+		t.Fatalf("expected character_card_id %q, got %q", characterA, member.CharacterCardID)
+	}
+
+	// Free switching, no approval required.
+	member, err = SelectCharacter(context.Background(), pool, player, showRunID, characterB)
+	if err != nil {
+		t.Fatalf("switch to character B: %v", err)
+	}
+	if member.CharacterCardID != characterB {
+		t.Fatalf("expected character_card_id %q after switching, got %q", characterB, member.CharacterCardID)
+	}
+
+	// Cannot select someone else's Character.
+	if _, err := SelectCharacter(context.Background(), pool, player, showRunID, strangersCharacter); err == nil || err.Error() != "not_authorized" {
+		t.Fatalf("expected not_authorized selecting another user's character, got %v", err)
+	}
+
+	// A non-roster-member cannot select a character for this show run.
+	if _, err := SelectCharacter(context.Background(), pool, stranger, showRunID, strangersCharacter); err == nil || err.Error() != "not_a_roster_member" {
+		t.Fatalf("expected not_a_roster_member for a non-roster user, got %v", err)
 	}
 }
 
@@ -315,15 +477,17 @@ func TestListAudienceProgramMembersOrdersAudienceFirstAndRespectsVisibility(t *t
 	locationID, _, showRunID := insertShowRunFixture(t, pool, producer)
 	grantLocationRole(t, pool, locationID, producer, "producer")
 
+	// Inserted directly (not via AddRosterMember, which Kernel 71 gates
+	// role="player" behind a ticket) -- this test's subject is program
+	// ordering/visibility, not add-authority.
 	addMember := func(userID, role string, programVisible bool) {
 		if _, err := playerprofile.EnsureWorkbook(context.Background(), pool, userID); err != nil {
 			t.Fatalf("ensure workbook: %v", err)
 		}
-		var profileID string
-		if err := pool.QueryRow(context.Background(), `SELECT id::text FROM player_profile_workbooks WHERE user_id = $1`, userID).Scan(&profileID); err != nil {
-			t.Fatalf("load profile id: %v", err)
-		}
-		if _, err := AddRosterMember(context.Background(), pool, producer, showRunID, profileID, role, "", programVisible); err != nil {
+		if _, err := pool.Exec(context.Background(), `
+			INSERT INTO show_run_roster_members (show_run_id, user_id, role, program_visible, added_by_user_id)
+			VALUES ($1, $2, $3, $4, $5)
+		`, showRunID, userID, role, programVisible, producer); err != nil {
 			t.Fatalf("add roster member role=%s: %v", role, err)
 		}
 	}
@@ -359,17 +523,19 @@ func TestProjectRosterMemberReflectsLiveTrailerFace(t *testing.T) {
 	grantLocationRole(t, pool, locationID, producer, "producer")
 
 	setStageName(t, pool, player, "Original Roster Name")
-	if _, err := playerprofile.EnsureWorkbook(context.Background(), pool, player); err != nil {
-		t.Fatalf("ensure workbook: %v", err)
-	}
-	var profileID string
-	if err := pool.QueryRow(context.Background(), `SELECT id::text FROM player_profile_workbooks WHERE user_id = $1`, player).Scan(&profileID); err != nil {
-		t.Fatalf("load profile id: %v", err)
-	}
 
-	member, err := AddRosterMember(context.Background(), pool, producer, showRunID, profileID, "player", "", true)
-	if err != nil {
+	// Inserted directly, not via AddRosterMember (Kernel 71 gates
+	// role="player" behind a ticket) -- this test's subject is live Face
+	// projection, not add-authority.
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO show_run_roster_members (show_run_id, user_id, role, added_by_user_id)
+		VALUES ($1, $2, 'player', $3)
+	`, showRunID, player, producer); err != nil {
 		t.Fatalf("add roster member: %v", err)
+	}
+	member, err := LoadMyRosterMember(context.Background(), pool, player, showRunID)
+	if err != nil {
+		t.Fatalf("load roster member: %v", err)
 	}
 
 	proj, err := ProjectRosterMember(context.Background(), pool, producer, member)

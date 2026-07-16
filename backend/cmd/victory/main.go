@@ -42,7 +42,9 @@ import (
 	"victory/backend/internal/showings"
 	"victory/backend/internal/showruns"
 	"victory/backend/internal/shows"
+	"victory/backend/internal/showtime"
 	"victory/backend/internal/thirdplace"
+	"victory/backend/internal/tickets"
 	"victory/backend/internal/venues"
 	"victory/backend/internal/world"
 )
@@ -199,9 +201,18 @@ func main() {
 	mux.HandleFunc("PATCH /api/show-runs/{id}/roster/{member_id}", showruns.HandleRosterUpdate(pool))
 	mux.HandleFunc("DELETE /api/show-runs/{id}/roster/{member_id}", showruns.HandleRosterRemove(pool))
 	mux.HandleFunc("POST /api/show-runs/{id}/roster/self-join", showruns.HandleSelfJoin(pool))
+	mux.HandleFunc("GET /api/show-runs/{id}/roster/me", showruns.HandleMyRosterMember(pool))
+	mux.HandleFunc("POST /api/show-runs/{id}/roster/me/character", showruns.HandleSelectCharacter(pool))
 	mux.HandleFunc("GET /api/show-runs/{id}/audience-program", showruns.HandleAudienceProgram(pool))
 	mux.HandleFunc("POST /api/show-runs/{id}/blocks", showruns.HandleBlock(pool))
 	mux.HandleFunc("DELETE /api/show-runs/{id}/blocks/{block_id}", showruns.HandleUnblock(pool))
+	mux.HandleFunc("POST /api/show-runs/{id}/tickets/request", tickets.HandleRequest(pool))
+	mux.HandleFunc("POST /api/show-runs/{id}/tickets/invite", tickets.HandleInvite(pool))
+	mux.HandleFunc("GET /api/show-runs/{id}/tickets/incoming", tickets.HandleListIncoming(pool))
+	mux.HandleFunc("POST /api/tickets/{ticket_id}/punch", tickets.HandlePunch(pool))
+	mux.HandleFunc("POST /api/tickets/{ticket_id}/decline", tickets.HandleDecline(pool))
+	mux.HandleFunc("POST /api/tickets/{ticket_id}/withdraw", tickets.HandleWithdraw(pool))
+	mux.HandleFunc("GET /api/tickets/mine", tickets.HandleListMine(pool))
 	mux.HandleFunc("GET /api/show-runs/{show_run_id}/shows", shows.HandleShowRunShows(pool))
 	mux.HandleFunc("POST /api/show-runs/{show_run_id}/shows", shows.HandleShowRunShows(pool))
 	mux.HandleFunc("GET /api/shows/{show_id}", shows.HandleShowByID(pool))
@@ -212,6 +223,9 @@ func main() {
 	mux.HandleFunc("POST /api/shows/{show_id}/sessions/{session_id}/unlink", shows.HandleShowSessionUnlink(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/sessions/start", shows.HandleShowSessionStart(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/current-scene", shows.HandleShowCurrentScene(pool))
+	mux.HandleFunc("PATCH /api/shows/{show_id}/short-code", shows.HandleUpdateShortCode(pool))
+	mux.HandleFunc("GET /api/shows/by-code", shows.HandleResolveByShortCode(pool))
+	mux.HandleFunc("POST /api/showtime/control", showtime.HandleShowtimeControl(pool))
 	mux.HandleFunc("GET /api/scenes", scenes.HandleScenesCollection(pool))
 	mux.HandleFunc("POST /api/scenes", scenes.HandleScenesCollection(pool))
 	mux.HandleFunc("GET /api/scenes/{scene_id}", scenes.HandleSceneByID(pool))

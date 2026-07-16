@@ -314,11 +314,15 @@
       }
     }
 
-    // Kernel 66 integration point: a Producer/Director/Operator can add
-    // someone else's Headshot straight to one of their own Show Run
-    // rosters, reusing the existing roster-add endpoint rather than a new
-    // one. The picker only lists runs the viewer already manages -- the
-    // server re-checks authority on submit regardless.
+    // Kernel 66 integration point, converted to a ticket invite in Kernel
+    // 71: a Producer/Director/Operator can invite someone else's Headshot
+    // into one of their own Show Runs, but Third Place itself must never
+    // directly create Show Run participation (spec §1.3) -- this now
+    // creates a pending two-punch ticket (the Director's first punch)
+    // instead of inserting a roster row directly. The Player still has to
+    // accept in Audition Hall before anything is granted. The picker only
+    // lists runs the viewer already manages -- the server re-checks
+    // authority on submit regardless.
     async function openShowRunPicker(profileId) {
       const overlay = document.createElement("div");
       overlay.className = "show-run-picker-overlay";
@@ -329,7 +333,7 @@
       const panel = document.createElement("div");
       panel.className = "show-run-picker";
       const heading = document.createElement("h2");
-      heading.textContent = "Add to a Show Run";
+      heading.textContent = "Invite to a Show Run";
       panel.appendChild(heading);
       const status = document.createElement("p");
       status.className = "show-run-picker-empty";
@@ -357,30 +361,33 @@
         const label = document.createElement("span");
         label.textContent = run.title;
         row.appendChild(label);
-        const addButton = document.createElement("button");
-        addButton.type = "button";
-        addButton.className = "chip";
-        addButton.textContent = "Add as Player";
-        addButton.addEventListener("click", async () => {
-          addButton.disabled = true;
+        const inviteButton = document.createElement("button");
+        inviteButton.type = "button";
+        inviteButton.className = "chip";
+        inviteButton.textContent = "Invite as Player";
+        inviteButton.addEventListener("click", async () => {
+          inviteButton.disabled = true;
           try {
-            const res = await fetch(`/api/show-runs/${encodeURIComponent(run.id)}/roster`, {
+            const res = await fetch(`/api/show-runs/${encodeURIComponent(run.id)}/tickets/invite`, {
               method: "POST", credentials: "include",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ target_profile_id: profileId, role: "player" }),
+              body: JSON.stringify({ target_profile_id: profileId, message: "Invited from Third Place" }),
             });
             const p = await res.json().catch(() => null);
             if (!res.ok || !p?.ok) {
-              alert("Could not add to Show Run: " + (p?.data?.error || `HTTP ${res.status}`));
-              addButton.disabled = false;
+              alert("Could not send the invitation: " + (p?.data?.error || `HTTP ${res.status}`));
+              inviteButton.disabled = false;
               return;
             }
-            overlay.remove();
+            row.textContent = "";
+            const sent = document.createElement("span");
+            sent.textContent = "Invitation sent — pending until they accept it in Audition Hall.";
+            row.appendChild(sent);
           } catch (error) {
-            addButton.disabled = false;
+            inviteButton.disabled = false;
           }
         });
-        row.appendChild(addButton);
+        row.appendChild(inviteButton);
         panel.appendChild(row);
       }
     }

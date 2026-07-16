@@ -56,6 +56,16 @@ func AllCommands() []Command {
 			LegacyEndpoint: "/api/session/control",
 		},
 		{
+			Path:           "showtime",
+			Title:          "Start or resume a Show",
+			Description:    "Start or resume the live Show Session for a Show by its short code -- no manual Session ID or venue picker required.",
+			Usage:          "/showtime <code>|status|end",
+			Category:       "system",
+			Subcommands:    []string{"status", "end"},
+			Legacy:         true,
+			LegacyEndpoint: "/api/showtime/control",
+		},
+		{
 			// Rolls execute through the venue dice tray/websocket, not the
 			// generic command executor -- registered here so the palette,
 			// /help, and the Guide tab list it.

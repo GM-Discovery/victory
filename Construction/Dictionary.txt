@@ -457,6 +457,140 @@ Showing (live/runtime) vs. Show (scheduling/instance container)
   instance container, and left `showings` completely untouched. Any future
   kernel should treat `shows`, not `showings`, as the scheduling primitive.
 
+Canonical Participation Context
+- Kernel 71's single answer to "what is this user's role/access here,"
+  resolved by `participation.ResolveParticipationContext`
+  (backend/internal/participation). Before this existed, four independent
+  tables each answered a related question with no agreed precedence:
+  `location_memberships` (per-Location role, the Kernel-66+ source Show-Run/
+  Show/Scene/Cue authority already trusted), the older `memberships`
+  (per-venue-or-production-or-location, used only by the legacy
+  `lookupVenueRole` feeding `world.LoadVenueSnapshot`'s `viewerRole`),
+  `access_grants` (a boolean venue/production reach grant, no role of its
+  own), and `show_run_roster_members` (Show-Run-scoped role, its own
+  vocabulary including `player`).
+- Precedence, highest wins, nothing lower may ever downgrade a role a higher
+  step already found: Operator -> active `location_memberships` row ->
+  active `show_run_roster_members` row -> any active `location_memberships`
+  row at all (audience) -> legacy `memberships`/`access_grants`, read only
+  as a last-resort upgrade from "none," never consulted if a canonical step
+  above already resolved something.
+- This is the fix for a real bug found during Kernel 70A's live checklist: a
+  Producer/Director whose only grant was a `location_memberships` row (the
+  normal shape for anyone bootstrapped or signed up after Kernel 66)
+  resolved as `viewerRole = "none"` at their own venue, because the legacy
+  `lookupVenueRole` queried `memberships` alone. `main.go`'s `lookupVenueRole`
+  now delegates to the resolver (`participation.LegacyLookupVenueRole`)
+  instead, keeping its three existing `/api/world/*` call sites unchanged.
+
+Show Ticket / Player Punch / Director Punch / Valid Ticket
+- Kernel 71's mutual-consent mechanism: the only ordinary path that creates
+  an active Player row on a Show Run's roster. One compact record
+  (`show_run_tickets`) represents both consent directions rather than
+  separate invitation/request tables.
+- A "punch" is one side's half of the agreement. The Player's punch and the
+  Director's (or Producer's/Operator's) punch are each recorded
+  independently, with who and when. Either side may punch first:
+  Player-initiated (a request, status starts `pending_director`) or
+  Director-initiated (an invitation, status starts `pending_player`).
+- A ticket is "valid" only once BOTH punches exist. The single punch that
+  completes it is one atomic transaction (`tickets.SecondPunch`): it locks
+  the ticket row, verifies the punching side is the correct party (a Player
+  can only punch for themselves; a Director's authority is re-checked
+  against the locked ticket's own Show Run, never a client-supplied one),
+  marks the ticket valid, and creates or reactivates exactly one Player
+  roster row via `show_run_roster_members`'s existing partial-unique-index
+  `ON CONFLICT` -- the same mechanism `showruns.AddRosterMember` already
+  relied on -- so a duplicate roster row or a double-processed concurrent
+  second punch is structurally impossible, not just application-checked.
+- One punch alone grants nothing: no roster row, no venue access, no
+  Character selection. A pending ticket may be declined (by the waiting
+  side) or withdrawn (by the initiating side) before validation; both leave
+  an auditable, resolved ticket row and grant nothing. Ticket scope is the
+  Show Run, not one Show -- a valid ticket permits participation across
+  every Show under that bounded Show Run.
+- `showruns.AddRosterMember` and `UpdateRosterMemberRole` both reject a
+  direct or promoted `role="player"` for non-Operator actors -- a ticket's
+  second punch is the only ordinary route to that role. Operator retains an
+  explicit, auditable override (the same shape as Kernel 66's Audience-block
+  Operator override). All other roster roles (director, producer, crew,
+  audience, guest, observer, custom) remain ordinary direct-add, unchanged.
+- Future, explicitly NOT built this kernel: Audience tickets. Unlike Player
+  tickets (Show-Run-scoped), a future Audience ticket would be
+  single-Show-scoped and acquired through a future audience/marketing venue,
+  not Audition Hall. `show_run_tickets.requested_role` is CHECK-locked to
+  `'player'` specifically so that future kernel is an additive migration
+  (widen the CHECK), not a schema redesign.
+
+Selected Show Run Character
+- The Character (`character_cards` row) a Player is currently presenting as
+  for one specific Show Run, stored on `show_run_roster_members.
+  character_card_id` (Kernel 71). Selectable/switchable freely by the
+  rostered Player themselves, no Director approval required; must be active
+  (`is_deleted = FALSE`) and owned by that Player.
+- Deliberately independent of two older, unrelated "current Character"
+  concepts: `active_user_characters` (site-wide, one row per user, read by
+  Greenroom/venue runtimes generally) and `current_session_personas`
+  (Session-scoped, ephemeral, cleared when a Session ends). Conflating
+  either with Show-Run-scoped selection would leak one Show Run's presented
+  identity into an unrelated context, or make the selection only "stick" for
+  the currently-live Session. The one connection point:
+  `world.LoadVenueSnapshot`'s `TheaterContext` now reads
+  `show_run_roster_members.character_card_id` (joined against
+  `character_cards.is_deleted`) as its "has this Player chosen a Character"
+  signal, replacing the old `current_session_personas` EXISTS check. An
+  archived/deleted selected Character is treated exactly like no selection
+  at all -- the Player is prompted again, never left pointing at a vanished
+  Character.
+
+Show Short Code
+- A short, human-typeable, per-Show identifier (`shows.short_code`),
+  auto-generated at Show creation with no client input, from a
+  confusable-excluding charset (no `0/O`, `1/I/L`). Director/Producer/
+  Operator may edit it within their authority. Deliberately a new column,
+  not a repurposing of the existing per-show-run `slug` (unique only within
+  one Show Run and used for a different job, page routing).
+- Uniqueness is location-scoped (joined through `show_runs.location_id`,
+  since `shows` has no direct location column) and case-insensitive.
+  Resolution (`GET /api/shows/by-code`) returns only show/show-run/location
+  identifiers -- never roster, variables, or other backstage state, so
+  Audition Hall's "Join a Show" lookup and an unauthenticated-adjacent
+  glance never leak backstage information.
+- Used by `/showtime <code>` and by Audition Hall's Show-Run lookup when a
+  Player wants to request to join (see "Show Ticket" above) -- resolving a
+  code for that purpose must tell the Player the resulting ticket is
+  Show-Run-scoped, not limited to the one Show named by the code.
+
+Showtime
+- The one Director action (Kernel 71) that replaces separately operating
+  Production/Show-Run/Show/Session start plus a manual venue picker: resolve
+  a Show by its short code, derive which venue it belongs on, and
+  start-or-resume its live Session -- all through the existing, unmodified
+  Kernel 70A `shows.StartShowSession`.
+- Venue derivation: if the Show already has a persistent current Scene
+  (`current_show_scene_placement_id`), use that placement's resolved venue
+  (its own override, or its Scene's default). Otherwise, scan every Scene
+  Placement staged on the Show; if they resolve to exactly one distinct
+  venue, use it (and set that placement as the Show's current Scene as a
+  side effect, since it had none yet); if zero or more than one distinct
+  venue is found, ask instead of guessing (`needs_venue_choice` in the
+  response) -- Showtime never silently picks among ambiguous venues.
+- Mic always starts off; `StartShowSession` never touches mic state at all,
+  so this is true by construction, not by an explicit "turn mic off" call.
+  The success response suggests `/mic hot` as a separate, deliberate next
+  step.
+- `/showtime end` ends only the technical live Session -- the Show's
+  current Scene, its variables, its roster, and every Player's Character
+  selection are untouched by construction (no write path in
+  `showtime.End` reaches any of those tables); the Show may be resumed
+  later exactly where it left off, matching "Persistent Show Stage Fold"
+  above.
+- Implemented as an in-app "legacy" command (`commands/registry.go`,
+  `POST /api/showtime/control`), matching `/session`'s existing precedent,
+  not a real Discord-native slash command the way `/mic` is -- a confirmed
+  scope decision, not an oversight; a Stage Management button reaches the
+  same endpoint.
+
 Trailer Face Ready
 - A computed (not stored/durable) readiness verdict on whether a user has
   intentionally set up a usable Trailer Face: a stage name plus at least one

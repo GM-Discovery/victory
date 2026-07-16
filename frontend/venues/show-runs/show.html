@@ -121,11 +121,18 @@
       </section>
 
       <section class="card" id="session-card" hidden>
-        <h2 style="margin-top:0;">Show Session</h2>
+        <h2 style="margin-top:0;">Showtime</h2>
+        <div class="form-grid">
+          <div class="field">
+            <label for="short-code-input">Show code (used by /showtime)</label>
+            <input type="text" id="short-code-input" placeholder="RA01" />
+          </div>
+          <button class="chip" type="button" id="save-short-code-button">Save Code</button>
+        </div>
         <p class="status-line" id="session-status-line">No live Session yet.</p>
         <p class="launchbar">
-          <button class="chip" type="button" id="start-session-button">Start Show Session</button>
-          <button class="chip danger" type="button" id="end-session-button" hidden>End Session</button>
+          <button class="chip" type="button" id="start-session-button">Start Showtime</button>
+          <button class="chip danger" type="button" id="end-session-button" hidden>End Showtime</button>
         </p>
         <details>
           <summary style="cursor:pointer; color: var(--muted); font-size: 0.82rem;">Advanced: manual Session link</summary>
@@ -201,6 +208,7 @@
       document.getElementById("status-select").value = show.status;
       document.getElementById("scheduled-start-input").value = isoToLocalInputValue(show.scheduled_start_at);
       document.getElementById("scheduled-end-input").value = isoToLocalInputValue(show.scheduled_end_at);
+      document.getElementById("short-code-input").value = show.short_code || "";
     }
 
     async function bootstrap() {
@@ -665,8 +673,7 @@
         const line = document.getElementById("session-status-line");
         const endButton = document.getElementById("end-session-button");
         if (data && data.session_id) {
-          const resumed = data.was_resumed ? "Resumed" : "Started";
-          line.textContent = `${resumed} Session at Catharsis — ${data.session_status}. Showing #${data.showing_id}.`;
+          line.textContent = data.message || `Session ${data.was_resumed ? "resumed" : "started"} at ${data.venue_name || data.venue_slug}.`;
           endButton.hidden = false;
         } else {
           line.textContent = "No live Session yet.";
@@ -674,21 +681,41 @@
         }
       }
 
-      async function startShowSession(forceReattach) {
-        const res = await fetch(`/api/shows/${encodeURIComponent(showId)}/sessions/start`, {
+      async function showtimeControl(action, extra) {
+        const shortCode = document.getElementById("short-code-input").value.trim();
+        if (!shortCode) {
+          alert("Set a show code above first (Save Code) — /showtime needs one to find this Show.");
+          return null;
+        }
+        const res = await fetch("/api/showtime/control", {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ venue_slug: "catharsis", force_reattach: !!forceReattach }),
+          body: JSON.stringify(Object.assign({ short_code: shortCode, action }, extra || {})),
         });
         const p = await res.json().catch(() => null);
-        if (!res.ok || !p?.ok) { alert("Could not start Show Session: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
-        const data = p.data;
+        if (!res.ok || !p?.ok) { alert("Showtime could not " + action + ": " + (p?.data?.error || `HTTP ${res.status}`)); return null; }
+        return p.data;
+      }
+
+      async function startShowtime(forceReattach, venueSlug) {
+        const data = await showtimeControl("start", { force_reattach: !!forceReattach, venue_slug: venueSlug || "" });
+        if (!data) return;
         if (data.venue_busy_with_other_show) {
           const otherTitle = data.venue_busy_with_other_show.other_show_title || "another Show";
-          if (confirm(`Catharsis's active Session is currently linked to "${otherTitle}". Reattach it to this Show instead?`)) {
-            await startShowSession(true);
+          if (confirm(`That venue's active Session is currently linked to "${otherTitle}". Reattach it to this Show instead?`)) {
+            await startShowtime(true, venueSlug);
           }
+          return;
+        }
+        if (data.needs_venue_choice) {
+          const suggestion = (data.candidate_venues || []).join(", ");
+          const chosen = prompt(
+            suggestion
+              ? `This Show's Scenes are staged across more than one venue (${suggestion}). Which venue should Showtime use?`
+              : "This Show has no staged Scenes yet, so Showtime can't tell which venue to use. Which venue should it use?"
+          );
+          if (chosen) await startShowtime(false, chosen.trim());
           return;
         }
         applySessionStartResult(data);
@@ -697,7 +724,7 @@
       document.getElementById("start-session-button").addEventListener("click", async (event) => {
         event.target.disabled = true;
         try {
-          await startShowSession(false);
+          await startShowtime(false, "");
         } finally {
           event.target.disabled = false;
         }
@@ -706,15 +733,25 @@
       document.getElementById("end-session-button").addEventListener("click", async (event) => {
         event.target.disabled = true;
         try {
-          const res = await fetch("/api/session/control", {
-            method: "POST",
-            credentials: "include",
+          const data = await showtimeControl("end");
+          if (data) applySessionStartResult(null);
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+
+      document.getElementById("save-short-code-button").addEventListener("click", async (event) => {
+        event.target.disabled = true;
+        try {
+          const code = document.getElementById("short-code-input").value.trim();
+          const res = await fetch(`/api/shows/${encodeURIComponent(showId)}/short-code`, {
+            method: "PATCH", credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ venue_slug: "catharsis", command: "end" }),
+            body: JSON.stringify({ short_code: code }),
           });
           const p = await res.json().catch(() => null);
-          if (!res.ok || !p?.ok) { alert("Could not end session: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
-          applySessionStartResult(null);
+          if (!res.ok || !p?.ok) { alert("Could not save show code: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+          document.getElementById("short-code-input").value = p.data.show.short_code || "";
         } finally {
           event.target.disabled = false;
         }

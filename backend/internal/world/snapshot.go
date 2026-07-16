@@ -36,6 +36,10 @@ type Snapshot struct {
 type TheaterContext struct {
 	Kind    string `json:"kind"`
 	Message string `json:"message,omitempty"`
+	// SelectedCharacterID is the Kernel 71 Show-Run-scoped Character the
+	// viewer is presenting as, when Kind is "participant" and they've
+	// chosen one. Empty otherwise.
+	SelectedCharacterID string `json:"selected_character_id,omitempty"`
 }
 
 type Venue struct {
@@ -477,6 +481,7 @@ func resolveTheaterContext(ctx context.Context, pool *pgxpool.Pool, viewerUserID
 
 	viewerUserID = strings.TrimSpace(viewerUserID)
 	isRegisteredPlayer := false
+	selectedCharacterID := ""
 	if viewerUserID != "" {
 		var showRunID string
 		err := pool.QueryRow(ctx, `SELECT show_run_id::text FROM shows WHERE id = $1`, showID).Scan(&showRunID)
@@ -484,30 +489,38 @@ func resolveTheaterContext(ctx context.Context, pool *pgxpool.Pool, viewerUserID
 			return TheaterContext{}, err
 		}
 		if showRunID != "" {
+			// Kernel 71: the Show-Run-scoped character_card_id is the
+			// canonical "has this Player chosen a Character" signal,
+			// replacing the Session-scoped current_session_personas check
+			// -- a Player's selection now belongs to their participation
+			// in the Show Run, not to any one live Session. An archived
+			// Character (is_deleted) is treated as unselected, per the
+			// required fallback (spec §7.2).
 			var rosterRole string
+			var characterCardID *string
+			var characterIsDeleted *bool
 			err := pool.QueryRow(ctx, `
-				SELECT role FROM show_run_roster_members
-				WHERE show_run_id = $1 AND user_id = $2 AND removed_at IS NULL
+				SELECT rm.role, rm.character_card_id::text, cc.is_deleted
+				FROM show_run_roster_members rm
+				LEFT JOIN character_cards cc ON cc.id = rm.character_card_id
+				WHERE rm.show_run_id = $1 AND rm.user_id = $2 AND rm.removed_at IS NULL
 				LIMIT 1
-			`, showRunID, viewerUserID).Scan(&rosterRole)
+			`, showRunID, viewerUserID).Scan(&rosterRole, &characterCardID, &characterIsDeleted)
 			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 				return TheaterContext{}, err
 			}
 			isRegisteredPlayer = rosterRole == "player"
+			if characterCardID != nil && (characterIsDeleted == nil || !*characterIsDeleted) {
+				selectedCharacterID = *characterCardID
+			}
 		}
 	}
 
 	if isRegisteredPlayer {
-		var hasCharacter bool
-		if err := pool.QueryRow(ctx, `
-			SELECT EXISTS(SELECT 1 FROM current_session_personas WHERE session_id = $1 AND user_id = $2)
-		`, sessionID, viewerUserID).Scan(&hasCharacter); err != nil {
-			return TheaterContext{}, err
-		}
-		if !hasCharacter {
+		if selectedCharacterID == "" {
 			return TheaterContext{Kind: "participant", Message: "You are registered for this Show, but you have not chosen a Character yet."}, nil
 		}
-		return TheaterContext{Kind: "participant"}, nil
+		return TheaterContext{Kind: "participant", SelectedCharacterID: selectedCharacterID}, nil
 	}
 
 	if backstageTier {

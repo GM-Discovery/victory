@@ -56,16 +56,17 @@ func ProjectRosterMember(ctx context.Context, pool *pgxpool.Pool, viewerUserID s
 	}
 
 	proj := RosterMemberProjection{
-		MemberID:       member.ID,
-		ProfileID:      wb.ID,
-		Role:           member.Role,
-		RoleLabel:      roleDisplayLabel(member.Role, member.CustomRoleLabel),
-		ProgramVisible: member.ProgramVisible,
-		AddedAt:        member.AddedAt,
-		StageName:      face.StageName,
-		HeadlineFacts:  []HeadlineFact{},
-		TrailerURL:     "/venues/trailers/view.html?id=" + wb.ID,
-		IsYou:          strings.TrimSpace(viewerUserID) == member.UserID,
+		MemberID:        member.ID,
+		ProfileID:       wb.ID,
+		Role:            member.Role,
+		RoleLabel:       roleDisplayLabel(member.Role, member.CustomRoleLabel),
+		ProgramVisible:  member.ProgramVisible,
+		AddedAt:         member.AddedAt,
+		StageName:       face.StageName,
+		HeadlineFacts:   []HeadlineFact{},
+		TrailerURL:      "/venues/trailers/view.html?id=" + wb.ID,
+		IsYou:           strings.TrimSpace(viewerUserID) == member.UserID,
+		CharacterCardID: member.CharacterCardID,
 	}
 
 	for _, f := range face.Regions["identity_header"] {
