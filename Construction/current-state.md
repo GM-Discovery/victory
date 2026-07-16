@@ -2,16 +2,17 @@
 
 ## Purpose
 
-This document is the current-state canon for Victory as of **Kernel 70**. Historical kernel specifications and reportbacks describe what was true when they were written; this file wins when an older current-tense statement conflicts with the implemented repository.
+This document is the current-state canon for Victory as of **Kernel 70A**. Historical kernel specifications and reportbacks describe what was true when they were written; this file wins when an older current-tense statement conflicts with the implemented repository.
 
 For detailed vocabulary use `Construction/Dictionary.txt`. For durable implementation traps use `Construction/OperatorLogs/operator-notes.md`. For chronological kernel history use `Construction/OperatorLogs/operator-log.md`.
 
 ## Kernel State
 
-- Current completed kernel: **Kernel 70 — Persistent Show Stage, Rehearsal Workspace, and Go Cue Foundation**
-- Completion date: **2026-07-14**
-- Commit: **`920aeb7`**
-- Product state: Kernels 53–70 are implemented through the persistent Show-stage and Cue foundation. Visual Scene-composition/capture remains future work.
+- Current completed kernel: **Kernel 70A — Live Stage Closure and Alpha Path Alignment**
+- Completion date: **2026-07-16**
+- Commit: **`2611840`**
+- Live deployment date: **2026-07-16**. Applying Kernel 70A's own code was a container rebuild only (no new migrations), but the deploy surfaced that **Kernel 70's three migrations (`043`–`045`) had never actually reached the live `victory` database** despite being committed since `920aeb7` on 2026-07-14 — `actions.show_id`, `cues`, and `cue_executions` did not exist in production until this deploy. A `pg_dump` backup was taken first (`backups/victory_pre_kernel70a_migrations_20260716_031420.dump`); all 46 migration files were then replayed against the live database (idempotent, `ON_ERROR_STOP=1`, zero errors) before the backend restart. Verified clean post-deploy: `/health`, `/ws/catharsis`, and `/api/director-console/current` all succeeded with no schema errors.
+- Product state: Kernels 53–70A are implemented and live. Visual Scene-composition/capture remains future work.
 - Kernel numbers are stable historical labels. Always check the operator log before assigning the next number.
 
 ## Product Shape
@@ -184,9 +185,9 @@ Kernel 70A route additions:
 
 ## Next Recommended Direction
 
-**Kernel 70A (Live Stage Closure and Alpha Path Alignment)** shipped: a server-side Start Show Session action (no manual Session ID handling), proof that Show-owned stage state survives a full start/end/resume cycle at Catharsis with no rebuild step, `go_to_scene`/`set_show_variable` working with no active session while `emit_game_event` fails cleanly and visibly, a closed Audience-facing leak (Rehearsal banner/Cue buttons were previously visible regardless of role), backend-computed theater-context empty states with the exact required strings, honest Scene/Cue setup labels, First Theater's own independent (still investor/demo-only) venue wiring, a Character-to-Show linkage audit (no build), and a `tests/catharsis/` mirror plus a scene-nodes contract test. **Deferred, by explicit scope decision**: applying the new migrations to the production database and restarting the live backend (a separate, explicitly-gated step); the first playable Socio show; a casting/attendance system; and any participant-facing First Theater work, since First Theater remains investor/demo-only for this pass.
+**Kernel 70A (Live Stage Closure and Alpha Path Alignment)** shipped and is now live in production (2026-07-16): a server-side Start Show Session action (no manual Session ID handling), proof that Show-owned stage state survives a full start/end/resume cycle at Catharsis with no rebuild step, `go_to_scene`/`set_show_variable` working with no active session while `emit_game_event` fails cleanly and visibly, a closed Audience-facing leak (Rehearsal banner/Cue buttons were previously visible regardless of role), backend-computed theater-context empty states with the exact required strings, honest Scene/Cue setup labels, First Theater's own independent (still investor/demo-only) venue wiring, a Character-to-Show linkage audit (no build), and a `tests/catharsis/` mirror plus a scene-nodes contract test. The live deploy also retroactively applied Kernel 70's own migrations, which had never reached production despite being committed since 2026-07-14 — see Kernel State above. **Still deferred, by explicit scope decision**: the first playable Socio show; a casting/attendance system; and any participant-facing First Theater work, since First Theater remains investor/demo-only for this pass.
 
-After that live-deployment step is explicitly approved and taken, the natural next kernel is **visual Scene composition/capture**: define how reusable Base Scene content and a Show Placement's overrides bind to the existing stage-object/action model without creating a second renderer authority system. A smaller independent closure pass can add browser screenshots for Kernel 70/70A's GO and Start Show Session controls and repair the nine pre-existing frontend dice-test failures (now duplicated in both `tests/first-theater/` and `tests/catharsis/`).
+The natural next kernel is **visual Scene composition/capture**: define how reusable Base Scene content and a Show Placement's overrides bind to the existing stage-object/action model without creating a second renderer authority system. A smaller independent closure pass can add browser screenshots for Kernel 70/70A's GO and Start Show Session controls and repair the nine pre-existing frontend dice-test failures (now duplicated in both `tests/first-theater/` and `tests/catharsis/`). A good practice to establish going forward: confirm each kernel's migrations actually reached the live database as part of closing it out, not just that they're committed — this gap sat unnoticed for two days.
 
 ## Recording Language
 
