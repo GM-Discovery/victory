@@ -63,7 +63,7 @@
       <p class="status-line" id="status-line">Loading Scene Library...</p>
 
       <section class="card" id="create-card" hidden>
-        <h2 style="margin-top:0;">Create a Scene</h2>
+        <h2 style="margin-top:0;">Scene Setup</h2>
         <div class="form-grid">
           <div class="field span-2">
             <label for="title-input">Title</label>
@@ -179,8 +179,8 @@
         const editButton = document.createElement("button");
         editButton.className = "chip";
         editButton.type = "button";
-        editButton.textContent = "Edit";
-        editButton.addEventListener("click", () => openEditor(scene));
+        editButton.textContent = "Edit Scene Details";
+        editButton.addEventListener("click", () => toggleEditForm(card, scene));
         actions.appendChild(editButton);
 
         if (scene.status !== "archived") {
@@ -208,17 +208,66 @@
       return card;
     }
 
-    async function openEditor(scene) {
-      const newTitle = prompt("Title", scene.title);
-      if (newTitle === null) return;
-      const res = await fetch("/api/scenes/" + encodeURIComponent(scene.id), {
-        method: "PATCH", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: newTitle.trim() }),
+    // toggleEditForm shows/hides an inline "Update Base Scene" form on the
+    // Scene's own card, replacing the old bare prompt() -- the label makes
+    // explicit that saving here changes the reusable Scene itself, visible
+    // in every Show that stages it (not just the one you're looking at).
+    function toggleEditForm(card, scene) {
+      const existing = card.querySelector(".scene-edit-form");
+      if (existing) {
+        existing.remove();
+        return;
+      }
+
+      const form = document.createElement("div");
+      form.className = "scene-edit-form form-grid";
+      form.style.cssText = "margin-top:8px;";
+
+      const titleField = document.createElement("div");
+      titleField.className = "field span-2";
+      const titleLabel = document.createElement("label");
+      titleLabel.textContent = "Title";
+      const titleInput = document.createElement("input");
+      titleInput.type = "text";
+      titleInput.value = scene.title;
+      titleField.appendChild(titleLabel);
+      titleField.appendChild(titleInput);
+      form.appendChild(titleField);
+
+      const actions = document.createElement("p");
+      actions.className = "launchbar span-2";
+      actions.style.cssText = "grid-column: span 2; margin: 4px 0 0;";
+
+      const saveButton = document.createElement("button");
+      saveButton.className = "chip";
+      saveButton.type = "button";
+      saveButton.textContent = "Update Base Scene";
+      saveButton.addEventListener("click", async () => {
+        saveButton.disabled = true;
+        try {
+          const res = await fetch("/api/scenes/" + encodeURIComponent(scene.id), {
+            method: "PATCH", credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: titleInput.value.trim() }),
+          });
+          const p = await res.json().catch(() => null);
+          if (!res.ok || !p?.ok) { alert("Could not update Scene: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+          await fetchScenes();
+        } finally {
+          saveButton.disabled = false;
+        }
       });
-      const p = await res.json().catch(() => null);
-      if (!res.ok || !p?.ok) { alert("Could not update Scene: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
-      await fetchScenes();
+      actions.appendChild(saveButton);
+
+      const cancelButton = document.createElement("button");
+      cancelButton.className = "chip";
+      cancelButton.type = "button";
+      cancelButton.textContent = "Cancel";
+      cancelButton.addEventListener("click", () => form.remove());
+      actions.appendChild(cancelButton);
+
+      form.appendChild(actions);
+      card.appendChild(form);
     }
 
     let locationId = "";

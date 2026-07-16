@@ -210,6 +210,7 @@ func main() {
 	mux.HandleFunc("GET /api/shows/{show_id}/program", shows.HandleShowProgram(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/sessions/{session_id}/link", shows.HandleShowSessionLink(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/sessions/{session_id}/unlink", shows.HandleShowSessionUnlink(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/sessions/start", shows.HandleShowSessionStart(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/current-scene", shows.HandleShowCurrentScene(pool))
 	mux.HandleFunc("GET /api/scenes", scenes.HandleScenesCollection(pool))
 	mux.HandleFunc("POST /api/scenes", scenes.HandleScenesCollection(pool))
@@ -425,7 +426,7 @@ func main() {
 			return
 		}
 
-		snapshot, err := world.LoadCaveSnapshot(ctx, pool, viewerRole)
+		snapshot, err := world.LoadCaveSnapshot(ctx, pool, viewerRole, userID)
 		if err != nil {
 			log.Printf("load snapshot failed: %v", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]any{
@@ -499,9 +500,89 @@ func main() {
 			return
 		}
 
-		snapshot, err := world.LoadVenueSnapshot(ctx, pool, viewerRole, "catharsis")
+		snapshot, err := world.LoadVenueSnapshot(ctx, pool, viewerRole, userID, "catharsis")
 		if err != nil {
 			log.Printf("load catharsis snapshot failed: %v", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"ok":    false,
+				"error": "failed_to_load_world",
+			})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":   true,
+			"data": snapshot,
+		})
+	})
+
+	// Kernel 70A: First Theater gets its own independent, real venue
+	// wiring instead of being a themed skin over the-cave's backend --
+	// its venues row (slug "first-theater") already existed as a
+	// reference_only placeholder; this is the first time it's actually
+	// queryable. the-cave itself is untouched (a deliberate, permanently
+	// hidden DOM-only test harness) and Catharsis's wiring is unaffected.
+	mux.HandleFunc("/api/world/first-theater", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
+				"ok":    false,
+				"error": "method_not_allowed",
+			})
+			return
+		}
+
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, private")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		sessionCookie := ""
+		if c, err := r.Cookie("victory_session"); err == nil {
+			sessionCookie = c.Value
+		}
+
+		userID, err := access.CurrentUserIDFromRequest(ctx, pool, sessionCookie)
+		if err != nil {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{
+				"ok":    false,
+				"error": "not_authenticated",
+			})
+			return
+		}
+
+		allowed, err := access.UserCanAccessVenueSlug(ctx, pool, userID, "first-theater")
+		if err != nil {
+			log.Printf("first-theater access check failed: %v", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"ok":    false,
+				"error": "access_check_failed",
+			})
+			return
+		}
+
+		if !allowed {
+			writeJSON(w, http.StatusForbidden, map[string]any{
+				"ok":    false,
+				"error": "forbidden",
+			})
+			return
+		}
+
+		viewerRole, err := lookupVenueRole(ctx, pool, userID, "first-theater")
+		if err != nil {
+			log.Printf("load first-theater viewer role failed: %v", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"ok":    false,
+				"error": "viewer_role_lookup_failed",
+			})
+			return
+		}
+
+		snapshot, err := world.LoadVenueSnapshot(ctx, pool, viewerRole, userID, "first-theater")
+		if err != nil {
+			log.Printf("load first-theater snapshot failed: %v", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]any{
 				"ok":    false,
 				"error": "failed_to_load_world",
@@ -671,8 +752,78 @@ func main() {
 		})
 	})
 
+	mux.HandleFunc("/api/session/first-theater/join", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
+				"ok":    false,
+				"error": "method_not_allowed",
+			})
+			return
+		}
+
+		var req identity.JoinRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"ok":    false,
+				"error": "invalid_json",
+			})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		sessionCookie := ""
+		if c, err := r.Cookie("victory_session"); err == nil {
+			sessionCookie = c.Value
+		}
+
+		userID, err := access.CurrentUserIDFromRequest(ctx, pool, sessionCookie)
+		if err != nil || strings.TrimSpace(userID) == "" {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{
+				"ok":    false,
+				"error": "ticket_or_auth_required",
+			})
+			return
+		}
+
+		allowed, err := access.UserCanAccessVenueSlug(ctx, pool, userID, "first-theater")
+		if err != nil {
+			log.Printf("first-theater join access check failed: %v", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"ok":    false,
+				"error": "access_check_failed",
+			})
+			return
+		}
+
+		if !allowed {
+			writeJSON(w, http.StatusForbidden, map[string]any{
+				"ok":    false,
+				"error": "forbidden",
+			})
+			return
+		}
+
+		resp, err := identity.JoinVenue(ctx, pool, req, sessionCookie, "first-theater")
+		if err != nil {
+			log.Printf("first-theater join failed: %v", err)
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"ok":    false,
+				"error": err.Error(),
+			})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":   true,
+			"data": resp,
+		})
+	})
+
 	mux.HandleFunc("/ws/the-cave", network.ServeCaveWS(hub, pool, discordServerLinkConfig))
 	mux.HandleFunc("/ws/catharsis", network.ServeVenueWS(hub, pool, discordServerLinkConfig, "catharsis"))
+	mux.HandleFunc("/ws/first-theater", network.ServeVenueWS(hub, pool, discordServerLinkConfig, "first-theater"))
 	mux.HandleFunc("/ws/player-profile", network.ServeProfileWS(hub, pool))
 
 	server := &http.Server{

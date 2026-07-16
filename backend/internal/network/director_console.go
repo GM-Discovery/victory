@@ -377,7 +377,7 @@ func loadDirectorConsoleState(ctx context.Context, hub *Hub, pool *pgxpool.Pool,
 		viewerRole = "producer"
 	}
 
-	snapshot, err := world.LoadCaveSnapshot(ctx, pool, viewerRole)
+	snapshot, err := world.LoadCaveSnapshot(ctx, pool, viewerRole, userID)
 	if err != nil {
 		return directorConsoleState{}, err
 	}

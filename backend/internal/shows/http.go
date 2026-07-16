@@ -438,3 +438,61 @@ func HandleShowSessionUnlink(pool *pgxpool.Pool) http.HandlerFunc {
 		writeOK(w, map[string]any{"unlinked": true})
 	}
 }
+
+// HandleShowSessionStart handles POST /api/shows/{show_id}/sessions/start --
+// the Kernel 70A "Start Show Session" backstage action. Starts-or-resumes
+// the given venue's live Session and links it to this Show server-side, so
+// the caller never handles a Session ID directly. If the venue's active
+// session already belongs to a different Show, responds with
+// venue_busy_with_other_show instead of an error so the client can prompt
+// for an explicit force_reattach retry.
+func HandleShowSessionStart(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		showID := strings.TrimSpace(r.PathValue("show_id"))
+
+		var body struct {
+			VenueSlug     string `json:"venue_slug"`
+			ForceReattach bool   `json:"force_reattach"`
+		}
+		if r.ContentLength != 0 {
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeError(w, errors.New("invalid_request_body"))
+				return
+			}
+		}
+
+		result, err := StartShowSession(ctx, pool, userID, showID, body.VenueSlug, body.ForceReattach)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+
+		if result.VenueBusyWithOtherShow != nil {
+			writeOK(w, map[string]any{
+				"venue_busy_with_other_show": map[string]any{
+					"other_show_id":    result.VenueBusyWithOtherShow.OtherShowID,
+					"other_show_title": result.VenueBusyWithOtherShow.OtherShowTitle,
+				},
+			})
+			return
+		}
+
+		writeOK(w, map[string]any{
+			"session_id":     result.SessionID,
+			"session_status": result.SessionStatus,
+			"showing_id":     result.ShowingID,
+			"was_resumed":    result.WasResumed,
+		})
+	}
+}

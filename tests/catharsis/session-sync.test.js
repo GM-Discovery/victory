@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const sessionSyncModule = require("../../frontend/venues/first-theater/runtime/session-sync.js");
+const sessionSyncModule = require("../../frontend/venues/catharsis/runtime/session-sync.js");
 
 test("session sync handles join, refresh, and staged index-card placement", async () => {
   const calls = [];
@@ -26,13 +26,13 @@ test("session sync handles join, refresh, and staged index-card placement", asyn
           json: async () => ({ data: { handle: "straturli", display_name: "Straturli" } }),
         };
       }
-      if (url === "/api/session/first-theater/join") {
+      if (url === "/api/session/catharsis/join") {
         return {
           ok: true,
           json: async () => ({ ok: true, data: { role: "producer", session_id: "session-1", actor_id: "actor-1" } }),
         };
       }
-      if (url === "/api/world/first-theater") {
+      if (url === "/api/world/catharsis") {
         return {
           ok: true,
           json: async () => ({
@@ -224,7 +224,7 @@ test("operator identity is promoted to producer in the Cave join flow", async ()
           json: async () => ({ data: { handle: "straturli", display_name: "Straturli", is_operator: true } }),
         };
       }
-      if (url === "/api/session/first-theater/join") {
+      if (url === "/api/session/catharsis/join") {
         return {
           ok: true,
           json: async () => ({ ok: true, data: { role: "audience", session_id: "session-2", actor_id: "actor-2" } }),

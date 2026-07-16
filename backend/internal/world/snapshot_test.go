@@ -11,7 +11,6 @@ import (
 
 	"victory/backend/internal/dbtest"
 	"victory/backend/internal/showruns"
-	"victory/backend/internal/shows"
 )
 
 // This is the first test file for the world package. It proves the Kernel
@@ -122,13 +121,20 @@ func buildWorldFixture(t *testing.T, pool *pgxpool.Pool, actorUserID string) wor
 	if err != nil {
 		t.Fatalf("create show run fixture: %v", err)
 	}
-	s, err := shows.CreateShow(ctx, pool, actorUserID, sr.ID, shows.CreateShowInput{
-		Title: "World Test Show " + suffix, Slug: "world-test-show-" + suffix,
-	})
-	if err != nil {
-		t.Fatalf("create show fixture: %v", err)
+	// Inserted directly via SQL rather than calling shows.CreateShow: Kernel
+	// 70A's shows.StartShowSession now imports network (to reuse
+	// network.StartSessionControl's idempotent session-start core), and
+	// network imports world -- so world's own test file importing shows
+	// would create a real import cycle (world_test -> shows -> network ->
+	// world). This mirrors the same small-duplicated-SQL-query pattern
+	// Kernel 70 already used for an analogous cross-package test need.
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO shows (show_run_id, slug, title, created_by_user_id)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id::text
+	`, sr.ID, "world-test-show-"+suffix, "World Test Show "+suffix, actorUserID).Scan(&f.showID); err != nil {
+		t.Fatalf("insert show fixture: %v", err)
 	}
-	f.showID = s.ID
 
 	return f
 }
@@ -229,7 +235,7 @@ func TestLoadVenueSnapshotFoldsPersistentShowActionsAcrossSessions(t *testing.T)
 		t.Fatalf("expected session B to start with zero of its own actions, got %d", sessionBActionCountBefore)
 	}
 
-	snap, err := LoadVenueSnapshot(context.Background(), pool, "producer", f.venueSlug)
+	snap, err := LoadVenueSnapshot(context.Background(), pool, "producer", producer, f.venueSlug)
 	if err != nil {
 		t.Fatalf("load venue snapshot: %v", err)
 	}
@@ -275,7 +281,7 @@ func TestLoadVenueSnapshotUnaffectedForSessionWithNoLinkedShow(t *testing.T) {
 	unlinkedSession := insertSession(t, pool, f.venueID, "", "live")
 	_ = unlinkedSession
 
-	snap, err := LoadVenueSnapshot(context.Background(), pool, "producer", f.venueSlug)
+	snap, err := LoadVenueSnapshot(context.Background(), pool, "producer", producer, f.venueSlug)
 	if err != nil {
 		t.Fatalf("load venue snapshot: %v", err)
 	}
@@ -303,7 +309,7 @@ func TestLoadVenueSnapshotStillFoldsOwnSessionActionsWhenLinkedToShow(t *testing
 	// Session-scoped only (no show_id) -- the pre-Kernel-70 path.
 	insertPlaceElementAction(t, pool, session, "", producer, f.elementID, f.venueSlug)
 
-	snap, err := LoadVenueSnapshot(context.Background(), pool, "producer", f.venueSlug)
+	snap, err := LoadVenueSnapshot(context.Background(), pool, "producer", producer, f.venueSlug)
 	if err != nil {
 		t.Fatalf("load venue snapshot: %v", err)
 	}
@@ -315,5 +321,141 @@ func TestLoadVenueSnapshotStillFoldsOwnSessionActionsWhenLinkedToShow(t *testing
 	}
 	if !found {
 		t.Fatalf("expected the session's own session_id-scoped action to still be folded in, got elements=%+v", snap.Elements)
+	}
+}
+
+// TestLoadVenueSnapshotReturnsGracefulVenueOpenForVenueWithNoActiveSession
+// is the Kernel 70A fix proof: a venue with zero active (rehearsal/live)
+// sessions must return a normal, empty snapshot with theater_context
+// "venue_open" for a non-backstage viewer -- not a Scan-type crash (the
+// prior bug: s.id/s.status/s.started_at came from a LEFT JOIN and were
+// scanned into non-nullable destinations, so this exact case -- a real,
+// valid venue with nothing currently on stage -- errored with a pgx
+// type-conversion error) and not a hard error either (this is a normal,
+// expected "idle theater" state a viewer should see a friendly empty state
+// for, not an error page).
+func TestLoadVenueSnapshotReturnsGracefulVenueOpenForVenueWithNoActiveSession(t *testing.T) {
+	pool := openWorldTestPool(t)
+	producer := insertWorldTestUser(t, pool, "wd_no_session_producer")
+	f := buildWorldFixture(t, pool, producer)
+	// buildWorldFixture creates the venue but no session at all -- exactly
+	// the "idle theater" case.
+
+	audienceViewer := insertWorldTestUser(t, pool, "wd_no_session_audience")
+
+	snap, err := LoadVenueSnapshot(context.Background(), pool, "audience", audienceViewer, f.venueSlug)
+	if err != nil {
+		t.Fatalf("expected a graceful snapshot for a venue with no active session, got error: %v", err)
+	}
+	if snap.TheaterContext.Kind != "venue_open" {
+		t.Fatalf("expected theater_context.kind = venue_open, got %+v", snap.TheaterContext)
+	}
+	if snap.TheaterContext.Message != "No Show is currently on stage here." {
+		t.Fatalf("expected the exact required empty-state message, got %q", snap.TheaterContext.Message)
+	}
+
+	// The same idle venue, viewed by backstage-tier staff, gets "backstage"
+	// instead -- same idle state, different audience.
+	backstageSnap, err := LoadVenueSnapshot(context.Background(), pool, "producer", producer, f.venueSlug)
+	if err != nil {
+		t.Fatalf("load venue snapshot for backstage viewer: %v", err)
+	}
+	if backstageSnap.TheaterContext.Kind != "backstage" {
+		t.Fatalf("expected theater_context.kind = backstage for a producer, got %+v", backstageSnap.TheaterContext)
+	}
+}
+
+// insertRosterMember inserts a show_run_roster_members row directly (not
+// via showruns.AddRosterMember, which requires a player_profile_workbooks
+// row this fixture has no other need for) with the given role.
+func insertRosterMember(t *testing.T, pool *pgxpool.Pool, showRunID, userID, role, addedByUserID string) {
+	t.Helper()
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO show_run_roster_members (show_run_id, user_id, role, added_by_user_id)
+		VALUES ($1, $2, $3, $4)
+	`, showRunID, userID, role, addedByUserID); err != nil {
+		t.Fatalf("insert roster member role %q: %v", role, err)
+	}
+}
+
+// insertEquippedCharacter inserts a minimal character_cards row and equips
+// it for the given session/user via current_session_personas.
+func insertEquippedCharacter(t *testing.T, pool *pgxpool.Pool, locationID, ownerUserID, sessionID string) {
+	t.Helper()
+	ctx := context.Background()
+	var cardID string
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO character_cards (owner_user_id, location_id, name)
+		VALUES ($1, $2, $3)
+		RETURNING id::text
+	`, ownerUserID, locationID, "Theater Context Test Character").Scan(&cardID); err != nil {
+		t.Fatalf("insert character card: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM character_cards WHERE id = $1`, cardID) })
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO current_session_personas (session_id, user_id, character_card_id)
+		VALUES ($1, $2, $3)
+	`, sessionID, ownerUserID, cardID); err != nil {
+		t.Fatalf("equip character card: %v", err)
+	}
+}
+
+// TestLoadVenueSnapshotTheaterContextParticipantAndAudienceMessages proves
+// the two remaining Kernel 70A theater_context branches and their exact
+// required message strings: a registered Show Run player with no equipped
+// Character yet, the same player once they've equipped one, and a plain
+// Audience viewer -- against the same active session/Show so the only
+// variable is the viewer.
+func TestLoadVenueSnapshotTheaterContextParticipantAndAudienceMessages(t *testing.T) {
+	pool := openWorldTestPool(t)
+	producer := insertWorldTestUser(t, pool, "wd_tc_producer")
+	f := buildWorldFixture(t, pool, producer)
+
+	var showRunID string
+	if err := pool.QueryRow(context.Background(), `SELECT show_run_id::text FROM shows WHERE id = $1`, f.showID).Scan(&showRunID); err != nil {
+		t.Fatalf("load show_run_id: %v", err)
+	}
+
+	session := insertSession(t, pool, f.venueID, f.showID, "live")
+
+	player := insertWorldTestUser(t, pool, "wd_tc_player")
+	insertRosterMember(t, pool, showRunID, player, "player", producer)
+
+	// Registered player, no Character equipped yet.
+	playerSnap, err := LoadVenueSnapshot(context.Background(), pool, "audience", player, f.venueSlug)
+	if err != nil {
+		t.Fatalf("load snapshot for unequipped player: %v", err)
+	}
+	if playerSnap.TheaterContext.Kind != "participant" {
+		t.Fatalf("expected kind = participant for a registered player, got %+v", playerSnap.TheaterContext)
+	}
+	if playerSnap.TheaterContext.Message != "You are registered for this Show, but you have not chosen a Character yet." {
+		t.Fatalf("expected the exact required no-character message, got %q", playerSnap.TheaterContext.Message)
+	}
+
+	// Same player, now with a Character equipped for this session.
+	insertEquippedCharacter(t, pool, f.locationID, player, session)
+	equippedSnap, err := LoadVenueSnapshot(context.Background(), pool, "audience", player, f.venueSlug)
+	if err != nil {
+		t.Fatalf("load snapshot for equipped player: %v", err)
+	}
+	if equippedSnap.TheaterContext.Kind != "participant" {
+		t.Fatalf("expected kind = participant once equipped, got %+v", equippedSnap.TheaterContext)
+	}
+	if equippedSnap.TheaterContext.Message != "" {
+		t.Fatalf("expected no message once a Character is equipped, got %q", equippedSnap.TheaterContext.Message)
+	}
+
+	// A plain Audience viewer, not on the roster at all.
+	audienceViewer := insertWorldTestUser(t, pool, "wd_tc_audience")
+	audienceSnap, err := LoadVenueSnapshot(context.Background(), pool, "audience", audienceViewer, f.venueSlug)
+	if err != nil {
+		t.Fatalf("load snapshot for audience viewer: %v", err)
+	}
+	if audienceSnap.TheaterContext.Kind != "audience" {
+		t.Fatalf("expected kind = audience for an unregistered viewer, got %+v", audienceSnap.TheaterContext)
+	}
+	if audienceSnap.TheaterContext.Message != "You are watching this Show. Player controls are not active." {
+		t.Fatalf("expected the exact required watching message, got %q", audienceSnap.TheaterContext.Message)
 	}
 }

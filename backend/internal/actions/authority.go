@@ -43,6 +43,23 @@ type actionQuerier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
+// isSingleVenueLegacySlug reports whether slug belongs to this package's
+// original single-venue authority model (element reveal/place/token/
+// index-card actions were built against "the-cave" specifically, before
+// Catharsis's more general per-session-participant-role model existed).
+// Kernel 70A gave First Theater its own independent venue wiring rather
+// than continuing to skin the-cave's backend, so it needs the same
+// authority surface the-cave already has -- additive only, the-cave's own
+// behavior is unchanged.
+func isSingleVenueLegacySlug(slug string) bool {
+	switch strings.ToLower(strings.TrimSpace(slug)) {
+	case "the-cave", "first-theater":
+		return true
+	default:
+		return false
+	}
+}
+
 func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, sessionID string, target ActionTarget) (Decision, error) {
 	userID = strings.TrimSpace(userID)
 	actionType = strings.TrimSpace(actionType)
@@ -235,7 +252,7 @@ func canActRevealInCave(ctx context.Context, q actionQuerier, userID, sessionID 
 			FROM sessions s
 			JOIN venues v ON v.id = s.venue_id
 			WHERE s.id = $1::uuid
-			  AND v.slug = 'the-cave'
+			  AND v.slug IN ('the-cave', 'first-theater')
 		)
 	`, sessionID).Scan(&venueAccess)
 	if err != nil {
@@ -245,7 +262,7 @@ func canActRevealInCave(ctx context.Context, q actionQuerier, userID, sessionID 
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 
-	if venueSlug != "the-cave" {
+	if !isSingleVenueLegacySlug(venueSlug) {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 
@@ -316,7 +333,7 @@ func canActOverlayInCave(ctx context.Context, q actionQuerier, userID, sessionID
 		return Decision{Allowed: false, Reason: "locked"}, nil
 	}
 
-	if venueSlug != "the-cave" {
+	if !isSingleVenueLegacySlug(venueSlug) {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 	if strings.ToLower(strings.TrimSpace(surface)) != "stage" {
@@ -355,7 +372,7 @@ func canActIndexCardInCave(ctx context.Context, q actionQuerier, userID, session
 		return Decision{}, err
 	}
 
-	if venueSlug != "the-cave" {
+	if !isSingleVenueLegacySlug(venueSlug) {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 
@@ -466,7 +483,7 @@ func canActCreateToken(ctx context.Context, q actionQuerier, userID, sessionID s
 	if strings.TrimSpace(target.ElementID) == "" {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
-	if strings.TrimSpace(target.VenueSlug) == "" || target.VenueSlug != "the-cave" {
+	if strings.TrimSpace(target.VenueSlug) == "" || !isSingleVenueLegacySlug(target.VenueSlug) {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 
@@ -513,7 +530,7 @@ func canActUpdateToken(ctx context.Context, q actionQuerier, userID, sessionID s
 	if err != nil {
 		return Decision{}, err
 	}
-	if state.VenueSlug != "the-cave" || strings.ToLower(strings.TrimSpace(state.Surface)) != "stage" {
+	if !isSingleVenueLegacySlug(state.VenueSlug) || strings.ToLower(strings.TrimSpace(state.Surface)) != "stage" {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 	if strings.ToLower(strings.TrimSpace(state.ElementType)) != "token" && strings.ToLower(strings.TrimSpace(state.ContextClass)) != "token" {
@@ -561,7 +578,7 @@ func canActDuplicateElement(ctx context.Context, q actionQuerier, userID, sessio
 	if err != nil {
 		return Decision{}, err
 	}
-	if state.VenueSlug != "the-cave" {
+	if !isSingleVenueLegacySlug(state.VenueSlug) {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 	if strings.ToLower(strings.TrimSpace(state.Surface)) != "stage" {
@@ -606,7 +623,7 @@ func canActRemoveElement(ctx context.Context, q actionQuerier, userID, sessionID
 	if err != nil {
 		return Decision{}, err
 	}
-	if state.VenueSlug != "the-cave" {
+	if !isSingleVenueLegacySlug(state.VenueSlug) {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 	if strings.ToLower(strings.TrimSpace(state.Surface)) != "stage" {
@@ -659,7 +676,7 @@ func canActSetElementLock(ctx context.Context, q actionQuerier, userID, sessionI
 	if err != nil {
 		return Decision{}, err
 	}
-	if state.VenueSlug != "the-cave" {
+	if !isSingleVenueLegacySlug(state.VenueSlug) {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 
@@ -691,7 +708,7 @@ func canActSetNameplateVisibility(ctx context.Context, q actionQuerier, userID, 
 	if err != nil {
 		return Decision{}, err
 	}
-	if state.VenueSlug != "the-cave" {
+	if !isSingleVenueLegacySlug(state.VenueSlug) {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 

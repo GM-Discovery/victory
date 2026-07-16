@@ -607,6 +607,7 @@
     // Scenes have no visual/Pixi binding yet (see reportback).
     let stageCueControlsEl = null;
     let stageCueControlsRequestSerial = 0;
+    let theaterContextEl = null;
 
     function ensureStageCueControlsElement() {
       if (stageCueControlsEl) return stageCueControlsEl;
@@ -616,6 +617,37 @@
       document.body.appendChild(el);
       stageCueControlsEl = el;
       return el;
+    }
+
+    function ensureTheaterContextElement() {
+      if (theaterContextEl) return theaterContextEl;
+      const el = document.createElement("div");
+      el.id = "kernel70a-theater-context-banner";
+      el.style.cssText = "position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(20,15,10,0.92);border:1px solid rgba(255,233,197,0.25);color:#f0d3a4;padding:10px 18px;border-radius:12px;font-family:Arial,Helvetica,sans-serif;font-size:0.86rem;font-weight:700;text-align:center;max-width:80vw;pointer-events:none;";
+      el.hidden = true;
+      document.body.appendChild(el);
+      theaterContextEl = el;
+      return el;
+    }
+
+    // Kernel 70A theater-context empty state: world.LoadVenueSnapshot
+    // computes theater_context.message server-side (role/registration facts
+    // a client must never re-derive) and leaves it blank for the two "stage
+    // controls make sense" cases -- an actively-playing participant and
+    // backstage staff. Everything else (idle venue, watching Audience, a
+    // registered player who hasn't picked a Character yet) gets a message,
+    // so showing/hiding this banner purely on message-presence already
+    // matches the required per-kind behavior without re-deriving kind here.
+    function updateTheaterContextPresentation(snapshot) {
+      const el = ensureTheaterContextElement();
+      const message = String(snapshot?.theater_context?.message || "").trim();
+      if (!message) {
+        el.hidden = true;
+        el.textContent = "";
+        return;
+      }
+      el.textContent = message;
+      el.hidden = false;
     }
 
     function renderRehearsalBanner(container, snapshot) {
@@ -692,6 +724,11 @@
 
     function updateStageCueControls(snapshot) {
       const container = ensureStageCueControlsElement();
+      if (normalizeRole(currentRole) === "audience") {
+        container.querySelector("#kernel70-rehearsal-banner")?.remove();
+        container.querySelector("#kernel70-cue-buttons")?.remove();
+        return;
+      }
       renderRehearsalBanner(container, snapshot);
       renderStageCueButtons(container, snapshot);
     }
@@ -2270,6 +2307,7 @@
       placeCreatedIndexCard: (action) => sessionSync?.placeCreatedIndexCard?.(action),
       setStageStatus: (...args) => setStageStatus(...args),
       updateStageCueControls: (...args) => updateStageCueControls(...args),
+      updateTheaterContextPresentation: (...args) => updateTheaterContextPresentation(...args),
     }) || null;
 
     editors = catharsisEditorsModule?.createEditorControllers?.({

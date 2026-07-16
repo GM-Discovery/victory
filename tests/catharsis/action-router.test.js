@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const actionRouterModule = require("../../frontend/venues/first-theater/runtime/action-router.js");
+const actionRouterModule = require("../../frontend/venues/catharsis/runtime/action-router.js");
 
 function makeDeps(overrides = {}) {
   const calls = [];
@@ -103,7 +103,7 @@ test("performStageObjectAction routes token move-here and nameplate visibility",
     {
       element_id: "asset-1",
       element_slug: "goat",
-      venue_slug: "first-theater",
+      venue_slug: "catharsis",
       layer: "stage",
       x: 100,
       y: 200,
@@ -195,7 +195,7 @@ test("performStageObjectAction routes card move-here and remove", () => {
     {
       element_id: "card-1",
       element_slug: "card-one",
-      venue_slug: "first-theater",
+      venue_slug: "catharsis",
       layer: "stage",
     },
   ]);

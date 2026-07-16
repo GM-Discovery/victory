@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const socketControllerModule = require("../../frontend/venues/first-theater/runtime/socket-controller.js");
+const socketControllerModule = require("../../frontend/venues/catharsis/runtime/socket-controller.js");
 
 class FakeSocket {
   static CONNECTING = 0;
@@ -61,7 +61,7 @@ test("connectSocket queues while connecting and flushes on open", () => {
 
   controller.connectSocket();
   const socket = controller.getWebSocket();
-  assert.equal(socket.url, "wss://victory.test/ws/first-theater");
+  assert.equal(socket.url, "wss://victory.test/ws/catharsis");
   assert.equal(controller.sendAction("create/token", { payload: "queued" }), true);
   assert.deepEqual(socket.sent, []);
 
@@ -74,7 +74,7 @@ test("connectSocket queues while connecting and flushes on open", () => {
       payload: "queued",
     },
   ]);
-  assert.ok(calls.some((entry) => entry[0] === "status" && entry[1] === "Connected to the Cave WebSocket."));
+  assert.ok(calls.some((entry) => entry[0] === "status" && entry[1] === "Connected to the Catharsis WebSocket."));
   assert.ok(calls.some((entry) => entry[0] === "meta"));
 });
 
@@ -99,7 +99,7 @@ test("focus ping payload uses current stage camera and last stage point", () => 
   });
 
   const payload = controller.buildFocusPingPayload();
-  assert.equal(payload.venue_slug, "first-theater");
+  assert.equal(payload.venue_slug, "catharsis");
   assert.equal(payload.focus_x, 60);
   assert.equal(payload.focus_y, 70);
   assert.equal(payload.camera_center_x, 40);

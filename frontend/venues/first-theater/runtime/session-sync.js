@@ -80,6 +80,7 @@
     const setRecentPlacementMarker = typeof deps.setRecentPlacementMarker === "function" ? deps.setRecentPlacementMarker : () => {};
     const getVenueSlug = typeof deps.getVenueSlug === "function" ? deps.getVenueSlug : () => "";
     const updateStageCueControls = typeof deps.updateStageCueControls === "function" ? deps.updateStageCueControls : () => {};
+    const updateTheaterContextPresentation = typeof deps.updateTheaterContextPresentation === "function" ? deps.updateTheaterContextPresentation : () => {};
     const smokeMode = Boolean(deps.smokeMode);
 
     let currentSnapshot = null;
@@ -154,6 +155,13 @@
       // snapshot -- updateStageCueControls fetches only the curated
       // player-cues listing.
       updateStageCueControls(snapshot);
+
+      // Kernel 70A: theater_context.message (backend-computed, e.g. "No
+      // Show is currently on stage here.") is blank exactly when normal
+      // stage controls apply (an actively-playing participant, or
+      // backstage staff) and set otherwise -- rendering it is enough to
+      // cover every non-participant empty state without re-deriving kind.
+      updateTheaterContextPresentation(snapshot);
     }
 
     function applyVenueFocusPingWrapper(data) {
@@ -171,7 +179,7 @@
         if (!currentSessionId) {
           await ensureJoinedCave();
         }
-        const response = await fetchFn("/api/world/the-cave", {
+        const response = await fetchFn("/api/world/first-theater", {
           method: "GET",
           credentials: "include",
           cache: "no-store",
@@ -190,7 +198,7 @@
     }
 
     async function joinCaveOnce() {
-      setStageStatus("Joining the live Cave session...");
+      setStageStatus("Joining the live First Theater session...");
 
       let sessionHandle = String(currentIdentity?.handle || "web").trim() || "web";
       let sessionDisplayName = String(currentIdentity?.display_name || "Friend").trim() || "Friend";
@@ -208,7 +216,7 @@
         }
       }
 
-      const response = await fetchFn("/api/session/the-cave/join", {
+      const response = await fetchFn("/api/session/first-theater/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -362,7 +370,7 @@
       const ok = deps.sendAction?.("act/place_element", {
         element_id: elementId,
         element_slug: elementSlug,
-        venue_slug: "the-cave",
+        venue_slug: "first-theater",
         layer: "stage",
         x: pendingStageCardPlacement.x,
         y: pendingStageCardPlacement.y,

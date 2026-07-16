@@ -150,7 +150,7 @@ func ServeVenueWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordS
 
 		presenceSnapshot, joined := hub.Presence().Connect(sessionIdentity.SessionID, client.Presence)
 
-		snapshot, err := world.LoadVenueSnapshot(ctx, pool, sessionIdentity.Role, venueSlug)
+		snapshot, err := world.LoadVenueSnapshot(ctx, pool, sessionIdentity.Role, sessionIdentity.UserID, venueSlug)
 		if err != nil {
 			log.Printf("ws snapshot failed: %v", err)
 			hub.Presence().Disconnect(sessionIdentity.SessionID, client.UserID)

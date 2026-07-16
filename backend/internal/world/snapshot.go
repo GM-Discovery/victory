@@ -15,14 +15,27 @@ import (
 )
 
 type Snapshot struct {
-	Location string          `json:"location"`
-	Lot      string          `json:"lot"`
-	Venue    Venue           `json:"venue"`
-	Session  Session         `json:"session"`
-	Showing  Showing         `json:"showing"`
-	Elements []PlacedElement `json:"elements"`
-	Overlay  *Overlay        `json:"overlay,omitempty"`
-	Actions  []Action        `json:"actions"`
+	Location       string          `json:"location"`
+	Lot            string          `json:"lot"`
+	Venue          Venue           `json:"venue"`
+	Session        Session         `json:"session"`
+	Showing        Showing         `json:"showing"`
+	Elements       []PlacedElement `json:"elements"`
+	Overlay        *Overlay        `json:"overlay,omitempty"`
+	Actions        []Action        `json:"actions"`
+	TheaterContext TheaterContext  `json:"theater_context"`
+}
+
+// TheaterContext is the Kernel 70A backend-computed answer to "what should
+// this specific viewer see right now" -- role/registration facts a client
+// must never re-derive itself. Kind is one of "participant" (a registered
+// Show Run player, active session linked to a Show), "audience" (anyone
+// else watching an active Show), "venue_open" (no active Show context, a
+// non-backstage viewer), or "backstage" (Director/Producer/Operator/Crew,
+// either idle or watching without playing).
+type TheaterContext struct {
+	Kind    string `json:"kind"`
+	Message string `json:"message,omitempty"`
 }
 
 type Venue struct {
@@ -94,11 +107,11 @@ type Action struct {
 	Timestamp        string         `json:"ts"`
 }
 
-func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole string) (*Snapshot, error) {
-	return LoadVenueSnapshot(ctx, pool, viewerRole, "the-cave")
+func LoadCaveSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, viewerUserID string) (*Snapshot, error) {
+	return LoadVenueSnapshot(ctx, pool, viewerRole, viewerUserID, "the-cave")
 }
 
-func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, venueSlug string) (*Snapshot, error) {
+func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, viewerUserID, venueSlug string) (*Snapshot, error) {
 	venueSlug = strings.ToLower(strings.TrimSpace(venueSlug))
 	if venueSlug == "" {
 		return nil, errors.New("venue slug is required")
@@ -109,9 +122,14 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, venu
 	snap.Actions = []Action{}
 
 	var venueConfig []byte
-	var startedAt time.Time
+	var startedAt *time.Time
 	var showID string
 
+	// s.id/s.status/s.started_at come from a LEFT JOIN and must tolerate a
+	// venue with zero active sessions -- COALESCE the text columns (same
+	// pattern already used for sh.* two lines below) and scan started_at
+	// into a nullable pointer, since COALESCE alone can't produce a
+	// non-null time.Time from SQL NULL the way it can for text.
 	err := pool.QueryRow(ctx, `
 		SELECT
 			l.name AS location_name,
@@ -121,8 +139,8 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, venu
 			v.slug,
 			v.kind,
 			v.config,
-			s.id,
-			s.status,
+			COALESCE(s.id::text, ''),
+			COALESCE(s.status::text, ''),
 			s.started_at,
 			COALESCE(s.show_id::text, ''),
 			COALESCE(sh.id::text, ''),
@@ -170,7 +188,9 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, venu
 		return nil, err
 	}
 
-	snap.Session.StartedAt = startedAt.UTC().Format(time.RFC3339)
+	if startedAt != nil {
+		snap.Session.StartedAt = startedAt.UTC().Format(time.RFC3339)
+	}
 	snap.Session.ShowID = showID
 	if showID != "" {
 		var currentPlacementID *string
@@ -272,9 +292,12 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, venu
 	}
 	snap.Elements = compactElements
 
-	if snap.Session.ID == "" {
-		return nil, fmt.Errorf("no active session found for %s", venueSlug)
-	}
+	// Kernel 70A: a venue with no active session is a normal, expected
+	// "idle theater" state, not an error -- resolveTheaterContext below is
+	// what tells a caller whether to render "No Show is currently on stage
+	// here." (venue_open) or a backstage idle view, instead of an error
+	// page. snap.Session.ID/showID stay "" here since there's no active
+	// session row to derive them from.
 
 	// The WHERE clause folds in show_id-scoped actions (persistent, may
 	// have been recorded in a different, now-ended session) alongside
@@ -282,7 +305,9 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, venu
 	// this reduces to exactly `a.session_id = $1`, matching pre-Kernel-70
 	// behavior byte-for-byte. Ordering switches from moment_id (only
 	// unique/comparable within one session) to ts, which is comparable
-	// across sessions and Show-scoped rows alike.
+	// across sessions and Show-scoped rows alike. Both sides are guarded
+	// against an empty-string comparison against a NOT NULL uuid column
+	// (reachable now that a sessionless snapshot no longer returns early).
 	actionRows, err := pool.Query(ctx, `
 		SELECT
 			a.id,
@@ -301,7 +326,7 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, venu
 		FROM actions a
 		LEFT JOIN users u ON u.id = a.actor_id
 		LEFT JOIN session_participants sp ON sp.session_id = a.session_id AND sp.user_id = a.actor_id
-		WHERE a.session_id = $1 OR ($2 <> '' AND a.show_id IS NOT NULL AND a.show_id::text = $2)
+		WHERE (($1 <> '' AND a.session_id::text = $1) OR ($2 <> '' AND a.show_id IS NOT NULL AND a.show_id::text = $2))
 		ORDER BY a.ts DESC, a.moment_id DESC
 	`, snap.Session.ID, showID)
 	if err != nil {
@@ -410,7 +435,86 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, venu
 		}
 	}
 	snap.Elements = filtered
+
+	theaterContext, err := resolveTheaterContext(ctx, pool, viewerUserID, viewerRole, snap.Session.ID, showID)
+	if err != nil {
+		return nil, err
+	}
+	snap.TheaterContext = theaterContext
+
 	return &snap, nil
+}
+
+// isBackstageRole reports whether role is one of the Kernel 70A
+// "Director/Producer/Operator/Crew" backstage tier -- the set of viewers
+// who get a "backstage" TheaterContext instead of "venue_open"/"audience"
+// when they're not a registered Show Run player themselves.
+func isBackstageRole(role string) bool {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "producer", "director", "operator", "crew":
+		return true
+	default:
+		return false
+	}
+}
+
+// resolveTheaterContext computes the Kernel 70A theater-context priority
+// order (kernel §4): a registered Show Run player in the current Show
+// outranks a plain Audience viewer, which outranks the generic "venue is
+// open, nothing on stage" state, which outranks the backstage-staff idle
+// view. sessionID/showID being "" means there's no active session at this
+// venue right now -- the only two reachable kinds are then "venue_open" or
+// "backstage", split purely on viewerRole.
+func resolveTheaterContext(ctx context.Context, pool *pgxpool.Pool, viewerUserID, viewerRole, sessionID, showID string) (TheaterContext, error) {
+	backstageTier := isBackstageRole(viewerRole)
+
+	if sessionID == "" || showID == "" {
+		if backstageTier {
+			return TheaterContext{Kind: "backstage"}, nil
+		}
+		return TheaterContext{Kind: "venue_open", Message: "No Show is currently on stage here."}, nil
+	}
+
+	viewerUserID = strings.TrimSpace(viewerUserID)
+	isRegisteredPlayer := false
+	if viewerUserID != "" {
+		var showRunID string
+		err := pool.QueryRow(ctx, `SELECT show_run_id::text FROM shows WHERE id = $1`, showID).Scan(&showRunID)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return TheaterContext{}, err
+		}
+		if showRunID != "" {
+			var rosterRole string
+			err := pool.QueryRow(ctx, `
+				SELECT role FROM show_run_roster_members
+				WHERE show_run_id = $1 AND user_id = $2 AND removed_at IS NULL
+				LIMIT 1
+			`, showRunID, viewerUserID).Scan(&rosterRole)
+			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				return TheaterContext{}, err
+			}
+			isRegisteredPlayer = rosterRole == "player"
+		}
+	}
+
+	if isRegisteredPlayer {
+		var hasCharacter bool
+		if err := pool.QueryRow(ctx, `
+			SELECT EXISTS(SELECT 1 FROM current_session_personas WHERE session_id = $1 AND user_id = $2)
+		`, sessionID, viewerUserID).Scan(&hasCharacter); err != nil {
+			return TheaterContext{}, err
+		}
+		if !hasCharacter {
+			return TheaterContext{Kind: "participant", Message: "You are registered for this Show, but you have not chosen a Character yet."}, nil
+		}
+		return TheaterContext{Kind: "participant"}, nil
+	}
+
+	if backstageTier {
+		return TheaterContext{Kind: "backstage"}, nil
+	}
+
+	return TheaterContext{Kind: "audience", Message: "You are watching this Show. Player controls are not active."}, nil
 }
 
 func effectiveAudienceVisible(layerVisibility map[string]bool, el PlacedElement) bool {
@@ -448,13 +552,19 @@ func decodeJSONMap(raw []byte) map[string]any {
 // it. When showID is "" (no linked Show), the query reduces to exactly
 // `a.session_id = $1`, matching pre-Kernel-70 behavior byte-for-byte.
 func reconcilePlacedElementsFromActions(ctx context.Context, pool *pgxpool.Pool, sessionID, showID string, elements *[]PlacedElement, placementIndex map[string]int) error {
+	// sessionID may be "" when a venue has no active session (Kernel 70A:
+	// LoadVenueSnapshot no longer errors out before reaching this call in
+	// that case) -- guard the session_id comparison the same way showID
+	// already is, since a.session_id is a NOT NULL uuid column and
+	// comparing it against a bare empty string fails with a Postgres
+	// invalid-uuid-syntax error rather than simply matching nothing.
 	rows, err := pool.Query(ctx, `
 		SELECT
 			a.type,
 			a.target,
 			a.payload
 		FROM actions a
-		WHERE (a.session_id = $1 OR ($2 <> '' AND a.show_id IS NOT NULL AND a.show_id::text = $2))
+		WHERE (($1 <> '' AND a.session_id::text = $1) OR ($2 <> '' AND a.show_id IS NOT NULL AND a.show_id::text = $2))
 		  AND a.type IN ('act/place_element', 'act/remove_element', 'create/token', 'update/token', 'act/duplicate_element', 'delete/index_card')
 		ORDER BY a.ts ASC, a.moment_id ASC
 	`, sessionID, showID)

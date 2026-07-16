@@ -17,17 +17,21 @@ import (
 // registers participantUserID as a session_participants row -- required
 // by actions.StoreGameEventTrusted's identity.ResolveSessionIdentity
 // lookup, which joins session_participants and errors on no rows
-// otherwise.
+// otherwise. Defaults to the-cave for historical call sites; use
+// insertCueTestSessionAtVenue directly to target a specific venue (Kernel
+// 70A's loadActorIdentity fix means emit_game_event now works at any
+// venue, not just the-cave -- see TestExecuteCueEmitGameEventWithActiveSessionSucceedsAtCatharsis).
 func insertCueTestSession(t *testing.T, pool *pgxpool.Pool, showID, status, participantUserID string) string {
 	t.Helper()
+	return insertCueTestSessionAtVenue(t, pool, showID, status, participantUserID, "the-cave")
+}
+
+func insertCueTestSessionAtVenue(t *testing.T, pool *pgxpool.Pool, showID, status, participantUserID, venueSlug string) string {
+	t.Helper()
 	ctx := context.Background()
-	// actions.StoreGameEvent(Trusted)'s identity.ResolveSessionIdentity is
-	// hardcoded to require the session's venue to be "the-cave" (a
-	// pre-existing constraint of the game/event mirror system, unrelated
-	// to Kernel 70) -- use it explicitly rather than an arbitrary venue.
 	var venueID string
-	if err := pool.QueryRow(ctx, `SELECT id::text FROM venues WHERE slug = 'the-cave' LIMIT 1`).Scan(&venueID); err != nil {
-		t.Fatalf("load the-cave venue: %v", err)
+	if err := pool.QueryRow(ctx, `SELECT id::text FROM venues WHERE slug = $1 LIMIT 1`, venueSlug).Scan(&venueID); err != nil {
+		t.Fatalf("load %s venue: %v", venueSlug, err)
 	}
 	var sessionID string
 	if err := pool.QueryRow(ctx, `
@@ -172,6 +176,38 @@ func TestExecuteCueEmitGameEventWithActiveSessionSucceeds(t *testing.T) {
 	}
 	if result.Status != "succeeded" {
 		t.Fatalf("expected succeeded with an active session, got %+v", result)
+	}
+}
+
+// TestExecuteCueEmitGameEventWithActiveSessionSucceedsAtCatharsis pins the
+// Kernel 70A fix to actions.loadActorIdentity: this package's identity
+// resolution was hardcoded to assume every session belonged to venue
+// "the-cave", which would have made emit_game_event silently fail (wrong
+// failure reason, not the intentional no_active_session_for_show) for any
+// session at a different venue. Catharsis is the sole real functional
+// venue for Kernel 70A -- this must succeed there, not just at the-cave.
+func TestExecuteCueEmitGameEventWithActiveSessionSucceedsAtCatharsis(t *testing.T) {
+	pool := openCuesTestPool(t)
+	producer := insertCuesTestUser(t, pool, "cue_exec_event_catharsis_producer")
+	f := buildCueFixture(t, pool, producer)
+	insertCueTestSessionAtVenue(t, pool, f.showID, "live", producer, "catharsis")
+
+	c, err := CreateCue(context.Background(), pool, producer, f.placementID, CreateCueInput{
+		InternalName: "Emit Event At Catharsis",
+		Actions: []CueAction{
+			{Type: ActionTypeEmitGameEvent, EmitGameEvent: &EmitGameEventAction{EventKind: "test/kind", Detail: map[string]any{"note": "hi"}}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create cue: %v", err)
+	}
+
+	result, err := ExecuteCue(context.Background(), pool, producer, c.ID, newIdempotencyKey(t))
+	if err != nil {
+		t.Fatalf("execute cue: %v", err)
+	}
+	if result.Status != "succeeded" {
+		t.Fatalf("expected succeeded with an active Catharsis session, got %+v", result)
 	}
 }
 

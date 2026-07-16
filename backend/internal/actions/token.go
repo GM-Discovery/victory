@@ -363,7 +363,7 @@ func StoreUpdateToken(ctx context.Context, pool *pgxpool.Pool, req TokenUpdateRe
 	if err != nil {
 		return nil, err
 	}
-	if state.VenueSlug != "the-cave" || strings.ToLower(strings.TrimSpace(state.Surface)) != "stage" {
+	if !isSingleVenueLegacySlug(state.VenueSlug) || strings.ToLower(strings.TrimSpace(state.Surface)) != "stage" {
 		return nil, &ActionDeniedError{Reason: "unknown_target"}
 	}
 

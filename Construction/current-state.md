@@ -30,6 +30,13 @@ Victory is a persistent, theatrical TTRPG community platform. Its current spine 
 - A **Showing** is the reviewable live wrapper around one active Session, not the scheduling primitive.
 - The **Show owns persistent stage state**. Linked Sessions project and add to that state; they do not become its durable owner.
 
+This is the **Domain Hierarchy** — the production/scheduling spine above. A separate, only loosely-connected **Identity Hierarchy** governs who a given user is and what they may do, at up to three independent layers:
+
+- **Operator**: global installation authority (`access.IsOperatorUser`), independent of any Location.
+- **Location role** (`location_memberships`): per-user, per-Location role — `producer`, `director`, `cast`, `crew`, or `audience`. This is the primary authority scope for Production/Show Run/Show/Scene/Cue decisions; do not substitute a user's best role at any other Location.
+- **Show Run roster role** (`show_run_roster_members`): per-user, per-Show-Run role — `producer`, `director`, `player`, `crew`, `audience`, `guest`, `observer`, or `custom`. This is a distinct fact from Location role and can diverge from it: a Location Producer need not be on a given Show Run's roster at all, and a roster `crew` member need not hold any Location membership.
+- **Equipped Character** (`current_session_personas`): per-user, per-**Session** — which Character this user is currently playing, if any. This is ephemeral (`ON DELETE CASCADE` from `sessions`, primary key `(session_id, user_id)`), reset every time a Session ends. There is currently no durable link from a Character to a Show, Show Run, or roster entry; see "No durable Character-to-Show/Show-Run/Session linkage exists" below.
+
 ## Current Stack
 
 - Frontend: static HTML, CSS, and JavaScript under `frontend/`
@@ -100,7 +107,7 @@ The canonical registrations live in `backend/cmd/victory/main.go`. Major route f
 - `/api/showings*`, `/api/director-console/current`
 - `/api/world/{venue}`, `/api/session/{venue}/join`, `/api/venues/*`
 - `/api/workshop/*`, `/api/warehouse/*`, `/api/assets/*`
-- `/ws/the-cave`, `/ws/catharsis`, `/ws/player-profile`, `/health`
+- `/ws/the-cave`, `/ws/catharsis`, `/ws/first-theater`, `/ws/player-profile`, `/health`
 
 Kernel 70 route additions:
 
@@ -109,6 +116,11 @@ Kernel 70 route additions:
 - `GET /api/shows/{show_id}/scenes/{placement_id}/player-cues`
 - `GET|PATCH /api/cues/{cue_id}`
 - `POST /api/cues/{cue_id}/go`
+
+Kernel 70A route additions:
+
+- `GET /api/world/first-theater`, `POST /api/session/first-theater/join` — First Theater's own independent venue wiring, additive alongside the-cave and Catharsis (the-cave's own routes are untouched)
+- `POST /api/shows/{show_id}/sessions/start` — Start Show Session: starts-or-resumes a venue's live Session and links it to a Show server-side, with no manual Session ID handling by the caller
 
 ## Authority And Privacy Rules
 
@@ -158,17 +170,23 @@ Kernel 70 route additions:
 - **Visual Scene composition/capture is not implemented.** Base Scene versus This Show's Version currently covers metadata/configuration, not a bound visual composition over `elements`, `venue_layout_elements`, and stage actions.
 - `reveal_object`, `hide_object`, `enable_interaction`, and `disable_interaction` Cue actions are deferred until that object/state mapping is designed.
 - Kernel 70 lacks browser screenshot evidence for rehearsal messaging and Cue buttons; code paths, syntax, backend tests, and existing Node tests were used instead.
-- The First Theater Node suite has 46 passing tests and 9 pre-existing `dice.test.js` failures; do not describe that suite as wholly green until repaired.
-- First Theater and Catharsis retain parallel runtime trees. Changes to shared stage behavior must inspect and test both.
+- The First Theater Node suite (`tests/first-theater/`) has 46 passing tests and 9 pre-existing `dice.test.js` failures; do not describe that suite as wholly green until repaired. Kernel 70A added a byte-for-byte mirror at `tests/catharsis/` (import-path/fixture changes only) with the identical 46-pass/9-known-fail shape, plus `tests/contract/scene-nodes.contract.test.js` asserting the behavior both venues' `scene-nodes.js` must share.
+- First Theater and Catharsis retain parallel runtime trees. Changes to shared stage behavior must inspect and test both — `frontend/venues/{catharsis,first-theater}/runtime/*.js` — and update both `tests/catharsis/` and `tests/first-theater/`. One confirmed, intentional exception: Catharsis's `scene-nodes.js` renders an extra token-aura layer First Theater's does not; the contract test in `tests/contract/` documents this as accepted drift, not a bug.
 - The Cave remains a dense proving-ground UI rather than a polished player product.
 - Some older consolidated roadmaps contain superseded kernel numbers; their collision notes are historical planning records, not the actual kernel sequence.
 - Provider-only accounts still lack a provider step-up path for secure email change.
 - Discord active-speaker detection and per-user audio volume are not truthfully available through the current integration.
 - Video recording/capture does not exist and is not implied by Showing Review or Scene capture.
+- **The campus entry funnel is not the aspirational one-path journey.** Info Booth (a map-tile modal in `frontend/app.js`/`index.html`) and Audition Hall (`frontend/venues/audition-hall/`) are both real, shipped surfaces, but they are general orientation/onboarding points, not a guided "join a Show" flow. A registered participant reaching their Show today still depends on Stage Management/roster setup done ahead of time, not a single campus path from map to stage.
+- **First Theater gained its own independent, real venue wiring in Kernel 70A** (`GET /api/world/first-theater`, `POST /api/session/first-theater/join`, `/ws/first-theater`, plus widened stage-action authority) rather than remaining a themed skin over the-cave's backend. It is still investor/demo-only — no participant-facing map-visibility work targets it, and the-cave itself (a deliberate, permanently hidden, DOM-only test harness) was left completely untouched.
+- **No durable Character-to-Show/Show-Run/Session linkage exists.** Audited (Kernel 70A, schema + Go-type check, no build): `character_cards` carries `owner_user_id`/`location_id`/optional `production_id` provenance only, no Show/Show-Run/Session foreign key. `show_run_roster_members` is account-level (`user_id`), with no `character_card_id` column. `current_session_personas` is the only table connecting a Character to live play, and it is session-scoped/ephemeral (`ON DELETE CASCADE` from `sessions`, primary key `(session_id, user_id)`) — it answers "who is this user playing right now" for one live Session, not "which Character is this roster member's Character for this Show." A Show's roster and its participants' Characters are today two unconnected facts a Director must reconcile by memory. Greenroom's own unlock condition is unrelated to this gap: it checks only `EXISTS(character_cards WHERE owner_user_id = $1 AND is_deleted = FALSE)` (`backend/internal/access/visibility.go`) — any owned, non-deleted Character card unlocks it, regardless of workbook completion. Recommended smallest attachment point for Kernel 71, not built here: a nullable `character_card_id` on `show_run_roster_members`, letting a roster entry optionally declare its Character without touching the session-scoped persona-equip mechanism.
+- **Two independent, non-interchangeable membership tables both claim to answer "what is this user's role."** Discovered live during Kernel 70A's manual checklist walkthrough (a fresh Producer, correctly set up via `location_memberships`, was rejected as `viewerRole = "none"` at their own Catharsis snapshot). `location_memberships` (per-Location, used by `access.CurrentLocationRole*`, `showruns.CanManageShowRun`, and everything Show-Run/Show/Scene/Cue-authority-related) is the current, Kernel-66+ system. `memberships` (per-venue-or-production-or-location, used only by `main.go`'s `lookupVenueRole` to compute the `viewerRole` passed into `world.LoadVenueSnapshot`) is an older, still-live table that drives both the pre-Kernel-70 stage-element-visibility filtering and Kernel 70A's new `theater_context` "backstage" classification. A user can hold the correct `location_memberships` producer/director role and still be treated as role `"none"` for live-venue viewing purposes if nobody separately granted them a `memberships` row. Reaching Catharsis's live snapshot at all additionally requires an `access_grants` row (`venue_access`, tied to `location_memberships` role IN producer/director/cast/crew) — a third, also-separate gate. Not fixed here (a real authority-model unification, out of Kernel 70A's approved scope); flagged so Kernel 71+ treats `lookupVenueRole`/`memberships` as a known trap, not an oversight.
 
 ## Next Recommended Direction
 
-The natural next kernel is **visual Scene composition/capture**: define how reusable Base Scene content and a Show Placement's overrides bind to the existing stage-object/action model without creating a second renderer authority system. A smaller independent closure pass can add browser screenshots for Kernel 70's GO controls and repair the nine pre-existing frontend dice-test failures.
+**Kernel 70A (Live Stage Closure and Alpha Path Alignment)** shipped: a server-side Start Show Session action (no manual Session ID handling), proof that Show-owned stage state survives a full start/end/resume cycle at Catharsis with no rebuild step, `go_to_scene`/`set_show_variable` working with no active session while `emit_game_event` fails cleanly and visibly, a closed Audience-facing leak (Rehearsal banner/Cue buttons were previously visible regardless of role), backend-computed theater-context empty states with the exact required strings, honest Scene/Cue setup labels, First Theater's own independent (still investor/demo-only) venue wiring, a Character-to-Show linkage audit (no build), and a `tests/catharsis/` mirror plus a scene-nodes contract test. **Deferred, by explicit scope decision**: applying the new migrations to the production database and restarting the live backend (a separate, explicitly-gated step); the first playable Socio show; a casting/attendance system; and any participant-facing First Theater work, since First Theater remains investor/demo-only for this pass.
+
+After that live-deployment step is explicitly approved and taken, the natural next kernel is **visual Scene composition/capture**: define how reusable Base Scene content and a Show Placement's overrides bind to the existing stage-object/action model without creating a second renderer authority system. A smaller independent closure pass can add browser screenshots for Kernel 70/70A's GO and Start Show Session controls and repair the nine pre-existing frontend dice-test failures (now duplicated in both `tests/first-theater/` and `tests/catharsis/`).
 
 ## Recording Language
 

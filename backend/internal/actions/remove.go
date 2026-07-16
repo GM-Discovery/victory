@@ -62,7 +62,7 @@ func StoreRemoveElement(ctx context.Context, pool *pgxpool.Pool, req RemoveEleme
 	if err != nil {
 		return nil, err
 	}
-	if state.VenueSlug != "the-cave" {
+	if !isSingleVenueLegacySlug(state.VenueSlug) {
 		return nil, errors.New("unknown_target")
 	}
 	if strings.ToLower(strings.TrimSpace(state.Surface)) != "stage" {

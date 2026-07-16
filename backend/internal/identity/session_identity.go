@@ -56,6 +56,30 @@ func ResolveSessionIdentity(ctx context.Context, q identityQuerier, sessionID, u
 	return ResolveSessionIdentityForVenue(ctx, q, sessionID, userID, "the-cave")
 }
 
+// ResolveSessionVenueSlug returns the slug of the venue a session belongs
+// to. Used by callers (e.g. actions.loadActorIdentity, Kernel 70A) that
+// need to resolve a session's real venue dynamically rather than assuming
+// "the-cave" -- the actions package's identity resolution predates the
+// multi-venue generalization and was hardcoded to a single venue.
+func ResolveSessionVenueSlug(ctx context.Context, q identityQuerier, sessionID string) (string, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return "", errors.New("session_id is required")
+	}
+	var slug string
+	err := q.QueryRow(ctx, `
+		SELECT v.slug
+		FROM sessions s
+		JOIN venues v ON v.id = s.venue_id
+		WHERE s.id = $1::uuid
+		LIMIT 1
+	`, sessionID).Scan(&slug)
+	if err != nil {
+		return "", err
+	}
+	return slug, nil
+}
+
 func ResolveSessionIdentityForVenue(ctx context.Context, q identityQuerier, sessionID, userID, venueSlug string) (SessionIdentity, error) {
 	sessionID = strings.TrimSpace(sessionID)
 	userID = strings.TrimSpace(userID)

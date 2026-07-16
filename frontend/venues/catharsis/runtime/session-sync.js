@@ -80,6 +80,7 @@
     const setRecentPlacementMarker = typeof deps.setRecentPlacementMarker === "function" ? deps.setRecentPlacementMarker : () => {};
     const getVenueSlug = typeof deps.getVenueSlug === "function" ? deps.getVenueSlug : () => "";
     const updateStageCueControls = typeof deps.updateStageCueControls === "function" ? deps.updateStageCueControls : () => {};
+    const updateTheaterContextPresentation = typeof deps.updateTheaterContextPresentation === "function" ? deps.updateTheaterContextPresentation : () => {};
     const smokeMode = Boolean(deps.smokeMode);
 
     let currentSnapshot = null;
@@ -155,6 +156,13 @@
       // snapshot -- updateStageCueControls fetches only the curated
       // player-cues listing.
       updateStageCueControls(snapshot);
+
+      // Kernel 70A: theater_context.message (backend-computed, e.g. "No
+      // Show is currently on stage here.") is blank exactly when normal
+      // stage controls apply (an actively-playing participant, or
+      // backstage staff) and set otherwise -- rendering it is enough to
+      // cover every non-participant empty state without re-deriving kind.
+      updateTheaterContextPresentation(snapshot);
     }
 
     function applyVenueFocusPingWrapper(data) {

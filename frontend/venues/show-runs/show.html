@@ -121,16 +121,24 @@
       </section>
 
       <section class="card" id="session-card" hidden>
-        <h2 style="margin-top:0;">Session Link</h2>
-        <p class="status-line">Point a technical live Session at this Show. This does not start or stop a session — it only records the association.</p>
-        <div class="link-row">
-          <div class="field">
-            <label for="session-id-input">Session ID</label>
-            <input type="text" id="session-id-input" placeholder="Paste a session id" />
+        <h2 style="margin-top:0;">Show Session</h2>
+        <p class="status-line" id="session-status-line">No live Session yet.</p>
+        <p class="launchbar">
+          <button class="chip" type="button" id="start-session-button">Start Show Session</button>
+          <button class="chip danger" type="button" id="end-session-button" hidden>End Session</button>
+        </p>
+        <details>
+          <summary style="cursor:pointer; color: var(--muted); font-size: 0.82rem;">Advanced: manual Session link</summary>
+          <p class="status-line">Point a technical live Session at this Show directly by ID. This does not start or stop a session — it only records the association.</p>
+          <div class="link-row">
+            <div class="field">
+              <label for="session-id-input">Session ID</label>
+              <input type="text" id="session-id-input" placeholder="Paste a session id" />
+            </div>
+            <button class="chip" type="button" id="link-session-button">Link</button>
+            <button class="chip danger" type="button" id="unlink-session-button">Unlink</button>
           </div>
-          <button class="chip" type="button" id="link-session-button">Link</button>
-          <button class="chip danger" type="button" id="unlink-session-button">Unlink</button>
-        </div>
+        </details>
       </section>
 
       <section class="card" id="scenes-card" hidden>
@@ -485,6 +493,12 @@
           actions.appendChild(setCurrentButton);
         }
 
+        const statusLabel = document.createElement("span");
+        statusLabel.className = "help-text";
+        statusLabel.style.cssText = "margin-right:4px;";
+        statusLabel.textContent = "Save to This Show:";
+        actions.appendChild(statusLabel);
+
         const readySelect = document.createElement("select");
         for (const status of ["draft", "ready", "retired", "archived"]) {
           const option = document.createElement("option");
@@ -529,7 +543,7 @@
         const cueHeading = document.createElement("p");
         cueHeading.className = "scene-row-title";
         cueHeading.style.marginBottom = "4px";
-        cueHeading.textContent = "Cues";
+        cueHeading.textContent = "Cue Setup";
         cuePanel.appendChild(cueHeading);
         const cueList = document.createElement("div");
         cuePanel.appendChild(cueList);
@@ -642,6 +656,65 @@
           const res = await fetch("/api/shows/" + encodeURIComponent(showId) + "/archive", { method: "POST", credentials: "include" });
           const p = await res.json().catch(() => null);
           if (res.ok && p?.ok) applyShowToForm(p.data.show);
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+
+      function applySessionStartResult(data) {
+        const line = document.getElementById("session-status-line");
+        const endButton = document.getElementById("end-session-button");
+        if (data && data.session_id) {
+          const resumed = data.was_resumed ? "Resumed" : "Started";
+          line.textContent = `${resumed} Session at Catharsis — ${data.session_status}. Showing #${data.showing_id}.`;
+          endButton.hidden = false;
+        } else {
+          line.textContent = "No live Session yet.";
+          endButton.hidden = true;
+        }
+      }
+
+      async function startShowSession(forceReattach) {
+        const res = await fetch(`/api/shows/${encodeURIComponent(showId)}/sessions/start`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ venue_slug: "catharsis", force_reattach: !!forceReattach }),
+        });
+        const p = await res.json().catch(() => null);
+        if (!res.ok || !p?.ok) { alert("Could not start Show Session: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+        const data = p.data;
+        if (data.venue_busy_with_other_show) {
+          const otherTitle = data.venue_busy_with_other_show.other_show_title || "another Show";
+          if (confirm(`Catharsis's active Session is currently linked to "${otherTitle}". Reattach it to this Show instead?`)) {
+            await startShowSession(true);
+          }
+          return;
+        }
+        applySessionStartResult(data);
+      }
+
+      document.getElementById("start-session-button").addEventListener("click", async (event) => {
+        event.target.disabled = true;
+        try {
+          await startShowSession(false);
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+
+      document.getElementById("end-session-button").addEventListener("click", async (event) => {
+        event.target.disabled = true;
+        try {
+          const res = await fetch("/api/session/control", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ venue_slug: "catharsis", command: "end" }),
+          });
+          const p = await res.json().catch(() => null);
+          if (!res.ok || !p?.ok) { alert("Could not end session: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+          applySessionStartResult(null);
         } finally {
           event.target.disabled = false;
         }

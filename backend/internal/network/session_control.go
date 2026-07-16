@@ -120,7 +120,7 @@ func HandleSessionControl(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 			return
 
 		case "start":
-			row, err := startSessionControl(ctx, pool, venueSlug, userID, role)
+			row, err := StartSessionControl(ctx, pool, venueSlug, userID, role)
 			if err != nil {
 				writeJSON(w, http.StatusBadGateway, map[string]any{
 					"ok":     false,
@@ -263,7 +263,12 @@ func loadSessionControlRow(ctx context.Context, q sessionControlQuerier, venueSl
 	return row, nil
 }
 
-func startSessionControl(ctx context.Context, pool *pgxpool.Pool, venueSlug, userID, role string) (sessionControlRow, error) {
+// StartSessionControl is the idempotent "start or resume a venue's live
+// session" core (reuses an active rehearsal/live session at the venue
+// rather than creating a duplicate). Exported so backend/internal/shows's
+// StartShowSession (Kernel 70A) can call the exact same primitive
+// /session start already uses, rather than a second copy.
+func StartSessionControl(ctx context.Context, pool *pgxpool.Pool, venueSlug, userID, role string) (sessionControlRow, error) {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return sessionControlRow{}, err

@@ -313,8 +313,17 @@ func StoreSpeak(ctx context.Context, pool *pgxpool.Pool, sessionID, actorID, tex
 	return &out, nil
 }
 
+// loadActorIdentity resolves a session's real venue dynamically rather
+// than assuming "the-cave" -- this package predates the multi-venue
+// generalization used by Catharsis/First Theater and every one of its ~20
+// callers previously only worked correctly for sessions at the-cave
+// (Kernel 70A fix: sessionless/live Cue proof on Catharsis surfaced this).
 func loadActorIdentity(ctx context.Context, q actionQuerier, sessionID, actorID string) (displayName, handle, role string, persona any, err error) {
-	ident, err := identity.ResolveSessionIdentity(ctx, q, sessionID, actorID)
+	venueSlug, err := identity.ResolveSessionVenueSlug(ctx, q, sessionID)
+	if err != nil {
+		return "", "", "", nil, err
+	}
+	ident, err := identity.ResolveSessionIdentityForVenue(ctx, q, sessionID, actorID, venueSlug)
 	if err != nil {
 		return "", "", "", nil, err
 	}

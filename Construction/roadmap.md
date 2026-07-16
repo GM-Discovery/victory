@@ -30,9 +30,9 @@ This is the current forward-looking roadmap after **Kernel 70**. The chronologic
 
 ### Kernel 70 Evidence And Frontend Reliability
 
-- Add browser acceptance/screenshots for rehearsal messaging, current-Scene changes, and player Cue buttons in First Theater and Catharsis.
-- Repair the nine pre-existing `tests/first-theater/dice.test.js` failures.
-- Extract shared contracts from the parallel First Theater/Catharsis runtimes where behavior is genuinely identical.
+- **Closed by Kernel 70A**: shared contracts extracted from the parallel First Theater/Catharsis runtimes — `tests/catharsis/` mirrors `tests/first-theater/` (import-path/fixture changes only, identical 46-pass/9-known-fail shape) and `tests/contract/scene-nodes.contract.test.js` asserts the behavior both venues' `scene-nodes.js` must share, explicitly excluding Catharsis's extra token-aura layer as documented, accepted drift.
+- Still open: browser acceptance/screenshots for rehearsal messaging, current-Scene changes, Start Show Session, and player Cue buttons in First Theater and Catharsis — Kernel 70A's manual checklist step covers this by hand where browser automation isn't available; capturing it as durable screenshot evidence remains unclaimed.
+- Still open: repair the nine pre-existing `tests/first-theater/dice.test.js` failures — now duplicated (same 9, same cause) in `tests/catharsis/dice.test.js` too, since that suite is a faithful mirror. Both `scripts/test/alpha-gate.sh` and this roadmap track it as a named, non-blocking exception, not a silent gap.
 
 ### Product Journey Proof
 
