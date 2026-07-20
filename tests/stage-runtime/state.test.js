@@ -1,7 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { createProjectedState } = require("../../frontend/venues/catharsis/runtime/state.js");
+globalThis.VictoryStageVenue = { slug: "catharsis", name: "Catharsis" };
+const { createProjectedState } = require("../../frontend/lib/stage-runtime/state.js");
 
 function tokenSnapshot(overrides = {}) {
   return {

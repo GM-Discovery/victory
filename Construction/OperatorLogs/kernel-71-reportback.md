@@ -2,7 +2,7 @@
 
 ## Status
 
-**PASS.** Implemented and verified in six phases (A: canonical resolver; B: ticket schema/transactions; C: Audition Hall + Stage Management UI; D: Character selection; E: short codes + `/showtime`; F: docs/security/alpha-gate). Not yet deployed live.
+**PASS.** Implemented and verified in six phases (A: canonical resolver; B: ticket schema/transactions; C: Audition Hall + Stage Management UI; D: Character selection; E: short codes + `/showtime`; F: docs/security/alpha-gate). Deployed live 2026-07-16.
 
 **Commit note**: Phase A's work (`backend/internal/participation/`, the `lookupVenueRole` fix in `main.go`, the dead-duplicate removal in `network/ws.go`, and the Kernel 70A reportback) was committed by the operator mid-session as part of commit `bef0a69` (alongside unrelated storage cleanup). Everything from Phase B onward — the ticket system, Character selection, short codes, `/showtime`, all UI, and this documentation — remains **uncommitted**, consistent with this project's practice of leaving a kernel's work for review before committing (Kernels 62, 65–69).
 
@@ -120,7 +120,7 @@ No browser/screenshot evidence — no browser automation tooling exists in this 
 
 ## Live deployment status
 
-**Not deployed.** Implementation and verification only, per this pass's scope.
+**Deployed live 2026-07-16.** DB backed up (`backups/victory_pre_kernel71_migrations_20260716_232811.dump`), migrations `046`-`048` applied to the production database (idempotent `IF NOT EXISTS`/`ADD COLUMN IF NOT EXISTS` re-run of the full `database/migrations/` directory, `000`-`045` no-op'd as already applied), `show_run_tickets`/`shows.short_code`/`show_run_roster_members.character_card_id` all confirmed present afterward. `victory-backend` rebuilt (`docker compose up -d --build backend`, the running image had predated this kernel's commit) and restarted; `/health` responds OK post-restart.
 
 ## Known limitations
 
@@ -129,7 +129,6 @@ No browser/screenshot evidence — no browser automation tooling exists in this 
 - Legacy `memberships`/`access_grants` tables were not removed (explicit scope decision) and three packages still independently UNION them instead of calling a shared resolver helper.
 - `/showtime` is an in-app command, not a real Discord-native slash command (confirmed scope decision).
 - No browser/screenshot evidence for any of this kernel's new UI (Audition Hall panels, Stage Management panels, Character-selection page) — HTTP-level proof substituted, per the standing gap this project has flagged since Kernel 65.
-- Not deployed live.
 
 ## Files changed
 

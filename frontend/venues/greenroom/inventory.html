@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Character Inventory — Greenroom</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #17120e;
+      --panel: rgba(27, 21, 17, 0.92);
+      --line: rgba(255, 233, 197, 0.12);
+      --accent: #f0d3a4;
+      --muted: #d0bfa6;
+    }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(180deg, #17120e 0%, #0e0b09 100%);
+      color: #f6ecdd;
+    }
+    .shell { max-width: 720px; margin: 0 auto; padding: 22px 24px 60px; box-sizing: border-box; }
+    .eyebrow { text-transform: uppercase; letter-spacing: 0.18em; color: #d7ab6f; font-size: 0.76rem; margin: 0 0 8px; }
+    h1 { margin: 0 0 6px; font-size: clamp(1.6rem, 4vw, 2.2rem); }
+    .subtitle { color: var(--muted); margin: 0 0 18px; line-height: 1.5; }
+    .launchbar { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 20px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255, 233, 197, 0.08); border: 1px solid var(--line);
+      color: var(--accent); text-decoration: none; padding: 7px 12px; border-radius: 999px;
+      font-size: 0.82rem; cursor: pointer;
+    }
+    .chip:hover { background: rgba(255, 233, 197, 0.16); }
+    .status-line { color: var(--muted); font-style: italic; }
+    .item-card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+      padding: 14px 16px; margin-bottom: 10px; display: flex; gap: 12px; align-items: flex-start;
+    }
+    .item-card img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.06); }
+    .item-name { font-weight: 700; margin: 0 0 2px; }
+    .item-desc { color: var(--muted); font-size: 0.88rem; margin: 0 0 4px; }
+    .item-meta { color: #a8927a; font-size: 0.78rem; }
+    .qty-badge {
+      margin-left: auto; background: rgba(255,233,197,0.14); border-radius: 999px;
+      padding: 2px 10px; font-size: 0.82rem; font-weight: 700; flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <p class="eyebrow">Venue / Greenroom</p>
+    <h1 id="page-title">Character Inventory</h1>
+    <p class="subtitle">Equipment and items your Character has acquired. Purchases happen through in-Show interactions (like Kessa's Shop) and appear here once made.</p>
+    <div class="launchbar">
+      <a class="chip" href="/venues/greenroom/">← Back to Greenroom</a>
+    </div>
+    <p class="status-line" id="status-line">Loading inventory...</p>
+    <div id="item-list"></div>
+  </div>
+
+  <script>
+    (function () {
+      function characterIdFromQuery() {
+        return String(new URLSearchParams(window.location.search).get("character_id") || "").trim();
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+        }[ch]));
+      }
+
+      function sourceSummary(entry) {
+        const parts = [];
+        if (entry.source_interaction_key) parts.push("via an in-Show interaction");
+        const when = entry.first_acquired_at ? new Date(entry.first_acquired_at).toLocaleDateString() : "";
+        if (when) parts.push("first acquired " + when);
+        return parts.join(" · ");
+      }
+
+      async function load() {
+        const statusLine = document.getElementById("status-line");
+        const listEl = document.getElementById("item-list");
+        const characterId = characterIdFromQuery();
+
+        if (!characterId) {
+          statusLine.textContent = "Choose a Character before viewing inventory.";
+          return;
+        }
+
+        try {
+          const response = await fetch(`/api/characters/${encodeURIComponent(characterId)}/inventory`, { credentials: "include" });
+          const payload = await response.json().catch(() => null);
+          if (!response.ok || !payload?.ok) {
+            statusLine.textContent = "Could not load inventory: " + (payload?.data?.error || `HTTP ${response.status}`);
+            return;
+          }
+          const items = payload.data.inventory || [];
+          if (items.length === 0) {
+            statusLine.textContent = "No items yet.";
+            return;
+          }
+          statusLine.remove();
+          for (const entry of items) {
+            const card = document.createElement("div");
+            card.className = "item-card";
+            const item = entry.item || {};
+            const imageHtml = item.image_asset_id
+              ? `<img src="/api/assets/${encodeURIComponent(item.image_asset_id)}/content?variant=thumbnail" alt="" />`
+              : "";
+            card.innerHTML = `
+              ${imageHtml}
+              <div>
+                <p class="item-name">${escapeHtml(item.name || "Unknown item")}</p>
+                <p class="item-desc">${escapeHtml(item.short_description || "")}</p>
+                <p class="item-meta">${escapeHtml(sourceSummary(entry))}</p>
+              </div>
+              <span class="qty-badge">×${Number(entry.quantity) || 1}</span>
+            `;
+            listEl.appendChild(card);
+          }
+        } catch (err) {
+          statusLine.textContent = "Could not load inventory.";
+          console.error("inventory load failed", err);
+        }
+      }
+
+      load();
+    })();
+  </script>
+</body>
+</html>

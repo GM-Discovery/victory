@@ -1,7 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const contextModule = require("../../frontend/venues/catharsis/runtime/context.js");
+globalThis.VictoryStageVenue = { slug: "catharsis", name: "Catharsis" };
+const contextModule = require("../../frontend/lib/stage-runtime/context.js");
 
 function makeDeps(overrides = {}) {
   const calls = [];

@@ -13,7 +13,7 @@
 
 migrate_and_bootstrap_test_database() {
   echo "Applying migrations to $db_name..."
-  for migration in "$ROOT"/database/migrations/*.sql; do
+  for migration in "$ROOT"/backend/migrations/*.sql; do
     echo "  $(basename "$migration")"
     docker exec -i "$POSTGRES_CONTAINER" psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$db_name" < "$migration"
   done
@@ -30,6 +30,7 @@ migrate_and_bootstrap_test_database() {
   env \
     PORT="$bootstrap_port" \
     DATABASE_URL="$TEST_DATABASE_URL" \
+    MIGRATE_DANGEROUSLY_SKIP_BACKUP=1 \
     STORAGE_ROOT="$bootstrap_storage_root" \
     SESSION_COOKIE_SECURE=false \
     COOKIE_SECURE=false \

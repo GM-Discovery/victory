@@ -284,6 +284,8 @@ A user creates two characters, completes one, resumes another, selects an active
 
 ## S2. Courtyard as a real Scene
 
+**Status after Kernel 73:** Partially shipped. The reusable Courtyard Scene now exists (migration `057`, following Kernel 69's Scene model) and Kessa exists as a real, bounded interaction (a Director-authored Participant Interaction opening a private Equip Mode) rather than only a planning placeholder — see current-state.md's Kernel 73 entry and Dictionary.txt's "Participant Interaction"/"Merchant Packet (Kessa)" entries. Map/background, walls, booths/crowd, the locked door, and onboarding handoff remain open.
+
 ### Goal
 The current static Courtyard descriptor becomes the first genuine Scene-based Socio location.
 
@@ -305,6 +307,8 @@ Completing character onboarding activates the stored Courtyard Scene through the
 ---
 
 ## S3. Courtyard tutorial loop
+
+**Status after Kernel 73:** Partially shipped. "Interacting with Kessa" and "bartering and equipment introduction" are real: five authored conversational stances, a server-authoritative Haggle skill check (d6 skilled / d4 unskilled, Target Value 5), and equipment purchase into durable Character inventory. Movement/observation, journal use, general skill rolls, value gain/spend, the locked door, and booth/crowd interaction remain open; this is not yet an assembled guided sequence.
 
 ### Goal
 The Courtyard teaches Victory and Socio by letting the player do meaningful things rather than reading a manual.

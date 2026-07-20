@@ -77,6 +77,10 @@ func (q fakeQuerier) QueryRow(ctx context.Context, sql string, args ...any) pgx.
 		}
 		visibility := `{"locked":` + strings.ToLower(strconv.FormatBool(q.locked)) + `,"nameplate_visible":true,"visible":true}`
 		return fakeRow{values: []any{"venue-1", q.venueSlug, "card-1", "index-card-director", "index_card", "card", "stage", []byte(visibility)}}
+	case strings.Contains(sql, "stage_elements_enabled"):
+		// Kernel 72A capability flag: the fake models a stage venue that has
+		// the element surface enabled (as the-cave/first-theater/catharsis do).
+		return fakeRow{values: []any{true}}
 	case strings.Contains(sql, "COALESCE((v.config ->> 'index_cards_enabled')::boolean, FALSE)"):
 		return fakeRow{values: []any{q.venueSlug, q.venueEnabled}}
 	case strings.Contains(sql, "FROM session_participants sp") && strings.Contains(sql, "SELECT sp.role::text"):

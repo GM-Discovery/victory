@@ -11,6 +11,25 @@ This file should stay historical and chronological.
 
 ---
 
+## 2026-07-20 — Kernel 73: Catharsis Equip Mode, Character Inventory, and Kessa Merchant Packet
+
+Built Catharsis's first participant-local gameplay packet on top of Kernel 72's shared stage engine and Kernel 72A's venue capability flags: a Director-authored "Visit Kessa's Shop" interaction opens a private Program Panel for the triggering Player only, without moving the Show's shared current Scene. The Player picks one of five authored conversational stances (disposition fixed per stance, never flipped by a roll), attempts a server-authoritative Haggle skill check (d6 skilled / d4 unskilled, Target Value 5, narrative-only 20% discount, no currency touched), and purchases seeded starting equipment that persists as durable Character inventory.
+
+New reusable primitives, not Kessa-specific: `equipment_items`/`character_inventory_items` (idempotent purchase via a dedicated attempt ledger mirroring Cues' `cue_executions`), `merchant_packets` (a bounded, non-dialogue-graph packet format reusable for a future second merchant), `participant_interactions` (its own table, participant-scoped rather than role-scoped like Cues, attached to a Placement through a new Director authoring panel in Stage Management), and `frontend/lib/stage-runtime/program-panel.js` (a venue-agnostic large-format overlay component).
+
+### Real bugs found and fixed via an end-to-end integration test (not caught by reading the spec or code in isolation)
+- `characters.CanEditCard` (the obvious ownership check) also silently requires a `location_memberships` role that a ticket-only Show Run Player never has -- `showruns.SelectCharacter` had already special-cased around this; three call sites in the new `merchant` package needed the same narrower ownership-only check instead.
+- The only skill-lookup function in the codebase (`characters.FindCharacterSkillByName`) has the identical hidden requirement; replaced with a direct `character_skills` query scoped by an already-verified Character.
+- `actions.StoreGameEvent`'s built-in authority check only allows director/producer session roles, contradicting its own doc comment ("any session participant"); needed `StoreGameEventTrusted` instead, exactly like `cues.ExecuteCue` does for the identical reason.
+
+### Discovered precondition gap
+No non-test Show Run/Show has ever been linked to Catharsis's live session (`session.show_id` was NULL) -- the only existing "Courtyard"-adjacent content was a stale Kernel 69 test fixture. Migration `057` seeds a reusable Courtyard Scene; placing it into a real Show and attaching Kessa to that placement is the real Director-authoring flow (Phase E), not something migration-seeded against a specific show_id.
+
+### Verification
+Full Go suite green; a new DB-backed integration test drives the entire chain (ticket→roster→character→Show→Courtyard placement→Kessa attached→open Equip Mode→all five stances→Haggle preview and attempt→idempotent purchase with quantity-mode clamping→inventory persistence) against the real migrated test database, plus a dedicated security-proof test file (non-rostered user, archived Character, forged interaction ID, Character-switch does not rewrite history) and a Hub-isolation test proving the targeted invalidation push never reaches another Player or Audience. New frontend tests cover the Program Panel's open/close/focus/Escape/loading/error lifecycle. Full `alpha-gate.sh` picks up the new frontend tests automatically (no gate changes needed) and passes.
+
+---
+
 ## 2026-07-06 to 2026-07-09 — Kernel 61 / 61A: Trailer Player Workbook, Face Compiler, and Legacy Profile Migration
 
 Replaced the fixed performer-profile form in Trailers with a server-authoritative Player Workbook: catalogue-driven pages, typed profile events, recomputed current facts, an owner-curated Trailer Face, an append-only stage-name ledger, cross-user Face viewing, targeted websocket live updates, a secure email-change flow, and closure of the legacy `/api/profiles/*` surface. Spanned several sessions; status is **PARTIAL** — see `Construction/OperatorLogs/kernel-61-reportback.md` and `kernel-61A-reportback.md` for the full acceptance-criterion ledger. Durable operator reference notes are in `operator-notes.md` under "Kernel 61 / 61A."

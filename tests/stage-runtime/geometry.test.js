@@ -1,7 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const geometry = require("../../frontend/venues/catharsis/runtime/geometry.js");
+globalThis.VictoryStageVenue = { slug: "catharsis", name: "Catharsis" };
+const geometry = require("../../frontend/lib/stage-runtime/geometry.js");
 
 function tokenModel(overrides = {}) {
   return {

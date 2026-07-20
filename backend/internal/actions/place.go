@@ -267,11 +267,18 @@ func sanitizePlaceElementRequest(req PlaceElementRequest) PlaceElementRequest {
 	return req
 }
 
+// resolvePlacementVenue gates placing/creating/duplicating elements onto a
+// venue's stage. Kernel 72A: this checks stage_elements_enabled — the
+// element-surface capability — not index_cards_enabled, which it borrowed
+// historically (migration 010 only ever set that flag on the-cave, so token
+// placement on first-theater/catharsis died here with policy_denied even
+// after the venue passed every authority check). index_cards_enabled remains
+// the index-card-specific policy consulted by the CanAct authority path.
 func resolvePlacementVenue(ctx context.Context, tx pgx.Tx, venueSlug string) (venueID string, enabled bool, err error) {
 	err = tx.QueryRow(ctx, `
 		SELECT
 			v.id::text,
-			COALESCE((v.config ->> 'index_cards_enabled')::boolean, FALSE)
+			COALESCE((v.config ->> 'stage_elements_enabled')::boolean, FALSE)
 		FROM venues v
 		WHERE v.slug = $1
 		LIMIT 1

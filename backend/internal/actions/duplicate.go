@@ -78,7 +78,11 @@ func StoreDuplicateElement(ctx context.Context, pool *pgxpool.Pool, req Duplicat
 	if err != nil {
 		return nil, err
 	}
-	if !isSingleVenueLegacySlug(source.VenueSlug) || strings.ToLower(strings.TrimSpace(source.Surface)) != "stage" {
+	elementsEnabled, err := stageElementsEnabled(ctx, tx, source.VenueSlug)
+	if err != nil {
+		return nil, err
+	}
+	if !elementsEnabled || strings.ToLower(strings.TrimSpace(source.Surface)) != "stage" {
 		return nil, &ActionDeniedError{Reason: "unknown_target"}
 	}
 	if visibilityBool(source.Visibility, "locked", false) {

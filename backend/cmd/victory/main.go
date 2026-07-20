@@ -32,12 +32,15 @@ import (
 	"victory/backend/internal/cues"
 	"victory/backend/internal/db"
 	"victory/backend/internal/identity"
+	"victory/backend/internal/merchant"
 	"victory/backend/internal/messages"
+	"victory/backend/internal/migrate"
 	"victory/backend/internal/network"
 	"victory/backend/internal/participation"
 	"victory/backend/internal/playerprofile"
 	"victory/backend/internal/playerrelationships"
 	"victory/backend/internal/profiles"
+	"victory/backend/internal/ratelimit"
 	"victory/backend/internal/scenes"
 	"victory/backend/internal/showings"
 	"victory/backend/internal/showruns"
@@ -71,20 +74,26 @@ func main() {
 	}
 	defer pool.Close()
 
+	// Kernel 72: embedded migrations are the single schema truth. This runs
+	// before every Ensure* seed bootstrap and gets its own generous timeout —
+	// a first-time adoption pass re-applies the full history.
+	migrateCtx, migrateCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	if err := migrate.Run(migrateCtx, pool, migrate.OptionsFromEnv(databaseURL)); err != nil {
+		log.Fatalf("migrations: %v", err)
+	}
+	migrateCancel()
+
 	if err := profiles.EnsureKernel9ProfileSurface(ctx, pool); err != nil {
 		log.Fatalf("kernel 9 profile bootstrap failed: %v", err)
-	}
-	if err := messages.EnsureKernel11MessagesSurface(ctx, pool); err != nil {
-		log.Fatalf("kernel 11 messages bootstrap failed: %v", err)
 	}
 	if err := access.EnsureKernel16VenueSurface(ctx, pool); err != nil {
 		log.Fatalf("kernel 16 venue bootstrap failed: %v", err)
 	}
-	if err := showings.EnsureKernel22ShowingSurface(ctx, pool); err != nil {
-		log.Fatalf("kernel 22 showing bootstrap failed: %v", err)
-	}
-	if err := characters.EnsureKernel23CharacterSurface(ctx, pool); err != nil {
-		log.Fatalf("kernel 23 character bootstrap failed: %v", err)
+	// Kernel 73: must run after the venue bootstrap above -- migration 057
+	// seeds the same Courtyard Scene for existing databases, but on a fresh
+	// install migrations run before catharsis exists as a venue row.
+	if err := merchant.EnsureCourtyardScene(ctx, pool); err != nil {
+		log.Fatalf("kernel 73 courtyard scene bootstrap failed: %v", err)
 	}
 	characters.SetMaxCharacterCardsPerAccount(parseIntEnv("CHARACTER_ACCOUNT_LIMIT", 50))
 	if err := identity.EnsureKernel39DiscordGatewaySurface(ctx, pool); err != nil {
@@ -131,16 +140,20 @@ func main() {
 		})
 	})
 
-	mux.HandleFunc("/api/auth/signup", identity.HandleSignup(pool, secureCookie))
-	mux.HandleFunc("/api/auth/login", identity.HandleLogin(pool, secureCookie))
+	// Kernel 72: every endpoint that accepts a credential guess shares one
+	// per-IP token bucket (burst 10, refill 10/min). Ordinary API routes are
+	// deliberately unthrottled.
+	credentialLimiter := ratelimit.New(10, 10)
+	mux.HandleFunc("/api/auth/signup", ratelimit.Middleware(credentialLimiter, identity.HandleSignup(pool, secureCookie)))
+	mux.HandleFunc("/api/auth/login", ratelimit.Middleware(credentialLimiter, identity.HandleLogin(pool, secureCookie)))
 	mux.HandleFunc("/api/auth/logout", identity.HandleLogout(pool, secureCookie))
 	mux.HandleFunc("/api/auth/providers", identity.HandleDiscordOAuthProviders(discordOAuthConfig))
 	mux.HandleFunc("GET /auth/discord/start", identity.HandleDiscordOAuthStart(pool, discordOAuthConfig))
 	mux.HandleFunc("GET /auth/discord/callback", identity.HandleDiscordOAuthCallback(pool, discordOAuthConfig, secureCookie))
 	mux.HandleFunc("GET /api/auth/discord/start", identity.HandleDiscordOAuthStart(pool, discordOAuthConfig))
 	mux.HandleFunc("GET /api/auth/discord/callback", identity.HandleDiscordOAuthCallback(pool, discordOAuthConfig, secureCookie))
-	mux.HandleFunc("/api/auth/password-reset/request", identity.HandleForgotPassword(pool))
-	mux.HandleFunc("/api/auth/password-reset/confirm", identity.HandleResetPassword(pool, secureCookie))
+	mux.HandleFunc("/api/auth/password-reset/request", ratelimit.Middleware(credentialLimiter, identity.HandleForgotPassword(pool)))
+	mux.HandleFunc("/api/auth/password-reset/confirm", ratelimit.Middleware(credentialLimiter, identity.HandleResetPassword(pool, secureCookie)))
 	mux.HandleFunc("/api/invites", identity.HandleCreateInvite(pool))
 	mux.HandleFunc("/api/invites/accept", identity.HandleAcceptInvite(pool, secureCookie))
 	mux.HandleFunc("GET /api/discord/server-link/status", identity.HandleDiscordServerLinkStatus(pool, discordServerLinkConfig))
@@ -164,7 +177,7 @@ func main() {
 	mux.HandleFunc("/api/requests/respond", identity.HandleRespondPermissionRequest(pool))
 	mux.HandleFunc("/api/productions", identity.HandleProductionsCollection(pool))
 	mux.HandleFunc("/api/account/me", identity.HandleAccountMe(pool))
-	mux.HandleFunc("/api/account/email", identity.HandleUpdateAccountEmail(pool))
+	mux.HandleFunc("/api/account/email", ratelimit.Middleware(credentialLimiter, identity.HandleUpdateAccountEmail(pool)))
 	mux.HandleFunc("/api/session/me", identity.HandleMe(pool))
 	mux.HandleFunc("/api/profiles/me", profiles.HandleGetMyProfile(pool))
 	mux.HandleFunc("/api/profiles/public", profiles.HandleGetPublicProfile(pool))
@@ -242,6 +255,19 @@ func main() {
 	mux.HandleFunc("GET /api/cues/{cue_id}", cues.HandleCueByID(pool))
 	mux.HandleFunc("PATCH /api/cues/{cue_id}", cues.HandleCueByID(pool))
 	mux.HandleFunc("POST /api/cues/{cue_id}/go", cues.HandleCueGo(pool, hub))
+	mux.HandleFunc("GET /api/shows/{show_id}/scenes/{placement_id}/participant-interactions", merchant.HandlePlacementInteractionsCollection(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/scenes/{placement_id}/participant-interactions", merchant.HandlePlacementInteractionsCollection(pool))
+	mux.HandleFunc("GET /api/shows/{show_id}/scenes/{placement_id}/player-interactions", merchant.HandlePlacementPlayerInteractions(pool))
+	mux.HandleFunc("PATCH /api/participant-interactions/{interaction_id}", merchant.HandleInteractionByID(pool))
+	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/open", merchant.HandleInteractionOpen(pool))
+	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/stance", merchant.HandleInteractionStance(pool))
+	mux.HandleFunc("GET /api/participant-interactions/{interaction_id}/haggle", merchant.HandleInteractionHaggle(pool))
+	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/haggle", merchant.HandleInteractionHaggle(pool))
+	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/purchase", merchant.HandleInteractionPurchase(pool, hub))
+	mux.HandleFunc("GET /api/characters/{character_card_id}/inventory", merchant.HandleCharacterInventory(pool))
+	mux.HandleFunc("GET /api/venues/{venue_slug}/equipment", merchant.HandleVenueEquipmentCollection(pool))
+	mux.HandleFunc("POST /api/venues/{venue_slug}/equipment", merchant.HandleVenueEquipmentCollection(pool))
+	mux.HandleFunc("PATCH /api/equipment/{equipment_item_id}", merchant.HandleEquipmentItemByID(pool))
 	mux.HandleFunc("GET /api/characters/parentage-chart", characters.HandleParentageChart())
 	mux.HandleFunc("GET /api/characters/chapter2-rules", characters.HandleChapter2Rules())
 	mux.HandleFunc("GET /api/character-cards/me", characters.HandleMyCharacterCards(pool))

@@ -9,8 +9,15 @@ import (
 	"victory/backend/internal/sessions"
 	"victory/backend/internal/showings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// ErrNoActiveSession is the typed refusal for joining a venue that has no
+// rehearsal/live Session. Post Kernel 70A this is a venue's normal idle
+// state (Sessions start from Stage Management), so clients treat it as
+// "stage is open but idle", never as a raw database error.
+var ErrNoActiveSession = errors.New("no_active_session")
 
 type JoinRequest struct {
 	Handle      string `json:"handle"`
@@ -63,6 +70,9 @@ func JoinVenue(ctx context.Context, pool *pgxpool.Pool, req JoinRequest, session
 		ORDER BY s.started_at DESC
 		LIMIT 1
 	`, venueSlug).Scan(&sessionID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNoActiveSession
+	}
 	if err != nil {
 		return nil, err
 	}

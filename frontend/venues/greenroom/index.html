@@ -1345,6 +1345,7 @@
         </p>
       </div>
       <div class="toolbar">
+        <button class="chip" type="button" id="open-inventory-button">Character Inventory</button>
         <a class="chip" href="/">Back to Map</a>
       </div>
     </header>
@@ -3157,6 +3158,19 @@
         return;
       }
       window.location.href = "/venues/catharsis/?new_character=1";
+    });
+
+    // Kernel 73: Character Inventory lives on its own small page (spec S5.2
+    // "a dedicated page or clear Character subpage") rather than crowded
+    // into the Workbook surface -- items are acquired in-Show, not authored
+    // here.
+    document.getElementById("open-inventory-button")?.addEventListener("click", () => {
+      const card = selectedCard();
+      if (!card) {
+        setCharacterStatus("Choose a Character before viewing inventory.");
+        return;
+      }
+      window.location.href = `/venues/greenroom/inventory.html?character_id=${encodeURIComponent(card.id)}`;
     });
 
     resumeButton.addEventListener("click", () => {

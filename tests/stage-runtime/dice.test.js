@@ -1,7 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const diceModule = require("../../frontend/venues/catharsis/runtime/dice.js");
+globalThis.VictoryStageVenue = { slug: "catharsis", name: "Catharsis" };
+const diceModule = require("../../frontend/lib/stage-runtime/dice.js");
 
 class FakeElement {
   constructor(tagName) {

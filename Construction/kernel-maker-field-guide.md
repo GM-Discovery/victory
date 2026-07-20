@@ -21,7 +21,7 @@ Current canon references:
 - `/opt/victory/backend/internal/identity/` - users, sessions, auth, invites, role helpers.
 - `/opt/victory/backend/internal/profiles/` - Trailers and Greenroom profile surfaces.
 - `/opt/victory/backend/internal/characters/` - character cards, drafting grants, session personas.
-- `/opt/victory/database/migrations/` - SQL migrations. Add a new numbered file for schema changes.
+- `/opt/victory/backend/migrations/` - SQL migrations. Add a new numbered file for schema changes.
 - `/opt/victory/frontend/` - static app shell and venue pages.
 - `/opt/victory/frontend/venues/the-cave/index.html` - live table UI and inline Cave client.
 - `/opt/victory/frontend/venues/greenroom/index.html` - public profile and character dressing room.
@@ -172,26 +172,41 @@ If the backend behavior does not match your code, check for a stale process:
 - Browser cache may be holding an old static file. Hard refresh venue pages.
 
 ## Database And Migration Rules
-Schema changes need two paths:
-- A numbered SQL migration in `database/migrations/`.
-- A runtime `EnsureKernelXX...Surface` bootstrap if the existing project pattern has one for that surface.
 
-Apply a migration manually:
-```bash
-cd /opt/victory
-docker exec -i victory-postgres psql -U victory -d victory < database/migrations/017_kernel24_character_sheet_links.sql
-```
+**As of Kernel 72, `backend/migrations/` is the single source of schema truth.**
+The migration files are embedded into the backend binary (`backend/migrations/embed.go`)
+and applied automatically at startup by `backend/internal/migrate`, tracked in a
+`schema_migrations` ledger (filename + sha256 checksum). There is no manual
+apply step on deploy anymore: `docker compose up -d --build backend` is the
+whole deploy. Before applying anything pending to a non-empty database the
+runner writes a `pg_dump` backup to `/opt/victory/backups/` and refuses to
+migrate if the backup fails. Set `MIGRATE_ON_BOOT=false` to make the backend
+verify-only (it will refuse to boot and name the pending files).
 
-Inspect tables:
+Schema changes are ONE path now:
+- Add a new numbered SQL migration in `backend/migrations/`. Never edit a file
+  that has already shipped — the runner refuses to boot on a checksum
+  mismatch; add a new file instead.
+- `EnsureKernelXX...Surface` bootstraps still exist but may contain **seeds
+  and data repair only, never DDL**. No Go code outside
+  `backend/internal/migrate` may execute `CREATE TABLE`/`ALTER TABLE`/etc.
+  (Kernel 72 acceptance criterion A5; migrations 049–054 hold the DDL that
+  used to live in Go.)
+
+Inspect tables / the ledger:
 ```bash
 docker exec -it victory-postgres psql -U victory -d victory -c '\dt'
+docker exec -it victory-postgres psql -U victory -d victory -c 'SELECT filename, applied_at FROM schema_migrations ORDER BY filename DESC LIMIT 10;'
 ```
 
 Rules:
 - Do not destructively rewrite action history.
 - Prefer additive migrations: `ADD COLUMN IF NOT EXISTS`, new tables, new indexes.
-- Make migrations idempotent where practical.
-- Keep bootstrap SQL compatible with already-running databases.
+- Every migration must be idempotent — the runner executes each file without a
+  wrapping transaction (several historical files carry their own
+  BEGIN/COMMIT), so idempotency is what makes a partial failure safely
+  retryable on the next boot.
+- Keep seed bootstraps compatible with already-running databases.
 - Be careful with JSONB payload changes: omitted optional fields should not erase stored metadata on PATCH unless that is intentional.
 
 ## Action Stream Rules

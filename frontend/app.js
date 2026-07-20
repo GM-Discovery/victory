@@ -416,14 +416,11 @@ function renderMapMenu() {
   }
 }
 
-// Gateable venues (Kernel 68 §1.3, §3.4): map positions are known even when
-// a venue is hidden (fallbackPositions is fixed per slug), so a cloud puff
-// can sit exactly over where the tile will appear once unlocked. The base
-// fog layer separately recedes with overall visible-venue count -- the
-// "simpler cloud-level model" the spec allows in place of full per-venue
-// exploration state.
-const GATEABLE_VENUE_SLUGS = ["third-place", "show-runs"];
-
+// Map positions are known even when a venue is hidden (fallbackPositions is
+// fixed per slug), so a cloud puff can sit exactly over where the tile will
+// appear once unlocked. Every venue gets one (info-booth excluded -- it's a
+// permanent landmark, not a gateable venue). The base fog layer separately
+// recedes with overall visible-venue count.
 function renderMapFog(venues, fallbackPositions) {
   const fogLayer = document.getElementById("map-fog-layer");
   const fogBase = document.getElementById("map-fog-base");
@@ -438,7 +435,8 @@ function renderMapFog(venues, fallbackPositions) {
 
   fogLayer.querySelectorAll(".map-fog-puff").forEach((el) => el.remove());
 
-  for (const slug of GATEABLE_VENUE_SLUGS) {
+  for (const slug of Object.keys(fallbackPositions)) {
+    if (slug === "info-booth") continue;
     const pos = fallbackPositions[slug];
     if (!pos) continue;
     const puff = document.createElement("div");

@@ -27,6 +27,8 @@ services:
       DEFAULT_LOCATION_SLUG: ${DEFAULT_LOCATION_SLUG:-victory-theater}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      MIGRATE_ON_BOOT: ${MIGRATE_ON_BOOT:-}
+      BACKUP_DIR: ${BACKUP_DIR:-/opt/victory/backups}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
       DISCORD_REDIRECT_URL: ${DISCORD_REDIRECT_URL:-}
@@ -43,6 +45,7 @@ services:
       - postgres
     volumes:
       - /opt/victory/storage:/opt/victory/storage
+      - /opt/victory/backups:/opt/victory/backups
     expose:
       - "8081"
     networks:

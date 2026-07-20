@@ -1,21 +1,38 @@
 package network
 
 import (
+	"context"
 	"testing"
+
+	"victory/backend/internal/dbtest"
 )
 
-func TestNormalizeSessionControlVenueSlug(t *testing.T) {
-	cases := map[string]string{
-		"the-cave":            "the-cave",
-		"first-theater":       "first-theater",
-		"catharsis":           "catharsis",
-		"middle-school-stage": "middle-school-stage",
-		"unknown":             "",
+// Kernel 72A: the former hardcoded allowlist (normalizeSessionControlVenueSlug)
+// became the session_control_enabled venues.config flag, seeded by migration
+// 055 for exactly the same four venues — asserted here against the real
+// migrated test database, plus fail-closed behavior for unknown/blank slugs.
+func TestVenueSessionControlEnabled(t *testing.T) {
+	pool := dbtest.OpenTestPool(t)
+	defer pool.Close()
+	ctx := context.Background()
+
+	cases := map[string]bool{
+		"the-cave":            true,
+		"first-theater":       true,
+		"catharsis":           true,
+		"middle-school-stage": true,
+		"greenroom":           false,
+		"unknown-venue":       false,
+		"":                    false,
 	}
 
-	for input, want := range cases {
-		if got := normalizeSessionControlVenueSlug(input); got != want {
-			t.Fatalf("normalizeSessionControlVenueSlug(%q) = %q, want %q", input, got, want)
+	for slug, want := range cases {
+		got, err := VenueSessionControlEnabled(ctx, pool, slug)
+		if err != nil {
+			t.Fatalf("VenueSessionControlEnabled(%q): %v", slug, err)
+		}
+		if got != want {
+			t.Fatalf("VenueSessionControlEnabled(%q) = %v, want %v", slug, got, want)
 		}
 	}
 }

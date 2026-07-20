@@ -1,7 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const actionRouterModule = require("../../frontend/venues/catharsis/runtime/action-router.js");
+globalThis.VictoryStageVenue = { slug: "catharsis", name: "Catharsis" };
+const actionRouterModule = require("../../frontend/lib/stage-runtime/action-router.js");
 
 function makeDeps(overrides = {}) {
   const calls = [];

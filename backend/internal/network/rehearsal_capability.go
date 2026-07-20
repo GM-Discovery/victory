@@ -10,9 +10,9 @@ import (
 // VenueSceneRehearsalEnabled checks the venues.config JSONB
 // scene_rehearsal_enabled boolean flag, following the same
 // venues.config-boolean-flag precedent used elsewhere in this codebase
-// (index_cards_enabled, actors_can_reveal) rather than extending
-// session_control.go's hardcoded venue-slug allowlist
-// (normalizeSessionControlVenueSlug). Seeded true for first-theater and
+// (index_cards_enabled, actors_can_reveal). Kernel 72A later converted
+// session_control.go's hardcoded venue-slug allowlist to this same pattern
+// (session_control_enabled). Seeded true for first-theater and
 // catharsis, absent/false for middle-school-stage and other venues
 // (Kernel 70 §1.5).
 func VenueSceneRehearsalEnabled(ctx context.Context, pool *pgxpool.Pool, venueSlug string) (bool, error) {

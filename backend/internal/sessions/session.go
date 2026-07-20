@@ -109,36 +109,32 @@ func RevokeAllUserSessions(ctx context.Context, pool *pgxpool.Pool, userID strin
 	return err
 }
 
+// Kernel 72: SameSite is Lax in every mode. The previous None-when-secure
+// meant production cookies rode along on cross-site POSTs, and with no CSRF
+// tokens anywhere that left every mutating route forgeable from any website.
+// Nothing embeds Victory cross-site (Discord integration is OAuth redirect +
+// gateway bot, not an iframe Activity); if that ever changes, add an Origin
+// check middleware before relaxing this.
 func SetSessionCookie(w http.ResponseWriter, raw string, expiresAt time.Time, secure bool) {
-	sameSite := http.SameSiteLaxMode
-	if secure {
-		sameSite = http.SameSiteNoneMode
-	}
-
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
 		Value:    raw,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: sameSite,
+		SameSite: http.SameSiteLaxMode,
 		Expires:  expiresAt,
 	})
 }
 
 func ClearSessionCookie(w http.ResponseWriter, secure bool) {
-	sameSite := http.SameSiteLaxMode
-	if secure {
-		sameSite = http.SameSiteNoneMode
-	}
-
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: sameSite,
+		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
 	})

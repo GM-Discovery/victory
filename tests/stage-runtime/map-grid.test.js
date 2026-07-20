@@ -1,7 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const mapGrid = require("../../frontend/venues/catharsis/runtime/map-grid.js");
+globalThis.VictoryStageVenue = { slug: "catharsis", name: "Catharsis" };
+const mapGrid = require("../../frontend/lib/stage-runtime/map-grid.js");
 
 test("panel clamping keeps editor windows inside the shell", () => {
   assert.deepEqual(mapGrid.clampPanelPosition(10, 20, { width: 300, height: 200 }, { width: 100, height: 80 }, 100, 80), {

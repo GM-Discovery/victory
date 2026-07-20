@@ -1,7 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const sessionSyncModule = require("../../frontend/venues/catharsis/runtime/session-sync.js");
+globalThis.VictoryStageVenue = { slug: "catharsis", name: "Catharsis" };
+const sessionSyncModule = require("../../frontend/lib/stage-runtime/session-sync.js");
 
 test("session sync handles join, refresh, and staged index-card placement", async () => {
   const calls = [];

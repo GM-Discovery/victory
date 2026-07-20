@@ -1,7 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const tokenUiModule = require("../../frontend/venues/catharsis/runtime/token-ui.js");
+globalThis.VictoryStageVenue = { slug: "catharsis", name: "Catharsis" };
+const tokenUiModule = require("../../frontend/lib/stage-runtime/token-ui.js");
 
 test("token picker filtering respects shape and search", () => {
   const state = { search: "goat", filterShape: "circle" };

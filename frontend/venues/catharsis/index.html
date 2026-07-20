@@ -4084,21 +4084,24 @@
   <script src="/lib/discord-audio.js?v=kernel43-2"></script>
   <script src="/lib/victory-mic-chat.js?v=kernel40-1"></script>
   <script src="/lib/victory-command-palette.js?v=kernel59-1"></script>
-  <script src="/venues/catharsis/runtime/state.js?v=kernel51-2"></script>
-  <script src="/venues/catharsis/runtime/socket.js?v=kernel51-2"></script>
-  <script src="/venues/catharsis/runtime/logic.js?v=kernel51-2"></script>
-  <script src="/venues/catharsis/runtime/geometry.js?v=kernel51-2"></script>
-  <script src="/venues/catharsis/runtime/stage-controls.js?v=kernel51-3"></script>
-  <script src="/venues/catharsis/runtime/map-grid.js?v=kernel51-4"></script>
-  <script src="/venues/catharsis/runtime/scene-nodes.js?v=kernel51-5"></script>
-  <script src="/venues/catharsis/runtime/token-ui.js?v=kernel51-7"></script>
-  <script src="/venues/catharsis/runtime/dice.js?v=kernel52-1"></script>
-  <script src="/venues/catharsis/runtime/action-router.js?v=kernel51-10"></script>
-  <script src="/venues/catharsis/runtime/socket-controller.js?v=kernel51-8"></script>
-  <script src="/venues/catharsis/runtime/session-sync.js?v=kernel52-1"></script>
-  <script src="/venues/catharsis/runtime/editors.js?v=kernel51-8"></script>
-  <script src="/venues/catharsis/runtime/lifecycle.js?v=kernel51-2"></script>
-  <script src="/venues/catharsis/runtime/context.js?v=kernel51-2"></script>
+  <script src="/venues/catharsis/venue.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/state.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/socket.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/logic.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/geometry.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/stage-controls.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/map-grid.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/scene-nodes.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/token-ui.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/dice.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/action-router.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/socket-controller.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/session-sync.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/editors.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/lifecycle.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/context.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/program-panel.js?v=kernel73-1"></script>
+  <script src="/lib/stage-runtime/participant-interactions.js?v=kernel73-1"></script>
   <script>
     window.VictoryDiscordAudio?.mount({
       venueSlug: "catharsis",
@@ -4111,10 +4114,10 @@
       window.__catharsisBootWiring = true;
 
       const script = document.createElement("script");
-      script.src = "/venues/catharsis/runtime.js?v=boot-37";
+      script.src = "/lib/stage-runtime/runtime.js?v=kernel72-1";
       script.dataset.victoryRuntime = "catharsis";
       script.addEventListener("load", () => {
-        window.VictoryCatharsis?.start?.();
+        window.VictoryStage?.start?.();
       }, { once: true });
       document.head.appendChild(script);
     })();

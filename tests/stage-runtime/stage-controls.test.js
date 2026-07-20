@@ -1,7 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const stageControls = require("../../frontend/venues/catharsis/runtime/stage-controls.js");
+globalThis.VictoryStageVenue = { slug: "catharsis", name: "Catharsis" };
+const stageControls = require("../../frontend/lib/stage-runtime/stage-controls.js");
 
 test("camera helpers report label and lock state consistently", () => {
   assert.equal(stageControls.cameraViewLabel({ zoomRelativeToFit: 1.23 }), "123%");

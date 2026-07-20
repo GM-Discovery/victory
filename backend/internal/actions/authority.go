@@ -43,21 +43,38 @@ type actionQuerier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-// isSingleVenueLegacySlug reports whether slug belongs to this package's
-// original single-venue authority model (element reveal/place/token/
-// index-card actions were built against "the-cave" specifically, before
-// Catharsis's more general per-session-participant-role model existed).
-// Kernel 70A gave First Theater its own independent venue wiring rather
-// than continuing to skin the-cave's backend, so it needs the same
-// authority surface the-cave already has -- additive only, the-cave's own
-// behavior is unchanged.
-func isSingleVenueLegacySlug(slug string) bool {
-	switch strings.ToLower(strings.TrimSpace(slug)) {
-	case "the-cave", "first-theater":
-		return true
-	default:
-		return false
+// stageElementsEnabled reports whether the venue carries the
+// stage_elements_enabled config capability — the gate for this package's
+// element-action surface (tokens, index cards, reveal, remove, duplicate,
+// lock, nameplate). Kernel 72A: this replaces the hardcoded
+// isSingleVenueLegacySlug allowlist ("the-cave", then Kernel 70A's
+// "first-theater", then the Kernel 72 hotfix's "catharsis") with the
+// venues.config-boolean-flag precedent (index_cards_enabled,
+// actors_can_reveal, scene_rehearsal_enabled). The hardcoded list is how
+// catharsis shipped a full stage whose every element action was denied
+// "unknown_target"; a config flag means a new game venue turns the surface
+// on in its seed row instead of by editing authority code. Seeded true for
+// the-cave/first-theater/catharsis (migration 055 + the Kernel 16 venue
+// seed for fresh installs). Unknown venues and missing flags fail closed.
+func stageElementsEnabled(ctx context.Context, q actionQuerier, slug string) (bool, error) {
+	slug = strings.ToLower(strings.TrimSpace(slug))
+	if slug == "" {
+		return false, nil
 	}
+	var enabled bool
+	err := q.QueryRow(ctx, `
+		SELECT COALESCE((config ->> 'stage_elements_enabled')::boolean, FALSE)
+		FROM venues
+		WHERE slug = $1
+		LIMIT 1
+	`, slug).Scan(&enabled)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return enabled, nil
 }
 
 func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, sessionID string, target ActionTarget) (Decision, error) {
@@ -252,7 +269,7 @@ func canActRevealInCave(ctx context.Context, q actionQuerier, userID, sessionID 
 			FROM sessions s
 			JOIN venues v ON v.id = s.venue_id
 			WHERE s.id = $1::uuid
-			  AND v.slug IN ('the-cave', 'first-theater')
+			  AND COALESCE((v.config ->> 'stage_elements_enabled')::boolean, FALSE)
 		)
 	`, sessionID).Scan(&venueAccess)
 	if err != nil {
@@ -262,7 +279,11 @@ func canActRevealInCave(ctx context.Context, q actionQuerier, userID, sessionID 
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 
-	if !isSingleVenueLegacySlug(venueSlug) {
+	elementsEnabled, err := stageElementsEnabled(ctx, q, venueSlug)
+	if err != nil {
+		return Decision{}, err
+	}
+	if !elementsEnabled {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 
@@ -333,7 +354,11 @@ func canActOverlayInCave(ctx context.Context, q actionQuerier, userID, sessionID
 		return Decision{Allowed: false, Reason: "locked"}, nil
 	}
 
-	if !isSingleVenueLegacySlug(venueSlug) {
+	elementsEnabled, err := stageElementsEnabled(ctx, q, venueSlug)
+	if err != nil {
+		return Decision{}, err
+	}
+	if !elementsEnabled {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 	if strings.ToLower(strings.TrimSpace(surface)) != "stage" {
@@ -372,7 +397,11 @@ func canActIndexCardInCave(ctx context.Context, q actionQuerier, userID, session
 		return Decision{}, err
 	}
 
-	if !isSingleVenueLegacySlug(venueSlug) {
+	elementsEnabled, err := stageElementsEnabled(ctx, q, venueSlug)
+	if err != nil {
+		return Decision{}, err
+	}
+	if !elementsEnabled {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 
@@ -483,7 +512,14 @@ func canActCreateToken(ctx context.Context, q actionQuerier, userID, sessionID s
 	if strings.TrimSpace(target.ElementID) == "" {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
-	if strings.TrimSpace(target.VenueSlug) == "" || !isSingleVenueLegacySlug(target.VenueSlug) {
+	if strings.TrimSpace(target.VenueSlug) == "" {
+		return Decision{Allowed: false, Reason: "unknown_target"}, nil
+	}
+	elementsEnabled, err := stageElementsEnabled(ctx, q, target.VenueSlug)
+	if err != nil {
+		return Decision{}, err
+	}
+	if !elementsEnabled {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 
@@ -530,7 +566,11 @@ func canActUpdateToken(ctx context.Context, q actionQuerier, userID, sessionID s
 	if err != nil {
 		return Decision{}, err
 	}
-	if !isSingleVenueLegacySlug(state.VenueSlug) || strings.ToLower(strings.TrimSpace(state.Surface)) != "stage" {
+	elementsEnabled, err := stageElementsEnabled(ctx, q, state.VenueSlug)
+	if err != nil {
+		return Decision{}, err
+	}
+	if !elementsEnabled || strings.ToLower(strings.TrimSpace(state.Surface)) != "stage" {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 	if strings.ToLower(strings.TrimSpace(state.ElementType)) != "token" && strings.ToLower(strings.TrimSpace(state.ContextClass)) != "token" {
@@ -578,7 +618,11 @@ func canActDuplicateElement(ctx context.Context, q actionQuerier, userID, sessio
 	if err != nil {
 		return Decision{}, err
 	}
-	if !isSingleVenueLegacySlug(state.VenueSlug) {
+	elementsEnabled, err := stageElementsEnabled(ctx, q, state.VenueSlug)
+	if err != nil {
+		return Decision{}, err
+	}
+	if !elementsEnabled {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 	if strings.ToLower(strings.TrimSpace(state.Surface)) != "stage" {
@@ -623,7 +667,11 @@ func canActRemoveElement(ctx context.Context, q actionQuerier, userID, sessionID
 	if err != nil {
 		return Decision{}, err
 	}
-	if !isSingleVenueLegacySlug(state.VenueSlug) {
+	elementsEnabled, err := stageElementsEnabled(ctx, q, state.VenueSlug)
+	if err != nil {
+		return Decision{}, err
+	}
+	if !elementsEnabled {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 	if strings.ToLower(strings.TrimSpace(state.Surface)) != "stage" {
@@ -676,7 +724,11 @@ func canActSetElementLock(ctx context.Context, q actionQuerier, userID, sessionI
 	if err != nil {
 		return Decision{}, err
 	}
-	if !isSingleVenueLegacySlug(state.VenueSlug) {
+	elementsEnabled, err := stageElementsEnabled(ctx, q, state.VenueSlug)
+	if err != nil {
+		return Decision{}, err
+	}
+	if !elementsEnabled {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 
@@ -708,7 +760,11 @@ func canActSetNameplateVisibility(ctx context.Context, q actionQuerier, userID, 
 	if err != nil {
 		return Decision{}, err
 	}
-	if !isSingleVenueLegacySlug(state.VenueSlug) {
+	elementsEnabled, err := stageElementsEnabled(ctx, q, state.VenueSlug)
+	if err != nil {
+		return Decision{}, err
+	}
+	if !elementsEnabled {
 		return Decision{Allowed: false, Reason: "unknown_target"}, nil
 	}
 

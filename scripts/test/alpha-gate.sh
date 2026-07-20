@@ -14,14 +14,14 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BACKEND_DIR="$ROOT/backend"
 
-# Test titles from the nine pre-existing tests/first-theater/dice.test.js
-# failures (Construction/roadmap.md's tracked, non-blocking exception).
-# tests/catharsis/dice.test.js is a faithful mirror of the same file, so the
-# same nine titles reappear there too -- 18 total, not a new regression.
-# Every one of these titles starts with "dice tray"; nothing else in either
-# suite does, so that prefix is used below as the allowlist check.
+# Test titles from the nine pre-existing dice.test.js failures
+# (Construction/roadmap.md's tracked, non-blocking exception). Kernel 72
+# merged the mirrored first-theater/catharsis suites into tests/stage-runtime,
+# so the nine titles appear once now, not twice. Every one of these titles
+# starts with "dice tray"; nothing else in the suite does, so that prefix is
+# used below as the allowlist check.
 KNOWN_DICE_FAILURE_PREFIX="dice tray"
-KNOWN_DICE_FAILURE_COUNT=18
+KNOWN_DICE_FAILURE_COUNT=9
 
 STEP_RESULTS=()
 OVERALL_PASS=1
@@ -81,11 +81,11 @@ else
 fi
 echo
 
-# --- Step 4: Node test suites (First Theater + Catharsis + contract) -------
-echo "--- Step 4/7: node --test tests/first-theater tests/catharsis tests/contract ---"
+# --- Step 4: Node test suites (shared stage engine + contract) -------------
+echo "--- Step 4/7: node --test tests/stage-runtime tests/contract ---"
 NODE_TEST_LOG="$(mktemp)"
 trap 'rm -f "$NODE_TEST_LOG"' EXIT
-node --test "$ROOT"/tests/first-theater/*.test.js "$ROOT"/tests/catharsis/*.test.js "$ROOT"/tests/contract/*.test.js >"$NODE_TEST_LOG" 2>&1
+node --test "$ROOT"/tests/stage-runtime/*.test.js "$ROOT"/tests/contract/*.test.js >"$NODE_TEST_LOG" 2>&1
 node_test_exit=$?
 
 # Every failing test's title, one per line, from the TAP "not ok N - <title>" lines.
@@ -106,13 +106,13 @@ fi
 
 if [[ "$unexpected_count" -eq 0 && "$failing_count" -eq "$KNOWN_DICE_FAILURE_COUNT" ]]; then
   echo "Node suite result: only the tracked, non-blocking dice.test.js exception failed ($failing_count/$failing_count)."
-  record_step "Node test suites (First Theater/Catharsis/contract)" "PASS (with tracked exception)"
+  record_step "Node test suites (stage-runtime/contract)" "PASS (with tracked exception)"
 elif [[ "$unexpected_count" -eq 0 && "$failing_count" -ne "$KNOWN_DICE_FAILURE_COUNT" ]]; then
   echo "Node suite result: dice.test.js failure count drifted from the tracked $KNOWN_DICE_FAILURE_COUNT (now $failing_count) -- update the tracked count in this script and Construction/roadmap.md if this is an intentional partial fix or new break, and confirm which before treating this as a pass."
-  record_step "Node test suites (First Theater/Catharsis/contract)" "FAIL"
+  record_step "Node test suites (stage-runtime/contract)" "FAIL"
 else
   echo "Node suite result: unexpected failures outside the tracked dice.test.js exception."
-  record_step "Node test suites (First Theater/Catharsis/contract)" "FAIL"
+  record_step "Node test suites (stage-runtime/contract)" "FAIL"
 fi
 echo
 

@@ -508,7 +508,7 @@ func createIndexCard(ctx context.Context, tx pgx.Tx, req IndexCardRequest) (inde
 		FROM sessions s
 		JOIN venues v ON v.id = s.venue_id
 		WHERE s.id = $2
-		  AND v.slug = 'the-cave'
+		  AND v.slug IN ('the-cave', 'first-theater', 'catharsis')
 	`, elementID, req.SessionID); err != nil {
 		return indexCardRecord{}, "", err
 	}
@@ -649,7 +649,7 @@ func resolveIndexCardScope(ctx context.Context, tx pgx.Tx, sessionID, actorID st
 		JOIN lots lo ON lo.id = v.lot_id
 		JOIN locations l ON l.id = lo.location_id
 		WHERE s.id = $1
-		  AND v.slug = 'the-cave'
+		  AND v.slug IN ('the-cave', 'first-theater', 'catharsis')
 		LIMIT 1
 	`, sessionID).Scan(&locationID, &venueSlug)
 	if err != nil {

@@ -445,6 +445,137 @@
         return formWrap;
       }
 
+      // Kernel 73: Participant Interactions are a distinct, smaller
+      // authoring surface from Cues -- a participant interaction opens a
+      // Program (currently only "Open Equip Mode") for the ONE triggering
+      // Player, never a shared Cue every eligible viewer can press. Ships
+      // exactly one interaction_type, so the create form only needs a
+      // label and which merchant packet to attach (Kessa's packet ships
+      // seeded; a future second packet would just be a new slug here).
+      function renderInteraction(interaction) {
+        const row = document.createElement("div");
+        row.className = "cue-row";
+        const left = document.createElement("div");
+        const title = document.createElement("div");
+        title.className = "cue-row-title";
+        title.textContent = interaction.stage_button_label || interaction.internal_name;
+        left.appendChild(title);
+        const meta = document.createElement("div");
+        meta.className = "cue-row-meta";
+        const packetSlug = interaction.configuration_json?.packet_slug || "(no packet configured)";
+        meta.textContent = interaction.internal_name + " · packet: " + packetSlug + (interaction.enabled ? "" : " · disabled");
+        left.appendChild(meta);
+        row.appendChild(left);
+
+        const toggleButton = document.createElement("button");
+        toggleButton.className = "chip small";
+        toggleButton.type = "button";
+        toggleButton.textContent = interaction.enabled ? "Disable" : "Enable";
+        toggleButton.addEventListener("click", async () => {
+          toggleButton.disabled = true;
+          try {
+            const res = await fetch(`/api/participant-interactions/${encodeURIComponent(interaction.id)}`, {
+              method: "PATCH", credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ enabled: !interaction.enabled }),
+            });
+            const p = await res.json().catch(() => null);
+            if (!res.ok || !p?.ok) { alert("Could not update interaction: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+            await loadInteractionsForPlacement(interaction.show_scene_placement_id, row.parentElement);
+          } finally {
+            toggleButton.disabled = false;
+          }
+        });
+        row.appendChild(toggleButton);
+        return row;
+      }
+
+      async function loadInteractionsForPlacement(placementId, container) {
+        container.innerHTML = "Loading Participant Interactions...";
+        const response = await fetch(`/api/shows/${encodeURIComponent(showId)}/scenes/${encodeURIComponent(placementId)}/participant-interactions`, { credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) { container.textContent = "Could not load Participant Interactions."; return; }
+        container.innerHTML = "";
+        const interactions = payload.data.interactions || [];
+        if (interactions.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "help-text";
+          empty.textContent = "No Participant Interactions yet.";
+          container.appendChild(empty);
+        }
+        for (const interaction of interactions) container.appendChild(renderInteraction(interaction));
+      }
+
+      function renderInteractionCreateForm(placementId, listContainer) {
+        const wrap = document.createElement("div");
+        wrap.className = "cue-create-form";
+
+        const nameField = document.createElement("div");
+        nameField.className = "field span-2";
+        const nameLabel = document.createElement("label");
+        nameLabel.textContent = "Internal name";
+        const nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.placeholder = "Backstage name, e.g. Kessa's Shop";
+        nameField.append(nameLabel, nameInput);
+
+        const labelField = document.createElement("div");
+        labelField.className = "field";
+        const labelLabel = document.createElement("label");
+        labelLabel.textContent = "Stage button label";
+        const labelInput = document.createElement("input");
+        labelInput.type = "text";
+        labelInput.placeholder = "Visit Kessa's Shop";
+        labelField.append(labelLabel, labelInput);
+
+        const packetField = document.createElement("div");
+        packetField.className = "field";
+        const packetLabel = document.createElement("label");
+        packetLabel.textContent = "Merchant packet";
+        const packetInput = document.createElement("input");
+        packetInput.type = "text";
+        packetInput.value = "kessa";
+        packetInput.placeholder = "kessa";
+        packetField.append(packetLabel, packetInput);
+
+        const createButton = document.createElement("button");
+        createButton.className = "chip small";
+        createButton.type = "button";
+        createButton.textContent = "Create Participant Interaction";
+        createButton.addEventListener("click", async () => {
+          const internalName = nameInput.value.trim();
+          const stageButtonLabel = labelInput.value.trim();
+          const packetSlug = packetInput.value.trim();
+          if (!internalName || !stageButtonLabel) { alert("Internal name and stage button label are required."); return; }
+          if (!packetSlug) { alert("Merchant packet slug is required."); return; }
+          createButton.disabled = true;
+          try {
+            const res = await fetch(`/api/shows/${encodeURIComponent(showId)}/scenes/${encodeURIComponent(placementId)}/participant-interactions`, {
+              method: "POST", credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                internal_name: internalName,
+                stage_button_label: stageButtonLabel,
+                interaction_type: "open_equip_mode",
+                configuration_json: { packet_slug: packetSlug },
+              }),
+            });
+            const p = await res.json().catch(() => null);
+            if (!res.ok || !p?.ok) { alert("Could not create Participant Interaction: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+            nameInput.value = ""; labelInput.value = ""; packetInput.value = "kessa";
+            await loadInteractionsForPlacement(placementId, listContainer);
+          } finally {
+            createButton.disabled = false;
+          }
+        });
+
+        wrap.append(nameField, labelField, packetField);
+        const formWrap = document.createElement("div");
+        formWrap.appendChild(wrap);
+        formWrap.appendChild(createButton);
+        return formWrap;
+      }
+
       function renderScenePlacement(detail) {
         const row = document.createElement("div");
         row.className = "scene-row";
@@ -558,6 +689,19 @@
         cuePanel.appendChild(renderCueCreateForm(detail.placement.id, cueList));
         row.appendChild(cuePanel);
         loadCuesForPlacement(detail.placement.id, cueList);
+
+        const interactionPanel = document.createElement("div");
+        interactionPanel.className = "cue-panel";
+        const interactionHeading = document.createElement("p");
+        interactionHeading.className = "scene-row-title";
+        interactionHeading.style.marginBottom = "4px";
+        interactionHeading.textContent = "Participant Interactions";
+        interactionPanel.appendChild(interactionHeading);
+        const interactionList = document.createElement("div");
+        interactionPanel.appendChild(interactionList);
+        interactionPanel.appendChild(renderInteractionCreateForm(detail.placement.id, interactionList));
+        row.appendChild(interactionPanel);
+        loadInteractionsForPlacement(detail.placement.id, interactionList);
 
         return row;
       }

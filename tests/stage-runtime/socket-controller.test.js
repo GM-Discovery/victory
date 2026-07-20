@@ -1,7 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const socketControllerModule = require("../../frontend/venues/catharsis/runtime/socket-controller.js");
+globalThis.VictoryStageVenue = { slug: "catharsis", name: "Catharsis" };
+const socketControllerModule = require("../../frontend/lib/stage-runtime/socket-controller.js");
 
 class FakeSocket {
   static CONNECTING = 0;
@@ -74,7 +75,7 @@ test("connectSocket queues while connecting and flushes on open", () => {
       payload: "queued",
     },
   ]);
-  assert.ok(calls.some((entry) => entry[0] === "status" && entry[1] === "Connected to the Catharsis WebSocket."));
+  assert.ok(calls.some((entry) => entry[0] === "status" && entry[1] === "Connected to the stage WebSocket."));
   assert.ok(calls.some((entry) => entry[0] === "meta"));
 });
 

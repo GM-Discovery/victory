@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Creates (if missing) and migrates the dedicated Kernel 64 test database
-# named by TEST_DATABASE_URL. Every migration file under database/migrations
+# named by TEST_DATABASE_URL. Every migration file under backend/migrations
 # is idempotent (IF NOT EXISTS / ON CONFLICT DO UPDATE), and the Go-side
 # bootstrap this also runs (see lib-migrate-and-bootstrap.sh) is idempotent
 # too, so running this repeatedly never destroys existing rows - it only

@@ -1,8 +1,9 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { createProjectedState } = require("../../frontend/venues/catharsis/runtime/state.js");
-const { createDispatcher } = require("../../frontend/venues/catharsis/runtime/socket.js");
+globalThis.VictoryStageVenue = { slug: "catharsis", name: "Catharsis" };
+const { createProjectedState } = require("../../frontend/lib/stage-runtime/state.js");
+const { createDispatcher } = require("../../frontend/lib/stage-runtime/socket.js");
 
 test("raw socket messages are parsed once and msg.data is normalized", () => {
   let parseCount = 0;

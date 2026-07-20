@@ -85,8 +85,13 @@ func HandleSessionControl(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		venueSlug := normalizeSessionControlVenueSlug(req.VenueSlug)
-		if venueSlug == "" {
+		venueSlug := strings.ToLower(strings.TrimSpace(req.VenueSlug))
+		sessionEnabled, err := VenueSessionControlEnabled(ctx, pool, venueSlug)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "venue_lookup_failed"})
+			return
+		}
+		if !sessionEnabled {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "venue_not_session_enabled"})
 			return
 		}
@@ -173,13 +178,31 @@ func HandleSessionControl(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func normalizeSessionControlVenueSlug(raw string) string {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "the-cave", "first-theater", "catharsis", "middle-school-stage":
-		return strings.ToLower(strings.TrimSpace(raw))
-	default:
-		return ""
+// VenueSessionControlEnabled checks the venues.config session_control_enabled
+// boolean flag. Kernel 72A: replaces the hardcoded venue-slug allowlist
+// (the-cave/first-theater/catharsis/middle-school-stage — membership
+// unchanged, now seeded by migration 055 and the Kernel 16 venue seed),
+// following rehearsal_capability.go's config-flag precedent. Unknown venues
+// and missing flags fail closed.
+func VenueSessionControlEnabled(ctx context.Context, pool *pgxpool.Pool, venueSlug string) (bool, error) {
+	venueSlug = strings.ToLower(strings.TrimSpace(venueSlug))
+	if venueSlug == "" {
+		return false, nil
 	}
+	var enabled bool
+	err := pool.QueryRow(ctx, `
+		SELECT COALESCE((config ->> 'session_control_enabled')::boolean, FALSE)
+		FROM venues
+		WHERE slug = $1
+		LIMIT 1
+	`, venueSlug).Scan(&enabled)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return enabled, nil
 }
 
 func normalizeSessionControlCommand(raw string) string {

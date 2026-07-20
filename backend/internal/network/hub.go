@@ -120,6 +120,31 @@ func (h *Hub) BroadcastProfileWatchers(profileID string, msg []byte) {
 	}
 }
 
+// BroadcastToSessionUser sends msg only to clients connected to sessionID
+// AND authenticated as userID -- the Kernel 73 privacy requirement that
+// Program Panel state (stance/Haggle rolls, purchase confirmations) never
+// reaches other Players or Audience (spec S6.2, S12). Reuses the Client
+// fields BroadcastSession and UpdateClientPresence already filter on
+// (SessionID, UserID); no new per-client "watching" field is needed since,
+// unlike the Kernel 61A player-profile WS (a separate lightweight endpoint
+// with no venue/session context), the existing venue WS connection already
+// carries both.
+func (h *Hub) BroadcastToSessionUser(sessionID, userID string, msg []byte) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for c := range h.clients {
+		if c == nil || c.SessionID != sessionID || c.UserID != userID {
+			continue
+		}
+		select {
+		case c.Send <- msg:
+		default:
+			log.Printf("dropping slow websocket client")
+		}
+	}
+}
+
 func (h *Hub) Presence() *PresenceRegistry {
 	return h.presence
 }

@@ -1,7 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const editorsModule = require("../../frontend/venues/catharsis/runtime/editors.js");
+globalThis.VictoryStageVenue = { slug: "catharsis", name: "Catharsis" };
+const editorsModule = require("../../frontend/lib/stage-runtime/editors.js");
 
 function makeElement(tagName = "div") {
   const listeners = new Map();

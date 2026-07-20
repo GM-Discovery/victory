@@ -1,15 +1,15 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-// Catharsis and First Theater each ship their own frontend/venues/<venue>/
-// runtime/scene-nodes.js -- confirmed genuine drift, not a bug: Catharsis
-// renders an extra token-aura Graphics layer First Theater doesn't have
-// (see Construction planning notes). This contract test runs the SAME
-// assertions against both modules' shared behavior only -- it deliberately
-// never asserts on the aura block or on exact PIXI child counts for
-// makeTokenNode, since those numbers legitimately differ between venues.
-const catharsisModule = require("../../frontend/venues/catharsis/runtime/scene-nodes.js");
-const firstTheaterModule = require("../../frontend/venues/first-theater/runtime/scene-nodes.js");
+// Until Kernel 72, Catharsis and First Theater shipped separate copies of
+// scene-nodes.js and this file existed to prove the forks stayed
+// behaviorally aligned. The de-fork collapsed both into the shared stage
+// engine (which kept Catharsis's token-aura layer), so the contract is now
+// asserted once against the one real module. It still deliberately avoids
+// exact PIXI child counts for makeTokenNode so the aura layer stays a free
+// implementation detail.
+globalThis.VictoryStageVenue = { slug: "catharsis", name: "Catharsis" };
+const stageRuntimeModule = require("../../frontend/lib/stage-runtime/scene-nodes.js");
 
 class FakeDisplayObject {
   constructor() {
@@ -145,8 +145,7 @@ function makeDeps(overrides = {}) {
 }
 
 const modules = [
-  ["catharsis", catharsisModule],
-  ["first-theater", firstTheaterModule],
+  ["stage-runtime", stageRuntimeModule],
 ];
 
 for (const [venueName, mod] of modules) {

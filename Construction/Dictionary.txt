@@ -440,6 +440,125 @@ Cue / GO
   panel wired through the existing `session-sync.js` snapshot-apply
   pipeline (`updateStageCueControls`), not a deep PIXI-canvas integration.
 
+Participant Interaction (Kernel 73)
+- A Director-authored, participant-local entry point attached to one Show
+  Scene Placement -- structurally similar to a Cue (own table
+  `participant_interactions`, placement-scoped, Director/Crew-authored via
+  the same `showruns.CanCrewPerformNonDestructiveEdit` authority a Cue
+  uses) but opposite in audience: a Cue is shared/role-scoped (every
+  eligible viewer sees and can press the SAME button); a Participant
+  Interaction opens a Program for ONLY the triggering Player. Deliberately
+  its own table rather than folded into `show_scene_placements.config_json`,
+  the same reasoning Cues used against the same column.
+- Ships exactly one `interaction_type` this kernel: `open_equip_mode`.
+  Eligibility (`merchant.ResolveEligibleContext`) requires, in order:
+  authenticated; active `player`-role Show Run roster member (not
+  audience, not backstage-only); the Show's *current* Scene Placement
+  matches the interaction's placement (opening/using it never changes that
+  pointer); the roster's currently-selected Character is owned and active;
+  the interaction is enabled; a rehearsal/live Session is linked to the
+  Show. Fails closed and typed at every step (`not_a_roster_member`,
+  `insufficient_role`, `scene_not_current`, `character_not_owned`,
+  `no_active_session`, ...).
+- Gated by the `participant_interactions_enabled` venues.config capability
+  flag (Kernel 72A's pattern: `actions.stageElementsEnabled`,
+  `network.VenueSessionControlEnabled`) -- seeded true only for
+  `catharsis`, both via migration and the Kernel 16 fresh-install venue
+  seed. Unknown/unflagged venues deny by construction.
+
+Equip Mode / Program Panel (Kernel 73)
+- **Program Panel**: a generic, venue-agnostic, participant-local large-
+  format overlay (`frontend/lib/stage-runtime/program-panel.js`) for an
+  item, dialogue, chart, instruction, or interaction -- built dynamically
+  via `document.createElement` (the same pattern Cue buttons use), not
+  static per-venue HTML. Distinct from **Audience Program** (the existing
+  curated Show-Run listing for ticket-buying Audience, `showruns`/`shows`
+  `AudienceProgramEntry`/`AudienceProgramBlurb`) -- unrelated concepts;
+  never conflate the two names.
+- **Equip Mode** is Catharsis's specific configuration of the Program
+  Panel for the `open_equip_mode` interaction type
+  (`frontend/lib/stage-runtime/participant-interactions.js`): the Kessa
+  Merchant Packet's six options (five stances + Haggle), equipment
+  browsing, and purchase confirmation. Opening/closing it never mutates
+  `shows.current_show_scene_placement_id` -- the shared Scene stays
+  current for everyone else exactly as it was.
+- Purchase/roll results return directly in the triggering request's HTTP
+  response; a same-user second tab is refreshed via a narrow targeted
+  websocket push, `network.Hub.BroadcastToSessionUser(sessionID, userID,
+  msg)` -- filtered on the exact (session, user) pair, reusing
+  `Client.SessionID`/`Client.UserID` already on every venue WS connection
+  rather than adding a new "watching" field or a separate lightweight
+  endpoint (contrast Kernel 61A's player-profile WS, which needed its own
+  endpoint because the old profile WS wasn't session-coupled).
+
+Merchant Packet (Kessa) and Authored Stance Disposition (Kernel 73)
+- **Merchant Packet**: the bounded, reusable non-dialogue-graph content
+  format (`merchant_packets` + `merchant_packet_equipment_items`) backing
+  a Program Panel merchant interaction -- exactly five fixed stance slots
+  (`command`, `convince`, `insight`, `follow`, `sympathize`) plus one
+  Haggle slot, authored response text, a Target Value, and a stock list.
+  Reusable for a future second merchant without code changes; adding one
+  is a new seed row, not new Go/JS. Kessa's own packet is seed-authored
+  (`backend/migrations/061_kernel73_participant_interactions.sql`), not
+  built through a UI editor this kernel (spec-permitted: "a bounded form
+  or seed configuration").
+- **Authored stance disposition**: each of the five stances has a FIXED
+  reaction (`reject`/`positive`/`neutral`) that a roll can never flip --
+  Command and Convince are always rejected, Insight is always positive,
+  Follow and Sympathize are always neutral. The roll (a flavor d20, not
+  skill-gated -- no stance names a skill anywhere in the spec) only
+  selects which authored response-text variant is shown, bucketed by
+  result tier. This is the deliberate line between "authored NPC" and "the
+  general dialogue/NPC-AI system" this kernel explicitly excludes.
+- **Skilled/unskilled Haggle and Target Value**: Haggle is NOT one of the
+  five stances -- it has its own confirmation-then-roll flow. A skilled
+  Character (has the packet's `haggle_skill_key`, resolved via
+  `merchant.hasCharacterSkill` -- a narrower direct `character_skills`
+  query than `characters.FindCharacterSkillByName`, because that function
+  additionally requires `characters.CanEditCard`'s `CanDraftCharacter`
+  gate, which a ticket-only Show Run Player never has) rolls the packet's
+  skilled die (d6 for Kessa); unskilled rolls the unskilled die (d4).
+  Target Value (5 for Kessa) is a plain `roll.Total >= TargetValue`
+  comparison -- server-calculated only, never computed in frontend
+  JavaScript. Success is a narrative-only benefit (Kessa: 20% off,
+  displayed as text); no currency field exists on `character_cards`, and
+  this kernel deliberately does not add one -- purchase never touches
+  currency.
+- `merchant.RollSkillGatedDie`/`SkillGatedRoll` is the shared bounded
+  roll-and-skill-check primitive both stance flavor-rolls and Haggle
+  reuse -- confirmed, per this kernel's own required audit, that no
+  target-value/skilled-vs-unskilled comparison mechanic existed anywhere
+  in the codebase before this; the skill ladder only ever produced die
+  *expressions*, never a pass/fail comparator.
+
+Equipment Item and Character Inventory Entry (Kernel 73)
+- **Equipment Item** (`equipment_items`, location-scoped like
+  `assets`/warehouse content): name, optional image (an `assets` row),
+  short description, descriptors, `quantity_mode` (`stackable` or
+  `unique`), active/archived. No slots, encumbrance, durability, resale,
+  crafting, weight, price enforcement, or vendor stock depletion -- all
+  explicitly out of scope. A minimal editor exists as real CRUD
+  (`GET/POST /api/venues/{venue_slug}/equipment`,
+  `PATCH /api/equipment/{id}`) though no frontend page calls it yet.
+- **Character Inventory Entry** (`character_inventory_items`): one row per
+  (Character, Equipment Item) -- `quantity` increments on repeat
+  `stackable` purchase; `unique`-mode items clamp at quantity 1 (a repeat
+  purchase is a no-op, not a second unit, not an error). Never rewritten
+  by a later Show Run roster Character-selection change -- it stays keyed
+  to the specific `character_card_id` it was purchased onto, regardless of
+  which Character the Player currently has selected. Viewable on its own
+  page, `frontend/venues/greenroom/inventory.html?character_id=...`
+  (reached from a "Character Inventory" toolbar button in the Greenroom),
+  satisfying this kernel's "dedicated page or clear Character subpage"
+  requirement as a real standalone page rather than a tab crowded into the
+  Workbook.
+- Purchase idempotency (`character_inventory_purchase_attempts`) follows
+  Cue's `cue_executions` precedent exactly: a dedicated attempt ledger
+  keyed `UNIQUE(character_card_id, equipment_item_id, idempotency_key)`,
+  not a field on the holdings row -- a retried request (same key) is
+  answered from the ledger without re-applying the quantity change; a
+  genuinely new purchase (new key) is free to increment again.
+
 Showing (live/runtime) vs. Show (scheduling/instance container)
 - "Showing" (Kernel 22, backend/internal/showings) is the live, 1:1 runtime
   wrapper auto-created around an already-active Session -- it controls
