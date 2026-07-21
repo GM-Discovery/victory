@@ -126,20 +126,21 @@ func TestKessaGoldenPath(t *testing.T) {
 
 	// --- Purchase: idempotent, lands in durable inventory ------------------
 	// The seeded stock mixes quantity_mode: pick a stackable item
-	// (coil-of-rope) for the increment proof and a unique item
-	// (travelers-cloak) for the clamp-at-1 proof, matching migration 061's
-	// actual seed data rather than assuming Stock[0] is stackable.
+	// (rations-1day) for the increment proof and a unique item (dagger) for
+	// the clamp-at-1 proof, matching the Kernel 73 follow-up's curated
+	// Kessa catalog (migration 063) rather than assuming Stock[0] is
+	// stackable.
 	var stockItem, uniqueItem EquipmentItem
 	for _, it := range equip.Packet.Stock {
 		switch it.Slug {
-		case "coil-of-rope":
+		case "rations-1day":
 			stockItem = it
-		case "travelers-cloak":
+		case "dagger":
 			uniqueItem = it
 		}
 	}
 	if stockItem.ID == "" || uniqueItem.ID == "" {
-		t.Fatalf("expected seeded coil-of-rope (stackable) and travelers-cloak (unique) in stock, got %+v", equip.Packet.Stock)
+		t.Fatalf("expected seeded rations-1day (stackable) and dagger (unique) in stock, got %+v", equip.Packet.Stock)
 	}
 
 	entry, err := AttemptPurchase(ctx, pool, fx.playerUserID, fx.interactionID, stockItem.ID, "purchase-key-1")

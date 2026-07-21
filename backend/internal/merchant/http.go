@@ -420,13 +420,16 @@ func HandleVenueEquipmentCollection(pool *pgxpool.Pool) http.HandlerFunc {
 
 		case http.MethodPost:
 			var body struct {
-				Name             string   `json:"name"`
-				Slug             string   `json:"slug"`
-				ImageAssetID     string   `json:"image_asset_id"`
-				ShortDescription string   `json:"short_description"`
-				Descriptors      []string `json:"descriptors"`
-				QuantityMode     string   `json:"quantity_mode"`
-				Active           *bool    `json:"active"`
+				Name             string         `json:"name"`
+				Slug             string         `json:"slug"`
+				ImageAssetID     string         `json:"image_asset_id"`
+				ShortDescription string         `json:"short_description"`
+				Descriptors      []string       `json:"descriptors"`
+				QuantityMode     string         `json:"quantity_mode"`
+				Active           *bool          `json:"active"`
+				Category         string         `json:"category"`
+				CostCredits      *float64       `json:"cost_credits"`
+				StatsJSON        map[string]any `json:"stats"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				writeError(w, errors.New("invalid_request_body"))
@@ -436,6 +439,7 @@ func HandleVenueEquipmentCollection(pool *pgxpool.Pool) http.HandlerFunc {
 				Name: body.Name, Slug: body.Slug, ImageAssetID: body.ImageAssetID,
 				ShortDescription: body.ShortDescription, Descriptors: body.Descriptors,
 				QuantityMode: body.QuantityMode, Active: body.Active,
+				Category: body.Category, CostCredits: body.CostCredits, StatsJSON: body.StatsJSON,
 			})
 			if err != nil {
 				writeError(w, err)
@@ -466,11 +470,14 @@ func HandleEquipmentItemByID(pool *pgxpool.Pool) http.HandlerFunc {
 		itemID := strings.TrimSpace(r.PathValue("equipment_item_id"))
 
 		var body struct {
-			Name             *string   `json:"name"`
-			ImageAssetID     *string   `json:"image_asset_id"`
-			ShortDescription *string   `json:"short_description"`
-			Descriptors      *[]string `json:"descriptors"`
-			Active           *bool     `json:"active"`
+			Name             *string         `json:"name"`
+			ImageAssetID     *string         `json:"image_asset_id"`
+			ShortDescription *string         `json:"short_description"`
+			Descriptors      *[]string       `json:"descriptors"`
+			Active           *bool           `json:"active"`
+			Category         *string         `json:"category"`
+			CostCredits      *float64        `json:"cost_credits"`
+			StatsJSON        *map[string]any `json:"stats"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			writeError(w, errors.New("invalid_request_body"))
@@ -479,6 +486,7 @@ func HandleEquipmentItemByID(pool *pgxpool.Pool) http.HandlerFunc {
 		item, err := UpdateEquipmentItem(ctx, pool, userID, itemID, EquipmentItemPatch{
 			Name: body.Name, ImageAssetID: body.ImageAssetID, ShortDescription: body.ShortDescription,
 			Descriptors: body.Descriptors, Active: body.Active,
+			Category: body.Category, CostCredits: body.CostCredits, StatsJSON: body.StatsJSON,
 		})
 		if err != nil {
 			writeError(w, err)

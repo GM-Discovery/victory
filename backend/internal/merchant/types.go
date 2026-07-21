@@ -25,6 +25,16 @@ type EquipmentItem struct {
 	CreatedByUserID  string    `json:"created_by_user_id,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
+
+	// Category, CostCredits, and StatsJSON are reference-only catalog
+	// fields (Kernel 73 follow-up) -- displayed for a narrator/player to
+	// read, never computed against, deducted, or used to gate a purchase.
+	// StatsJSON's shape varies by Category (a weapon's damage die has
+	// nothing in common with a mount's travel bonus); nothing server-side
+	// parses it for branching logic.
+	Category    string         `json:"category,omitempty"`
+	CostCredits *float64       `json:"cost_credits,omitempty"`
+	StatsJSON   map[string]any `json:"stats,omitempty"`
 }
 
 const (

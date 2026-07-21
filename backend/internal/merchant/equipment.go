@@ -15,16 +15,19 @@ import (
 const equipmentItemColumns = `
 	id::text, location_id::text, COALESCE(production_id::text, ''), name, slug,
 	COALESCE(image_asset_id::text, ''), short_description, descriptors_json,
-	quantity_mode, active, COALESCE(created_by_user_id::text, ''), created_at, updated_at
+	quantity_mode, active, COALESCE(created_by_user_id::text, ''), created_at, updated_at,
+	category, cost_credits, stats_json
 `
 
 func scanEquipmentItem(row pgx.Row) (EquipmentItem, error) {
 	var e EquipmentItem
 	var descriptorsRaw []byte
+	var statsRaw []byte
 	if err := row.Scan(
 		&e.ID, &e.LocationID, &e.ProductionID, &e.Name, &e.Slug,
 		&e.ImageAssetID, &e.ShortDescription, &descriptorsRaw,
 		&e.QuantityMode, &e.Active, &e.CreatedByUserID, &e.CreatedAt, &e.UpdatedAt,
+		&e.Category, &e.CostCredits, &statsRaw,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return EquipmentItem{}, errors.New("equipment_item_not_found")
@@ -32,6 +35,7 @@ func scanEquipmentItem(row pgx.Row) (EquipmentItem, error) {
 		return EquipmentItem{}, err
 	}
 	_ = json.Unmarshal(descriptorsRaw, &e.DescriptorsJSON)
+	_ = json.Unmarshal(statsRaw, &e.StatsJSON)
 	return e, nil
 }
 
@@ -79,6 +83,11 @@ type EquipmentItemInput struct {
 	Descriptors      []string
 	QuantityMode     string
 	Active           *bool
+	// Category/CostCredits/StatsJSON are reference-only catalog fields
+	// (Kernel 73 follow-up) -- see EquipmentItem's doc comment.
+	Category    string
+	CostCredits *float64
+	StatsJSON   map[string]any
 }
 
 func canManageEquipment(ctx context.Context, pool *pgxpool.Pool, actorUserID, locationID string) (bool, error) {
@@ -132,17 +141,23 @@ func CreateEquipmentItem(ctx context.Context, pool *pgxpool.Pool, actorUserID, l
 	if strings.TrimSpace(in.ImageAssetID) != "" {
 		imageAssetID = in.ImageAssetID
 	}
+	statsJSON, _ := json.Marshal(in.StatsJSON)
+	if in.StatsJSON == nil {
+		statsJSON = []byte("{}")
+	}
 
 	var id string
 	if err := pool.QueryRow(ctx, `
 		INSERT INTO equipment_items (
 			location_id, name, slug, image_asset_id, short_description,
-			descriptors_json, quantity_mode, active, created_by_user_id
+			descriptors_json, quantity_mode, active, created_by_user_id,
+			category, cost_credits, stats_json
 		)
-		VALUES ($1::uuid, $2, $3, $4::uuid, $5, $6::jsonb, $7, $8, $9::uuid)
+		VALUES ($1::uuid, $2, $3, $4::uuid, $5, $6::jsonb, $7, $8, $9::uuid, $10, $11, $12::jsonb)
 		RETURNING id::text
 	`, locationID, name, slug, imageAssetID, strings.TrimSpace(in.ShortDescription),
-		descriptorsJSON, quantityMode, active, actorUserID).Scan(&id); err != nil {
+		descriptorsJSON, quantityMode, active, actorUserID,
+		strings.TrimSpace(in.Category), in.CostCredits, statsJSON).Scan(&id); err != nil {
 		return EquipmentItem{}, err
 	}
 	return LoadEquipmentItemByID(ctx, pool, id)
@@ -154,6 +169,14 @@ type EquipmentItemPatch struct {
 	ShortDescription *string
 	Descriptors      *[]string
 	Active           *bool
+	// Category/CostCredits/StatsJSON are reference-only catalog fields
+	// (Kernel 73 follow-up) -- see EquipmentItem's doc comment. A provided
+	// CostCredits always sets the value; there is no patch-level way to
+	// clear it back to NULL (matches this editor's existing minor scope --
+	// unwired to any frontend yet).
+	Category    *string
+	CostCredits *float64
+	StatsJSON   *map[string]any
 }
 
 func UpdateEquipmentItem(ctx context.Context, pool *pgxpool.Pool, actorUserID, id string, patch EquipmentItemPatch) (EquipmentItem, error) {
@@ -193,13 +216,30 @@ func UpdateEquipmentItem(ctx context.Context, pool *pgxpool.Pool, actorUserID, i
 	if imageAssetIDStr != "" {
 		imageAssetID = imageAssetIDStr
 	}
+	category := existing.Category
+	if patch.Category != nil {
+		category = strings.TrimSpace(*patch.Category)
+	}
+	costCredits := existing.CostCredits
+	if patch.CostCredits != nil {
+		costCredits = patch.CostCredits
+	}
+	statsJSON, _ := json.Marshal(existing.StatsJSON)
+	if existing.StatsJSON == nil {
+		statsJSON = []byte("{}")
+	}
+	if patch.StatsJSON != nil {
+		statsJSON, _ = json.Marshal(*patch.StatsJSON)
+	}
 
 	if _, err := pool.Exec(ctx, `
 		UPDATE equipment_items
 		SET name = $2, image_asset_id = $3::uuid, short_description = $4,
-		    descriptors_json = $5::jsonb, active = $6, updated_at = NOW()
+		    descriptors_json = $5::jsonb, active = $6, updated_at = NOW(),
+		    category = $7, cost_credits = $8, stats_json = $9::jsonb
 		WHERE id = $1
-	`, id, name, imageAssetID, shortDescription, descriptorsJSON, active); err != nil {
+	`, id, name, imageAssetID, shortDescription, descriptorsJSON, active,
+		category, costCredits, statsJSON); err != nil {
 		return EquipmentItem{}, err
 	}
 	return LoadEquipmentItemByID(ctx, pool, id)
