@@ -400,6 +400,27 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, view
 		return nil, err
 	}
 
+	// Kernel 73A: when this session's Show has a current Scene Placement,
+	// fold that Scene's own authored composition (backend/internal/scenes'
+	// scene_stage_elements, Base layer + this placement's Show layer) into
+	// the same Elements array warehouse-asset tokens/index cards already
+	// live in, so the existing role-based visibility filtering below and
+	// the frontend's existing normalizeSnapshot/applyAction rendering path
+	// pick them up with zero further client-side special-casing. This is
+	// the seam that replaces Kernel 73A pass one's manual "Load Composition
+	// Into Live Session" button and its stopgap 'scene_composition_loaded'
+	// action type -- composition is now simply part of what a snapshot
+	// *is* for the Scene that's current, computed fresh on every read
+	// (same "not persisted, computed on read" model this function already
+	// uses for the actions-log replay above), not a client-interpreted event.
+	if snap.Session.CurrentShowScenePlacementID != "" {
+		compositionElements, err := loadSceneCompositionAsPlacedElements(ctx, pool, snap.Session.CurrentShowScenePlacementID)
+		if err != nil {
+			return nil, err
+		}
+		snap.Elements = append(snap.Elements, compositionElements...)
+	}
+
 	snap.Overlay = deriveActiveOverlay(snap.Actions, snap.Elements)
 
 	layerVisibility := deriveElementLayerVisibility(snap.Actions)
@@ -447,6 +468,116 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, view
 	snap.TheaterContext = theaterContext
 
 	return &snap, nil
+}
+
+// loadSceneCompositionAsPlacedElements resolves a Show Scene Placement's
+// Kernel 73A composition (scene_stage_elements' Base layer + this
+// placement's own Show layer, plus each element's stage_element_bindings
+// row if any) and converts each row into a synthetic PlacedElement, so it
+// flows through this file's existing overlay/visibility/role-filtering
+// pipeline identically to a warehouse-asset-backed token or index card.
+//
+// This package deliberately does NOT import backend/internal/scenes to get
+// at scenes.LoadResolvedComposition -- world is imported by
+// backend/internal/network (director_console.go), and shows (which scenes
+// itself imports) imports network back (sessions.go), so
+// world -> scenes -> shows -> network -> world would be a real import
+// cycle. A narrow duplicated SQL query against tables this package doesn't
+// "own" is the established smaller, safer fix in this codebase for exactly
+// this shape of problem (e.g. shows/stage.go's own placementOwnership
+// query against show_scene_placements rather than importing scenes back).
+//
+// ElementID is prefixed "scene:" (never a bare UUID) so a client can tell a
+// Kernel 73A composition element apart from a legacy warehouse element
+// sharing this same array -- composition elements have no warehouse asset,
+// no elements-table row, and are never targets of create/token,
+// act/place_element, or the lock/nameplate/duplicate/remove action family
+// those rows support; they are edited exclusively through
+// backend/internal/scenes' own stage-element endpoints and simply re-read
+// fresh on every snapshot call (never mutated by an action replay).
+func loadSceneCompositionAsPlacedElements(ctx context.Context, pool *pgxpool.Pool, placementID string) ([]PlacedElement, error) {
+	var sceneID string
+	if err := pool.QueryRow(ctx, `
+		SELECT scene_id::text FROM show_scene_placements WHERE id = $1
+	`, placementID).Scan(&sceneID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// A stale current-scene pointer (placement archived/removed
+			// out from under it) should not fail the whole snapshot --
+			// render the rest of the stage with no composition layer.
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT
+			sse.id::text, sse.kind, COALESCE(sse.label, ''),
+			CASE WHEN sse.show_scene_placement_id IS NULL THEN 'base' ELSE 'show' END,
+			sse.data::text, sse.position::text, sse.visibility::text,
+			COALESCE(seb.binding_type, ''), COALESCE(seb.participant_interaction_id::text, ''),
+			COALESCE(pi.stage_button_label, ''), COALESCE(pi.enabled, FALSE)
+		FROM scene_stage_elements sse
+		LEFT JOIN stage_element_bindings seb ON seb.scene_stage_element_id = sse.id AND seb.binding_type = 'participant_interaction'
+		LEFT JOIN participant_interactions pi ON pi.id = seb.participant_interaction_id
+		WHERE sse.scene_id = $1 AND (sse.show_scene_placement_id IS NULL OR sse.show_scene_placement_id = $2)
+		ORDER BY (sse.show_scene_placement_id IS NULL) DESC, sse.sort_order ASC, sse.created_at ASC
+	`, sceneID, placementID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []PlacedElement
+	for rows.Next() {
+		var id, kind, label, layer, dataText, positionText, visibilityText, bindingType, bindingInteractionID, bindingLabel string
+		var bindingEnabled bool
+		if err := rows.Scan(&id, &kind, &label, &layer, &dataText, &positionText, &visibilityText, &bindingType, &bindingInteractionID, &bindingLabel, &bindingEnabled); err != nil {
+			return nil, err
+		}
+
+		data := decodeJSONMap([]byte(dataText))
+		if data == nil {
+			data = map[string]any{}
+		}
+		data["scene_stage_element_id"] = id
+		data["kind"] = kind
+		data["layer"] = layer
+		if bindingInteractionID != "" {
+			data["binding"] = map[string]any{
+				"binding_type":               bindingType,
+				"participant_interaction_id": bindingInteractionID,
+				"stage_button_label":         bindingLabel,
+				"enabled":                    bindingEnabled,
+			}
+		}
+
+		position := decodeJSONMap([]byte(positionText))
+		if position == nil {
+			position = map[string]any{}
+		}
+		visibility := decodeJSONMap([]byte(visibilityText))
+		if visibility == nil {
+			visibility = map[string]any{"toRoles": []any{"audience", "cast", "crew", "director", "producer"}, "privateTo": []any{}}
+		}
+
+		out = append(out, PlacedElement{
+			ElementID:    "scene:" + id,
+			Name:         label,
+			Slug:         "scene-" + id,
+			ElementType:  "scene_" + kind,
+			ContextClass: "scene_composition",
+			Surface:      "stage",
+			Position:     position,
+			Visibility:   visibility,
+			State: map[string]any{
+				"locked":            false,
+				"nameplate_visible": true,
+				"visible":           true,
+			},
+			Data: data,
+		})
+	}
+	return out, rows.Err()
 }
 
 // isBackstageRole reports whether role is one of the Kernel 70A

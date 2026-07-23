@@ -495,3 +495,32 @@ func HandleEquipmentItemByID(pool *pgxpool.Pool) http.HandlerFunc {
 		writeOK(w, map[string]any{"equipment_item": item})
 	}
 }
+
+// HandleInteractionPreview handles GET /api/participant-interactions/{interaction_id}/preview
+// -- the Kernel 73A "Preview as Player" endpoint (spec item 7). Backstage-
+// authority gated (the opposite gate from OpenEquipMode's participant
+// eligibility), read-only, and structurally unable to reach any
+// purchase/roll/participation code path -- see PreviewInteraction's own
+// doc comment for exactly why.
+func HandleInteractionPreview(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		interactionID := strings.TrimSpace(r.PathValue("interaction_id"))
+		out, err := PreviewInteraction(ctx, pool, userID, interactionID)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeOK(w, out)
+	}
+}

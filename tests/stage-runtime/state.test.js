@@ -102,3 +102,77 @@ test("hide and reveal element actions update projected visibility", () => {
   state.applyEvent({ type: "act/reveal_element", target: { element_id: "token-1" }, sequence: 3 });
   assert.equal(state.getState().objects[0].visibility.visible, true);
 });
+
+// Kernel 73A: a scene_composition-context_class element (synthesized by
+// backend/internal/world/snapshot.go's loadSceneCompositionAsPlacedElements
+// from scene_stage_elements, never a warehouse-asset element) must map onto
+// the existing "token"/"card" node kinds this pipeline already renders,
+// carry its bound participant interaction through to model.source.data.binding
+// untouched, and never be treated as a persistable live stage object (it has
+// no elements-table row for update/token or act/place_element to target).
+test("scene composition elements map onto token/card kinds and stay non-live", () => {
+  const state = createProjectedState({ viewerRole: "director" });
+  state.replaceFromSnapshot({
+    elements: [
+      {
+        element_id: "scene:kessa-token-id",
+        element_type: "scene_token",
+        context_class: "scene_composition",
+        name: "Kessa",
+        slug: "scene-kessa-token-id",
+        position: { x: 0.4, y: 0.6 },
+        visibility: { visible: true, nameplate_visible: true },
+        data: {
+          scene_stage_element_id: "kessa-token-id",
+          kind: "token",
+          layer: "base",
+          binding: {
+            binding_type: "participant_interaction",
+            participant_interaction_id: "interaction-1",
+            stage_button_label: "Talk to Kessa",
+            enabled: true,
+          },
+        },
+      },
+      {
+        element_id: "scene:note-card-id",
+        element_type: "scene_index_card",
+        context_class: "scene_composition",
+        name: "A Note",
+        slug: "scene-note-card-id",
+        position: { x: 0.2, y: 0.2 },
+        visibility: { visible: true, nameplate_visible: true },
+        data: { scene_stage_element_id: "note-card-id", kind: "index_card", layer: "base" },
+      },
+      {
+        element_id: "scene:backdrop-id",
+        element_type: "scene_map_backdrop",
+        context_class: "scene_composition",
+        name: "Backdrop",
+        slug: "scene-backdrop-id",
+        position: {},
+        visibility: { visible: true, nameplate_visible: true },
+        data: { scene_stage_element_id: "backdrop-id", kind: "map_backdrop", layer: "base" },
+      },
+    ],
+  });
+
+  const objects = state.getState().objects;
+  // map_backdrop has no generic per-element node yet -- must be dropped,
+  // not mis-rendered as a token or card.
+  assert.equal(objects.length, 2);
+
+  const kessa = objects.find((o) => o.label === "Kessa");
+  assert.ok(kessa, "expected the Kessa token to be present");
+  assert.equal(kessa.kind, "token");
+  assert.equal(kessa.live, false);
+  assert.equal(kessa.source.data.binding.participant_interaction_id, "interaction-1");
+  assert.equal(kessa.source.data.binding.stage_button_label, "Talk to Kessa");
+  assert.equal(kessa.source.data.binding.enabled, true);
+
+  const note = objects.find((o) => o.label === "A Note");
+  assert.ok(note, "expected the index card to be present");
+  assert.equal(note.kind, "card");
+  assert.equal(note.live, false);
+  assert.equal(note.source.data.binding, undefined);
+});

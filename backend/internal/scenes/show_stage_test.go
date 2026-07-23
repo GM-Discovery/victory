@@ -165,3 +165,11 @@ func TestSetCurrentScenePlacementRequiresManageAuthority(t *testing.T) {
 		t.Fatalf("expected not_authorized for outsider, got %v", err)
 	}
 }
+
+// The former TestProjectCompositionIntoSessionRequiresActiveSession and
+// TestProjectCompositionIntoSessionAppendsActionForLinkedSession tests
+// lived here, covering the now-removed ProjectCompositionIntoSession
+// stopgap. The real integration is covered instead by
+// backend/internal/world's TestLoadVenueSnapshotIncludesCurrentSceneComposition
+// (and its Kessa-binding sibling), which drive the actual
+// world.LoadVenueSnapshot seam that replaced it.

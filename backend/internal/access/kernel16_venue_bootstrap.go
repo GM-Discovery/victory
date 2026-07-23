@@ -53,7 +53,7 @@ func EnsureKernel16VenueSurface(ctx context.Context, pool *pgxpool.Pool) error {
 			slug:       "catharsis",
 			name:       "Catharsis",
 			kind:       "plaza",
-			config:     `{ "surface": "audience", "ticketing": "planned", "permission_gate": true, "project": "Socio", "index_cards_enabled": true, "scene_rehearsal_enabled": true, "stage_elements_enabled": true, "session_control_enabled": true, "participant_interactions_enabled": true }`,
+			config:     `{ "surface": "audience", "ticketing": "planned", "permission_gate": true, "project": "Socio", "index_cards_enabled": true, "scene_rehearsal_enabled": true, "stage_elements_enabled": true, "session_control_enabled": true, "participant_interactions_enabled": true, "scene_composer_enabled": true }`,
 			isPublic:   false,
 			isWorkshop: false,
 		},

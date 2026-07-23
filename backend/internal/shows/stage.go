@@ -84,7 +84,11 @@ func SetCurrentScenePlacement(ctx context.Context, pool *pgxpool.Pool, actorUser
 		UPDATE shows SET current_show_scene_placement_id = $2, updated_at = NOW()
 		WHERE id = $1
 		RETURNING `+showColumns, showID, placementID)
-	return scanShow(row)
+	updated, err := scanShow(row)
+	if err != nil {
+		return Show{}, err
+	}
+	return updated, nil
 }
 
 // SetCurrentScenePlacementTrusted is SetCurrentScenePlacement without the
@@ -105,7 +109,11 @@ func SetCurrentScenePlacementTrusted(ctx context.Context, pool *pgxpool.Pool, sh
 		UPDATE shows SET current_show_scene_placement_id = $2, updated_at = NOW()
 		WHERE id = $1
 		RETURNING `+showColumns, showID, placementID)
-	return scanShow(row)
+	updated, err := scanShow(row)
+	if err != nil {
+		return Show{}, err
+	}
+	return updated, nil
 }
 
 // validatePlacementBelongsToShow enforces the kernel's pointer-safety

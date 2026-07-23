@@ -75,9 +75,34 @@
     ]);
   }
 
+  // Kernel 73A: a "scene_composition" context_class marks a synthetic
+  // element backend/internal/world/snapshot.go merged in from a Scene's
+  // own scene_stage_elements (Base + Show layer authored composition),
+  // not a warehouse-asset-backed element. Its data.kind is the authored
+  // composition kind (token/index_card/map_backdrop/grid_config), which
+  // this maps onto the SAME "token"/"card" node kinds the rest of this
+  // pipeline already knows how to render -- reusing the real PIXI token/
+  // card node factories (scene-nodes.js) rather than a bolt-on renderer,
+  // so a Scene's tokens and index cards appear on the actual Catharsis
+  // stage exactly like any other live object. map_backdrop/grid_config
+  // have no equivalent generic per-element node in this pipeline (the
+  // venue map/backdrop and grid are rendered as a separate background
+  // layer, not a per-element node) -- composition rows of those two kinds
+  // are intentionally not converted into stage objects here yet (Kernel
+  // 74 follow-up), not silently mis-rendered as a token/card.
+  function sceneCompositionNodeKind(dataKind) {
+    const kind = String(dataKind || "").trim().toLowerCase();
+    if (kind === "token") return "token";
+    if (kind === "index_card") return "card";
+    return ""; // map_backdrop, grid_config, or unknown -- no node yet.
+  }
+
   function kindForElement(element) {
     const source = element && typeof element === "object" ? element : {};
     const data = source.data && typeof source.data === "object" ? source.data : {};
+    if (String(source.context_class || "").trim().toLowerCase() === "scene_composition") {
+      return sceneCompositionNodeKind(data.kind);
+    }
     const kind = String(source.kind || source.element_type || data.type || "").trim().toLowerCase();
     if (kind === "token") return "token";
     if (kind === "card" || kind === "index_card") return "card";
@@ -102,7 +127,14 @@
     const data = source.data && typeof source.data === "object" ? source.data : {};
     const visibility = normalizeVisibility(source.visibility);
     const state = normalizeState(source.state);
+    const isSceneComposition = String(source.context_class || "").trim().toLowerCase() === "scene_composition";
     const kind = kindForElement(source);
+    if (isSceneComposition && !kind) {
+      // map_backdrop / grid_config / an unrecognized composition kind --
+      // no stage-object node exists for these yet; drop rather than
+      // mis-render as a token or card (see sceneCompositionNodeKind).
+      return null;
+    }
     const key = makeKey(source);
     const role = String(options.viewerRole || options.role || "").trim().toLowerCase();
     const tokenLayer = String(
@@ -130,7 +162,14 @@
     return {
       key,
       kind,
-      live: Boolean(source.live ?? true),
+      // Kernel 73A composition elements are never live/1persistable stage
+      // objects -- they have no elements-table row for update/token or
+      // act/place_element to target, so drag/scale/lock actions must not
+      // attempt to send a persistence request (makeTokenNode/makeCardNode's
+      // own `if (!model.live) return;` guard after selectObject already
+      // covers this: selection and the bound "Talk to X" action below both
+      // still work with live=false, only drag-persistence is suppressed).
+      live: isSceneComposition ? false : Boolean(source.live ?? true),
       elementId: readFirst(source, ["element_id", "elementId"]),
       elementSlug: readFirst(source, ["slug", "element_slug", "elementSlug"]),
       label,

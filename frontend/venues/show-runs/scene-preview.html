@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Preview as Player — Victory</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    :root { color-scheme: dark; --bg: #17120e; --panel: rgba(27, 21, 17, 0.92); --line: rgba(255, 233, 197, 0.12); --accent: #f0d3a4; --accent-strong: #fff2d7; --muted: #d0bfa6; }
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: linear-gradient(180deg, #17120e 0%, #0e0b09 100%); color: #f6ecdd; }
+    .header { padding: 18px 20px 8px; max-width: 900px; margin: 0 auto; }
+    .eyebrow { text-transform: uppercase; letter-spacing: 0.18em; color: #d7ab6f; font-size: 0.76rem; margin: 0 0 6px; }
+    h1 { margin: 0; font-size: 1.5rem; }
+    .subtitle { margin: 8px 0 0; color: var(--muted); max-width: 70ch; line-height: 1.5; font-size: 0.9rem; }
+    .stage-wrap { max-width: 900px; margin: 16px auto 40px; padding: 0 20px; box-sizing: border-box; }
+    .stage-surface { position: relative; width: 100%; aspect-ratio: 16 / 9; background: repeating-linear-gradient(45deg, #241a12, #241a12 10px, #1c140e 10px, #1c140e 20px); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+    .token { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .token-face { width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
+    .token.bound .token-face { border-color: var(--accent); cursor: pointer; }
+    .token-label { font-size: 0.78rem; color: var(--accent-strong); background: rgba(0,0,0,0.4); padding: 2px 8px; border-radius: 999px; }
+    .index-card { position: absolute; transform: translate(-50%, -50%); background: #fff6e0; color: #241a12; padding: 10px 12px; border-radius: 8px; max-width: 200px; font-size: 0.82rem; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
+    .status-line { color: var(--muted); }
+    .chip { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; text-decoration: none; border: 1px solid var(--line); padding: 9px 14px; color: var(--accent-strong); background: rgba(255,255,255,0.03); font-weight: 700; cursor: pointer; font: inherit; }
+    .panel { margin-top: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <p class="eyebrow">Victory / Preview as Player</p>
+    <h1>Preview as Player</h1>
+    <p class="subtitle">A read-only render of this Scene's resolved composition (Base layer + this Show's own layer), exactly as a Player would see the stage. Bound elements (like Kessa's stall) are clickable here too, to prove a token is reachable and bound to the right interaction -- clicking one calls a dedicated, backstage-authority, read-only preview endpoint (never the real Equip Mode open/stance/haggle/purchase path), so nothing here can purchase, roll, or record participation no matter what this page's client code does.</p>
+  </div>
+  <div class="stage-wrap">
+    <p class="status-line" id="status-line">Loading composition...</p>
+    <div class="stage-surface" id="stage-surface" hidden></div>
+    <div class="panel" id="open-result" hidden>
+      <p class="status-line" id="open-result-text"></p>
+    </div>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script>
+    function query(name) { return new URLSearchParams(window.location.search).get(name) || ""; }
+
+    function renderToken(el, container) {
+      const wrap = document.createElement("div");
+      wrap.className = "token" + (el.binding ? " bound" : "");
+      const x = (el.position && typeof el.position.x === "number") ? el.position.x : 0.5;
+      const y = (el.position && typeof el.position.y === "number") ? el.position.y : 0.5;
+      wrap.style.left = (x * 100) + "%";
+      wrap.style.top = (y * 100) + "%";
+
+      const face = document.createElement("div");
+      face.className = "token-face";
+      face.textContent = (el.label || "?").slice(0, 1).toUpperCase();
+      wrap.appendChild(face);
+
+      const label = document.createElement("div");
+      label.className = "token-label";
+      label.textContent = el.label || "(untitled)";
+      wrap.appendChild(label);
+
+      if (el.binding) {
+        face.title = "Click to open (bound to a participant interaction)";
+        face.addEventListener("click", () => attemptOpen(el.binding.participant_interaction_id));
+      }
+
+      container.appendChild(wrap);
+    }
+
+    function renderIndexCard(el, container) {
+      const card = document.createElement("div");
+      card.className = "index-card";
+      const x = (el.position && typeof el.position.x === "number") ? el.position.x : 0.5;
+      const y = (el.position && typeof el.position.y === "number") ? el.position.y : 0.5;
+      card.style.left = (x * 100) + "%";
+      card.style.top = (y * 100) + "%";
+      card.textContent = (el.data && el.data.text) || el.label || "(index card)";
+      container.appendChild(card);
+    }
+
+    // Kernel 73A item 7: this calls GET .../preview, a structurally
+    // separate, read-only, backstage-authority endpoint -- never the real
+    // POST .../open (participant-eligibility, mutation-adjacent) path a
+    // Player's click uses. See backend/internal/merchant/preview.go's
+    // PreviewInteraction for exactly why this can never reach a
+    // purchase/roll/participation code path.
+    async function attemptOpen(interactionId) {
+      const resultPanel = document.getElementById("open-result");
+      const resultText = document.getElementById("open-result-text");
+      resultPanel.hidden = false;
+      resultText.textContent = "Loading preview...";
+      try {
+        const res = await fetch(`/api/participant-interactions/${encodeURIComponent(interactionId)}/preview`, { credentials: "include" });
+        const p = await res.json().catch(() => null);
+        if (!res.ok || !p?.ok) {
+          resultText.textContent = "Could not load preview: " + (p?.data?.error || `HTTP ${res.status}`);
+          return;
+        }
+        const d = p.data || {};
+        resultText.textContent = "Preview only -- no purchase, roll, or participation is possible through this page.\n" +
+          "Stage button: " + (d.stage_button_label || "(none)") + (d.enabled ? "" : " (DISABLED)") + "\n" +
+          (d.packet_display_name ? ("Packet: " + d.packet_display_name + "\n" + (d.packet_intro_text || "") + "\n") : "") +
+          (d.stock_names && d.stock_names.length ? ("Stock: " + d.stock_names.join(", ")) : "");
+      } catch (e) {
+        resultText.textContent = "Request failed: " + e;
+      }
+    }
+
+    async function bootstrap() {
+      const showId = query("show_id");
+      const placementId = query("placement_id");
+      const sceneId = query("scene_id");
+      const statusLine = document.getElementById("status-line");
+      const surface = document.getElementById("stage-surface");
+
+      let elements = [];
+      if (showId && placementId) {
+        const res = await fetch(`/api/shows/${encodeURIComponent(showId)}/scenes/${encodeURIComponent(placementId)}/stage-composition`, { credentials: "include" });
+        const p = await res.json().catch(() => null);
+        if (!res.ok || !p?.ok) { statusLine.textContent = "Could not load composition: " + (p?.data?.error || `HTTP ${res.status}`); return; }
+        elements = p.data.composition?.elements || [];
+      } else if (sceneId) {
+        const res = await fetch(`/api/scenes/${encodeURIComponent(sceneId)}/stage-elements`, { credentials: "include" });
+        const p = await res.json().catch(() => null);
+        if (!res.ok || !p?.ok) { statusLine.textContent = "Could not load Base-layer elements: " + (p?.data?.error || `HTTP ${res.status}`); return; }
+        elements = p.data.elements || [];
+      } else {
+        statusLine.textContent = "Pass ?show_id=&placement_id= (full merged composition) or ?scene_id= (Base layer only) in the URL.";
+        return;
+      }
+
+      statusLine.hidden = true;
+      surface.hidden = false;
+      for (const el of elements) {
+        if (el.kind === "token") renderToken(el, surface);
+        else if (el.kind === "index_card") renderIndexCard(el, surface);
+      }
+      if (elements.length === 0) {
+        statusLine.hidden = false;
+        statusLine.textContent = "This Scene has no composition elements yet.";
+      }
+    }
+
+    bootstrap().catch((error) => {
+      console.error("scene preview bootstrap failed", error);
+      document.getElementById("status-line").textContent = "Something went wrong loading the preview.";
+    });
+  </script>
+</body>
+</html>

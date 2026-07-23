@@ -2857,6 +2857,42 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
 
         selectedActions.appendChild(button);
       });
+
+      // Kernel 73A: the selected object's own bound participant
+      // interaction (e.g. Kessa's stall token bound to her "Talk to
+      // Kessa" interaction, backend/internal/scenes' stage_element_
+      // bindings) surfaces here as a real, clickable action -- "selecting
+      // it exposes its bound action" -- reusing the exact tested Kernel
+      // 73 Program Panel controller (getParticipantInteractionsController)
+      // any other participant-interaction button on this page already
+      // uses. This is a client-side convenience only: eligibility
+      // (roster membership, selected Character, Scene-current match,
+      // enabled) is re-checked server-side inside OpenEquipMode/
+      // ResolveEligibleContext on every open attempt regardless of
+      // whether this button is shown, so an Audience viewer or a
+      // non-rostered Player who somehow triggers this click still gets
+      // refused server-side.
+      const binding = currentSelection?.source?.data?.binding;
+      const interactionId = binding?.participant_interaction_id ? String(binding.participant_interaction_id) : "";
+      if (interactionId && binding?.enabled && normalizeRole(currentRole) !== "audience") {
+        if (actions.length > 0) {
+          const separator = document.createElement("div");
+          separator.className = "action-separator";
+          selectedActions.appendChild(separator);
+        }
+        const bindingButton = document.createElement("button");
+        bindingButton.type = "button";
+        bindingButton.textContent = binding.stage_button_label || "Interact";
+        bindingButton.addEventListener("click", () => {
+          const controller = getParticipantInteractionsController();
+          if (!controller) {
+            setStageStatus("Interactions are unavailable right now.");
+            return;
+          }
+          controller.openInteraction(interactionId, bindingButton.textContent);
+        });
+        selectedActions.appendChild(bindingButton);
+      }
     }
 
     function showCardEditorFor(model) { return editors?.showCardEditorFor?.(model); }

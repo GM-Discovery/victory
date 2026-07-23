@@ -36,6 +36,11 @@
     .chip.small { padding: 8px 12px; font-size: 0.82rem; }
     .badge.current { color: #baffb0; border-color: rgba(140, 240, 130, 0.5); }
     .cue-panel { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 10px; flex-basis: 100%; }
+    .composer-surface { position: relative; width: 100%; max-width: 640px; aspect-ratio: 16 / 9; margin: 10px 0; background: repeating-linear-gradient(45deg, #241a12, #241a12 10px, #1c140e 10px, #1c140e 20px); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; touch-action: none; }
+    .composer-dot { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: grab; user-select: none; }
+    .composer-dot-glyph { width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.08); border: 2px solid var(--accent); color: var(--accent-strong); display: flex; align-items: center; justify-content: center; font-weight: 700; }
+    .composer-dot.is-card .composer-dot-glyph { border-radius: 6px; background: #fff6e0; color: #241a12; border-color: #5d4327; }
+    .composer-dot-label { font-size: 0.68rem; color: var(--accent-strong); background: rgba(0,0,0,0.4); padding: 1px 6px; border-radius: 999px; white-space: nowrap; }
     .cue-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0; }
     .cue-row-title { font-weight: 700; }
     .cue-row-meta { color: var(--muted); font-size: 0.8rem; }
@@ -150,6 +155,11 @@
 
       <section class="card" id="scenes-card" hidden>
         <h2 style="margin-top:0;">Scenes in this Show</h2>
+        <p class="launchbar">
+          <button class="chip" type="button" id="prepare-courtyard-button">Prepare Locked Courtyard Opening</button>
+          <button class="chip" type="button" id="kessa-diagnostics-button">Kessa Reachability Diagnostics</button>
+        </p>
+        <pre id="kessa-diagnostics-output" class="help-text" style="white-space:pre-wrap; background:rgba(0,0,0,0.2); border-radius:10px; padding:10px;" hidden></pre>
         <p class="status-line" id="scenes-status-line">Loading Scenes...</p>
         <div id="scenes-list"></div>
         <div class="form-grid">
@@ -703,6 +713,303 @@
         row.appendChild(interactionPanel);
         loadInteractionsForPlacement(detail.placement.id, interactionList);
 
+        row.appendChild(renderCompositionPanel(detail));
+
+        return row;
+      }
+
+      // --- Kernel 73A: Scene Setup composer + Preview as Player --------
+
+      function renderCompositionPanel(detail) {
+        const panel = document.createElement("div");
+        panel.className = "cue-panel";
+        const heading = document.createElement("p");
+        heading.className = "scene-row-title";
+        heading.style.marginBottom = "4px";
+        heading.textContent = "Scene Setup (Composition)";
+        panel.appendChild(heading);
+
+        const help = document.createElement("p");
+        help.className = "help-text";
+        help.textContent = "Base-layer elements belong to the reusable Scene itself (every Show that stages it sees them). Adding one here from a Show's page still writes to the Base layer -- there is no per-Show override editor yet (Kernel 74 follow-up). Drag a token/card on the surface below to position it -- the numeric fields underneath are precision editing for the same value, not a separate source of truth. This composition is now read live by the real Catharsis runtime whenever this Scene is current -- there is no separate \"load\" step.";
+        panel.appendChild(help);
+
+        const launchbar = document.createElement("p");
+        launchbar.className = "launchbar";
+        const previewLink = document.createElement("a");
+        previewLink.className = "chip small";
+        previewLink.target = "_blank";
+        previewLink.rel = "noopener";
+        previewLink.textContent = "Preview as Player";
+        previewLink.href = "/venues/show-runs/scene-preview.html?show_id=" + encodeURIComponent(showId) + "&placement_id=" + encodeURIComponent(detail.placement.id);
+        launchbar.appendChild(previewLink);
+        panel.appendChild(launchbar);
+
+        const surface = document.createElement("div");
+        surface.className = "composer-surface";
+        panel.appendChild(surface);
+
+        const list = document.createElement("div");
+        panel.appendChild(list);
+
+        const addForm = document.createElement("div");
+        addForm.className = "form-grid";
+        const kindField = document.createElement("div");
+        kindField.className = "field";
+        const kindLabel = document.createElement("label");
+        kindLabel.textContent = "Kind";
+        const kindSelect = document.createElement("select");
+        for (const k of ["token", "index_card", "map_backdrop", "grid_config"]) {
+          const opt = document.createElement("option"); opt.value = k; opt.textContent = k; kindSelect.appendChild(opt);
+        }
+        kindField.appendChild(kindLabel); kindField.appendChild(kindSelect);
+        addForm.appendChild(kindField);
+
+        const labelField = document.createElement("div");
+        labelField.className = "field";
+        const labelLabel = document.createElement("label");
+        labelLabel.textContent = "Label";
+        const labelInput = document.createElement("input");
+        labelInput.type = "text";
+        labelInput.placeholder = "e.g. Kessa";
+        labelField.appendChild(labelLabel); labelField.appendChild(labelInput);
+        addForm.appendChild(labelField);
+
+        panel.appendChild(addForm);
+        const addHelp = document.createElement("p");
+        addHelp.className = "help-text";
+        addHelp.textContent = "New elements are added centered on the surface -- drag to reposition afterward.";
+        panel.appendChild(addHelp);
+
+        const addButton = document.createElement("button");
+        addButton.className = "chip small";
+        addButton.type = "button";
+        addButton.textContent = "Add Base-Layer Element";
+        addButton.addEventListener("click", async () => {
+          addButton.disabled = true;
+          try {
+            const res = await fetch(`/api/scenes/${encodeURIComponent(detail.scene.id)}/stage-elements`, {
+              method: "POST", credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                kind: kindSelect.value,
+                label: labelInput.value.trim(),
+                position: { x: 0.5, y: 0.5 },
+              }),
+            });
+            const p = await res.json().catch(() => null);
+            if (!res.ok || !p?.ok) { alert("Could not add element: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+            labelInput.value = "";
+            await loadComposition(detail, surface, list);
+          } finally {
+            addButton.disabled = false;
+          }
+        });
+        panel.appendChild(addButton);
+
+        loadComposition(detail, surface, list);
+        return panel;
+      }
+
+      // patchStageElementPosition is the single write path both the drag
+      // surface and the precision numeric inputs below use, so "drag it"
+      // and "type the exact number" are provably the same value round-
+      // tripped through the same PATCH -- there is no separate draft state
+      // that could drift from what GET /stage-composition later returns.
+      async function patchStageElementPosition(elementId, x, y) {
+        const res = await fetch(`/api/stage-elements/${encodeURIComponent(elementId)}`, {
+          method: "PATCH", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ position: { x, y } }),
+        });
+        const p = await res.json().catch(() => null);
+        if (!res.ok || !p?.ok) { alert("Could not update position: " + (p?.data?.error || `HTTP ${res.status}`)); return false; }
+        return true;
+      }
+
+      function renderComposerSurface(surface, elements, detail, onChanged) {
+        surface.innerHTML = "";
+        for (const el of elements) {
+          const x = Number.isFinite(el.position?.x) ? el.position.x : 0.5;
+          const y = Number.isFinite(el.position?.y) ? el.position.y : 0.5;
+          const dot = document.createElement("div");
+          dot.className = "composer-dot" + (el.kind === "index_card" ? " is-card" : "");
+          dot.style.left = (Math.max(0, Math.min(1, x)) * 100) + "%";
+          dot.style.top = (Math.max(0, Math.min(1, y)) * 100) + "%";
+          dot.title = (el.label || "(untitled)") + " -- drag to reposition";
+          const glyph = document.createElement("span");
+          glyph.className = "composer-dot-glyph";
+          glyph.textContent = (el.label || "?").slice(0, 1).toUpperCase();
+          dot.appendChild(glyph);
+          const dotLabel = document.createElement("span");
+          dotLabel.className = "composer-dot-label";
+          dotLabel.textContent = el.label || "(untitled)";
+          dot.appendChild(dotLabel);
+
+          if (el.kind === "token" || el.kind === "index_card") {
+            let dragging = false;
+            dot.addEventListener("pointerdown", (event) => {
+              dragging = true;
+              dot.setPointerCapture(event.pointerId);
+              event.preventDefault();
+            });
+            dot.addEventListener("pointermove", (event) => {
+              if (!dragging) return;
+              const rect = surface.getBoundingClientRect();
+              const nx = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+              const ny = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+              dot.style.left = (nx * 100) + "%";
+              dot.style.top = (ny * 100) + "%";
+            });
+            const endDrag = async (event) => {
+              if (!dragging) return;
+              dragging = false;
+              const rect = surface.getBoundingClientRect();
+              const nx = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+              const ny = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+              const ok = await patchStageElementPosition(el.id, Math.round(nx * 1000) / 1000, Math.round(ny * 1000) / 1000);
+              if (ok) await onChanged();
+            };
+            dot.addEventListener("pointerup", endDrag);
+            dot.addEventListener("pointercancel", endDrag);
+          }
+
+          surface.appendChild(dot);
+        }
+        if (elements.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "help-text";
+          empty.style.cssText = "position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);margin:0;";
+          empty.textContent = "No composition elements yet.";
+          surface.appendChild(empty);
+        }
+      }
+
+      async function loadComposition(detail, surface, list) {
+        list.innerHTML = "Loading composition...";
+        const [compositionRes, interactionsRes] = await Promise.all([
+          fetch(`/api/shows/${encodeURIComponent(showId)}/scenes/${encodeURIComponent(detail.placement.id)}/stage-composition`, { credentials: "include" }),
+          fetch(`/api/shows/${encodeURIComponent(showId)}/scenes/${encodeURIComponent(detail.placement.id)}/participant-interactions`, { credentials: "include" }),
+        ]);
+        const compositionPayload = await compositionRes.json().catch(() => null);
+        const interactionsPayload = await interactionsRes.json().catch(() => null);
+        if (!compositionRes.ok || !compositionPayload?.ok) { list.textContent = "Could not load composition."; return; }
+        const elements = compositionPayload.data.composition?.elements || [];
+        // Authorized picker source (Kernel 73A item 6): this is the SAME
+        // backstage-authorized listing endpoint the Participant
+        // Interactions panel above already uses -- never a free-text
+        // pasted id, so a picker can only ever bind to an interaction that
+        // actually belongs to this exact placement and that this viewer is
+        // already authorized to see.
+        const availableInteractions = (interactionsRes.ok && interactionsPayload?.ok) ? (interactionsPayload.data.interactions || []) : [];
+
+        renderComposerSurface(surface, elements, detail, () => loadComposition(detail, surface, list));
+
+        list.innerHTML = "";
+        if (elements.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "help-text";
+          empty.textContent = "No composition elements yet.";
+          list.appendChild(empty);
+        }
+        for (const el of elements) list.appendChild(renderCompositionElement(el, detail, availableInteractions, surface, list));
+      }
+
+      function renderCompositionElement(el, detail, availableInteractions, surface, list) {
+        const row = document.createElement("div");
+        row.className = "cue-row";
+        const left = document.createElement("div");
+        const title = document.createElement("div");
+        title.className = "cue-row-title";
+        title.textContent = (el.label || "(untitled)") + " · " + el.kind + " · " + el.layer + " layer";
+        left.appendChild(title);
+        const meta = document.createElement("div");
+        meta.className = "cue-row-meta";
+        meta.textContent = el.binding ? ("Bound to: " + (el.binding.stage_button_label || el.binding.participant_interaction_id)) : "Unbound";
+        left.appendChild(meta);
+        row.appendChild(left);
+
+        if (el.kind === "token" || el.kind === "index_card") {
+          const xLabel = document.createElement("label");
+          xLabel.textContent = "X"; xLabel.style.cssText = "margin:0 4px 0 0;";
+          row.appendChild(xLabel);
+          const xInput = document.createElement("input");
+          xInput.type = "text"; xInput.style.cssText = "width:64px;";
+          xInput.value = Number.isFinite(el.position?.x) ? el.position.x : "";
+          row.appendChild(xInput);
+          const yLabel = document.createElement("label");
+          yLabel.textContent = "Y"; yLabel.style.cssText = "margin:0 4px 0 8px;";
+          row.appendChild(yLabel);
+          const yInput = document.createElement("input");
+          yInput.type = "text"; yInput.style.cssText = "width:64px;";
+          yInput.value = Number.isFinite(el.position?.y) ? el.position.y : "";
+          row.appendChild(yInput);
+          const applyButton = document.createElement("button");
+          applyButton.className = "chip small";
+          applyButton.type = "button";
+          applyButton.textContent = "Set Exact Position";
+          applyButton.addEventListener("click", async () => {
+            const nx = parseFloat(xInput.value); const ny = parseFloat(yInput.value);
+            if (!Number.isFinite(nx) || !Number.isFinite(ny)) { alert("X and Y must be numbers between 0 and 1."); return; }
+            const ok = await patchStageElementPosition(el.id, nx, ny);
+            if (ok) await loadComposition(detail, surface, list);
+          });
+          row.appendChild(applyButton);
+        }
+
+        // Authorized picker (item 6): only this placement's own
+        // participant interactions are ever selectable -- there is no
+        // free-text id field, so binding can never target a cross-Show or
+        // cross-location interaction id, even a guessed valid one.
+        const bindSelect = document.createElement("select");
+        const noneOption = document.createElement("option");
+        noneOption.value = ""; noneOption.textContent = "(unbound)";
+        bindSelect.appendChild(noneOption);
+        for (const interaction of availableInteractions) {
+          const opt = document.createElement("option");
+          opt.value = interaction.id;
+          opt.textContent = interaction.stage_button_label || interaction.internal_name || interaction.id;
+          if (el.binding && el.binding.participant_interaction_id === interaction.id) opt.selected = true;
+          bindSelect.appendChild(opt);
+        }
+        if (!el.binding) noneOption.selected = true;
+        row.appendChild(bindSelect);
+
+        const bindButton = document.createElement("button");
+        bindButton.className = "chip small";
+        bindButton.type = "button";
+        bindButton.textContent = "Apply Binding";
+        bindButton.addEventListener("click", async () => {
+          const interactionId = bindSelect.value;
+          if (!interactionId) {
+            const res = await fetch(`/api/stage-elements/${encodeURIComponent(el.id)}/binding`, { method: "DELETE", credentials: "include" });
+            const p = await res.json().catch(() => null);
+            if (!res.ok || !p?.ok) { alert("Could not unbind: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+          } else {
+            const res = await fetch(`/api/stage-elements/${encodeURIComponent(el.id)}/binding`, {
+              method: "POST", credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ participant_interaction_id: interactionId }),
+            });
+            const p = await res.json().catch(() => null);
+            if (!res.ok || !p?.ok) { alert("Could not bind element: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+          }
+          await loadComposition(detail, surface, list);
+        });
+        row.appendChild(bindButton);
+
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "chip danger small";
+        deleteButton.type = "button";
+        deleteButton.textContent = "Delete";
+        deleteButton.addEventListener("click", async () => {
+          const res = await fetch(`/api/stage-elements/${encodeURIComponent(el.id)}`, { method: "DELETE", credentials: "include" });
+          const p = await res.json().catch(() => null);
+          if (!res.ok || !p?.ok) { alert("Could not delete element: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+          await loadComposition(detail, surface, list);
+        });
+        row.appendChild(deleteButton);
+
         return row;
       }
 
@@ -762,6 +1069,35 @@
           document.getElementById("scene-venue-input").value = "";
           document.getElementById("scene-sort-input").value = "";
           await loadScenes();
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+
+      document.getElementById("prepare-courtyard-button").addEventListener("click", async (event) => {
+        event.target.disabled = true;
+        const out = document.getElementById("kessa-diagnostics-output");
+        try {
+          const res = await fetch(`/api/shows/${encodeURIComponent(showId)}/prepare-locked-courtyard-opening`, { method: "POST", credentials: "include" });
+          const p = await res.json().catch(() => null);
+          if (!res.ok || !p?.ok) { alert("Could not prepare Locked Courtyard Opening: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+          out.hidden = false;
+          out.textContent = "Prepare Locked Courtyard Opening result:\n" + JSON.stringify(p.data.result, null, 2);
+          await loadScenes();
+        } finally {
+          event.target.disabled = false;
+        }
+      });
+
+      document.getElementById("kessa-diagnostics-button").addEventListener("click", async (event) => {
+        event.target.disabled = true;
+        const out = document.getElementById("kessa-diagnostics-output");
+        try {
+          const res = await fetch(`/api/shows/${encodeURIComponent(showId)}/kessa-reachability`, { credentials: "include" });
+          const p = await res.json().catch(() => null);
+          if (!res.ok || !p?.ok) { alert("Could not load Kessa reachability diagnostics: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+          out.hidden = false;
+          out.textContent = "Kessa reachability diagnostics:\n" + JSON.stringify(p.data.result, null, 2);
         } finally {
           event.target.disabled = false;
         }

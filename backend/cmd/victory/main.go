@@ -95,6 +95,14 @@ func main() {
 	if err := merchant.EnsureCourtyardScene(ctx, pool); err != nil {
 		log.Fatalf("kernel 73 courtyard scene bootstrap failed: %v", err)
 	}
+	// Kernel 73A: composition is no longer projected into a session via a
+	// separate action/hook -- world.LoadVenueSnapshot (backend/internal/
+	// world/snapshot.go) now resolves the current placement's Base+Show
+	// composition fresh on every snapshot read, and both
+	// shows.HandleShowCurrentScene and cues.HandleCueGo already broadcast
+	// network.BroadcastShowStageInvalidation on a successful current-Scene
+	// change, which every connected client already refetches on. No
+	// wiring needed here beyond those two existing broadcast call sites.
 	characters.SetMaxCharacterCardsPerAccount(parseIntEnv("CHARACTER_ACCOUNT_LIMIT", 50))
 	if err := identity.EnsureKernel39DiscordGatewaySurface(ctx, pool); err != nil {
 		log.Fatalf("kernel 39 discord gateway bootstrap failed: %v", err)
@@ -235,7 +243,7 @@ func main() {
 	mux.HandleFunc("POST /api/shows/{show_id}/sessions/{session_id}/link", shows.HandleShowSessionLink(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/sessions/{session_id}/unlink", shows.HandleShowSessionUnlink(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/sessions/start", shows.HandleShowSessionStart(pool))
-	mux.HandleFunc("POST /api/shows/{show_id}/current-scene", shows.HandleShowCurrentScene(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/current-scene", shows.HandleShowCurrentScene(pool, hub))
 	mux.HandleFunc("PATCH /api/shows/{show_id}/short-code", shows.HandleUpdateShortCode(pool))
 	mux.HandleFunc("GET /api/shows/by-code", shows.HandleResolveByShortCode(pool))
 	mux.HandleFunc("POST /api/showtime/control", showtime.HandleShowtimeControl(pool))
@@ -249,6 +257,14 @@ func main() {
 	mux.HandleFunc("PATCH /api/shows/{show_id}/scenes/{placement_id}", scenes.HandleShowScenePlacementByID(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/scenes/{placement_id}/archive", scenes.HandleShowScenePlacementArchive(pool))
 	mux.HandleFunc("GET /api/shows/{show_id}/scenes/program", scenes.HandleShowSceneProgram(pool))
+	mux.HandleFunc("GET /api/scenes/{scene_id}/stage-elements", scenes.HandleSceneStageElementsCollection(pool))
+	mux.HandleFunc("POST /api/scenes/{scene_id}/stage-elements", scenes.HandleSceneStageElementsCollection(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/scenes/{placement_id}/stage-elements", scenes.HandlePlacementStageElementsCollection(pool))
+	mux.HandleFunc("PATCH /api/stage-elements/{element_id}", scenes.HandleStageElementByID(pool))
+	mux.HandleFunc("DELETE /api/stage-elements/{element_id}", scenes.HandleStageElementByID(pool))
+	mux.HandleFunc("POST /api/stage-elements/{element_id}/binding", scenes.HandleStageElementBinding(pool))
+	mux.HandleFunc("DELETE /api/stage-elements/{element_id}/binding", scenes.HandleStageElementBinding(pool))
+	mux.HandleFunc("GET /api/shows/{show_id}/scenes/{placement_id}/stage-composition", scenes.HandlePlacementStageComposition(pool))
 	mux.HandleFunc("GET /api/shows/{show_id}/scenes/{placement_id}/cues", cues.HandlePlacementCuesCollection(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/scenes/{placement_id}/cues", cues.HandlePlacementCuesCollection(pool))
 	mux.HandleFunc("GET /api/shows/{show_id}/scenes/{placement_id}/player-cues", cues.HandlePlacementPlayerCues(pool))
@@ -260,11 +276,14 @@ func main() {
 	mux.HandleFunc("GET /api/shows/{show_id}/scenes/{placement_id}/player-interactions", merchant.HandlePlacementPlayerInteractions(pool))
 	mux.HandleFunc("PATCH /api/participant-interactions/{interaction_id}", merchant.HandleInteractionByID(pool))
 	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/open", merchant.HandleInteractionOpen(pool))
+	mux.HandleFunc("GET /api/participant-interactions/{interaction_id}/preview", merchant.HandleInteractionPreview(pool))
 	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/stance", merchant.HandleInteractionStance(pool))
 	mux.HandleFunc("GET /api/participant-interactions/{interaction_id}/haggle", merchant.HandleInteractionHaggle(pool))
 	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/haggle", merchant.HandleInteractionHaggle(pool))
 	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/purchase", merchant.HandleInteractionPurchase(pool, hub))
 	mux.HandleFunc("GET /api/characters/{character_card_id}/inventory", merchant.HandleCharacterInventory(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/prepare-locked-courtyard-opening", merchant.HandlePrepareLockedCourtyardOpening(pool))
+	mux.HandleFunc("GET /api/shows/{show_id}/kessa-reachability", merchant.HandleKessaReachabilityDiagnostics(pool))
 	mux.HandleFunc("GET /api/venues/{venue_slug}/equipment", merchant.HandleVenueEquipmentCollection(pool))
 	mux.HandleFunc("POST /api/venues/{venue_slug}/equipment", merchant.HandleVenueEquipmentCollection(pool))
 	mux.HandleFunc("PATCH /api/equipment/{equipment_item_id}", merchant.HandleEquipmentItemByID(pool))

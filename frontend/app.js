@@ -234,6 +234,15 @@ function createVenuePin(venue, assetURL, fallbackPositions) {
   if (venue.slug === "victory-theater") {
     pin.classList.add("venue-pin--theater");
   }
+  if (venue.slug === "third-place") {
+    pin.classList.add("venue-pin--third-place");
+  }
+  if (venue.slug === "info-booth") {
+    pin.classList.add("venue-pin--info-booth");
+  }
+  if (venue.slug === "first-theater") {
+    pin.classList.add("venue-pin--first-theater");
+  }
   pin.type = "button";
   pin.setAttribute("aria-label", venueDisplayName(venue));
 
@@ -421,6 +430,147 @@ function renderMapMenu() {
 // appear once unlocked. Every venue gets one (info-booth excluded -- it's a
 // permanent landmark, not a gateable venue). The base fog layer separately
 // recedes with overall visible-venue count.
+// Ambient puffs are purely decorative atmosphere, independent of venue
+// visibility -- they never recede (that job belongs to the per-venue puffs
+// in renderMapFog, which fully disappear once a venue unlocks). Fixed
+// pseudo-random layout (seeded, not Math.random) so the sky doesn't reshuffle
+// on every reload. Deliberately edge-weighted: the map's middle is already
+// covered by venue puffs, so ambient atmosphere piles up along the border and
+// thins out fast toward the center to avoid double-fogging the middle.
+const AMBIENT_FOG_SEED_LAYOUT = [
+  // Top edge
+  { x: 2, y: 2, scale: 1.1, drift: "med" }, { x: 10, y: 4, scale: 0.9, drift: "slow" },
+  { x: 20, y: 3, scale: 1.3, drift: "fast" }, { x: 30, y: 5, scale: 0.8, drift: "med" },
+  { x: 40, y: 2, scale: 1.15, drift: "slow" }, { x: 50, y: 4, scale: 0.95, drift: "fast" },
+  { x: 60, y: 3, scale: 1.2, drift: "med" }, { x: 70, y: 5, scale: 0.85, drift: "slow" },
+  { x: 80, y: 2, scale: 1.1, drift: "fast" }, { x: 90, y: 4, scale: 1.3, drift: "med" },
+  { x: 98, y: 2, scale: 0.9, drift: "slow" },
+  // Bottom edge
+  { x: 4, y: 96, scale: 1.0, drift: "fast" }, { x: 14, y: 92, scale: 1.2, drift: "med" },
+  { x: 24, y: 95, scale: 0.85, drift: "slow" }, { x: 34, y: 91, scale: 1.15, drift: "fast" },
+  { x: 44, y: 96, scale: 0.9, drift: "med" }, { x: 55, y: 92, scale: 1.25, drift: "slow" },
+  { x: 65, y: 95, scale: 0.8, drift: "fast" }, { x: 75, y: 91, scale: 1.1, drift: "med" },
+  { x: 85, y: 96, scale: 0.95, drift: "slow" }, { x: 96, y: 92, scale: 1.2, drift: "fast" },
+  // Left edge -- lighter around (4, 65) where Soil Experts sits, so its icon
+  // stays readable without going fully clear like the Info Booth.
+  { x: 2, y: 15, scale: 1.1, drift: "slow" }, { x: 4, y: 28, scale: 0.9, drift: "med" },
+  { x: 2, y: 40, scale: 1.2, drift: "fast" }, { x: 8, y: 55, scale: 0.55, drift: "slow" },
+  { x: 9, y: 72, scale: 0.5, drift: "med" }, { x: 2, y: 88, scale: 0.9, drift: "slow" },
+  // Right edge
+  { x: 97, y: 15, scale: 1.05, drift: "med" }, { x: 95, y: 28, scale: 0.85, drift: "fast" },
+  { x: 98, y: 40, scale: 1.2, drift: "slow" }, { x: 94, y: 52, scale: 0.95, drift: "med" },
+  { x: 97, y: 64, scale: 1.1, drift: "fast" }, { x: 95, y: 76, scale: 0.8, drift: "slow" },
+  { x: 98, y: 88, scale: 1.15, drift: "med" },
+  // Sparse inner ring -- just enough to avoid a hard edge, nothing near the middle.
+  { x: 16, y: 18, scale: 0.7, drift: "slow" }, { x: 84, y: 18, scale: 0.75, drift: "fast" },
+  { x: 16, y: 82, scale: 0.7, drift: "med" }, { x: 84, y: 82, scale: 0.8, drift: "slow" },
+];
+
+// Info Booth sits at (50, 93) and must read clearly whether signed in or out --
+// it's the entry point, not a gateable venue. Keep every ambient puff at least
+// this far from it (in %, roughly circular) rather than hand-tuning coordinates.
+const INFO_BOOTH_CLEAR_ZONE = { x: 50, y: 93, radius: 14 };
+
+function isInInfoBoothClearZone(x, y) {
+  const dx = x - INFO_BOOTH_CLEAR_ZONE.x;
+  const dy = y - INFO_BOOTH_CLEAR_ZONE.y;
+  return Math.sqrt(dx * dx + dy * dy) < INFO_BOOTH_CLEAR_ZONE.radius;
+}
+
+// Venue icon positions (mirrors the fallbackPositions built in loadVenues --
+// duplicated here deliberately, since fog layout is decorative and shouldn't
+// depend on venue-visibility data being loaded yet) used only to keep the new
+// top-band/center-woods fog fill from sitting directly on top of an icon.
+const VENUE_ICON_CLEAR_ZONES = [
+  { x: 22, y: 23, r: 10 }, // the-cave
+  { x: 28, y: 21, r: 10 }, // grants-cabin
+  { x: 29, y: 37, r: 9 }, // audition-hall
+  { x: 38, y: 14, r: 10 }, // producers-office
+  { x: 55, y: 23, r: 10 }, // directors-chair
+  { x: 52, y: 11, r: 10 }, // show-runs / Stage Management
+  { x: 69, y: 13, r: 10 }, // trailers
+  { x: 75, y: 33, r: 9 }, // workshop
+  { x: 75, y: 27, r: 9 }, // warehouse
+  { x: 88, y: 47, r: 9 }, // greenroom
+  { x: 50, y: 50, r: 12 }, // third-place (icon is 2x size, give it more room)
+  { x: 37, y: 69, r: 9 }, // catharsis
+  { x: 29, y: 57, r: 9 }, // construction
+  { x: 70, y: 62, r: 9 }, // first-theater
+  { x: 70, y: 87, r: 9 }, // library
+  { x: 83, y: 77, r: 10 }, // victory-theater
+  { x: 4, y: 65, r: 10 }, // soil-experts
+];
+
+function isNearVenueIcon(x, y) {
+  return VENUE_ICON_CLEAR_ZONES.some((zone) => {
+    const dx = x - zone.x;
+    const dy = y - zone.y;
+    return Math.sqrt(dx * dx + dy * dy) < zone.r;
+  });
+}
+
+// Fills the top band (Trailers/Stage Management/Producer's Office row) and
+// the central woods, which were left too clear by the edge-weighted layout
+// above. Generated deterministically (not Math.random, same seeded-layout
+// requirement as the rest of this file) across a jittered grid, then any
+// point landing on a venue icon or the Info Booth is dropped.
+const WOODS_FOG_LAYOUT = (() => {
+  const points = [];
+  const rows = [10, 18, 26, 34, 42, 50, 58, 66];
+  let i = 0;
+  for (const y of rows) {
+    for (let x = 8; x <= 92; x += 10) {
+      i += 1;
+      const px = x + (((i * 37) % 7) - 3);
+      const py = y + (((i * 53) % 7) - 3);
+      if (isInInfoBoothClearZone(px, py)) continue;
+      if (isNearVenueIcon(px, py)) continue;
+      const scale = 0.75 + ((i * 13) % 6) * 0.08;
+      const drift = ["slow", "med", "fast"][i % 3];
+      points.push({ x: px, y: py, scale, drift });
+    }
+  }
+  return points;
+})();
+
+// Anonymous-only extra atmosphere: signed-out visitors see a heavier center,
+// which clears the instant they sign in (see .map-layer--signed-in rule in
+// styles.css) rather than persisting like the edge/venue fog does.
+const ANONYMOUS_CENTER_FOG_LAYOUT = [
+  { x: 38, y: 48, scale: 1.1, drift: "slow" }, { x: 58, y: 42, scale: 0.95, drift: "med" },
+  { x: 46, y: 58, scale: 1.2, drift: "fast" }, { x: 62, y: 60, scale: 0.9, drift: "slow" },
+  { x: 34, y: 62, scale: 1.0, drift: "med" }, { x: 54, y: 34, scale: 1.05, drift: "fast" },
+];
+
+function renderAmbientFog(fogLayer) {
+  fogLayer.querySelectorAll(".map-fog-puff--ambient, .map-fog-puff--anon-center").forEach((el) => el.remove());
+  for (const spot of AMBIENT_FOG_SEED_LAYOUT) {
+    if (isInInfoBoothClearZone(spot.x, spot.y)) continue;
+    const puff = document.createElement("div");
+    puff.className = `map-fog-puff map-fog-puff--ambient map-fog-puff--drift-${spot.drift}`;
+    puff.style.left = `${spot.x}%`;
+    puff.style.top = `${spot.y}%`;
+    puff.style.setProperty("--puff-scale", String(spot.scale));
+    fogLayer.appendChild(puff);
+  }
+  for (const spot of WOODS_FOG_LAYOUT) {
+    const puff = document.createElement("div");
+    puff.className = `map-fog-puff map-fog-puff--ambient map-fog-puff--woods map-fog-puff--drift-${spot.drift}`;
+    puff.style.left = `${spot.x}%`;
+    puff.style.top = `${spot.y}%`;
+    puff.style.setProperty("--puff-scale", String(spot.scale));
+    fogLayer.appendChild(puff);
+  }
+  for (const spot of ANONYMOUS_CENTER_FOG_LAYOUT) {
+    const puff = document.createElement("div");
+    puff.className = `map-fog-puff map-fog-puff--anon-center map-fog-puff--drift-${spot.drift}`;
+    puff.style.left = `${spot.x}%`;
+    puff.style.top = `${spot.y}%`;
+    puff.style.setProperty("--puff-scale", String(spot.scale));
+    fogLayer.appendChild(puff);
+  }
+}
+
 function renderMapFog(venues, fallbackPositions) {
   const fogLayer = document.getElementById("map-fog-layer");
   const fogBase = document.getElementById("map-fog-base");
@@ -433,7 +583,7 @@ function renderMapFog(venues, fallbackPositions) {
     fogBase.style.opacity = String(opacity);
   }
 
-  fogLayer.querySelectorAll(".map-fog-puff").forEach((el) => el.remove());
+  fogLayer.querySelectorAll(".map-fog-puff:not(.map-fog-puff--ambient)").forEach((el) => el.remove());
 
   for (const slug of Object.keys(fallbackPositions)) {
     if (slug === "info-booth") continue;
@@ -447,6 +597,10 @@ function renderMapFog(venues, fallbackPositions) {
     puff.style.left = `${pos.x}%`;
     puff.style.top = `${pos.y}%`;
     fogLayer.appendChild(puff);
+  }
+
+  if (!fogLayer.querySelector(".map-fog-puff--ambient")) {
+    renderAmbientFog(fogLayer);
   }
 }
 
@@ -490,7 +644,7 @@ async function loadVenues() {
 
     const fallbackPositions = {
       library: { x: 70, y: 87 },
-      "first-theater": { x: 70, y: 62 },
+      "first-theater": { x: 69, y: 62 },
       "middle-school-stage": { x: 105, y: 50 },
       "the-cave": { x: 22, y: 23 },
       "grants-cabin": { x: 28, y: 21 },
@@ -498,7 +652,7 @@ async function loadVenues() {
       "producers-office": { x: 38, y: 14 },
       "directors-chair": { x: 55, y: 23 },
       greenroom: { x: 88, y: 47 },
-      trailers: { x: 69, y: 13 },
+      trailers: { x: 71, y: 13 },
       "third-place": { x: 50, y: 50 },
       "show-runs": { x: 52, y: 11 },
       catharsis: { x: 37, y: 69 },
@@ -506,7 +660,7 @@ async function loadVenues() {
       workshop: { x: 75, y: 33 },
       warehouse: { x: 75, y: 27 },
       "soil-experts": { x: 4, y: 65 },
-      construction: { x: 29, y: 57 },
+      construction: { x: -15, y: 57 },
       "info-booth": { x: 50, y: 93 },
     };
 
@@ -699,6 +853,11 @@ async function loadAccountLink() {
     closeMenu();
     renderMapMenu();
   }
+}
+
+const initialFogLayer = document.getElementById("map-fog-layer");
+if (initialFogLayer) {
+  renderAmbientFog(initialFogLayer);
 }
 
 loadAccountLink();
