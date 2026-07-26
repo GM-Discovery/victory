@@ -240,6 +240,52 @@ func SelfJoinAsAudience(ctx context.Context, pool *pgxpool.Pool, userID, showRun
 	return scanRosterMember(row)
 }
 
+// SelfJoinAsPlayer lets an authenticated user join a run's roster as Player
+// themselves, when the Director has explicitly marked the run open_enrollment
+// -- the real-world-tested gap the Kernel 71 ticket flow left: a live opening
+// (Socio at Catharsis) cannot have a Director manually punch a ticket for
+// every walk-up Player before they can select a Character and see the first
+// Scene. This intentionally does NOT touch AddRosterMember's player_requires_
+// ticket guard (roster.go above) -- that guard, and the ticket system it
+// protects, remain the default for every run where open_enrollment is false.
+// Idempotent, mirroring SelfJoinAsAudience.
+func SelfJoinAsPlayer(ctx context.Context, pool *pgxpool.Pool, userID, showRunID string) (RosterMember, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return RosterMember{}, errors.New("not_authenticated")
+	}
+	sr, err := LoadShowRunByID(ctx, pool, showRunID)
+	if err != nil {
+		return RosterMember{}, err
+	}
+	if !sr.OpenEnrollment {
+		return RosterMember{}, errors.New("open_enrollment_disabled")
+	}
+	hasMembership, err := access.HasActiveLocationMembership(ctx, pool, userID, sr.LocationID)
+	if err != nil {
+		return RosterMember{}, err
+	}
+	if !hasMembership {
+		return RosterMember{}, errors.New("not_authorized")
+	}
+
+	blocked, err := IsUserBlocked(ctx, pool, showRunID, userID)
+	if err != nil {
+		return RosterMember{}, err
+	}
+	if blocked {
+		return RosterMember{}, errors.New("user_blocked")
+	}
+
+	row := pool.QueryRow(ctx, `
+		INSERT INTO show_run_roster_members (show_run_id, user_id, role, program_visible, added_by_user_id)
+		VALUES ($1, $2, 'player', TRUE, $2)
+		ON CONFLICT (show_run_id, user_id) WHERE removed_at IS NULL
+		DO UPDATE SET role = 'player', program_visible = TRUE
+		RETURNING `+rosterMemberColumns, showRunID, userID)
+	return scanRosterMember(row)
+}
+
 // ListInternalRoster returns every active roster row regardless of role or
 // program_visible. Callers must already have authority-checked
 // Producer/Director/Operator before calling this -- it performs no check of

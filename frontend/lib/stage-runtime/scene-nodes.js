@@ -34,12 +34,26 @@
     const renderPixiScene = deps.renderPixiScene;
     const stageState = deps.stageState;
 
+    // removeChildren() only detaches DisplayObjects from the tree -- it does
+    // not release their GPU-side geometry/mesh data, so a full scene rebuild
+    // (fires on every snapshot replace) leaked every prior token/card node
+    // for the lifetime of the page. destroy({children:true, texture:false})
+    // frees each node's own resources while leaving textures alone (they're
+    // cached/shared by URL via PIXI.Assets, not owned by any one node).
+    function destroyLayerChildren(layer) {
+      if (!layer) return;
+      const removed = layer.removeChildren();
+      for (const child of removed) {
+        child.destroy?.({ children: true, texture: false, baseTexture: false });
+      }
+    }
+
     function clearSceneNodes() {
       stageState.currentNodeMap = new Map();
-      if (stageState.pinnedObjectLayer) stageState.pinnedObjectLayer.removeChildren();
-      if (stageState.overlayObjectLayer) stageState.overlayObjectLayer.removeChildren();
-      if (stageState.floatingObjectLayer) stageState.floatingObjectLayer.removeChildren();
-      if (stageState.facadeLayer) stageState.facadeLayer.removeChildren();
+      destroyLayerChildren(stageState.pinnedObjectLayer);
+      destroyLayerChildren(stageState.overlayObjectLayer);
+      destroyLayerChildren(stageState.floatingObjectLayer);
+      destroyLayerChildren(stageState.facadeLayer);
     }
 
     function refreshNodeSelection() {

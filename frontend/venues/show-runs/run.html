@@ -113,6 +113,10 @@
             <input type="checkbox" id="self-join-checkbox" />
             <label for="self-join-checkbox" style="margin:0;">Allow Audience self-join</label>
           </div>
+          <div class="field span-2 checkbox-row">
+            <input type="checkbox" id="open-enrollment-checkbox" />
+            <label for="open-enrollment-checkbox" style="margin:0;">Open enrollment (Players can join without a ticket -- for live walk-up openings)</label>
+          </div>
         </div>
         <p class="launchbar">
           <button class="chip" type="button" id="save-button">Save Changes</button>
@@ -162,6 +166,7 @@
       document.getElementById("cohort-input").value = run.cohort_name || "";
       document.getElementById("status-select").value = run.status;
       document.getElementById("self-join-checkbox").checked = !!run.audience_self_join_enabled;
+      document.getElementById("open-enrollment-checkbox").checked = !!run.open_enrollment;
       document.getElementById("archive-button").hidden = run.status === "archived";
       document.getElementById("unarchive-button").hidden = run.status !== "archived";
     }
@@ -309,6 +314,7 @@
             cohort_name: document.getElementById("cohort-input").value.trim(),
             status: document.getElementById("status-select").value,
             audience_self_join_enabled: document.getElementById("self-join-checkbox").checked,
+            open_enrollment: document.getElementById("open-enrollment-checkbox").checked,
           });
         } finally {
           event.target.disabled = false;

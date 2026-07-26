@@ -559,6 +559,27 @@ func loadSceneCompositionAsPlacedElements(ctx context.Context, pool *pgxpool.Poo
 		if visibility == nil {
 			visibility = map[string]any{"toRoles": []any{"audience", "cast", "crew", "director", "producer"}, "privateTo": []any{}}
 		}
+		// Bridge Kernel 73A's {toRoles, privateTo} visibility model onto the
+		// older {visible: bool} model effectiveAudienceVisible/
+		// elementVisibilityForLayer actually read (inherited from warehouse
+		// tokens) -- without this, a composition element with no explicit
+		// "visible" key reads as invisible by default for every audience-
+		// tier viewer, silently, regardless of toRoles ever including
+		// "audience". This was a real bug: Kessa's own base-layer token
+		// vanished for any viewer whose session role resolved to audience.
+		if _, hasVisibleKey := visibility["visible"]; !hasVisibleKey {
+			visibleToAudience := true
+			if toRoles, ok := visibility["toRoles"].([]any); ok {
+				visibleToAudience = false
+				for _, r := range toRoles {
+					if s, ok := r.(string); ok && strings.EqualFold(s, "audience") {
+						visibleToAudience = true
+						break
+					}
+				}
+			}
+			visibility["visible"] = visibleToAudience
+		}
 
 		out = append(out, PlacedElement{
 			ElementID:    "scene:" + id,

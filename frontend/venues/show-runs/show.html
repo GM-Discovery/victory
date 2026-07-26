@@ -827,6 +827,28 @@
         return true;
       }
 
+      // PATCH /api/stage-elements/{id} replaces `data` wholesale (not a
+      // merge) -- always send the element's existing data plus the changed
+      // key, never just the changed key alone, or every other data field
+      // (e.g. a future appearance/tag) gets silently clobbered.
+      async function patchStageElementImage(elementId, existingData, imageURL) {
+        const nextData = Object.assign({}, existingData || {});
+        const trimmed = String(imageURL || "").trim();
+        if (trimmed) {
+          nextData.asset_content_url = trimmed;
+        } else {
+          delete nextData.asset_content_url;
+        }
+        const res = await fetch(`/api/stage-elements/${encodeURIComponent(elementId)}`, {
+          method: "PATCH", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data: nextData }),
+        });
+        const p = await res.json().catch(() => null);
+        if (!res.ok || !p?.ok) { alert("Could not update image: " + (p?.data?.error || `HTTP ${res.status}`)); return false; }
+        return true;
+      }
+
       function renderComposerSurface(surface, elements, detail, onChanged) {
         surface.innerHTML = "";
         for (const el of elements) {
@@ -955,6 +977,24 @@
             if (ok) await loadComposition(detail, surface, list);
           });
           row.appendChild(applyButton);
+
+          const imageLabel = document.createElement("label");
+          imageLabel.textContent = "Image URL"; imageLabel.style.cssText = "margin:0 4px 0 8px;";
+          row.appendChild(imageLabel);
+          const imageInput = document.createElement("input");
+          imageInput.type = "text"; imageInput.style.cssText = "width:220px;";
+          imageInput.placeholder = "/assets/your-file.png";
+          imageInput.value = (el.data && el.data.asset_content_url) || "";
+          row.appendChild(imageInput);
+          const imageButton = document.createElement("button");
+          imageButton.className = "chip small";
+          imageButton.type = "button";
+          imageButton.textContent = "Set Image";
+          imageButton.addEventListener("click", async () => {
+            const ok = await patchStageElementImage(el.id, el.data, imageInput.value);
+            if (ok) await loadComposition(detail, surface, list);
+          });
+          row.appendChild(imageButton);
         }
 
         // Authorized picker (item 6): only this placement's own

@@ -229,6 +229,18 @@
       const tokenPosition = model?.position || {};
       const tokenX = Number(tokenPosition.x ?? model?.source?.data?.world_x ?? model?.source?.data?.x ?? 0);
       const tokenY = Number(tokenPosition.y ?? model?.source?.data?.world_y ?? model?.source?.data?.y ?? 0);
+      // Kernel 73A scene_composition tokens store position as a 0-1
+      // fraction of the stage (authored via Scene Setup's drag surface,
+      // which has no concept of the live stage's actual pixel size), unlike
+      // ordinary warehouse tokens whose position.x/y are already absolute
+      // pixels. Reading a fraction as a raw pixel value placed every
+      // composition token at ~(0,0), the stage's top-left corner -- e.g.
+      // Kessa's {x:0.5, y:0.6} rendered one pixel off the origin, invisible
+      // behind the header chrome, while a real token at the same authored
+      // position (60% down, center) rendered correctly.
+      if (String(model?.source?.context_class || "").trim().toLowerCase() === "scene_composition") {
+        return { x: tokenX * Number(size.width || 0), y: tokenY * Number(size.height || 0) };
+      }
       return { x: tokenX, y: tokenY };
     }
     if (pin.mode === "world") {

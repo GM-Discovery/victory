@@ -43,6 +43,77 @@
     }
   }
 
+  // "/showtime <code>", "/showtime <code> status", "/showtime <code> end" --
+  // unlike /mic and /session (single-word verbs), showtime's first token is
+  // always the Show's short code, with an optional trailing action verb.
+  function normalizeShowtimeCommand(rawText) {
+    const raw = String(rawText || "").trim();
+    if (!/^\/showtime(\s+|$)/i.test(raw)) {
+      return null;
+    }
+
+    const tail = raw.replace(/^\/showtime\s*/i, "").trim();
+    if (!tail) {
+      return { shortCode: "", action: "start" };
+    }
+
+    const parts = tail.split(/\s+/);
+    const shortCode = parts[0];
+    const verb = (parts[1] || "start").toLowerCase();
+    if (!["start", "status", "end"].includes(verb)) {
+      return { shortCode: "", action: "start" };
+    }
+
+    return { shortCode, action: verb };
+  }
+
+  async function sendShowtimeCommand(venueSlug, rawText) {
+    const parsed = normalizeShowtimeCommand(rawText);
+    if (parsed === null) {
+      return { handled: false };
+    }
+
+    if (!parsed.shortCode) {
+      return {
+        handled: true,
+        ok: false,
+        message: "Use /showtime <code>, /showtime <code> status, or /showtime <code> end.",
+      };
+    }
+
+    const response = await fetch("/api/showtime/control", {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        short_code: parsed.shortCode,
+        action: parsed.action,
+        venue_slug: String(venueSlug || "").trim(),
+      }),
+    });
+
+    const payload = await response.json().catch(() => null);
+    const error = payload?.data?.error || payload?.error || `HTTP ${response.status}`;
+
+    if (!response.ok || !payload?.ok) {
+      return {
+        handled: true,
+        ok: false,
+        message: payload?.data?.message || payload?.data?.detail || error,
+      };
+    }
+
+    return {
+      handled: true,
+      ok: true,
+      message: String(payload?.data?.message || "").trim(),
+      data: payload.data || {},
+    };
+  }
+
   function normalizeJournalCommand(rawText) {
     const raw = String(rawText || "").trim();
     if (!/^\/journal(\s+|$)/i.test(raw)) {
@@ -208,9 +279,11 @@
   window.VictoryMicChat = {
     normalizeMicCommand,
     normalizeSessionCommand,
+    normalizeShowtimeCommand,
     normalizeJournalCommand,
     sendMicCommand,
     sendSessionCommand,
+    sendShowtimeCommand,
     sendJournalCommand,
     emitMicRefresh,
   };

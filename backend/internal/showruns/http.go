@@ -178,6 +178,7 @@ func HandleByID(pool *pgxpool.Pool) http.HandlerFunc {
 				CohortName              *string `json:"cohort_name"`
 				Status                  *string `json:"status"`
 				AudienceSelfJoinEnabled *bool   `json:"audience_self_join_enabled"`
+				OpenEnrollment          *bool   `json:"open_enrollment"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				writeError(w, errors.New("invalid_request_body"))
@@ -191,6 +192,7 @@ func HandleByID(pool *pgxpool.Pool) http.HandlerFunc {
 				CohortName:              body.CohortName,
 				Status:                  body.Status,
 				AudienceSelfJoinEnabled: body.AudienceSelfJoinEnabled,
+				OpenEnrollment:          body.OpenEnrollment,
 			})
 			if err != nil {
 				writeError(w, err)
@@ -397,6 +399,34 @@ func HandleSelfJoin(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		member, err := SelfJoinAsAudience(ctx, pool, userID, strings.TrimSpace(r.PathValue("id")))
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		proj, err := ProjectRosterMember(ctx, pool, userID, member)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeOK(w, map[string]any{"member": proj})
+	}
+}
+
+// HandleSelfJoinAsPlayer handles POST /api/show-runs/{id}/roster/self-join-as-player.
+func HandleSelfJoinAsPlayer(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		member, err := SelfJoinAsPlayer(ctx, pool, userID, strings.TrimSpace(r.PathValue("id")))
 		if err != nil {
 			writeError(w, err)
 			return

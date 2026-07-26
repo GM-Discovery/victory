@@ -353,9 +353,42 @@ func ListTriggerableInteractionsForViewer(ctx context.Context, pool *pgxpool.Poo
 	if err != nil {
 		return nil, err
 	}
+
+	// Kernel 73A bound a token to an interaction so it's reachable by clicking
+	// the token on stage. This floating listing predates that (Kernel 73) and
+	// would otherwise show the exact same interaction a second time as a
+	// disembodied button -- exclude anything already bound to a token so the
+	// token stays the one true entry point, leaving this listing as the
+	// fallback for interactions that aren't placed on stage yet.
+	boundIDs := map[string]bool{}
+	rows, err := pool.Query(ctx, `
+		SELECT DISTINCT b.participant_interaction_id::text
+		FROM stage_element_bindings b
+		JOIN participant_interactions pi ON pi.id = b.participant_interaction_id
+		WHERE pi.show_scene_placement_id = $1
+	`, placementID)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		boundIDs[id] = true
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	out := make([]PlayerVisibleInteraction, 0, len(all))
 	for _, it := range all {
 		if !it.Enabled {
+			continue
+		}
+		if boundIDs[it.ID] {
 			continue
 		}
 		if _, err := ResolveEligibleContext(ctx, pool, viewerUserID, it.ID); err != nil {

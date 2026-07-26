@@ -5266,7 +5266,20 @@
         }
       }
 
-      if (parsed && parsed.path !== "session" && parsed.path !== "mic" && window.VictoryCommandPalette?.execute) {
+      if (parsed?.path === "showtime") {
+        const showtimeResult = await window.VictoryMicChat?.sendShowtimeCommand?.("the-cave", text);
+        if (showtimeResult?.handled) {
+          const message = String(showtimeResult.message || "").replace(/\n+/g, " · ").trim();
+          if (message) {
+            addChatMessage(message, formatTime(), "system");
+          }
+          chatInput.value = "";
+          chatInput.focus();
+          return;
+        }
+      }
+
+      if (parsed && parsed.path !== "session" && parsed.path !== "mic" && parsed.path !== "showtime" && window.VictoryCommandPalette?.execute) {
         const response = await window.VictoryCommandPalette.execute({
           path: parsed.path,
           args: parsed.args,

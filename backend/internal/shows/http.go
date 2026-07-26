@@ -579,8 +579,9 @@ func HandleResolveByShortCode(pool *pgxpool.Pool) http.HandlerFunc {
 				"show_run_id": s.ShowRunID,
 			},
 			"show_run": map[string]any{
-				"id":    sr.ID,
-				"title": sr.Title,
+				"id":              sr.ID,
+				"title":           sr.Title,
+				"open_enrollment": sr.OpenEnrollment,
 			},
 		})
 	}

@@ -222,6 +222,7 @@ func main() {
 	mux.HandleFunc("PATCH /api/show-runs/{id}/roster/{member_id}", showruns.HandleRosterUpdate(pool))
 	mux.HandleFunc("DELETE /api/show-runs/{id}/roster/{member_id}", showruns.HandleRosterRemove(pool))
 	mux.HandleFunc("POST /api/show-runs/{id}/roster/self-join", showruns.HandleSelfJoin(pool))
+	mux.HandleFunc("POST /api/show-runs/{id}/roster/self-join-as-player", showruns.HandleSelfJoinAsPlayer(pool))
 	mux.HandleFunc("GET /api/show-runs/{id}/roster/me", showruns.HandleMyRosterMember(pool))
 	mux.HandleFunc("POST /api/show-runs/{id}/roster/me/character", showruns.HandleSelectCharacter(pool))
 	mux.HandleFunc("GET /api/show-runs/{id}/audience-program", showruns.HandleAudienceProgram(pool))

@@ -15,6 +15,13 @@
       const point = deps.getStagePoint();
       const kind = deps.objectKind(objectModel);
 
+      if (action.startsWith("open-bound-interaction:")) {
+        const interactionId = action.slice("open-bound-interaction:".length);
+        deps.openBoundInteraction?.(interactionId, objectModel);
+        deps.closeContextMenu();
+        return;
+      }
+
       if (action === "select") {
         deps.selectObject(objectModel, `${objectModel.label} selected.`);
         deps.closeContextMenu();
@@ -167,6 +174,12 @@
       if (action === "add-token") {
         deps.selectObject(null, "Selection cleared.");
         deps.openTokenPicker("create", null);
+        deps.closeContextMenu();
+        return;
+      }
+
+      if (action === "add-index-card") {
+        deps.createIndexCardFromMenu();
         deps.closeContextMenu();
         return;
       }

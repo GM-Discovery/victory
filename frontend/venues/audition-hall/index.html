@@ -379,6 +379,34 @@
         const row = document.createElement("div");
         row.className = "ticket-row";
         const info = document.createElement("div");
+
+        if (showRun.open_enrollment) {
+          info.innerHTML = `<div><strong>${escapeHtml(show.title)}</strong> is open enrollment -- join now, no approval needed.</div>`;
+          row.appendChild(info);
+          const joinButton = document.createElement("button");
+          joinButton.type = "button";
+          joinButton.textContent = "Join as Player";
+          joinButton.addEventListener("click", async () => {
+            joinButton.disabled = true;
+            try {
+              const r = await fetch(`/api/show-runs/${encodeURIComponent(showRun.id)}/roster/self-join-as-player`, {
+                method: "POST", credentials: "include",
+                headers: { "Content-Type": "application/json" },
+              });
+              const p = await r.json().catch(() => null);
+              if (!r.ok || !p?.ok) { alert("Could not join: " + (p?.data?.error || `HTTP ${r.status}`)); joinButton.disabled = false; return; }
+              showCodeResult.innerHTML = `<div class="muted">Joined as Player. Select your Character to see the opening Scene.</div>`;
+              await loadMyTickets();
+            } catch (err) {
+              joinButton.disabled = false;
+            }
+          });
+          row.appendChild(joinButton);
+          showCodeResult.innerHTML = "";
+          showCodeResult.appendChild(row);
+          return;
+        }
+
         info.innerHTML = `<div>This request is for the Show Run containing <strong>${escapeHtml(show.title)}</strong>.</div><div class="muted">Approval applies to the Show Run, not only this one Show.</div>`;
         row.appendChild(info);
         const sendButton = document.createElement("button");

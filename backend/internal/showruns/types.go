@@ -20,6 +20,7 @@ type ShowRun struct {
 	CohortName              string     `json:"cohort_name,omitempty"`
 	Status                  string     `json:"status"`
 	AudienceSelfJoinEnabled bool       `json:"audience_self_join_enabled"`
+	OpenEnrollment          bool       `json:"open_enrollment"`
 	CreatedByUserID         string     `json:"created_by_user_id"`
 	CreatedAt               time.Time  `json:"created_at"`
 	UpdatedAt               time.Time  `json:"updated_at"`

@@ -14,7 +14,7 @@ import (
 const showRunColumns = `
 	id::text, location_id::text, production_id::text, title, slug,
 	COALESCE(description, ''), show_format, COALESCE(custom_show_format, ''),
-	COALESCE(cohort_name, ''), status, audience_self_join_enabled,
+	COALESCE(cohort_name, ''), status, audience_self_join_enabled, open_enrollment,
 	created_by_user_id::text, created_at, updated_at, archived_at
 `
 
@@ -23,7 +23,7 @@ func scanShowRun(row pgx.Row) (ShowRun, error) {
 	if err := row.Scan(
 		&sr.ID, &sr.LocationID, &sr.ProductionID, &sr.Title, &sr.Slug,
 		&sr.Description, &sr.ShowFormat, &sr.CustomShowFormat,
-		&sr.CohortName, &sr.Status, &sr.AudienceSelfJoinEnabled,
+		&sr.CohortName, &sr.Status, &sr.AudienceSelfJoinEnabled, &sr.OpenEnrollment,
 		&sr.CreatedByUserID, &sr.CreatedAt, &sr.UpdatedAt, &sr.ArchivedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -106,6 +106,7 @@ type UpdateShowRunPatch struct {
 	CohortName              *string
 	Status                  *string
 	AudienceSelfJoinEnabled *bool
+	OpenEnrollment          *bool
 }
 
 // UpdateShowRun authority-checks against the run's existing location, then
@@ -151,6 +152,10 @@ func UpdateShowRun(ctx context.Context, pool *pgxpool.Pool, actorUserID, showRun
 	if patch.AudienceSelfJoinEnabled != nil {
 		selfJoin = *patch.AudienceSelfJoinEnabled
 	}
+	openEnrollment := sr.OpenEnrollment
+	if patch.OpenEnrollment != nil {
+		openEnrollment = *patch.OpenEnrollment
+	}
 
 	archivedAt := "NULL"
 	if status == "archived" {
@@ -161,11 +166,11 @@ func UpdateShowRun(ctx context.Context, pool *pgxpool.Pool, actorUserID, showRun
 		UPDATE show_runs
 		SET title = $2, description = NULLIF($3, ''), show_format = $4,
 		    custom_show_format = NULLIF($5, ''), cohort_name = NULLIF($6, ''),
-		    status = $7, audience_self_join_enabled = $8,
+		    status = $7, audience_self_join_enabled = $8, open_enrollment = $9,
 		    archived_at = `+archivedAt+`, updated_at = NOW()
 		WHERE id = $1
 		RETURNING `+showRunColumns,
-		showRunID, title, description, format, customFormat, cohort, status, selfJoin)
+		showRunID, title, description, format, customFormat, cohort, status, selfJoin, openEnrollment)
 	return scanShowRun(row)
 }
 

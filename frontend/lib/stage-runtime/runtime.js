@@ -1829,7 +1829,23 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         }
       }
 
-      if (parsed && parsed.path !== "session" && parsed.path !== "mic") {
+      if (parsed?.path === "showtime") {
+        try {
+          const showtimeResult = await window.VictoryMicChat?.sendShowtimeCommand?.(VENUE.slug, text);
+          if (showtimeResult?.handled) {
+            const message = String(showtimeResult.message || "").replace(/\n+/g, " · ").trim();
+            if (message) appendSystemChatNotice(message);
+            chatInput.value = "";
+            return;
+          }
+        } catch (error) {
+          appendSystemChatNotice(String(error?.message || error || "Showtime command failed"));
+          chatInput.value = "";
+          return;
+        }
+      }
+
+      if (parsed && parsed.path !== "session" && parsed.path !== "mic" && parsed.path !== "showtime") {
         if (!currentShowingIsOpen()) {
           chatInput.value = "";
           appendSystemChatNotice(chatClosedMessage());
@@ -2647,6 +2663,18 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         stagePlacementCandidate = point;
         stagePlacementScreenCandidate = screenPoint;
       },
+      createIndexCardFromMenu: () => createIndexCardFromMenu(),
+      placeCreatedIndexCard: (action) => placeCreatedIndexCard(action),
+      openBoundInteraction: (interactionId, objectModel) => {
+        const binding = objectModel?.source?.data?.binding;
+        const label = binding?.stage_button_label || "Interact";
+        const controller = getParticipantInteractionsController();
+        if (!controller) {
+          setStageStatus("Interactions are unavailable right now.");
+          return;
+        }
+        controller.openInteraction(interactionId, label);
+      },
     }) || null;
 
     socketController = stageEngineSocketControllerModule?.createSocketController?.({
@@ -2972,6 +3000,16 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
             return null;
           }
           if (venueMapTextureURLForState(currentVenueMapState) === assetURL) {
+            // Each map swap/revision produces a distinct cache-busted URL
+            // (see venueMapTextureURLForState), so PIXI.Assets never hits
+            // its own URL cache for the old backdrop -- without an explicit
+            // unload here, every swap leaks a full-resolution GPU texture
+            // that's never freed, and enough swaps in one session can
+            // exhaust GPU memory and crash the WebGL context entirely.
+            const previousURL = venueMapTextureURL;
+            if (previousURL && previousURL !== assetURL) {
+              window.PIXI.Assets.unload(previousURL).catch(() => {});
+            }
             venueMapTexture = resolvedTexture;
             venueMapTextureURL = assetURL;
             venueMapTextureFailedURL = "";
@@ -3850,6 +3888,27 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
 
       runtimeLifecycle.listen(pixiApp.view, "contextmenu", handleNativeStageContextMenu, true);
       runtimeLifecycle.listen(stageHost, "contextmenu", handleNativeStageContextMenu, true);
+
+      // Without this, a lost WebGL context (GPU driver reset, out-of-memory
+      // kill, tab backgrounding) leaves the canvas permanently blank with no
+      // way to recover short of a full page reload -- there was previously
+      // no listener anywhere in this codebase for either event. preventDefault()
+      // on contextlost is required for the browser to attempt automatic
+      // context restoration at all; on restore, cached texture references
+      // point at GPU resources that no longer exist, so the map texture
+      // cache is cleared and the whole scene is rebuilt from a fresh
+      // snapshot rather than assumed still valid.
+      runtimeLifecycle.listen(pixiApp.view, "webglcontextlost", (event) => {
+        event.preventDefault();
+        console.warn("stage-runtime: WebGL context lost, awaiting restore");
+        setStageStatus("Graphics connection lost -- attempting to recover...");
+      }, false);
+      runtimeLifecycle.listen(pixiApp.view, "webglcontextrestored", () => {
+        console.warn("stage-runtime: WebGL context restored, rebuilding scene");
+        clearVenueMapTexture();
+        setStageStatus("Graphics connection restored.");
+        refreshWorld();
+      }, false);
 
       sceneRoot = new PIXI.Container();
       sceneRoot.sortableChildren = true;

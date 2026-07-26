@@ -350,6 +350,7 @@
       push("set-map", "Add / Replace Map", "create", { disabled: !canManageIndexCards });
       push("configure-grid", "Configure Grid", "create", { disabled: !canManageIndexCards });
       push("add-token", "Add Token", "create", { disabled: !canManageStageTokens });
+      push("add-index-card", "Create Index Card", "create", { disabled: !canManageIndexCards, requiresPoint: true });
       push("inspect", "Inspect Stage", "info");
       if (hasSelection) {
         push("clear", "Clear selection", "clear");
@@ -372,6 +373,17 @@
     if (!objectModel?.live) {
       push("select", "Select", "info");
       push("info", "Info", "info");
+      // Kernel 73A bound interactions (e.g. Kessa's token -> "Speak with
+      // Kessa") previously only surfaced in the selected-object action
+      // panel after a plain click (see runtime.js's syncSelectedActions),
+      // not here in the right-click context menu -- the more discoverable
+      // path a Director/Player naturally reaches for first. Both paths call
+      // the same openInteraction controller, so this is additive, not a
+      // second source of truth.
+      const binding = objectModel?.source?.data?.binding;
+      if (binding?.participant_interaction_id && binding?.enabled) {
+        push(`open-bound-interaction:${binding.participant_interaction_id}`, binding.stage_button_label || "Interact", "interact");
+      }
       if (hasSelection) {
         push("clear", "Clear selection", "clear");
       }
