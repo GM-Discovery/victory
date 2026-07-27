@@ -496,8 +496,166 @@
             toggleButton.disabled = false;
           }
         });
+        // Kernel 75: guided_dialogue interactions name a dialogue packet
+        // whose prose every Player reads verbatim. The editor lives HERE,
+        // next to the interaction that references the packet, rather than in
+        // the Director's Chair -- Scene Setup already authors the thing that
+        // points at it.
+        if (interaction.interaction_type === "guided_dialogue") {
+          const editButton = document.createElement("button");
+          editButton.className = "chip small";
+          editButton.type = "button";
+          editButton.textContent = "Edit dialogue";
+          editButton.addEventListener("click", () => openDialogueEditor(interaction, row));
+          row.appendChild(editButton);
+        }
+
         row.appendChild(toggleButton);
         return row;
+      }
+
+      // --- Kernel 75: dialogue packet editor ---------------------------------
+      //
+      // Edits TEXT AND ORDERING ONLY. There is no create-topic, delete-topic,
+      // prerequisite, or destination-scene control here, and their absence is
+      // deliberate: those decide whether a Player can reach the end of a
+      // conversation at all, and they stay migrations.
+
+      async function openDialogueEditor(interaction, anchorRow) {
+        const existing = document.getElementById("k75-dialogue-editor");
+        if (existing) existing.remove();
+
+        const wrap = document.createElement("div");
+        wrap.id = "k75-dialogue-editor";
+        wrap.className = "cue-create-form";
+        wrap.textContent = "Loading dialogue packet...";
+        anchorRow.parentElement.insertBefore(wrap, anchorRow.nextSibling);
+
+        const slug = interaction.configuration_json?.packet_slug || "";
+        if (!slug) { wrap.textContent = "This interaction names no dialogue packet."; return; }
+
+        try {
+          const listRes = await fetch(`/api/locations/${encodeURIComponent(locationId)}/dialogue-packets`, { credentials: "include" });
+          const listPayload = await listRes.json().catch(() => null);
+          if (!listRes.ok || !listPayload?.ok) throw new Error(listPayload?.data?.error || `HTTP ${listRes.status}`);
+          const packet = (listPayload.data.packets || []).find((p) => p.slug === slug);
+          if (!packet) throw new Error("dialogue_packet_not_found");
+
+          const detailRes = await fetch(`/api/dialogue-packets/${encodeURIComponent(packet.id)}`, { credentials: "include" });
+          const detailPayload = await detailRes.json().catch(() => null);
+          if (!detailRes.ok || !detailPayload?.ok) throw new Error(detailPayload?.data?.error || `HTTP ${detailRes.status}`);
+          renderDialogueEditor(wrap, detailPayload.data.packet, detailPayload.data.topics || []);
+        } catch (error) {
+          wrap.textContent = "Could not load dialogue packet: " + (error.message || String(error));
+        }
+      }
+
+      function dialogueField(label, value, rows) {
+        const field = document.createElement("div");
+        field.className = "field span-2";
+        const labelEl = document.createElement("label");
+        labelEl.textContent = label;
+        const input = rows ? document.createElement("textarea") : document.createElement("input");
+        if (rows) input.rows = rows; else input.type = "text";
+        input.value = value || "";
+        field.append(labelEl, input);
+        return { field, input };
+      }
+
+      function renderDialogueEditor(wrap, packet, topics) {
+        wrap.innerHTML = "";
+
+        const heading = document.createElement("h4");
+        heading.textContent = `Dialogue: ${packet.npc_name || packet.slug}`;
+        wrap.appendChild(heading);
+
+        const origin = document.createElement("p");
+        origin.className = "help-text";
+        origin.textContent = packet.content_origin === "authored"
+          ? "Edited here. Future content updates will not overwrite it."
+          : "Seed content. Editing it here protects it from future content updates.";
+        wrap.appendChild(origin);
+
+        const npc = dialogueField("NPC name", packet.npc_name);
+        const openingNarration = dialogueField("Opening narration", packet.opening_narration, 2);
+        const openingLine = dialogueField("Opening line", packet.opening_line, 2);
+        const leaveLabel = dialogueField("Leave button label", packet.leave_label);
+        wrap.append(npc.field, openingNarration.field, openingLine.field, leaveLabel.field);
+
+        // The staged ending. Four beats by convention, but any number works;
+        // empty beats are dropped server-side and an empty list falls back
+        // to closing_narration.
+        const beatsHeading = document.createElement("p");
+        beatsHeading.className = "help-text";
+        beatsHeading.textContent = "Closing beats — revealed one at a time as the gate opens.";
+        wrap.appendChild(beatsHeading);
+        const beatInputs = [];
+        const beats = (packet.closing_beats || []).length ? packet.closing_beats : ["", "", "", ""];
+        beats.forEach((beat, i) => {
+          const b = dialogueField(`Beat ${i + 1}`, beat, 2);
+          beatInputs.push(b.input);
+          wrap.appendChild(b.field);
+        });
+
+        const fallback = dialogueField("Closing narration (fallback)", packet.closing_narration, 3);
+        wrap.appendChild(fallback.field);
+
+        const saveButton = document.createElement("button");
+        saveButton.className = "chip small";
+        saveButton.type = "button";
+        saveButton.textContent = "Save dialogue";
+        saveButton.addEventListener("click", async () => {
+          saveButton.disabled = true;
+          try {
+            const res = await fetch(`/api/dialogue-packets/${encodeURIComponent(packet.id)}`, {
+              method: "PATCH", credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                npc_name: npc.input.value,
+                opening_narration: openingNarration.input.value,
+                opening_line: openingLine.input.value,
+                leave_label: leaveLabel.input.value,
+                closing_narration: fallback.input.value,
+                closing_beats: beatInputs.map((el) => el.value),
+              }),
+            });
+            const p = await res.json().catch(() => null);
+            if (!res.ok || !p?.ok) { alert("Could not save dialogue: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+            renderDialogueEditor(wrap, p.data.packet, topics);
+          } finally {
+            saveButton.disabled = false;
+          }
+        });
+        wrap.appendChild(saveButton);
+
+        const topicsHeading = document.createElement("h4");
+        topicsHeading.textContent = "Topics";
+        wrap.appendChild(topicsHeading);
+
+        for (const topic of topics) {
+          const label = dialogueField(`${topic.topic_key} — question`, topic.label);
+          const response = dialogueField(`${topic.topic_key} — response`, topic.response_text, 4);
+          const save = document.createElement("button");
+          save.className = "chip small";
+          save.type = "button";
+          save.textContent = topic.required_for_completion ? "Save (required topic)" : "Save topic";
+          save.addEventListener("click", async () => {
+            save.disabled = true;
+            try {
+              const res = await fetch(`/api/dialogue-topics/${encodeURIComponent(topic.id)}`, {
+                method: "PATCH", credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ label: label.input.value, response_text: response.input.value }),
+              });
+              const p = await res.json().catch(() => null);
+              if (!res.ok || !p?.ok) { alert("Could not save topic: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+              save.textContent = "Saved";
+            } finally {
+              save.disabled = false;
+            }
+          });
+          wrap.append(label.field, response.field, save);
+        }
       }
 
       async function loadInteractionsForPlacement(placementId, container) {

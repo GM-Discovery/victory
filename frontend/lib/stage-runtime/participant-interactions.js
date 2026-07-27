@@ -365,24 +365,345 @@
       panel.setLoading(true);
       try {
         const data = await fetchJSON(`/api/participant-interactions/${encodeURIComponent(currentInteractionId)}/dialogue/leave`, { method: "POST" });
-        // The closing narration is the lock reveal (S10.1) -- Ra operating a
-        // concealed courtyard-side mechanism. Shown before the transition so
-        // the Player actually reads how the door opened.
-        panel.setBody(`
-          <p><em>${escapeHtml(data.dialogue.closing_narration || "")}</em></p>
-          <div class="victory-program-panel__buttons">
-            <button type="button" class="is-primary" data-action="continue">Step Through</button>
-          </div>
-        `);
-        bindActions({
-          continue: () => {
-            panel.close();
-            deps.onTutorialProgress?.();
-          },
-        });
+        // Kernel 75 S3.1: the closing narration is the lock reveal -- Ra
+        // exposing and operating a concealed courtyard-side mechanism. It is
+        // now staged across ordered beats so the Player watches the gate
+        // open rather than reading the whole ending at once.
+        //
+        // FALLBACK, load-bearing: a packet seeded before migration 072, or
+        // one a Director left as a single paragraph, has no closing_beats.
+        // Falling back to closing_narration is what lets the frontend and
+        // backend deploy in either order.
+        const beats = Array.isArray(data.dialogue.closing_beats) && data.dialogue.closing_beats.length
+          ? data.dialogue.closing_beats
+          : [data.dialogue.closing_narration || ""];
+        renderClosingBeats(beats.filter((b) => String(b || "").trim() !== ""), 0);
       } catch (error) {
         panel.setError(error.message || String(error));
       }
+    }
+
+    // renderClosingBeats reveals one beat at a time. The final beat's button
+    // is `continue`, which POSTs the Continue verb -- NOT a panel close.
+    // S3.1 is explicit that the completion projection must not interrupt
+    // Ra's final physical action, so the Program only opens after this.
+    function renderClosingBeats(beats, index) {
+      const shown = beats.slice(0, index + 1);
+      const isLast = index >= beats.length - 1;
+      const paragraphs = shown.map((beat, i) => {
+        const dim = i < shown.length - 1 ? ' class="is-dim"' : "";
+        return `<p${dim}><em>${escapeHtml(beat)}</em></p>`;
+      }).join("");
+      panel.setBody(`
+        <div data-region="closing-beats">${paragraphs}</div>
+        <div class="victory-program-panel__buttons">
+          ${isLast
+            ? '<button type="button" class="is-primary" data-action="continue">Continue</button>'
+            : '<button type="button" class="is-primary" data-action="next-beat">…</button>'}
+        </div>
+      `);
+      bindActions({
+        "next-beat": () => renderClosingBeats(beats, index + 1),
+        continue: () => runTutorialContinue(),
+      });
+    }
+
+    async function runTutorialContinue() {
+      panel.setLoading(true);
+      try {
+        const data = await fetchJSON(
+          `/api/participant-interactions/${encodeURIComponent(currentInteractionId)}/tutorial/continue`,
+          { method: "POST" });
+        renderTutorialCompletion(data.completion);
+        deps.onTutorialProgress?.();
+      } catch (error) {
+        panel.setError(error.message || String(error));
+      }
+    }
+
+    // openTutorialCompletion is the reopen path (S4.3). A pure read: it
+    // records nothing and re-awards nothing.
+    async function openTutorialCompletion(interactionId) {
+      currentInteractionId = interactionId;
+      panel.open({
+        title: "Tutorial Complete",
+        onClose: () => { currentInteractionId = null; currentContext = null; },
+      });
+      panel.setLoading(true);
+      try {
+        const data = await fetchJSON(
+          `/api/participant-interactions/${encodeURIComponent(interactionId)}/tutorial/completion`);
+        renderTutorialCompletion(data.completion);
+      } catch (error) {
+        panel.setError(error.message || String(error));
+      }
+    }
+
+    // renderTutorialCompletion draws the six required sections (S4.1).
+    //
+    // EVERY string of prose here comes from the server. The client must not
+    // become a second place where this copy is decided, or the wording lives
+    // in two files and drifts. The only text authored here is structural
+    // labels and button captions.
+    function renderTutorialCompletion(completion) {
+      const c = completion || {};
+      panel.updateHeader({ title: "Tutorial Complete", subtitle: c.character_name || "" });
+
+      const body = (c.body || []).map((p) => `<p>${escapeHtml(p)}</p>`).join("");
+
+      // Section 2 -- What You Did. Generated summaries, server-authored.
+      const recap = (c.recap_lines || []).length
+        ? `<ul class="victory-story-list">${(c.recap_lines || [])
+            .map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`
+        : "<p>Your Character's history begins here.</p>";
+
+      // Section 3 -- Story So Far. Private by default; say so plainly.
+      const storyCount = (c.story_events || []).length;
+      const story = `
+        <p>${storyCount} moment${storyCount === 1 ? "" : "s"} ${storyCount === 1 ? "was" : "were"} recorded in your Character's Story So Far.</p>
+        <p class="is-dim">These entries are private to you. You can share individual moments with your table later, from your Character's Story So Far page.</p>
+        <div class="victory-program-panel__buttons">
+          <a class="chip" href="/venues/greenroom/?character_id=${encodeURIComponent(c.character_card_id || "")}">Open Story So Far</a>
+        </div>`;
+
+      // Section 4 -- Progress Earned. S7.3's visible half: the one-time
+      // Player recognition appears only on a genuine first completion; a
+      // replay with a second Character shows the Character-level line.
+      const recog = c.recognition || {};
+      const progress = recog.newly_granted && recog.grant
+        ? `<p><strong>${escapeHtml(recog.grant.label || "")}</strong></p>
+           <p>You completed your first Socio Show.</p>`
+        : `<p>${escapeHtml(c.character_name || "This Character")} completed the Locked Courtyard.</p>
+           ${recog.grant ? '<p class="is-dim">You have already earned first-completion recognition on this account.</p>' : ""}`;
+
+      const inventory = (c.inventory || []).length
+        ? `<ul class="victory-story-list">${(c.inventory || [])
+            .map((item) => `<li>${escapeHtml(item.name || item.item_name || "")}</li>`).join("")}</ul>`
+        : "<p class=\"is-dim\">You carry nothing new from the Courtyard.</p>";
+
+      const waiting = (c.waiting_copy || []).map((p) => `<p>${escapeHtml(p)}</p>`).join("");
+
+      panel.setBody(`
+        <section data-section="tutorial-complete">
+          <h3>${escapeHtml(c.headline || "Tutorial Complete")}</h3>
+          ${body}
+        </section>
+        <section data-section="what-you-did">
+          <h4>What You Did</h4>
+          ${recap}
+        </section>
+        <section data-section="story-so-far">
+          <h4>Story So Far</h4>
+          ${story}
+        </section>
+        <section data-section="progress-earned">
+          <h4>Progress Earned</h4>
+          ${progress}
+          ${inventory}
+        </section>
+        <section data-section="aftercare" data-aftercare-slot="1">
+          <h4>Aftercare</h4>
+          <p>Take a moment, if you want to. It is optional and you can come back to it.</p>
+          <div class="victory-program-panel__buttons">
+            <button type="button" class="is-primary" data-action="aftercare-open">Write something</button>
+            <button type="button" data-action="aftercare-skip">Skip</button>
+          </div>
+        </section>
+        <section data-section="waiting">
+          <h4>Waiting for Human Play</h4>
+          ${waiting}
+          <div class="victory-program-panel__buttons">
+            <button type="button" data-action="close-completion">Explore Catharsis</button>
+          </div>
+        </section>
+      `);
+
+      bindActions({
+        "close-completion": () => {
+          // S1.3/S4.3: closing must not erase completion or return the
+          // Player to the Courtyard fiction. It just puts the panel away;
+          // the local projection and the reopen affordance both persist.
+          panel.close();
+          deps.onTutorialProgress?.();
+        },
+        "aftercare-open": () => openAftercare(c),
+        "aftercare-skip": () => confirmAftercareSkip(c),
+      });
+    }
+
+    // --- Aftercare (S8) -------------------------------------------------------
+    //
+    // Three qualitative prompts, all optional, with Save and Close / Skip.
+    //
+    // Drafts autosave SERVER-SIDE, not to localStorage. A Player may finish
+    // on a different device, and reflection text must not linger in browser
+    // storage after a logout on a shared machine.
+
+    let aftercareDraftTimer = null;
+    let aftercareShowID = "";
+
+    function collectAftercareResponses() {
+      const out = {};
+      document.querySelectorAll("[data-aftercare-prompt]").forEach((el) => {
+        out[el.getAttribute("data-aftercare-prompt")] = el.value || "";
+      });
+      return out;
+    }
+
+    function scheduleAftercareDraftSave() {
+      if (aftercareDraftTimer) clearTimeout(aftercareDraftTimer);
+      aftercareDraftTimer = setTimeout(saveAftercareDraft, 1200);
+    }
+
+    async function saveAftercareDraft() {
+      if (!aftercareShowID) return;
+      try {
+        await fetchJSON(`/api/shows/${encodeURIComponent(aftercareShowID)}/aftercare/draft`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ responses: collectAftercareResponses() }),
+        });
+      } catch (error) {
+        // A failed autosave must never interrupt writing. The Player still
+        // has their text on screen, and Save and Close submits it directly.
+        setStageStatus("Draft not saved: " + (error.message || String(error)));
+      }
+    }
+
+    async function openAftercare(completion) {
+      aftercareShowID = (completion && completion.show_id) || "";
+      panel.setLoading(true);
+      try {
+        const data = await fetchJSON(`/api/shows/${encodeURIComponent(aftercareShowID)}/aftercare`);
+        renderAftercareForm(completion, data.aftercare || {});
+      } catch (error) {
+        panel.setError(error.message || String(error));
+      }
+    }
+
+    function renderAftercareForm(completion, state) {
+      const prompts = state.prompts || [];
+      const draft = (state.draft && state.draft.responses) || {};
+      const fields = prompts.map((p) => `
+        <label class="victory-field">
+          <span>${escapeHtml(p.label)}</span>
+          <textarea data-aftercare-prompt="${escapeHtml(p.key)}"
+                    maxlength="${Number(p.max_length) || 2000}"
+                    rows="3">${escapeHtml(draft[p.key] || "")}</textarea>
+        </label>`).join("");
+
+      panel.setBody(`
+        <section data-section="aftercare-form">
+          <h4>Aftercare</h4>
+          <p class="victory-aftercare-notice" data-aftercare-notice="1">
+            Your Director can read this.
+          </p>
+          <p class="is-dim">Every question is optional. You can save what you have and come back later.</p>
+          ${fields}
+          <div class="victory-program-panel__buttons">
+            <button type="button" class="is-primary" data-action="aftercare-save">Save and Close</button>
+            <button type="button" data-action="aftercare-skip">Skip</button>
+            <button type="button" data-action="aftercare-back">Back</button>
+          </div>
+        </section>
+      `);
+
+      document.querySelectorAll("[data-aftercare-prompt]").forEach((el) => {
+        el.addEventListener("input", scheduleAftercareDraftSave);
+      });
+
+      bindActions({
+        "aftercare-save": () => submitAftercare(completion),
+        "aftercare-skip": () => confirmAftercareSkip(completion),
+        "aftercare-back": () => renderTutorialCompletion(completion),
+      });
+    }
+
+    async function submitAftercare(completion) {
+      panel.setLoading(true);
+      try {
+        await fetchJSON(`/api/shows/${encodeURIComponent(aftercareShowID)}/aftercare`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ responses: collectAftercareResponses() }),
+        });
+        renderNotesReminder(completion);
+      } catch (error) {
+        panel.setError(error.message || String(error));
+      }
+    }
+
+    // confirmAftercareSkip is S8.4/S1.14's two-step skip.
+    //
+    // The POST fires only on the SECOND press. Closing the panel, refreshing,
+    // or pressing Go Back all leave the count untouched -- there is no
+    // endpoint they could reach that would change it (S8.5).
+    async function confirmAftercareSkip(completion) {
+      aftercareShowID = (completion && completion.show_id) || aftercareShowID;
+      let consecutive = 0;
+      try {
+        const data = await fetchJSON(`/api/shows/${encodeURIComponent(aftercareShowID)}/aftercare`);
+        consecutive = Number((data.aftercare || {}).consecutive_skips) || 0;
+      } catch (error) {
+        // If we cannot read the count, still offer the choice -- just
+        // without the factual context line.
+        consecutive = 0;
+      }
+
+      // Factual, never punitive (S1.14).
+      let context = "";
+      if (consecutive === 1) {
+        context = "<p>You skipped Aftercare last time.</p>";
+      } else if (consecutive === 2) {
+        context = "<p>You skipped the last two Aftercare check-ins.</p>";
+      } else if (consecutive >= 3) {
+        context = `<p>You have skipped the last ${consecutive} Aftercare check-ins.</p>`;
+      }
+
+      panel.setBody(`
+        <section data-section="aftercare-skip-confirm">
+          <h4>Skip Aftercare?</h4>
+          ${context}
+          <p>You can still write it later from the Greenroom. Skipping is recorded.</p>
+          <div class="victory-program-panel__buttons">
+            <button type="button" class="is-primary" data-action="skip-confirm">Continue Without Aftercare</button>
+            <button type="button" data-action="skip-back">Go Back</button>
+          </div>
+        </section>
+      `);
+      bindActions({
+        "skip-confirm": async () => {
+          panel.setLoading(true);
+          try {
+            await fetchJSON(`/api/shows/${encodeURIComponent(aftercareShowID)}/aftercare/skip`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ confirmed: true }),
+            });
+            renderNotesReminder(completion);
+          } catch (error) {
+            panel.setError(error.message || String(error));
+          }
+        },
+        "skip-back": () => renderTutorialCompletion(completion),
+      });
+    }
+
+    // S1.16/S8.6: My People is the default note follow-up.
+    function renderNotesReminder(completion) {
+      panel.setBody(`
+        <section data-section="notes-reminder">
+          <h4>Before you go</h4>
+          <p>Did you take notes? Don't forget to update your notes on yourself and your fellow Players.</p>
+          <div class="victory-program-panel__buttons">
+            <a class="chip is-primary" href="/venues/trailers/people.html">Update My People</a>
+            <button type="button" data-action="notes-next">Next</button>
+          </div>
+        </section>
+      `);
+      bindActions({
+        "notes-next": () => renderTutorialCompletion(completion),
+      });
     }
 
     // --- Dispatch ------------------------------------------------------------
@@ -440,7 +761,7 @@
       }
     }
 
-    return { openInteraction };
+    return { openInteraction, openTutorialCompletion };
   }
 
   return { createParticipantInteractionsController };

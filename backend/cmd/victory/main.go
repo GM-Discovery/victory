@@ -290,6 +290,40 @@ func main() {
 	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/complete", merchant.HandleInteractionComplete(pool, hub))
 	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/submit", merchant.HandleInteractionSubmit(pool, hub))
 	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/dialogue/{action}", merchant.HandleInteractionDialogue(pool, hub))
+	// Kernel 75: the tutorial's ending. /tutorial/continue is the Player's
+	// Continue press after watching Ra open the gate; /tutorial/completion
+	// is the reopen path and records nothing. Registered under the existing
+	// participant-interactions prefix so they inherit the same
+	// ResolveEligibleContext gate as every other participant action.
+	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/tutorial/continue", merchant.HandleTutorialContinue(pool, hub))
+	mux.HandleFunc("GET /api/participant-interactions/{interaction_id}/tutorial/completion", merchant.HandleTutorialCompletion(pool))
+	// Story So Far. Deliberately under /api/characters/ rather than
+	// /api/character-cards/, which is a PREFIX handler below and would
+	// swallow a sibling route.
+	mux.HandleFunc("GET /api/characters/{character_card_id}/story-so-far", merchant.HandleCharacterStorySoFar(pool))
+	mux.HandleFunc("PATCH /api/story-events/{event_id}", merchant.HandleStoryEventVisibility(pool))
+	mux.HandleFunc("GET /api/player-recognition/me", merchant.HandleMyRecognition(pool))
+	// Aftercare (Kernel 75 S8). Show-keyed rather than interaction-keyed so
+	// a Player can write it later from the Greenroom, when no Program is on
+	// screen and possibly no Session is running.
+	mux.HandleFunc("GET /api/shows/{show_id}/aftercare", merchant.HandleShowAftercare(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/aftercare", merchant.HandleShowAftercare(pool))
+	mux.HandleFunc("PUT /api/shows/{show_id}/aftercare/draft", merchant.HandleShowAftercareDraft(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/aftercare/skip", merchant.HandleShowAftercareSkip(pool))
+	// Directors+ review (S9). Read-only: no POST/PATCH/DELETE exists for
+	// these paths. The two gates differ on purpose -- reading the table is
+	// backstage visibility (CanViewBackstage), while exporting takes
+	// Player-written reflection off the platform (CanManageShowRun).
+	mux.HandleFunc("GET /api/shows/{show_id}/aftercare-review", merchant.HandleShowAftercareReview(pool))
+	mux.HandleFunc("GET /api/shows/{show_id}/aftercare-review.csv", merchant.HandleShowAftercareReviewCSV(pool))
+	// Dialogue authoring (Kernel 75). Reads take CanViewBackstage; writes
+	// take CanManageShowRun -- stricter than interaction editing, because an
+	// NPC's prose is canon every Player reads verbatim.
+	mux.HandleFunc("GET /api/locations/{location_id}/dialogue-packets", merchant.HandleLocationDialoguePackets(pool))
+	mux.HandleFunc("GET /api/dialogue-packets/{packet_id}", merchant.HandleDialoguePacketByID(pool))
+	mux.HandleFunc("PATCH /api/dialogue-packets/{packet_id}", merchant.HandleDialoguePacketByID(pool))
+	mux.HandleFunc("GET /api/dialogue-packets/{packet_id}/revisions", merchant.HandleDialoguePacketRevisions(pool))
+	mux.HandleFunc("PATCH /api/dialogue-topics/{topic_id}", merchant.HandleDialogueTopicByID(pool))
 	mux.HandleFunc("GET /api/shows/{show_id}/tutorial-progress", merchant.HandleShowTutorialProgress(pool))
 	mux.HandleFunc("DELETE /api/shows/{show_id}/local-projections/{user_id}", merchant.HandleClearLocalProjection(pool, hub))
 	mux.HandleFunc("POST /api/shows/{show_id}/prepare-locked-courtyard-opening", merchant.HandlePrepareLockedCourtyardOpening(pool))

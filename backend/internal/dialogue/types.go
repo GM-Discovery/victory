@@ -32,6 +32,16 @@ type Packet struct {
 	Active               bool      `json:"active"`
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
+
+	// ClosingBeats is the staged lock-reveal ending (kernel-75 S3.1), added
+	// by migration 072. Never read this field directly -- use
+	// ClosingBeatsOrNarration, which supplies the closing_narration fallback
+	// an unedited or pre-072 packet needs.
+	ClosingBeats []string `json:"closing_beats"`
+	// ContentOrigin is 'seed' until a Director edits this packet through the
+	// authoring API, then 'authored'. Content migrations must only touch
+	// rows still marked 'seed'.
+	ContentOrigin string `json:"content_origin"`
 }
 
 // Topic is one authored question and its authored answer.
@@ -85,4 +95,12 @@ type State struct {
 	// ClosingNarration is populated only by Leave -- the lock-reveal beat
 	// (S10.1). Empty on open and on topic reads.
 	ClosingNarration string `json:"closing_narration,omitempty"`
+
+	// ClosingBeats is the same ending broken into ordered beats so the
+	// Program can reveal it a step at a time (kernel-75 S3.1). Populated
+	// only by Leave. Always non-empty when ClosingNarration is non-empty,
+	// because it comes from Packet.ClosingBeatsOrNarration -- a client may
+	// render either, and an older client that only knows ClosingNarration
+	// keeps working unchanged.
+	ClosingBeats []string `json:"closing_beats,omitempty"`
 }

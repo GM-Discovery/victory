@@ -1,0 +1,5 @@
+Ended a pre-existing Session at catharsis on 2026-07-27T23:20:31.868Z
+  show_id:    b1b67fd4-6c81-4ee6-ab58-ea6cfabc20a4
+  show title: K75 Browser Show
+  short code: 9XDR
+Restart it with: /showtime -> 9XDR, or from Stage Management.

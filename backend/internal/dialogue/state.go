@@ -92,6 +92,12 @@ func LeaveState(ctx context.Context, pool *pgxpool.Pool, p tutorial.Participatio
 	// door's "no obvious lock or keyhole" opening description honest rather
 	// than contradicted.
 	state.ClosingNarration = packet.ClosingNarration
+	// Kernel 75 S3.1: the same ending, broken into ordered beats so the
+	// Player watches Ra find the mechanism, work it, and open the gate,
+	// rather than reading it all at once. ClosingBeatsOrNarration supplies
+	// the single-beat fallback for a packet that has none authored, so both
+	// fields are always consistent and either may be rendered.
+	state.ClosingBeats = packet.ClosingBeatsOrNarration()
 	state.CurrentResponse = ""
 	return state, nil
 }

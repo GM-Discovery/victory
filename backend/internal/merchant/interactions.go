@@ -301,26 +301,13 @@ func ResolveEligibleContext(ctx context.Context, pool *pgxpool.Pool, actorUserID
 		return EligibleContext{}, errors.New("scene_not_current")
 	}
 
-	member, err := showruns.LoadMyRosterMember(ctx, pool, actorUserID, showRunID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) || strings.TrimSpace(err.Error()) == "roster_member_not_found" {
-			return EligibleContext{}, errors.New("not_a_roster_member")
-		}
-		return EligibleContext{}, err
-	}
-	if strings.ToLower(strings.TrimSpace(member.Role)) != "player" {
-		return EligibleContext{}, errors.New("insufficient_role")
-	}
-	if strings.TrimSpace(member.CharacterCardID) == "" {
-		return EligibleContext{}, errors.New("no_character_selected")
-	}
-
-	allowed, err := characterActiveAndOwnedBy(ctx, pool, actorUserID, member.CharacterCardID)
+	// Kernel 75 extracted the roster-and-Character half of this gate into
+	// ResolveShowParticipation, so Aftercare (which is Show-keyed and may be
+	// written when no Session is live) can reuse it rather than growing a
+	// second copy. The checks are unchanged; only their location moved.
+	participation, err := ResolveShowParticipation(ctx, pool, actorUserID, showID)
 	if err != nil {
 		return EligibleContext{}, err
-	}
-	if !allowed {
-		return EligibleContext{}, errors.New("character_not_owned")
 	}
 
 	var sessionID string
@@ -345,7 +332,7 @@ func ResolveEligibleContext(ctx context.Context, pool *pgxpool.Pool, actorUserID
 		ShowRunID:       showRunID,
 		LocationID:      locationID,
 		SessionID:       sessionID,
-		CharacterCardID: member.CharacterCardID,
+		CharacterCardID: participation.CharacterCardID,
 	}, nil
 }
 
@@ -517,6 +504,21 @@ func AttemptStance(ctx context.Context, pool *pgxpool.Pool, actorUserID, interac
 	}
 	response := stance.Responses[tier]
 
+	// Kernel 75 S5.1: the durable, Character-keyed record, written BEFORE the
+	// ephemeral actions row so a failure here can never leave an actions row
+	// claiming an attempt that Character history cannot corroborate.
+	if err := recordInteractionAttempt(ctx, pool, eligible, attemptRecord{
+		AttemptKind:  "stance",
+		PacketSlug:   packet.Slug,
+		StanceKey:    stanceKey,
+		Disposition:  stance.Disposition,
+		ResponseTier: intPtr(tier),
+		Die:          "d20",
+		Total:        intPtr(result.Total),
+	}); err != nil {
+		return StanceAttemptResult{}, err
+	}
+
 	// StoreGameEventTrusted, not StoreGameEvent: StoreGameEvent's own CanAct
 	// gate for "game/event" only allows director/producer session
 	// participants (despite its doc comment's "any session participant"
@@ -641,6 +643,21 @@ func AttemptHaggle(ctx context.Context, pool *pgxpool.Pool, actorUserID, interac
 	text := packet.HaggleFailureText
 	if success {
 		text = packet.HaggleSuccessText
+	}
+
+	// Kernel 75 S5.1: durable record first, ephemeral actions row second --
+	// see recordInteractionAttempt for why the ordering is load-bearing.
+	if err := recordInteractionAttempt(ctx, pool, eligible, attemptRecord{
+		AttemptKind: "haggle",
+		PacketSlug:  packet.Slug,
+		SkillKey:    packet.HaggleSkillKey,
+		HasSkill:    boolPtr(roll.HasSkill),
+		Die:         roll.Die,
+		Total:       intPtr(roll.Result.Total),
+		TargetValue: intPtr(packet.HaggleTargetValue),
+		Success:     boolPtr(success),
+	}); err != nil {
+		return HaggleAttemptResult{}, err
 	}
 
 	if _, err := actions.StoreGameEventTrusted(ctx, pool, actions.GameEventRequest{

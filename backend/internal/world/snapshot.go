@@ -71,6 +71,30 @@ type Session struct {
 	// Scene, which is what makes "the shared current Scene did not move"
 	// directly assertable from a Player's own snapshot.
 	LocalProjection *LocalProjection `json:"local_projection,omitempty"`
+	// TutorialState is Kernel 75's viewer-scoped tutorial position, present
+	// only for a participant who has recorded progress. It exists so the
+	// completion Program's reopen affordance and the waiting copy render
+	// straight from the snapshot instead of polling.
+	//
+	// Viewer-scoped in the strict sense: it reports THIS viewer's own
+	// milestones and nothing about anyone else's. It deliberately carries no
+	// denominator, no participant count, and no "N of M ready" field --
+	// S1.11 forbids that framing, and a type with no such field cannot grow
+	// one by accident.
+	TutorialState *TutorialState `json:"tutorial_state,omitempty"`
+}
+
+// TutorialState is the curated, viewer-facing tutorial position.
+type TutorialState struct {
+	Milestones []string `json:"milestones"`
+	// CompletionAvailable is true once the gate is open, i.e. once this
+	// Player could press Continue or reopen the completion Program.
+	CompletionAvailable bool `json:"completion_available"`
+	// Completed is true once they actually pressed it.
+	Completed bool `json:"completed"`
+	// CompletionInteractionID is the Ra interaction the Program hangs off,
+	// so the client can call /tutorial/completion without rediscovering it.
+	CompletionInteractionID string `json:"completion_interaction_id,omitempty"`
 }
 
 // LocalProjection is the curated, viewer-facing shape of an active
@@ -468,6 +492,17 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, view
 		return nil, err
 	}
 	snap.Session.LocalProjection = localProjection
+
+	// Kernel 75: this viewer's own tutorial position, on the same
+	// already-resolved (viewer, Character, Show) triple the projection
+	// lookup above just used. One extra query on a path that is already
+	// querying, and it is what lets the completion Program's reopen
+	// affordance and the waiting copy render without polling.
+	tutorialState, err := loadTutorialStateForViewer(ctx, pool, viewerUserID, theaterContext.SelectedCharacterID, showID)
+	if err != nil {
+		return nil, err
+	}
+	snap.Session.TutorialState = tutorialState
 
 	participation := tutorial.Participation{
 		UserID:          viewerUserID,

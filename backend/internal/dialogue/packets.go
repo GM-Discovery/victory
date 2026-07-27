@@ -2,6 +2,7 @@ package dialogue
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sort"
 	"strings"
@@ -16,23 +17,53 @@ const packetColumns = `
 	id::text, location_id::text, slug, npc_name,
 	COALESCE(portrait_asset_id::text, ''), portrait_url,
 	opening_narration, opening_line, closing_narration, leave_label,
-	destination_scene_slug, active, created_at, updated_at
+	destination_scene_slug, active, created_at, updated_at,
+	closing_beats, content_origin
 `
 
 func scanPacket(row pgx.Row) (Packet, error) {
 	var p Packet
+	var closingBeats []byte
 	if err := row.Scan(
 		&p.ID, &p.LocationID, &p.Slug, &p.NPCName,
 		&p.PortraitAssetID, &p.PortraitURL,
 		&p.OpeningNarration, &p.OpeningLine, &p.ClosingNarration, &p.LeaveLabel,
 		&p.DestinationSceneSlug, &p.Active, &p.CreatedAt, &p.UpdatedAt,
+		&closingBeats, &p.ContentOrigin,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Packet{}, errors.New("dialogue_packet_not_found")
 		}
 		return Packet{}, err
 	}
+	if len(closingBeats) > 0 {
+		_ = json.Unmarshal(closingBeats, &p.ClosingBeats)
+	}
 	return p, nil
+}
+
+// ClosingBeatsOrNarration is the one place the empty-array fallback lives
+// (kernel-75 S3.1).
+//
+// closing_beats arrived in migration 072; a packet seeded before it, or one
+// a Director has deliberately left as a single paragraph, has an empty
+// array. Callers must never read ClosingBeats directly -- going through this
+// helper is what lets an unedited packet keep working and what lets the
+// frontend and backend deploy in either order.
+func (p Packet) ClosingBeatsOrNarration() []string {
+	out := []string{}
+	for _, beat := range p.ClosingBeats {
+		if strings.TrimSpace(beat) != "" {
+			out = append(out, beat)
+		}
+	}
+	if len(out) > 0 {
+		return out
+	}
+	if strings.TrimSpace(p.ClosingNarration) != "" {
+		return []string{p.ClosingNarration}
+	}
+	return []string{}
 }
 
 // LoadPacketBySlug mirrors merchant.LoadPacketBySlug exactly: packets are

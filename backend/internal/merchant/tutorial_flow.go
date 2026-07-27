@@ -463,12 +463,27 @@ type LeaveDialogueResult struct {
 	Projection projection.Active `json:"projection"`
 }
 
-// LeaveDialogue is the Player-controlled end of the tutorial (S11.1).
+// LeaveDialogue is the Player-controlled end of Ra's conversation
+// (kernel-74 S11.1, kernel-75 S3.1).
 //
-// It records ra_intro_completed and tutorial_handoff_entered, opens THIS
-// Player's local projection, and changes nothing shared: no write to
-// shows.current_show_scene_placement_id, no other Player moved, no Director
-// approval required (S16.13-16.16).
+// It records ra_intro_completed, tutorial_gate_opened and
+// tutorial_handoff_entered, opens THIS Player's local projection, and
+// changes nothing shared: no write to shows.current_show_scene_placement_id,
+// no other Player moved, no Director approval required (S16.13-16.16).
+//
+// KERNEL 75 SPLIT. Leaving Ra is no longer the end of the tutorial -- it is
+// the gate opening. The Player then presses Continue, which is
+// CompleteTutorial below. The two are separate verbs because S3.1 is
+// explicit that "the tutorial-complete projection must not interrupt Ra's
+// final physical action": the Player must get to watch the gate open before
+// a completion screen takes over.
+//
+// The projection still opens HERE rather than on Continue, deliberately.
+// It is the handoff destination, and a Player who refreshes between the
+// closing beats and pressing Continue must come back to the courtyard-side
+// of an open gate rather than to a stale Scene. Continue then records the
+// completion and builds the Program; it does not need to move anyone,
+// because Leave already did.
 func LeaveDialogue(ctx context.Context, pool *pgxpool.Pool, actorUserID, interactionID string) (LeaveDialogueResult, error) {
 	eligible, packet, topics, err := resolveDialoguePacket(ctx, pool, actorUserID, interactionID)
 	if err != nil {
@@ -506,6 +521,14 @@ func LeaveDialogue(ctx context.Context, pool *pgxpool.Pool, actorUserID, interac
 
 	completedPayload, _ := json.Marshal(map[string]any{"packet_slug": packet.Slug})
 	if err := tutorial.RecordMilestone(ctx, pool, p, tutorial.MilestoneRaIntroCompleted, completedPayload); err != nil {
+		return LeaveDialogueResult{}, err
+	}
+	// Kernel 75 S3.1: the gate is now open. Recorded as its own milestone so
+	// the completion Program can replay the ending later without
+	// re-deriving it, and so a Directors+ readiness list can distinguish
+	// "the gate opened" from "the Player acknowledged it".
+	gatePayload, _ := json.Marshal(map[string]any{"packet_slug": packet.Slug})
+	if err := tutorial.RecordMilestone(ctx, pool, p, tutorial.MilestoneTutorialGateOpened, gatePayload); err != nil {
 		return LeaveDialogueResult{}, err
 	}
 	handoffPayload, _ := json.Marshal(map[string]any{"scene_slug": active.SceneSlug})

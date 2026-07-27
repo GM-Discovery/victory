@@ -780,6 +780,21 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         if (list) list.remove();
         return;
       }
+      // Kernel 75: while this viewer is on a participant-local projection,
+      // they are standing somewhere else. The shared current Scene has not
+      // moved, so these buttons would still be live -- which is exactly the
+      // problem: a Player who has walked out through the gate was still
+      // being offered "Try the Door" and "Speak with Kessa" from the
+      // Courtyard they just left. Confusing on screen, and worse in a
+      // narrated demonstration.
+      //
+      // Hiding them is safe for the tutorial itself: the projection only
+      // exists AFTER Ra opens the gate, so every interaction the Player
+      // still needs is offered before this can be true.
+      if (snapshot?.session?.local_projection) {
+        if (list) list.remove();
+        return;
+      }
       const serial = ++participantInteractionControlsRequestSerial;
       try {
         const res = await fetch(`/api/shows/${encodeURIComponent(showId)}/scenes/${encodeURIComponent(placementId)}/player-interactions`, { credentials: "include" });
@@ -3122,7 +3137,55 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         banner.style.cssText = "pointer-events:none;background:rgba(20,15,10,0.92);border:1px solid rgba(255,233,197,0.25);color:#f0d3a4;padding:8px 14px;border-radius:12px;font-size:0.8rem;font-weight:700;max-width:340px;text-align:right;";
         container.appendChild(banner);
       }
-      banner.textContent = `${projection.scene_title || "Tutorial handoff"} — your view only.`;
+
+      let line = banner.querySelector("[data-projection-line]");
+      if (!line) {
+        banner.textContent = "";
+        line = document.createElement("div");
+        line.setAttribute("data-projection-line", "1");
+        banner.appendChild(line);
+      }
+      line.textContent = `${projection.scene_title || "Tutorial handoff"} — your view only.`;
+
+      // Kernel 75 S4.3: a persistent, unobtrusive way to reopen the
+      // completion Program. The banner itself stays pointer-events:none and
+      // ONLY this button takes pointer events -- Kernel 74's defect (b) was
+      // exactly a control that could not act but could still block clicks on
+      // the stage behind it.
+      const tutorialState = snapshot?.session?.tutorial_state;
+      let reopen = banner.querySelector("#kernel75-reopen-completion");
+      if (tutorialState?.completion_available && tutorialState?.completion_interaction_id) {
+        if (!reopen) {
+          reopen = document.createElement("button");
+          reopen.id = "kernel75-reopen-completion";
+          reopen.type = "button";
+          reopen.style.cssText = "pointer-events:auto;margin-top:6px;background:rgba(255,233,197,0.16);color:#f0d3a4;border:1px solid rgba(255,233,197,0.35);padding:6px 12px;border-radius:999px;font-weight:700;cursor:pointer;font-size:0.76rem;";
+          banner.appendChild(reopen);
+        }
+        reopen.textContent = tutorialState.completed ? "Tutorial Complete" : "What just happened?";
+        reopen.onclick = () => {
+          getParticipantInteractionsController()?.openTutorialCompletion?.(tutorialState.completion_interaction_id);
+        };
+      } else {
+        reopen?.remove();
+      }
+
+      // S10.1: the waiting copy. No countdown, no participant count, no
+      // "N of M ready" -- S1.11 forbids depending on a declared or inferred
+      // group size, and that applies to this line as much as to the
+      // backstage list.
+      let waiting = banner.querySelector("[data-waiting-line]");
+      if (tutorialState?.completed) {
+        if (!waiting) {
+          waiting = document.createElement("div");
+          waiting.setAttribute("data-waiting-line", "1");
+          waiting.style.cssText = "margin-top:6px;font-weight:400;opacity:0.85;";
+          banner.appendChild(waiting);
+        }
+        waiting.textContent = "The story continues with real people during a scheduled Session.";
+      } else {
+        waiting?.remove();
+      }
     }
 
     function showCardEditorFor(model) { return editors?.showCardEditorFor?.(model); }

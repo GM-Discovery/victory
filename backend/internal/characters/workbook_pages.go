@@ -12,6 +12,12 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	// storysofar is a leaf package that imports nothing from this repo,
+	// precisely so this import can exist without forming a cycle. Do not
+	// make storysofar import characters -- inject the canonical rules
+	// instead, as merchant.storyRules does.
+	"victory/backend/internal/storysofar"
 )
 
 type WorkbookPageField struct {
@@ -59,6 +65,17 @@ type CharacterWorkbookPage struct {
 	Entries  []CharacterWorkbookEntry `json:"entries,omitempty"`
 	Journals []CharacterJournalEntry  `json:"journals,omitempty"`
 	Skills   []CharacterSkill         `json:"skills,omitempty"`
+	// StoryEvents is Kernel 75's generated play history (S6), following the
+	// same one-typed-slice-per-page-kind shape as Entries/Journals/Skills.
+	//
+	// Populated only for the Character's OWNER, or filtered to shared
+	// entries otherwise -- see the note in LoadCharacterWorkbookView about
+	// why CanEditCard is not sufficient here.
+	StoryEvents []storysofar.StoryEvent `json:"story_events,omitempty"`
+	// StoryEventsOwnerView tells the renderer whether it is showing the
+	// full private history or only what the Player chose to share, so the
+	// page can say so plainly rather than looking mysteriously short.
+	StoryEventsOwnerView bool `json:"story_events_owner_view,omitempty"`
 }
 
 type CharacterWorkbookView struct {
@@ -324,8 +341,31 @@ func LoadCharacterWorkbookView(ctx context.Context, pool *pgxpool.Pool, actorUse
 	if err != nil {
 		return CharacterWorkbookView{}, err
 	}
+	// Kernel 75 PRIVACY TRAP, stated plainly because getting it wrong is a
+	// leak rather than a bug:
+	//
+	// CanEditCard above grants access to the Character's owner OR to anyone
+	// holding authority at the Character's Location. That is correct for
+	// editing a Character, but S12 requires that a Player read only their
+	// OWN Character history -- so passing that gate must not be enough to
+	// see private Story So Far entries.
+	//
+	// The owner comparison is therefore separate from and stricter than the
+	// edit gate, and the filtering itself happens inside
+	// storysofar.ListForCharacter's SQL rather than by trimming the payload
+	// here. An omit-from-payload gate applied per call site is the pattern
+	// that produced Kernel 74's authority hole.
+	ownerView := strings.TrimSpace(actorUserID) == strings.TrimSpace(card.OwnerUserID)
+	storyEvents, err := storysofar.ListForCharacter(ctx, pool, cardID, ownerView)
+	if err != nil {
+		return CharacterWorkbookView{}, err
+	}
+
 	for i, page := range pages {
 		switch page.Key {
+		case "story":
+			pages[i].StoryEvents = storyEvents
+			pages[i].StoryEventsOwnerView = ownerView
 		case "face":
 			pages[i].Fields = applyFaceOverrides(page.Fields, overrides)
 			sortFaceFields(pages[i].Fields)
@@ -647,6 +687,23 @@ func buildWorkbookPages(card CharacterCard, module map[string]any, entries []Cha
 				{Key: "parentage_chart_version", Label: "Ruleset Version", Value: stringValue(module["parentage_chart_version"]), InputType: "text", Editable: false},
 				{Key: "module_context", Label: "Module Context", Value: jsonStringify(module["module_context"]), InputType: "textarea", Editable: false},
 			},
+		},
+		{
+			// Kernel 75 S6.1: generated play history, kept deliberately
+			// separate from the Player-authored History page above. S1.8
+			// forbids merging the two indistinguishably -- what you wrote
+			// about your Character and what your Character actually did are
+			// different kinds of truth, and a reader must be able to tell
+			// which is which.
+			//
+			// Editable:false is load-bearing, not cosmetic. S5.5 says the
+			// Player cannot edit generated text; the only thing they control
+			// is each entry's reveal state, through PATCH /api/story-events.
+			Key:      "story",
+			Title:    "Story So Far",
+			Kind:     "story",
+			Summary:  "What actually happened in play. Private by default.",
+			Editable: false,
 		},
 		{
 			Key:      "creation_progress",

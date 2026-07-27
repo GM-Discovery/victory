@@ -23,16 +23,27 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// The five milestones of the Locked Courtyard tutorial (kernel-74 S5.1).
-// Kept in sync by hand with participant_tutorial_progress_milestone_check in
-// migration 066; IsMilestone below is the Go-side gate so a typo fails as a
-// clean error rather than a constraint violation surfacing as a 500.
+// The milestones of the Locked Courtyard tutorial (kernel-74 S5.1,
+// kernel-75 S3.1/S3.2). Kept in sync by hand with
+// participant_tutorial_progress_milestone_check in migrations 066 and 069;
+// IsMilestone below is the Go-side gate so a typo fails as a clean error
+// rather than a constraint violation surfacing as a 500.
+//
+// MilestoneTutorialGateOpened and MilestoneTutorialCompleted are Kernel 75's
+// two additions. They bracket the Player's Continue press: the gate opening
+// is a narrative fact recorded when Ra's closing beats are generated, and
+// tutorial_completed is the Player's own acknowledgement. The latter is the
+// idempotency anchor for Story So Far generation and one-time Player
+// recognition -- both ask "was this already recorded" rather than
+// read-then-write, so a retried Continue converges.
 const (
-	MilestoneKessaIntroCompleted   = "kessa_intro_completed"
+	MilestoneKessaIntroCompleted    = "kessa_intro_completed"
 	MilestoneDoorIntentionSubmitted = "door_intention_submitted"
-	MilestoneRaIntroStarted        = "ra_intro_started"
-	MilestoneRaIntroCompleted      = "ra_intro_completed"
+	MilestoneRaIntroStarted         = "ra_intro_started"
+	MilestoneRaIntroCompleted       = "ra_intro_completed"
+	MilestoneTutorialGateOpened     = "tutorial_gate_opened"
 	MilestoneTutorialHandoffEntered = "tutorial_handoff_entered"
+	MilestoneTutorialCompleted      = "tutorial_completed"
 )
 
 var allMilestones = []string{
@@ -40,7 +51,9 @@ var allMilestones = []string{
 	MilestoneDoorIntentionSubmitted,
 	MilestoneRaIntroStarted,
 	MilestoneRaIntroCompleted,
+	MilestoneTutorialGateOpened,
 	MilestoneTutorialHandoffEntered,
+	MilestoneTutorialCompleted,
 }
 
 func IsMilestone(key string) bool {
@@ -182,8 +195,12 @@ type CharacterProgress struct {
 // backstage list shows. Ordered most-advanced-first.
 func statusForMilestones(seen map[string]bool) string {
 	switch {
+	case seen[MilestoneTutorialCompleted]:
+		return "Tutorial complete"
 	case seen[MilestoneTutorialHandoffEntered]:
 		return "Tutorial handoff entered"
+	case seen[MilestoneTutorialGateOpened]:
+		return "Gate opened"
 	case seen[MilestoneRaIntroCompleted]:
 		return "Finished with Ra"
 	case seen[MilestoneRaIntroStarted]:

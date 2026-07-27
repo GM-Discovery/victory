@@ -811,6 +811,46 @@
         </div>
       </div>
     </section>
+
+    <!--
+      Kernel 75 S9: Aftercare review.
+
+      Self-contained on purpose. The four sections above share one bootstrap
+      try/catch that calls showForbidden() on any throw, so an unguarded
+      failure here would blank the whole page for every Director. Its loader
+      is added to that Promise.all with its own .catch(), and everything it
+      does is inside its own try/catch with its own status line.
+
+      READ-ONLY (S9.3): there is no reply, score, comment, or edit control
+      anywhere in this section, and no backend route that would accept one.
+    -->
+    <section class="content">
+      <div class="card">
+        <h2>Aftercare</h2>
+        <p class="muted small">
+          What Players wrote after a Show. Read-only — Aftercare is theirs, not a thread.
+        </p>
+        <div id="aftercare-status" class="status"></div>
+        <div class="form-grid">
+          <label>
+            Show Run
+            <select id="aftercare-show-run"><option value="">Loading…</option></select>
+          </label>
+          <label>
+            Show
+            <select id="aftercare-show"><option value="">Select a Show Run first</option></select>
+          </label>
+          <label>
+            Filter
+            <input id="aftercare-filter" type="text" placeholder="Player, Character, or text" />
+          </label>
+        </div>
+        <div class="form-actions">
+          <a id="aftercare-export" class="chip" hidden download>Export CSV</a>
+        </div>
+        <div id="aftercare-table"><p class="muted">Select a Show to see its Aftercare.</p></div>
+      </div>
+    </section>
   </div>
 
   <script>
@@ -1704,6 +1744,223 @@
       }
     });
 
+    // --- Kernel 75 S9: Aftercare review -------------------------------------
+    //
+    // This page had no Show model at all before Kernel 75 -- it knew about
+    // productions, showings and permission requests, but nothing about Show
+    // Runs, Shows, or placements. The three chained selects below are how it
+    // acquires one, using endpoints that already exist.
+    //
+    // AUTHORITY NOTE (S12). The page-level guard above is a coarse global
+    // role check and is left exactly as it was: changing it is the
+    // regression risk, and it only decides whether the page RENDERS. What
+    // this section SHOWS is decided by the endpoints, which are
+    // location-scoped (CanViewBackstage to read, CanManageShowRun to
+    // export). A Director at Location A simply gets an empty Show Run list
+    // for Location B. Never use /api/session/me's role to decide section
+    // content.
+
+    const aftercareShowRunSelect = document.getElementById("aftercare-show-run");
+    const aftercareShowSelect = document.getElementById("aftercare-show");
+    const aftercareFilter = document.getElementById("aftercare-filter");
+    const aftercareTable = document.getElementById("aftercare-table");
+    const aftercareStatus = document.getElementById("aftercare-status");
+    const aftercareExport = document.getElementById("aftercare-export");
+    const AFTERCARE_STORAGE_KEY = "victory:directors-chair:aftercare";
+    let aftercareRows = [];
+    let aftercarePrompts = [];
+
+    function aftercareRemember(runId, showId) {
+      try {
+        localStorage.setItem(AFTERCARE_STORAGE_KEY, JSON.stringify({ runId, showId }));
+      } catch (error) { /* private browsing; a lost preference is harmless */ }
+    }
+
+    function aftercareRecall() {
+      try {
+        return JSON.parse(localStorage.getItem(AFTERCARE_STORAGE_KEY) || "{}") || {};
+      } catch (error) { return {}; }
+    }
+
+    async function aftercareFetch(url) {
+      const response = await fetch(url, { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload || payload.ok === false) {
+        throw new Error((payload && payload.data && payload.data.error) || `HTTP ${response.status}`);
+      }
+      return payload.data;
+    }
+
+    async function loadAftercareReview() {
+      try {
+        const data = await aftercareFetch("/api/show-runs");
+        const runs = data.show_runs || data.runs || [];
+        aftercareShowRunSelect.innerHTML = "";
+        const blank = document.createElement("option");
+        blank.value = "";
+        blank.textContent = runs.length ? "Select a Show Run" : "No Show Runs you can view";
+        aftercareShowRunSelect.appendChild(blank);
+        for (const run of runs) {
+          const option = document.createElement("option");
+          option.value = run.id;
+          option.textContent = run.title || run.slug || run.id;
+          aftercareShowRunSelect.appendChild(option);
+        }
+        const remembered = aftercareRecall();
+        if (remembered.runId && runs.some((r) => r.id === remembered.runId)) {
+          aftercareShowRunSelect.value = remembered.runId;
+          await loadAftercareShows(remembered.runId, remembered.showId);
+        }
+      } catch (error) {
+        aftercareStatus.textContent = "Could not load Show Runs: " + (error.message || String(error));
+      }
+    }
+
+    async function loadAftercareShows(runId, preselectShowId) {
+      aftercareShowSelect.innerHTML = "";
+      aftercareTable.innerHTML = '<p class="muted">Select a Show to see its Aftercare.</p>';
+      aftercareExport.hidden = true;
+      if (!runId) {
+        const blank = document.createElement("option");
+        blank.value = "";
+        blank.textContent = "Select a Show Run first";
+        aftercareShowSelect.appendChild(blank);
+        return;
+      }
+      try {
+        const data = await aftercareFetch(`/api/show-runs/${encodeURIComponent(runId)}/shows`);
+        const shows = data.shows || [];
+        const blank = document.createElement("option");
+        blank.value = "";
+        blank.textContent = shows.length ? "Select a Show" : "No Shows in this Run";
+        aftercareShowSelect.appendChild(blank);
+        for (const show of shows) {
+          const option = document.createElement("option");
+          option.value = show.id;
+          option.textContent = show.title || show.slug || show.id;
+          aftercareShowSelect.appendChild(option);
+        }
+        if (preselectShowId && shows.some((s) => s.id === preselectShowId)) {
+          aftercareShowSelect.value = preselectShowId;
+          await loadAftercareRows(preselectShowId);
+        }
+      } catch (error) {
+        aftercareStatus.textContent = "Could not load Shows: " + (error.message || String(error));
+      }
+    }
+
+    async function loadAftercareRows(showId) {
+      if (!showId) {
+        aftercareTable.innerHTML = '<p class="muted">Select a Show to see its Aftercare.</p>';
+        aftercareExport.hidden = true;
+        return;
+      }
+      aftercareStatus.textContent = "";
+      aftercareTable.innerHTML = '<p class="muted">Loading…</p>';
+      try {
+        const data = await aftercareFetch(`/api/shows/${encodeURIComponent(showId)}/aftercare-review`);
+        aftercareRows = data.rows || [];
+        aftercarePrompts = data.prompts || [];
+        // can_export is a courtesy so the UI does not offer a control the
+        // caller cannot use. The endpoint runs its own stricter check.
+        aftercareExport.hidden = !data.can_export;
+        aftercareExport.href = `/api/shows/${encodeURIComponent(showId)}/aftercare-review.csv`;
+        renderAftercareRows();
+      } catch (error) {
+        aftercareTable.innerHTML = "";
+        aftercareStatus.textContent = "Could not load Aftercare: " + (error.message || String(error));
+      }
+    }
+
+    // S9.5: every state is named explicitly, so "has not opened it" reads
+    // differently from "chose to skip" and from "is still writing".
+    const AFTERCARE_STATE_LABELS = {
+      submitted: "Submitted",
+      skipped: "Skipped",
+      draft: "Draft in progress",
+      none: "Not opened",
+    };
+
+    function renderAftercareRows() {
+      const needle = (aftercareFilter.value || "").trim().toLowerCase();
+      const rows = aftercareRows.filter((row) => {
+        if (!needle) return true;
+        const hay = [row.player_handle, row.player_name, row.character_name,
+          row.door_intention, ...Object.values(row.responses || {})].join(" ").toLowerCase();
+        return hay.includes(needle);
+      });
+
+      aftercareTable.innerHTML = "";
+      if (!rows.length) {
+        const empty = document.createElement("p");
+        empty.className = "muted";
+        empty.textContent = aftercareRows.length
+          ? "No rows match that filter."
+          : "No Players on this Show's roster yet.";
+        aftercareTable.appendChild(empty);
+        return;
+      }
+
+      for (const row of rows) {
+        const card = document.createElement("div");
+        card.className = "list-item";
+
+        const head = document.createElement("strong");
+        head.textContent = `${row.character_name || "Unnamed Character"} — ${row.player_name || row.player_handle}`;
+        card.appendChild(head);
+
+        const meta = document.createElement("p");
+        meta.className = "muted small";
+        const bits = [AFTERCARE_STATE_LABELS[row.state] || row.state];
+        if (row.tutorial_status) bits.push(row.tutorial_status);
+        if (row.submitted_at) bits.push(new Date(row.submitted_at).toLocaleString());
+        if (row.consecutive_skips > 0) bits.push(`${row.consecutive_skips} consecutive skip${row.consecutive_skips === 1 ? "" : "s"}`);
+        meta.textContent = bits.join(" · ");
+        card.appendChild(meta);
+
+        // Answers in authored prompt order, never map order.
+        for (const prompt of aftercarePrompts) {
+          const answer = (row.responses || {})[prompt.key];
+          if (!answer) continue;
+          const q = document.createElement("p");
+          q.className = "muted small";
+          q.textContent = prompt.label;
+          const a = document.createElement("p");
+          // textContent, always: this is text a Player typed.
+          a.textContent = answer;
+          card.append(q, a);
+        }
+
+        if (row.door_intention) {
+          const label = document.createElement("p");
+          label.className = "muted small";
+          label.textContent = "At the locked gate, they intended to:";
+          const text = document.createElement("p");
+          text.textContent = row.door_intention;
+          card.append(label, text);
+        }
+
+        if (row.state === "draft") {
+          const note = document.createElement("p");
+          note.className = "muted small";
+          note.textContent = "This Player is mid-thought. Draft content is not shared.";
+          card.appendChild(note);
+        }
+
+        aftercareTable.appendChild(card);
+      }
+    }
+
+    aftercareShowRunSelect?.addEventListener("change", () => {
+      aftercareRemember(aftercareShowRunSelect.value, "");
+      loadAftercareShows(aftercareShowRunSelect.value, "");
+    });
+    aftercareShowSelect?.addEventListener("change", () => {
+      aftercareRemember(aftercareShowRunSelect.value, aftercareShowSelect.value);
+      loadAftercareRows(aftercareShowSelect.value);
+    });
+    aftercareFilter?.addEventListener("input", renderAftercareRows);
+
     (async () => {
       try {
         const response = await fetch("/api/session/me", { credentials: "include" });
@@ -1722,7 +1979,14 @@
         }
 
         chairShell.hidden = false;
-        await Promise.all([loadProductions(), loadIncomingRequests(), loadReviewShowings(), loadDirectorConsoleCurrent()]);
+        await Promise.all([
+          loadProductions(), loadIncomingRequests(), loadReviewShowings(), loadDirectorConsoleCurrent(),
+          // FAIL-SOFT (Kernel 75). This bootstrap's shared catch calls
+          // showForbidden(), which blanks the entire page. A backend
+          // failure in the newest section must degrade that section only,
+          // never take the Director Console down with it.
+          loadAftercareReview().catch(() => {}),
+        ]);
       } catch (error) {
         console.error("director chair bootstrap failed", error);
         showForbidden();

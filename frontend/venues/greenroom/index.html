@@ -3025,10 +3025,112 @@
         return;
       }
 
+      if (page.key === "story") {
+        renderStorySoFarPage(page);
+        return;
+      }
+
       const empty = document.createElement("p");
       empty.className = "empty-state";
       empty.textContent = "This page is not implemented yet.";
       pageBody.appendChild(empty);
+    }
+
+    // Kernel 75 S6: Story So Far -- generated play history, private by
+    // default, with a per-entry reveal control.
+    //
+    // Every Player-authored or generated string goes in through textContent.
+    // Story summaries quote the Player's own words verbatim (their door
+    // intention, for instance), so markup in them must render as literal
+    // characters rather than as markup.
+    function renderStorySoFarPage(page) {
+      const section = document.createElement("div");
+      section.className = "page-section";
+
+      const intro = document.createElement("p");
+      intro.className = "hint";
+      intro.textContent = page.story_events_owner_view
+        ? "These entries are private to you. Share individual moments with your table when you want to."
+        : "You are seeing only the moments this Player chose to share with the table.";
+      section.appendChild(intro);
+
+      const events = page.story_events || [];
+      if (!events.length) {
+        const empty = document.createElement("p");
+        empty.className = "empty-state";
+        empty.textContent = page.story_events_owner_view
+          ? "Nothing here yet. Your Character's story starts the first time you play."
+          : "This Player has not shared any moments.";
+        section.appendChild(empty);
+        pageBody.appendChild(section);
+        return;
+      }
+
+      const list = document.createElement("div");
+      list.className = "list";
+      for (const event of events) {
+        const item = document.createElement("div");
+        item.className = "list-item";
+
+        const title = document.createElement("strong");
+        title.textContent = event.title || event.event_type || "A moment";
+        item.appendChild(title);
+
+        const body = document.createElement("p");
+        body.textContent = event.summary || "";
+        item.appendChild(body);
+
+        const meta = document.createElement("p");
+        meta.className = "hint";
+        const when = event.occurred_at ? new Date(event.occurred_at).toLocaleString() : "";
+        // Director-authored moments name their author; generated ones say
+        // so, because a reader must be able to tell the two apart (S1.8).
+        const source = event.authored_by_user_id
+          ? `Recorded by ${event.authored_by_name || "a Director"}`
+          : "Recorded from play";
+        meta.textContent = when ? `${source} · ${when}` : source;
+        item.appendChild(meta);
+
+        if (page.story_events_owner_view) {
+          const shared = event.visibility_state === "table";
+          const toggle = document.createElement("button");
+          toggle.type = "button";
+          toggle.className = "chip";
+          toggle.textContent = shared ? "Shared with your table" : "Private";
+          toggle.setAttribute("data-story-event-id", event.id);
+          toggle.setAttribute("data-story-visibility", event.visibility_state || "private");
+          toggle.addEventListener("click", () => toggleStoryVisibility(event, toggle));
+          item.appendChild(toggle);
+        }
+
+        list.appendChild(item);
+      }
+      section.appendChild(list);
+      pageBody.appendChild(section);
+    }
+
+    async function toggleStoryVisibility(event, button) {
+      const next = event.visibility_state === "table" ? "private" : "table";
+      button.disabled = true;
+      try {
+        const response = await fetch(`/api/story-events/${encodeURIComponent(event.id)}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ visibility_state: next }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload || payload.ok === false) {
+          throw new Error((payload && payload.data && payload.data.error) || `HTTP ${response.status}`);
+        }
+        event.visibility_state = next;
+        button.textContent = next === "table" ? "Shared with your table" : "Private";
+        button.setAttribute("data-story-visibility", next);
+      } catch (error) {
+        setStatus(error.message || String(error));
+      } finally {
+        button.disabled = false;
+      }
     }
 
     function renderWorkbook() {
