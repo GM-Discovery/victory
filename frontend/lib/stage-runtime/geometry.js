@@ -225,7 +225,15 @@
     const worldPointForStage = typeof deps.worldPointForStagePoint === "function" ? deps.worldPointForStagePoint : (point) => worldPointForStagePoint(point, camera);
     const size = deps.size || { width: 0, height: 0 };
 
-    if (String(model?.kind || "").toLowerCase() === "token") {
+    // Kernel 74: hotspots are authored in the SAME normalized 0-1 space as
+    // composition tokens, so they must resolve through the same conversion
+    // below. Gating that conversion on kind === "token" was a real bug: a
+    // hotspot fell through to the generic mid-stage fallback, which ignored
+    // its stored position entirely -- so the Courtyard door hotspot landed
+    // on top of Kessa no matter what coordinates were saved, and re-authoring
+    // it appeared to do nothing.
+    const modelKind = String(model?.kind || "").toLowerCase();
+    if (modelKind === "token" || modelKind === "hotspot") {
       const tokenPosition = model?.position || {};
       const tokenX = Number(tokenPosition.x ?? model?.source?.data?.world_x ?? model?.source?.data?.x ?? 0);
       const tokenY = Number(tokenPosition.y ?? model?.source?.data?.world_y ?? model?.source?.data?.y ?? 0);

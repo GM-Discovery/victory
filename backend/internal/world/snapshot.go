@@ -459,7 +459,11 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, view
 	// are loaded. The elements themselves then fall through the identical
 	// role-based visibility filter below. There is still exactly one object
 	// model, which is the constraint cues/types.go:43-48 recorded.
-	localProjection, err := loadLocalProjectionForViewer(ctx, pool, viewerUserID, showID)
+	// Scoped to the viewer's CURRENTLY SELECTED Character, not just their
+	// account: switching Character must return them to the shared stage
+	// rather than stranding a Character who never played the tutorial on the
+	// handoff map (S5.2).
+	localProjection, err := loadLocalProjectionForViewer(ctx, pool, viewerUserID, theaterContext.SelectedCharacterID, showID)
 	if err != nil {
 		return nil, err
 	}

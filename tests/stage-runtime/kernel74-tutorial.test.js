@@ -202,3 +202,93 @@ test("tutorial/stage_refresh and backstage/note_created are distinct routed mess
     "the backstage push must not carry a note body -- a mis-targeted push would then leak one",
   );
 });
+
+// --- Regression: an unbound hotspot must be completely inert --------------
+//
+// This is a real bug that reached the live stage. A hotspot left unbound
+// still rendered a full-size, pointer-capturing box; on the Courtyard it
+// covered Kessa's token, swallowed every click meant for her, and answered
+// "Locked Courtyard Door cannot be used right now". A control that cannot
+// act must not be able to block either.
+
+test("an unbound hotspot still normalizes, so the renderer must be what makes it inert", () => {
+  const unbound = doorElement();
+  delete unbound.data.binding;
+  const state = createProjectedState({ viewerRole: "cast" });
+  state.replaceFromSnapshot(compositionSnapshot([unbound]));
+  const door = state.getState().objects.find((o) => o.label === "Locked Courtyard Door");
+
+  assert.ok(door, "normalization keeps the element (backstage still authors it)");
+  assert.equal(door.source.data.binding, undefined,
+    "with no binding, the node factory must render it non-interactive");
+});
+
+test("a disabled binding is treated as unusable, not merely unlabelled", () => {
+  const disabled = doorElement();
+  disabled.data.binding.enabled = false;
+  const state = createProjectedState({ viewerRole: "cast" });
+  state.replaceFromSnapshot(compositionSnapshot([disabled]));
+  const door = state.getState().objects.find((o) => o.label === "Locked Courtyard Door");
+  assert.equal(door.source.data.binding.enabled, false,
+    "the renderer keys off enabled, so a disabled binding must survive normalization as false");
+});
+
+test("scene-nodes makes unbound hotspots non-interactive and hides them from players", () => {
+  const source = require("node:fs").readFileSync(
+    require("node:path").join(__dirname, "../../frontend/lib/stage-runtime/scene-nodes.js"),
+    "utf8",
+  );
+  // The guard must exist and must gate BOTH pointer handling and visibility.
+  assert.match(source, /const usable = Boolean\(binding\?\.participant_interaction_id\) && Boolean\(binding\?\.enabled\)/);
+  assert.match(source, /eventMode = usable \? "static" : "none"/);
+  assert.match(source, /container\.visible = backstage/);
+});
+
+test("hotspots render beneath tokens so they never steal a token's click", () => {
+  const source = require("node:fs").readFileSync(
+    require("node:path").join(__dirname, "../../frontend/lib/stage-runtime/runtime.js"),
+    "utf8",
+  );
+  // Scope to the single z-index decision block so the match cannot run on
+  // into the floating-layer branch further down (which uses 100 + index).
+  const block = /let zIndex = 10 \+ index;[\s\S]*?node\.container\.zIndex = zIndex;/.exec(source);
+  assert.ok(block, "the z-index decision block must exist");
+  const hotspotZ = /kind === "hotspot"\)[\s\S]*?zIndex = (\d+) \+ index/.exec(block[0]);
+  const tokenZ = /=== "director" \? \d+ \+ index : (\d+) \+ index/.exec(block[0]);
+  assert.ok(hotspotZ, "the hotspot z-index branch must exist");
+  assert.ok(tokenZ, "the token z-index branch must exist");
+  assert.ok(Number(hotspotZ[1]) < Number(tokenZ[1]),
+    `hotspot z (${hotspotZ[1]}) must be below public token z (${tokenZ[1]})`);
+});
+
+// --- Regression: a hotspot's authored position must actually be used ------
+//
+// Real bug found in live play. geometry.js converted normalized 0-1
+// composition coordinates to pixels only for kind === "token", so a hotspot
+// fell through to a generic mid-stage fallback and ignored its stored
+// position completely. The Courtyard door landed on Kessa regardless of
+// what was saved, and re-authoring it looked like it did nothing.
+
+test("hotspots resolve normalized 0-1 positions through the same path as composition tokens", () => {
+  const source = require("node:fs").readFileSync(
+    require("node:path").join(__dirname, "../../frontend/lib/stage-runtime/geometry.js"),
+    "utf8",
+  );
+  const branch = /const modelKind = String\(model\?\.kind \|\| ""\)\.toLowerCase\(\);\s*if \(([^)]*)\)/.exec(source);
+  assert.ok(branch, "the normalized-coordinate branch must exist");
+  assert.match(branch[1], /modelKind === "token"/);
+  assert.match(branch[1], /modelKind === "hotspot"/,
+    "a hotspot must not fall through to the mid-stage fallback that ignores its stored position");
+});
+
+test("a hotspot authored near the top of the stage stays near the top", () => {
+  // Guards the actual symptom: an authored y of 0.075 must not resolve
+  // anywhere near Kessa's 0.518.
+  const high = doorElement();
+  const state = createProjectedState({ viewerRole: "cast" });
+  state.replaceFromSnapshot(compositionSnapshot([high]));
+  const door = state.getState().objects.find((o) => o.label === "Locked Courtyard Door");
+  assert.equal(door.position.y, 0.35, "the authored normalized y must survive normalization unscaled");
+  assert.equal(door.kind, "hotspot",
+    "and it must carry the hotspot kind, which is what geometry keys the conversion off");
+});

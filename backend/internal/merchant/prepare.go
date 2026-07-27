@@ -342,12 +342,22 @@ func prepareKernel74TutorialTail(ctx context.Context, pool *pgxpool.Pool, actorU
 			result.Gaps = append(result.Gaps, "door_hotspot_not_created_composer_disabled")
 			return nil
 		}
-		w, h := 0.12, 0.28
+		// Measured off the current Courtyard art (frontend/assets/
+		// courtyard.png, 1448x1086): the ironbound oak double door in the
+		// top gatehouse sits at roughly x 728/1448, y 135/1086. The courtyard
+		// has a second gate at the bottom; the top one is the exit the
+		// tutorial means.
+		//
+		// A starting position, not a constant. The Director drags and resizes
+		// this in Scene Setup, which is the whole reason the hotspot is a
+		// placeable element rather than hardcoded geometry (S1.1) -- and the
+		// only way to get it right against art this code cannot see.
+		w, h := 0.06, 0.075
 		e, err := scenes.CreateSceneStageElement(ctx, pool, actorUserID, sceneID, scenes.CreateStageElementInput{
 			Kind:     scenes.StageElementKindInteractionHotspot,
 			Label:    "Locked Courtyard Door",
 			Data:     map[string]any{"nameplate_visible": true, "highlight_on_focus": true},
-			Position: map[string]any{"x": 0.5, "y": 0.35},
+			Position: map[string]any{"x": 0.503, "y": 0.124},
 			Width:    &w,
 			Height:   &h,
 		})

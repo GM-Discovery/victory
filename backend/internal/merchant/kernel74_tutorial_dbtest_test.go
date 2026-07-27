@@ -638,6 +638,45 @@ func TestKernel74TutorialTailEndToEnd(t *testing.T) {
 		t.Fatalf("expected exactly 1 active projection after a repeated Leave, got %d", activeProjections)
 	}
 
+	// --- S5.2 regression: switching Character leaves the projection --------
+	//
+	// This was a real bug found in live play. The projection was keyed on
+	// (user, show) and ignored character_card_id, so a Player who finished
+	// the tutorial with one Character and then switched stayed stranded on
+	// the handoff map -- with a Character who had never met Kessa, never
+	// tried the door, and never spoke to Ra. The original Character-switch
+	// assertion above only covered the door hotspot, not the projection,
+	// which is exactly how this got through.
+	setSelectedCharacter(playerAUserID, characterA2ID)
+	snapSwitched, err := world.LoadVenueSnapshot(ctx, pool, "cast", playerAUserID, venueSlug)
+	if err != nil {
+		t.Fatalf("snapshot after Character switch: %v", err)
+	}
+	if snapSwitched.Session.LocalProjection != nil {
+		t.Fatal("switching to a Character who never played the tutorial must return the Player to the shared stage")
+	}
+	foundKessaAfterSwitch := false
+	for _, el := range snapSwitched.Elements {
+		if el.Name == "Kessa" {
+			foundKessaAfterSwitch = true
+		}
+	}
+	if !foundKessaAfterSwitch {
+		t.Fatal("the switched-to Character must see the shared Courtyard, including Kessa")
+	}
+
+	// Switching back restores the finished Character's own projection --
+	// the record belongs to the Character who earned it and is not destroyed
+	// by looking away.
+	setSelectedCharacter(playerAUserID, characterAID)
+	snapBack, err := world.LoadVenueSnapshot(ctx, pool, "cast", playerAUserID, venueSlug)
+	if err != nil {
+		t.Fatalf("snapshot after switching back: %v", err)
+	}
+	if snapBack.Session.LocalProjection == nil {
+		t.Fatal("switching back to the finished Character must restore their handoff projection")
+	}
+
 	// --- S16.18: a later shared Scene clears the projection ----------------
 
 	// Stage a second Scene and fly to it as the Director.

@@ -369,6 +369,19 @@
       const container = new PIXI.Container();
       container.sortableChildren = true;
 
+      // An unbound (or disabled) hotspot is inert: it renders a faint
+      // authoring outline for backstage viewers so a Director can still see
+      // where it sits, and NOTHING for anyone else -- and in neither case
+      // does it accept pointer events.
+      //
+      // This was a real bug. A hotspot left unbound rendered a full-size,
+      // pointer-capturing box that sat over Kessa's token and swallowed
+      // every click meant for her, then answered with "cannot be used right
+      // now". A control that cannot do anything must not be able to block
+      // anything either.
+      const binding = model?.source?.data?.binding;
+      const usable = Boolean(binding?.participant_interaction_id) && Boolean(binding?.enabled);
+
       const bounds = deps.hotspotPixelSize?.(model) || { width: 96, height: 220 };
       const width = Math.max(24, Number(bounds.width) || 96);
       const height = Math.max(24, Number(bounds.height) || 220);
@@ -385,9 +398,11 @@
         region.endFill();
       };
       paint(0);
-      region.eventMode = "static";
-      region.cursor = "pointer";
-      region.hitArea = new PIXI.Rectangle(-width / 2, -height / 2, width, height);
+      region.eventMode = usable ? "static" : "none";
+      region.cursor = usable ? "pointer" : "default";
+      if (usable) {
+        region.hitArea = new PIXI.Rectangle(-width / 2, -height / 2, width, height);
+      }
       container.addChild(region);
 
       const nameplate = new PIXI.Text(model.label || "Hotspot", new PIXI.TextStyle({
@@ -401,14 +416,22 @@
       }));
       nameplate.anchor.set(0.5, 0.5);
       nameplate.position.set(0, height / 2 + 14);
-      nameplate.visible = model.nameplateVisible !== false;
-      nameplate.eventMode = "static";
-      nameplate.cursor = "pointer";
+      nameplate.visible = usable && model.nameplateVisible !== false;
+      nameplate.eventMode = usable ? "static" : "none";
+      nameplate.cursor = usable ? "pointer" : "default";
       container.addChild(nameplate);
 
-      container.eventMode = "static";
-      container.cursor = "pointer";
-      container.zIndex = 30;
+      container.eventMode = usable ? "static" : "none";
+      container.cursor = usable ? "pointer" : "default";
+
+      if (!usable) {
+        // Backstage keeps a faint outline to author against; everyone else
+        // gets nothing at all.
+        const backstage = ["producer", "director", "operator", "crew"].includes(currentRole());
+        container.visible = backstage;
+        container.alpha = 0.35;
+        return { model, container, activate() {}, updateSelected() {} };
+      }
 
       // S6.3 requires keyboard focus. PIXI has no focus model, so the node
       // publishes an activation callback and runtime.js mirrors every

@@ -737,6 +737,99 @@ Trailer Face Ready
 
 ---
 
+Tutorial Milestone (Kernel 74)
+- A durable, CHECK-constrained record that one participation reached one
+  bounded point in the Locked Courtyard tutorial: `kessa_intro_completed`,
+  `door_intention_submitted`, `ra_intro_started`, `ra_intro_completed`,
+  `tutorial_handoff_entered`. Stored in `participant_tutorial_progress`,
+  keyed (user, CHARACTER, show, milestone) -- the Character is part of the
+  key, so switching Characters never inherits another Character's progress.
+- Deliberately NOT a quest tracker. The milestone set is a database CHECK
+  constraint plus a mirrored Go allowlist; adding a sixth is a migration,
+  on purpose, because that friction is what keeps it from growing into the
+  general progression system every kernel since 73 has excluded.
+- The UNIQUE constraint is the idempotency mechanism (double-clicks,
+  retries, reconnects, replayed requests collide into one row), not a
+  read-then-write check.
+
+Interaction Hotspot (Kernel 74)
+- A positioned, resizable, keyboard-focusable composition element
+  (`scene_stage_elements.kind = 'interaction_hotspot'`, with normalized
+  0-1 `width`/`height` alongside the existing normalized 0-1 position)
+  aligned over artwork that ALREADY EXISTS in the map -- e.g. the
+  Courtyard's ironbound oak door. It renders no art of its own; that is
+  the point. Duplicating painted scenery as a token was explicitly
+  rejected.
+- Two hard rules learned in live play: an UNBOUND or disabled hotspot is
+  fully inert (no pointer events, invisible to non-backstage viewers) --
+  a control that cannot act must not be able to block; and hotspots render
+  BENEATH tokens, because a hotspot is a region over map art and map art
+  belongs behind the people standing on it.
+
+Milestone Reveal Gate (Kernel 74)
+- `stage_element_bindings.requires_milestone`: a bound element is resolved
+  out of a Player's snapshot ENTIRELY until that Player's participation has
+  recorded the named milestone -- omitted, never shipped flagged-hidden, so
+  there is nothing for a client to un-hide. Backstage roles bypass it so a
+  Director can author and position the element without playing the tutorial.
+- Discovery is not sufficient on its own. The same milestone is re-checked
+  on INVOCATION (`merchant.requireBindingMilestone`), because a Player who
+  learns an interaction id another way could otherwise POST straight to it.
+  Both halves are required; either alone is a hole.
+
+Guided Dialogue Packet (Kernel 74)
+- The bounded authored-conversation model (`dialogue_packets`,
+  `dialogue_topics`, `dialogue_topic_prerequisites`), sibling to Kernel
+  73's merchant packet and located by the same (location, slug) key. An NPC
+  has a portrait, an opening line, a flat list of authored topics with
+  prerequisite edges, a required-for-completion flag per topic, and a
+  closing narration.
+- What it is NOT, deliberately: a chatbot, AI dialogue, a general dialogue-
+  graph editor, or arbitrary scripting. The prerequisite graph is validated
+  ACYCLIC on load, so a bad seed fails loudly instead of leaving a Player
+  permanently unable to finish. A locked topic's authored response never
+  leaves the server, so reading ahead by inspecting the network payload is
+  not possible.
+- Per-participant seen-state lives in `participant_dialogue_topic_views`,
+  Character-keyed. Unlock and completion are recomputed from rows on every
+  response; the client never derives either.
+
+Participant-Local Stage Projection (Kernel 74)
+- A temporary, per-Player presentation layered over the shared stage
+  (`participant_local_projections`), scoped to the tutorial handoff. It
+  substitutes WHICH Scene's composition one viewer resolves in
+  `world.LoadVenueSnapshot` -- and nothing else.
+- The boundary that makes it safe: it does NOT fork the element/visibility
+  model. `cues/types.go` had deferred per-participant object visibility
+  precisely because that would need a second show-scoped source feeding the
+  snapshot's visibility derivation. This substitutes the Scene; every
+  element inside then passes through the ONE existing filter unchanged.
+  There is still exactly one object model.
+- `shows.current_show_scene_placement_id` is never written by it, and is
+  still reported verbatim in that Player's own snapshot -- which is what
+  makes "the shared Scene did not move" assertable from the client, not
+  only from the database.
+- Keyed (user, CHARACTER, show). Keying it on (user, show) was a real bug:
+  a Player who finished as one Character and switched stayed stranded on
+  the handoff map with a Character who had never played the tutorial.
+- Cleared when a Director+ flies a shared Scene away from the projection's
+  origin placement. That rule needs no "tutorial sequence" registry, and a
+  no-op re-fly of the same placement does not yank a Player out.
+
+Backstage Note (Kernel 74)
+- A durable, role-scoped, INFORMATIONAL message to Directors+ inside a
+  venue -- `messages` rows with `message_type = 'backstage_note'`, one per
+  resolved recipient (producer/director/operator/crew; explicitly NOT cast,
+  and never a Player or the Audience), read in Catharsis's own chat tray
+  rather than by leaving for Stage Management or the mailbox.
+- Informational is load-bearing: a backstage note never carries a GO, never
+  becomes a pending action, and nothing in the Show waits on it. Kernel 74's
+  first use is the abandoned door intention -- narrative material for the
+  Director, delivered after the Player has already moved on to Ra.
+- Live delivery is per-recipient (`hub.BroadcastToSessionUser`), never a
+  session-wide broadcast, because the WebSocket hub does no role filtering
+  of its own -- role scoping must be applied when CHOOSING who to push to.
+
 === SPACE MODEL (the-cave v1) ===
 
 World

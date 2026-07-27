@@ -90,8 +90,9 @@ func ResolveDestinationScene(ctx context.Context, pool *pgxpool.Pool, locationID
 
 // Open enters a Player into a local projection, idempotently.
 //
-// The partial unique index on (user_id, show_id) WHERE cleared_at IS NULL
-// means a retried Leave Ra cannot create a second projection (S5.3); the
+// The partial unique index on (user_id, character_card_id, show_id) WHERE
+// cleared_at IS NULL means a retried Leave Ra cannot create a second
+// projection for that Character (S5.3); the
 // ON CONFLICT turns that from a 500 into a no-op, and the subsequent read
 // returns whichever row is actually active.
 func Open(ctx context.Context, pool *pgxpool.Pool, userID, characterCardID, showID, destinationSceneID, originPlacementID string) (Active, error) {
@@ -114,7 +115,7 @@ func Open(ctx context.Context, pool *pgxpool.Pool, userID, characterCardID, show
 	`, userID, characterCardID, showID, destinationSceneID, originArg); err != nil {
 		return Active{}, err
 	}
-	active, err := LoadActiveForViewer(ctx, pool, userID, showID)
+	active, err := LoadActiveForViewer(ctx, pool, userID, characterCardID, showID)
 	if err != nil {
 		return Active{}, err
 	}
@@ -125,13 +126,20 @@ func Open(ctx context.Context, pool *pgxpool.Pool, userID, characterCardID, show
 }
 
 // LoadActiveForViewer returns the caller's own active projection for a
-// Show, or nil. This is the function world.LoadVenueSnapshot consults; a
-// nil result means "render the shared stage", which is every viewer's
-// normal path.
-func LoadActiveForViewer(ctx context.Context, pool *pgxpool.Pool, userID, showID string) (*Active, error) {
+// Show and a SPECIFIC Character, or nil. This is the function
+// world.LoadVenueSnapshot consults; a nil result means "render the shared
+// stage", which is every viewer's normal path.
+//
+// characterCardID is part of the lookup, not decoration (S5.2). Keying on
+// (user, show) alone was a real bug: a Player who finished the tutorial as
+// one Character and then switched stayed stranded on the handoff map with a
+// Character who had never played it. Switching Character now returns nil
+// here, which is exactly "render the shared stage".
+func LoadActiveForViewer(ctx context.Context, pool *pgxpool.Pool, userID, characterCardID, showID string) (*Active, error) {
 	userID = strings.TrimSpace(userID)
+	characterCardID = strings.TrimSpace(characterCardID)
 	showID = strings.TrimSpace(showID)
-	if userID == "" || showID == "" {
+	if userID == "" || characterCardID == "" || showID == "" {
 		return nil, nil
 	}
 	var a Active
@@ -140,9 +148,9 @@ func LoadActiveForViewer(ctx context.Context, pool *pgxpool.Pool, userID, showID
 		       p.destination_scene_id::text, s.slug, s.title, p.entered_at
 		FROM participant_local_projections p
 		JOIN scenes s ON s.id = p.destination_scene_id
-		WHERE p.user_id = $1 AND p.show_id = $2 AND p.cleared_at IS NULL
+		WHERE p.user_id = $1 AND p.character_card_id = $2 AND p.show_id = $3 AND p.cleared_at IS NULL
 		LIMIT 1
-	`, userID, showID).Scan(
+	`, userID, characterCardID, showID).Scan(
 		&a.ID, &a.UserID, &a.CharacterCardID, &a.ShowID,
 		&a.DestinationSceneID, &a.SceneSlug, &a.SceneTitle, &a.EnteredAt,
 	)
@@ -241,8 +249,11 @@ func ClearForSharedSceneAdvance(ctx context.Context, pool *pgxpool.Pool, showID,
 	return out, rows.Err()
 }
 
-// ClearForViewer clears one Player's projection -- the authorized backstage
-// "bring this Player back to the shared stage" control (S11.3).
+// ClearForViewer clears one Player's projections in a Show -- the
+// authorized backstage "bring this Player back to the shared stage" control
+// (S11.3). Deliberately clears every Character's projection for that user:
+// the operator is acting on a person who is stuck, and does not know or
+// care which Character they were presenting as.
 func ClearForViewer(ctx context.Context, pool *pgxpool.Pool, userID, showID, reason string) error {
 	reason = strings.TrimSpace(reason)
 	if reason == "" {

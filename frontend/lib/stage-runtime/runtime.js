@@ -3015,6 +3015,14 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
 
     // --- Kernel 74: interaction hotspots -----------------------------------
 
+    // Backstage viewers see milestone-gated elements so they can author and
+    // position them, but can never trigger them. theater_context is the
+    // backend's own answer to "who is this viewer", so this reuses it rather
+    // than re-deriving the role tier client-side.
+    function isBackstageTheaterContext() {
+      return String(currentSnapshot?.theater_context?.kind || "") === "backstage";
+    }
+
     // hotspotPixelSize converts a hotspot's normalized 0-1 size into pixels
     // against the current playable bounds, matching how composition
     // positions are already resolved (geometry.js's 0-1 special case). The
@@ -3040,10 +3048,19 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       const binding = model?.source?.data?.binding;
       const interactionId = binding?.participant_interaction_id ? String(binding.participant_interaction_id) : "";
       if (!interactionId || !binding?.enabled) {
-        setStageStatus(`${model?.label || "This"} cannot be used right now.`);
+        setStageStatus(`${model?.label || "This"} is not wired to an interaction yet.`);
         return;
       }
       if (normalizeRole(currentRole) === "audience") return;
+      // Participant interactions are Player-only by construction
+      // (merchant.ResolveEligibleContext has no backstage branch), so a
+      // Director clicking this would always be refused. Say WHY, and point
+      // at the surface that does work for them, instead of returning a
+      // generic failure that reads like a bug.
+      if (isBackstageTheaterContext()) {
+        setStageStatus(`${model?.label || "This"} is a Player interaction — use Preview as Player in Scene Setup to test it.`);
+        return;
+      }
       const controller = getParticipantInteractionsController();
       if (!controller) {
         setStageStatus("Interactions are unavailable right now.");
@@ -4030,7 +4047,14 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
             : (isWorldObject ? worldPointForStagePoint(displayedPoint) : displayedPoint);
           node.container.position.set(position.x, position.y);
           let zIndex = 10 + index;
-          if (model.kind === "token") {
+          if (model.kind === "hotspot") {
+            // Kernel 74: below tokens on purpose. A hotspot is a region over
+            // map art, and map art is behind the people standing on it -- so
+            // a hotspot that overlaps Kessa must never win her click. This
+            // was a real bug: the door hotspot's default box covered Kessa's
+            // token and swallowed every attempt to open her shop.
+            zIndex = 16 + index;
+          } else if (model.kind === "token") {
             zIndex = tokenLayerForModel(model) === "director" ? 34 + index : 24 + index;
           } else if (model.kind === "card") {
             zIndex = 44 + index;

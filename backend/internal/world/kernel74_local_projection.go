@@ -69,9 +69,10 @@ func (g *milestoneGate) allows(ctx context.Context, milestoneKey string) (bool, 
 // without a second round trip.
 //
 // Returns nil for every viewer without one, which is the overwhelmingly
-// common case and the unchanged shared-stage path.
-func loadLocalProjectionForViewer(ctx context.Context, pool *pgxpool.Pool, viewerUserID, showID string) (*LocalProjection, error) {
-	active, err := projection.LoadActiveForViewer(ctx, pool, viewerUserID, showID)
+// common case and the unchanged shared-stage path -- including a Player who
+// has switched to a Character that has not finished the tutorial.
+func loadLocalProjectionForViewer(ctx context.Context, pool *pgxpool.Pool, viewerUserID, characterCardID, showID string) (*LocalProjection, error) {
+	active, err := projection.LoadActiveForViewer(ctx, pool, viewerUserID, characterCardID, showID)
 	if err != nil || active == nil {
 		return nil, err
 	}

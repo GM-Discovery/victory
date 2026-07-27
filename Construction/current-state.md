@@ -2,16 +2,17 @@
 
 ## Purpose
 
-This document is the current-state canon for Victory as of **Kernel 71**. Historical kernel specifications and reportbacks describe what was true when they were written; this file wins when an older current-tense statement conflicts with the implemented repository.
+This document is the current-state canon for Victory as of **Kernel 74**. Historical kernel specifications and reportbacks describe what was true when they were written; this file wins when an older current-tense statement conflicts with the implemented repository.
 
 For detailed vocabulary use `Construction/Dictionary.txt`. For durable implementation traps use `Construction/OperatorLogs/operator-notes.md`. For chronological kernel history use `Construction/OperatorLogs/operator-log.md`.
 
 ## Kernel State
 
-- Current completed kernel: **Kernel 71 — Two-Punch Show Tickets, Character Participation, and Showtime**
-- Completion date: **2026-07-16**
-- Status: **PASS, uncommitted** — implemented and verified (full `go test ./...` green, `scripts/smoke/fresh-install.sh --local` and `scripts/test/alpha-gate.sh` both PASS end-to-end) but not yet committed or deployed; pending review.
-- Product state: Kernels 53–71 are implemented. Visual Scene-composition/capture remains future work.
+- Current completed kernel: **Kernel 74 — Locked Door Intentions, Ra Guided Dialogue, and Participant-Local Tutorial Handoff**
+- Completion date: **2026-07-27**
+- Status: **PASS, deployed live, uncommitted** — migrations `066`–`068` applied to production with pre-apply backups (ledger at 69), backend rebuilt, `scripts/test/alpha-gate.sh` green, and the operator walked the tutorial in a real browser. Not committed; pending review, matching project practice.
+- Product state: Kernels 53–74 are implemented. Visual Scene composition shipped in Kernel 73A; Scene *capture* remains future work.
+- Next kernel: **Kernel 75 — Tutorial Completion, Aftercare, and Director-Controlled Continuation** (drafted at `Construction/Kernels/kernel-75-tutorial-completion-aftercare-continuation-v0.1.md`; Aftercare needs an operator decision before implementation).
 - Kernel numbers are stable historical labels. Always check the operator log before assigning the next number.
 - Previous completed/live kernel: **Kernel 70A — Live Stage Closure and Alpha Path Alignment**, deployed live 2026-07-16, commit `2611840`. That deploy also retroactively applied Kernel 70's own migrations (`043`–`045`), which had never reached the live database despite being committed since `920aeb7` on 2026-07-14.
 
@@ -193,6 +194,7 @@ Kernel 71 route additions:
 - Director types a Show's short code into `/showtime` and the venue Session starts or resumes with the venue auto-derived, mic off, and the Show's persistent current Scene intact; `/showtime end` closes only the technical Session
 - **Kernel 72** replaced First Theater's and Catharsis's separately-copied stage runtimes with one shared engine (`frontend/lib/stage-runtime/`), configured per venue via a small `venue.js`; embedded, checksummed, auto-backed-up migrations (`backend/internal/migrate`) are now the single schema source of truth, ending the manual-apply/drift risk that bit Kernel 70A. **Kernel 72A** replaced the hardcoded per-feature venue-slug allowlists that risk (element actions, session control) with `venues.config` capability flags, fail-closed for unknown venues.
 - **Kernel 73** adds Catharsis's first participant-local gameplay packet: a Director-authored interaction (seeded example: "Visit Kessa's Shop") opens a private Program Panel for the triggering Player only, without changing the Show's shared current Scene. The Player picks one of five authored conversational stances (disposition is fixed per stance, never flipped by the roll), attempts a Haggle skill check (server-authoritative d6-skilled/d4-unskilled roll against Target Value 5, narrative-only discount, no currency touched), and purchases seeded starting equipment that persists as durable Character inventory (viewable on its own page, `frontend/venues/greenroom/inventory.html`). Built on new reusable primitives: `equipment_items`/`character_inventory_items` (idempotent purchase, ledger-based retry safety mirroring Cues' `cue_executions` pattern), `merchant_packets` (a bounded, reusable non-dialogue-graph packet format), and `participant_interactions` (its own table, participant-scoped rather than role-scoped like Cues, attached to a Show Scene Placement through a Director authoring panel in Stage Management). The Program Panel itself (`frontend/lib/stage-runtime/program-panel.js`) is venue-agnostic and reusable for a future second merchant/program packet.
+- **Kernel 74** closes the Player-controlled portion of the Locked Courtyard tutorial. A Player finishes with Kessa (no purchase required), which reveals a milestone-gated **interaction hotspot** aligned over the door already painted into the Courtyard map — not a duplicate door token. Clicking it opens one neutral freeform field: the Player writes what their Character tries, Victory stores those words verbatim, reports them privately to Directors+ as a durable backstage note (informational only, never a GO), and Ra interrupts before the attempt resolves. Ra is a bounded **guided-dialogue packet** — authored topics with prerequisites and per-Character seen-state, no AI and no dialogue graph — delivering the Crown Bet. `Leave Ra` is Player-controlled and moves **only that Player** onto a **participant-local stage projection**: a temporary per-Player presentation layered over the shared stage, which never writes `shows.current_show_scene_placement_id` and is cleared when a Director later flies a shared Scene. There is no Director GO anywhere inside the sequence.
 
 ## Known Gaps And Deferred Work
 

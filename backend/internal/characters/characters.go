@@ -651,6 +651,23 @@ func ActivateCharacterCard(ctx context.Context, pool *pgxpool.Pool, userID, card
 		return nil, err
 	}
 
+	// Kernel 74 follow-up: write through to the Show-Run roster selection.
+	//
+	// Victory had two independent "current Character" values -- this
+	// user-level active character, and show_run_roster_members.character_card_id,
+	// which Kernel 71 made canonical for Show participation and which every
+	// Kernel 74 surface keys off (tutorial milestones, the door reveal gate,
+	// Ra's topic progress, the participant-local projection).
+	//
+	// Switching here left the roster row untouched, so a Player who switched
+	// Characters mid-Show kept the previous Character's participation state
+	// -- observed live as being stranded on the tutorial-handoff map with a
+	// Character who had never played the tutorial. One "current Character",
+	// two entry points, is the fix.
+	if err := syncRosterCharacterSelection(ctx, pool, userID, cardID); err != nil {
+		return nil, err
+	}
+
 	activeCharacter, err := ActiveCharacterForUser(ctx, pool, userID)
 	if err != nil {
 		return nil, err
@@ -1607,4 +1624,38 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+
+// syncRosterCharacterSelection points every Show Run where this user is an
+// ACTIVE PLAYER at the Character they just activated.
+//
+// Deliberately narrow:
+//   - player rows only. A Director or Audience roster row has no Character
+//     participation to speak of, and writing one would be noise.
+//   - non-archived Show Runs only. A finished Run's roster is a record of
+//     what happened and must not be rewritten by a later, unrelated switch.
+//   - same Location as the Character. A Character is location-scoped, so it
+//     could never legitimately be selected in a Run somewhere else.
+//
+// Ownership, archived-Character, and workbook-completeness were all already
+// validated by ActivateCharacterCard before this runs; this function does
+// not re-derive them, and is not exported so it cannot be called without
+// them.
+func syncRosterCharacterSelection(ctx context.Context, pool *pgxpool.Pool, userID, cardID string) error {
+	_, err := pool.Exec(ctx, `
+		UPDATE show_run_roster_members rm
+		SET character_card_id = $2::uuid
+		FROM show_runs sr, character_cards cc
+		WHERE rm.show_run_id = sr.id
+		  AND cc.id = $2::uuid
+		  AND rm.user_id = $1::uuid
+		  AND rm.removed_at IS NULL
+		  AND rm.role = 'player'
+		  AND sr.archived_at IS NULL
+		  AND sr.status <> 'archived'
+		  AND sr.location_id = cc.location_id
+		  AND rm.character_card_id IS DISTINCT FROM $2::uuid
+	`, userID, cardID)
+	return err
 }

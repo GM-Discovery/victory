@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This is the current forward-looking roadmap after **Kernel 71**. The chronological record of shipped kernels lives in `Construction/OperatorLogs/operator-log.md`; older kernel specs and the large track roadmaps remain design history, not the source for the next unused kernel number.
+This is the current forward-looking roadmap after **Kernel 74**. The chronological record of shipped kernels lives in `Construction/OperatorLogs/operator-log.md`; older kernel specs and the large track roadmaps remain design history, not the source for the next unused kernel number.
 
 ## Shipped Foundation
 
@@ -13,6 +13,9 @@ This is the current forward-looking roadmap after **Kernel 71**. The chronologic
 - Kernel 70: location-scoped reusable Scenes, persistent Show-owned stage state, current Scene, Show variables, Cues, idempotent GO, rehearsal metadata, and curated player stage buttons.
 - Kernel 70A (live): Start Show Session, theater-context empty states, First Theater's independent venue wiring, and the retroactive Kernel 70 migration deploy.
 - Kernel 71 (PASS, uncommitted): the canonical participation resolver (fixing the `location_memberships`/`memberships` "none" bug), two-punch Show tickets as the sole ordinary path to Player roster participation, per-Show-Run Character selection, Show short codes, and `/showtime` one-action orchestration.
+- Kernel 72/72A (live): one shared stage engine (`frontend/lib/stage-runtime/`), embedded checksummed auto-backed-up migrations as the single schema source of truth, and venue capability flags replacing hardcoded slug allowlists.
+- Kernel 73/73A (live): Catharsis Equip Mode — the Kessa merchant packet, durable Character inventory, `participant_interactions` (participant-scoped, unlike Cues), the venue-agnostic Program Panel, and visual Scene composition with element-interaction bindings.
+- Kernel 74 (live): the Player-controlled tutorial tail — Kessa completion, a milestone-gated door hotspot, freeform Player intentions reported privately to Directors+, Ra's bounded guided dialogue, and the **participant-local stage projection**: a per-Player presentation layered over the shared stage that never moves the Show's current Scene.
 
 ## Recommended Near Horizon
 
@@ -34,12 +37,14 @@ This is the current forward-looking roadmap after **Kernel 71**. The chronologic
 
 - **Closed by Kernel 70A**: shared contracts extracted from the parallel First Theater/Catharsis runtimes — `tests/catharsis/` mirrors `tests/first-theater/` (import-path/fixture changes only, identical 46-pass/9-known-fail shape) and `tests/contract/scene-nodes.contract.test.js` asserts the behavior both venues' `scene-nodes.js` must share, explicitly excluding Catharsis's extra token-aura layer as documented, accepted drift.
 - Still open: browser acceptance/screenshots for rehearsal messaging, current-Scene changes, Start Show Session, and player Cue buttons in First Theater and Catharsis — Kernel 70A's manual checklist step covers this by hand where browser automation isn't available; capturing it as durable screenshot evidence remains unclaimed.
+- Still open: `scripts/smoke/kernel74-tutorial-browser.js` has never completed a full end-to-end run against live Catharsis, because another Show holds an active Session there; it preflights and aborts with a PRECONDITION rather than ending a Session it did not open. Running it once would convert Kernel 74's manual browser proof from operator attestation into reproducible automated evidence.
 - Still open: repair the nine pre-existing `tests/first-theater/dice.test.js` failures — now duplicated (same 9, same cause) in `tests/catharsis/dice.test.js` too, since that suite is a faithful mirror. Both `scripts/test/alpha-gate.sh` and this roadmap track it as a named, non-blocking exception, not a silent gap.
 
 ### Product Journey Proof
 
 - Prove account → Trailer Face → Production/roster → Show → staged Scene → linked Session → GO → durable aftermath.
 - **Partially closed by Kernel 71**: the Player-arrival half of this journey now has a real, mutual-consent path — Audition Hall request-or-invite → valid ticket → Character selection → `/showtime` → theater entry — proven end-to-end over real HTTP (`scripts/smoke/fresh-install.sh`), not just designed. Still open: a first playable Socio show, a casting/attendance system beyond the one-time ticket event, and browser/screenshot evidence of the new Audition Hall and Stage Management UI.
+- **Further closed by Kernels 73/74**: the tutorial half of the journey is now genuinely playable end to end — a rostered Player with a Character can enter Catharsis, shop with Kessa, finish with her, discover the locked door, describe what their Character tries, be interrupted by Ra, work through the Crown Bet in authored topics, and leave onto their own handoff map, with **no Director GO anywhere inside that sequence**. The operator walked this live on 2026-07-27. Still open: final art/copy for the ending (Kernel 75), Aftercare, and the campaign's first real Scene after the tutorial.
 - Observe non-developer users and record operator interventions, vocabulary confusion, and privacy misunderstandings.
 - Turn that path into the short public demonstration of Victory.
 

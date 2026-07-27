@@ -71,15 +71,20 @@
           ${stanceButtons}
           <button type="button" data-action="haggle">Haggle</button>
           <button type="button" data-action="equipment">Browse Equipment</button>
-          <button type="button" data-action="close">${escapeHtml(ctx.packet.close_label || "Leave the Shop")}</button>
-          <button type="button" class="is-primary" data-action="finish">Leave Kessa's Stall</button>
+          <button type="button" class="is-primary" data-action="finish">${escapeHtml(ctx.packet.close_label || "Leave the Shop")}</button>
         </div>
       `);
+      // ONE exit, not two. Kernel 74 first shipped "Leave Kessa's Stall"
+      // beside the packet's existing "Leave the Shop", which read as two
+      // different doors out of the same conversation -- the distinction
+      // (dismiss the panel vs. record the milestone) is an implementation
+      // detail no Player should have to parse. Leaving is leaving: it
+      // records completion and closes. The "x" and Esc remain a pure
+      // dismissal for someone who only wanted a look.
       bindActions({
         stance: (btn) => runStance(btn.getAttribute("data-stance")),
         haggle: () => runHagglePreview(),
         equipment: () => renderEquipment(),
-        close: () => panel.close(),
         finish: () => runLeaveKessa(),
       });
     }
