@@ -137,7 +137,7 @@ func CreateInteraction(ctx context.Context, pool *pgxpool.Pool, actorUserID, pla
 		return ParticipantInteraction{}, errors.New("stage_button_label_required")
 	}
 	interactionType := strings.TrimSpace(in.InteractionType)
-	if interactionType != InteractionTypeOpenEquipMode {
+	if !validInteractionTypes[interactionType] {
 		return ParticipantInteraction{}, errors.New("invalid_interaction_type")
 	}
 
@@ -238,7 +238,12 @@ func UpdateInteraction(ctx context.Context, pool *pgxpool.Pool, actorUserID, int
 // identity from client payloads). Resolving this once per request is what
 // makes every downstream action's identity server-authoritative.
 type EligibleContext struct {
-	Interaction     ParticipantInteraction
+	Interaction ParticipantInteraction
+	// ActorUserID is the authenticated caller this context was resolved
+	// for. Carried explicitly (Kernel 74) so downstream helpers building a
+	// tutorial.Participation cannot accidentally pair one caller's resolved
+	// Character/Show with a different caller's user ID.
+	ActorUserID     string
 	PlacementID     string
 	ShowID          string
 	ShowRunID       string
@@ -334,6 +339,7 @@ func ResolveEligibleContext(ctx context.Context, pool *pgxpool.Pool, actorUserID
 
 	return EligibleContext{
 		Interaction:     interaction,
+		ActorUserID:     actorUserID,
 		PlacementID:     interaction.ShowScenePlacementID,
 		ShowID:          showID,
 		ShowRunID:       showRunID,
@@ -394,7 +400,7 @@ func ListTriggerableInteractionsForViewer(ctx context.Context, pool *pgxpool.Poo
 		if _, err := ResolveEligibleContext(ctx, pool, viewerUserID, it.ID); err != nil {
 			continue
 		}
-		out = append(out, PlayerVisibleInteraction{ID: it.ID, Label: it.StageButtonLabel})
+		out = append(out, PlayerVisibleInteraction{ID: it.ID, Label: it.StageButtonLabel, InteractionType: it.InteractionType})
 	}
 	return out, nil
 }

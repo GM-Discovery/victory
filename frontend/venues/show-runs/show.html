@@ -759,7 +759,7 @@
         const kindLabel = document.createElement("label");
         kindLabel.textContent = "Kind";
         const kindSelect = document.createElement("select");
-        for (const k of ["token", "index_card", "map_backdrop", "grid_config"]) {
+        for (const k of ["token", "index_card", "map_backdrop", "grid_config", "interaction_hotspot"]) {
           const opt = document.createElement("option"); opt.value = k; opt.textContent = k; kindSelect.appendChild(opt);
         }
         kindField.appendChild(kindLabel); kindField.appendChild(kindSelect);
@@ -827,6 +827,22 @@
         return true;
       }
 
+      // patchStageElementSize is the size sibling of the position write
+      // path above, and is deliberately a SEPARATE request rather than a
+      // combined one: dragging a hotspot must never resize it, and resizing
+      // it must never move it. The backend applies only the fields present
+      // in the patch, so each stays independent.
+      async function patchStageElementSize(elementId, width, height) {
+        const res = await fetch(`/api/stage-elements/${encodeURIComponent(elementId)}`, {
+          method: "PATCH", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ width, height }),
+        });
+        const p = await res.json().catch(() => null);
+        if (!res.ok || !p?.ok) { alert("Could not update size: " + (p?.data?.error || `HTTP ${res.status}`)); return false; }
+        return true;
+      }
+
       // PATCH /api/stage-elements/{id} replaces `data` wholesale (not a
       // merge) -- always send the element's existing data plus the changed
       // key, never just the changed key alone, or every other data field
@@ -868,7 +884,10 @@
           dotLabel.textContent = el.label || "(untitled)";
           dot.appendChild(dotLabel);
 
-          if (el.kind === "token" || el.kind === "index_card") {
+          // Kernel 74: interaction_hotspot joins token/index_card as a
+          // positioned element -- it must be draggable so a Director can
+          // align it over the door already painted into the map art.
+          if (el.kind === "token" || el.kind === "index_card" || el.kind === "interaction_hotspot") {
             let dragging = false;
             dot.addEventListener("pointerdown", (event) => {
               dragging = true;
@@ -947,11 +966,14 @@
         left.appendChild(title);
         const meta = document.createElement("div");
         meta.className = "cue-row-meta";
-        meta.textContent = el.binding ? ("Bound to: " + (el.binding.stage_button_label || el.binding.participant_interaction_id)) : "Unbound";
+        meta.textContent = el.binding
+          ? ("Bound to: " + (el.binding.stage_button_label || el.binding.participant_interaction_id)
+             + (el.binding.requires_milestone ? " · requires " + el.binding.requires_milestone : ""))
+          : "Unbound";
         left.appendChild(meta);
         row.appendChild(left);
 
-        if (el.kind === "token" || el.kind === "index_card") {
+        if (el.kind === "token" || el.kind === "index_card" || el.kind === "interaction_hotspot") {
           const xLabel = document.createElement("label");
           xLabel.textContent = "X"; xLabel.style.cssText = "margin:0 4px 0 0;";
           row.appendChild(xLabel);
@@ -997,6 +1019,38 @@
           row.appendChild(imageButton);
         }
 
+        // Kernel 74: normalized 0-1 size. Only interaction_hotspot exposes
+        // it -- every other kind draws its own art at its own intrinsic
+        // size, and a width/height control there would imply a scaling
+        // feature that does not exist.
+        if (el.kind === "interaction_hotspot") {
+          const wLabel = document.createElement("label");
+          wLabel.textContent = "W"; wLabel.style.cssText = "margin:0 4px 0 8px;";
+          row.appendChild(wLabel);
+          const wInput = document.createElement("input");
+          wInput.type = "text"; wInput.style.cssText = "width:64px;";
+          wInput.value = Number.isFinite(el.width) ? el.width : "";
+          row.appendChild(wInput);
+          const hLabel = document.createElement("label");
+          hLabel.textContent = "H"; hLabel.style.cssText = "margin:0 4px 0 8px;";
+          row.appendChild(hLabel);
+          const hInput = document.createElement("input");
+          hInput.type = "text"; hInput.style.cssText = "width:64px;";
+          hInput.value = Number.isFinite(el.height) ? el.height : "";
+          row.appendChild(hInput);
+          const sizeButton = document.createElement("button");
+          sizeButton.className = "chip small";
+          sizeButton.type = "button";
+          sizeButton.textContent = "Set Size";
+          sizeButton.addEventListener("click", async () => {
+            const nw = parseFloat(wInput.value); const nh = parseFloat(hInput.value);
+            if (!Number.isFinite(nw) || !Number.isFinite(nh)) { alert("W and H must be numbers between 0 and 1."); return; }
+            const ok = await patchStageElementSize(el.id, nw, nh);
+            if (ok) await loadComposition(detail, surface, list);
+          });
+          row.appendChild(sizeButton);
+        }
+
         // Authorized picker (item 6): only this placement's own
         // participant interactions are ever selectable -- there is no
         // free-text id field, so binding can never target a cross-Show or
@@ -1015,6 +1069,22 @@
         if (!el.binding) noneOption.selected = true;
         row.appendChild(bindSelect);
 
+        // Kernel 74 reveal gate. An element bound with a milestone is
+        // resolved out of a Player's snapshot entirely until that Player's
+        // participation has recorded it -- so this is not a "hide" toggle,
+        // it is the whole reason the door is unreachable before Kessa.
+        // Backstage viewers always see gated elements, so authoring here
+        // does not blind the Director to what they are positioning.
+        const milestoneSelect = document.createElement("select");
+        for (const m of ["", "kessa_intro_completed", "door_intention_submitted", "ra_intro_started", "ra_intro_completed", "tutorial_handoff_entered"]) {
+          const opt = document.createElement("option");
+          opt.value = m;
+          opt.textContent = m === "" ? "(no requirement)" : ("requires " + m);
+          if (el.binding && el.binding.requires_milestone === m) opt.selected = true;
+          milestoneSelect.appendChild(opt);
+        }
+        row.appendChild(milestoneSelect);
+
         const bindButton = document.createElement("button");
         bindButton.className = "chip small";
         bindButton.type = "button";
@@ -1029,7 +1099,10 @@
             const res = await fetch(`/api/stage-elements/${encodeURIComponent(el.id)}/binding`, {
               method: "POST", credentials: "include",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ participant_interaction_id: interactionId }),
+              body: JSON.stringify({
+                participant_interaction_id: interactionId,
+                requires_milestone: milestoneSelect.value,
+              }),
             });
             const p = await res.json().catch(() => null);
             if (!res.ok || !p?.ok) { alert("Could not bind element: " + (p?.data?.error || `HTTP ${res.status}`)); return; }

@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"victory/backend/internal/projection"
 	"victory/backend/internal/showruns"
 )
 
@@ -88,6 +89,15 @@ func SetCurrentScenePlacement(ctx context.Context, pool *pgxpool.Pool, actorUser
 	if err != nil {
 		return Show{}, err
 	}
+	// Kernel 74 S11.3: advancing the shared stage ends any participant-local
+	// tutorial-handoff projection, returning those Players to the Scene the
+	// Director just flew. Placed here, in the shared write path, so both the
+	// direct Director route and the Cue route (which reaches the Trusted
+	// sibling) get it -- and so no future caller can advance the Show while
+	// leaving a Player stranded on a private map.
+	if _, err := projection.ClearForSharedSceneAdvance(ctx, pool, showID, placementID); err != nil {
+		return Show{}, err
+	}
 	return updated, nil
 }
 
@@ -111,6 +121,15 @@ func SetCurrentScenePlacementTrusted(ctx context.Context, pool *pgxpool.Pool, sh
 		RETURNING `+showColumns, showID, placementID)
 	updated, err := scanShow(row)
 	if err != nil {
+		return Show{}, err
+	}
+	// Kernel 74 S11.3: advancing the shared stage ends any participant-local
+	// tutorial-handoff projection, returning those Players to the Scene the
+	// Director just flew. Placed here, in the shared write path, so both the
+	// direct Director route and the Cue route (which reaches the Trusted
+	// sibling) get it -- and so no future caller can advance the Show while
+	// leaving a Player stranded on a private map.
+	if _, err := projection.ClearForSharedSceneAdvance(ctx, pool, showID, placementID); err != nil {
 		return Show{}, err
 	}
 	return updated, nil

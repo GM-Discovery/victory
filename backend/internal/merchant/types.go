@@ -130,9 +130,24 @@ type ParticipantInteraction struct {
 
 const InteractionTypeOpenEquipMode = "open_equip_mode"
 
+// validInteractionTypes mirrors participant_interactions_type_check
+// (migrations 061, extended by 066), so an unknown type is rejected before
+// it reaches the database. Kernel 74's two additions are declared in
+// tutorial_flow.go beside the code that implements them.
+var validInteractionTypes = map[string]bool{
+	InteractionTypeOpenEquipMode:      true,
+	InteractionTypeFreeformSubmission: true,
+	InteractionTypeGuidedDialogue:     true,
+}
+
 // PlayerVisibleInteraction is the curated, player-facing stage-button
 // listing -- mirrors cues.PlayerVisibleCue's shape.
 type PlayerVisibleInteraction struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
+	// InteractionType tells the client which Program to open. Kernel 74
+	// added a second and third type, so "the only type is Equip Mode" is no
+	// longer a safe client assumption. Still curated: the type name alone,
+	// never the configuration behind it.
+	InteractionType string `json:"interaction_type"`
 }

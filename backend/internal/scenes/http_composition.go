@@ -20,6 +20,11 @@ type stageElementBody struct {
 	Position   map[string]any `json:"position"`
 	Visibility map[string]any `json:"visibility"`
 	SortOrder  int            `json:"sort_order"`
+	// Kernel 74 normalized 0-1 size. Pointers so "absent" and "zero" stay
+	// distinguishable -- an omitted size must leave the stored value alone,
+	// not shrink the element to nothing.
+	Width  *float64 `json:"width"`
+	Height *float64 `json:"height"`
 }
 
 // HandleSceneStageElementsCollection handles GET /api/scenes/{scene_id}/stage-elements
@@ -67,6 +72,7 @@ func HandleSceneStageElementsCollection(pool *pgxpool.Pool) http.HandlerFunc {
 			e, err := CreateSceneStageElement(ctx, pool, userID, sceneID, CreateStageElementInput{
 				Kind: body.Kind, Label: body.Label, Data: body.Data,
 				Position: body.Position, Visibility: body.Visibility, SortOrder: body.SortOrder,
+				Width: body.Width, Height: body.Height,
 			})
 			if err != nil {
 				writeError(w, err)
@@ -106,6 +112,7 @@ func HandlePlacementStageElementsCollection(pool *pgxpool.Pool) http.HandlerFunc
 		e, err := CreatePlacementStageElement(ctx, pool, userID, placementID, CreateStageElementInput{
 			Kind: body.Kind, Label: body.Label, Data: body.Data,
 			Position: body.Position, Visibility: body.Visibility, SortOrder: body.SortOrder,
+			Width: body.Width, Height: body.Height,
 		})
 		if err != nil {
 			writeError(w, err)
@@ -135,6 +142,8 @@ func HandleStageElementByID(pool *pgxpool.Pool) http.HandlerFunc {
 				Position   *map[string]any `json:"position"`
 				Visibility *map[string]any `json:"visibility"`
 				SortOrder  *int            `json:"sort_order"`
+				Width      *float64        `json:"width"`
+				Height     *float64        `json:"height"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				writeError(w, errors.New("invalid_request_body"))
@@ -143,6 +152,7 @@ func HandleStageElementByID(pool *pgxpool.Pool) http.HandlerFunc {
 			e, err := UpdateStageElement(ctx, pool, userID, elementID, UpdateStageElementPatch{
 				Label: body.Label, Data: body.Data, Position: body.Position,
 				Visibility: body.Visibility, SortOrder: body.SortOrder,
+				Width: body.Width, Height: body.Height,
 			})
 			if err != nil {
 				writeError(w, err)
@@ -180,12 +190,13 @@ func HandleStageElementBinding(pool *pgxpool.Pool) http.HandlerFunc {
 		case http.MethodPost:
 			var body struct {
 				ParticipantInteractionID string `json:"participant_interaction_id"`
+				RequiresMilestone        string `json:"requires_milestone"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				writeError(w, errors.New("invalid_request_body"))
 				return
 			}
-			b, err := CreateStageElementBinding(ctx, pool, userID, elementID, body.ParticipantInteractionID)
+			b, err := CreateStageElementBinding(ctx, pool, userID, elementID, body.ParticipantInteractionID, body.RequiresMilestone)
 			if err != nil {
 				writeError(w, err)
 				return

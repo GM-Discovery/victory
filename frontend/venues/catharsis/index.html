@@ -3818,6 +3818,14 @@
                     <button id="chat-dice-tab" class="chat-tab" type="button" role="tab" aria-selected="false">Dice</button>
                     <button id="chat-game-events-tab" class="chat-tab" type="button" role="tab" aria-selected="false">Game Events</button>
                     <button id="chat-help-tab" class="chat-tab" type="button" role="tab" aria-selected="false">Guide</button>
+                    <!-- Kernel 74 S8.1: Directors+ read the door-intention
+                         note here, inside Catharsis, without opening Stage
+                         Management or the mailbox. Hidden by default and
+                         revealed only for a backstage theater_context; the
+                         GET /api/backstage-notes endpoint re-checks the
+                         caller's session role independently, so this
+                         attribute is convenience, not the boundary. -->
+                    <button id="chat-backstage-tab" class="chat-tab" type="button" role="tab" aria-selected="false" hidden>Backstage</button>
                   </div>
                   <div class="chat-tab-panels">
                     <div id="chat-log-panel" class="chat-tab-panel">
@@ -3831,6 +3839,9 @@
                     </div>
                     <div id="chat-game-events-panel" class="chat-tab-panel" hidden>
                       <div class="chat-log" id="chat-game-events-log"></div>
+                    </div>
+                    <div id="chat-backstage-panel" class="chat-tab-panel" hidden>
+                      <div class="chat-log" id="chat-backstage-log"></div>
                     </div>
                     <div id="chat-help-panel" class="chat-tab-panel" hidden>
                       <p class="chat-sidebar-copy">

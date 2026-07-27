@@ -248,6 +248,9 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     let tokenEditorDragState = null;
     let localPositionOverrides = new Map();
     let currentVenueMapState = null;
+    // Kernel 74: this viewer's own participant-local projection, or null for
+    // the shared stage (which is every viewer, almost always).
+    let currentLocalProjection = null;
     let currentVenueMapAssets = [];
     let currentVenueMapAssetID = "";
     let currentVenueMapBounds = null;
@@ -388,11 +391,14 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     const chatDiceTab = document.getElementById("chat-dice-tab");
     const chatGameEventsTab = document.getElementById("chat-game-events-tab");
     const chatHelpTab = document.getElementById("chat-help-tab");
+    const chatBackstageTab = document.getElementById("chat-backstage-tab");
     const chatLogPanel = document.getElementById("chat-log-panel");
     const chatOOCPanel = document.getElementById("chat-ooc-panel");
     const chatDicePanel = document.getElementById("chat-dice-panel");
     const chatGameEventsPanel = document.getElementById("chat-game-events-panel");
     const chatHelpPanel = document.getElementById("chat-help-panel");
+    const chatBackstagePanel = document.getElementById("chat-backstage-panel");
+    const chatBackstageLog = document.getElementById("chat-backstage-log");
     const chatOOCLog = document.getElementById("chat-ooc-log");
     const chatGameEventsLog = document.getElementById("chat-game-events-log");
     const venueSheetRoot = document.getElementById("venue-sheet");
@@ -651,6 +657,10 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     // so showing/hiding this banner purely on message-presence already
     // matches the required per-kind behavior without re-deriving kind here.
     function updateTheaterContextPresentation(snapshot) {
+      // Kernel 74: the Backstage notes tab lives or dies with the same
+      // backend-computed theater_context this banner already reads, so it
+      // is refreshed here rather than growing a second snapshot hook.
+      updateBackstageNotesVisibility(snapshot);
       const el = ensureTheaterContextElement();
       const message = String(snapshot?.theater_context?.message || "").trim();
       if (!message) {
@@ -752,6 +762,12 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         panel,
         escapeHtml: stageEngineProgramPanelModule.escapeHtml,
         setStageStatus,
+        // Kernel 74: tutorial milestones change what this Player's stage
+        // contains -- completing Kessa reveals the door, leaving Ra swaps
+        // them onto the handoff projection. Re-read the world rather than
+        // patching locally, so the server stays the only authority on what
+        // this viewer can see.
+        onTutorialProgress: () => { refreshWorld?.(); },
       });
       return participantInteractionsController;
     }
@@ -785,7 +801,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
           button.style.cssText = "background:rgba(255,233,197,0.16);color:#f0d3a4;border:1px solid rgba(255,233,197,0.35);padding:10px 18px;border-radius:999px;font-weight:700;cursor:pointer;font-size:0.86rem;";
           button.addEventListener("click", () => {
             const controller = getParticipantInteractionsController();
-            controller?.openInteraction(interaction.id, interaction.label);
+            controller?.openInteraction(interaction.id, interaction.label, interaction.interaction_type);
           });
           list.appendChild(button);
         }
@@ -806,6 +822,8 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       renderRehearsalBanner(container, snapshot);
       renderStageCueButtons(container, snapshot);
       renderParticipantInteractionButtons(container, snapshot);
+      renderStageHotspotControls(container);
+      renderLocalProjectionBanner(container, snapshot);
     }
 
     function setLastStagePoint(point) {
@@ -1700,6 +1718,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       { name: "dice", tab: chatDiceTab, panel: chatDicePanel },
       { name: "game_events", tab: chatGameEventsTab, panel: chatGameEventsPanel },
       { name: "help", tab: chatHelpTab, panel: chatHelpPanel },
+      { name: "backstage", tab: chatBackstageTab, panel: chatBackstagePanel },
     ];
 
     function setChatTab(name) {
@@ -1712,6 +1731,61 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       }
       if (target === "help") {
         renderCommandGuide();
+      }
+      if (target === "backstage") {
+        renderBackstageNotes();
+      }
+    }
+
+    // --- Kernel 74: Directors+ backstage notes ------------------------------
+
+    // The tab is revealed only for a backstage theater_context, and the
+    // endpoint independently refuses anyone whose session role is not
+    // Director/Producer/Operator/Crew. Two gates, and the UI one is the
+    // weaker of the two on purpose -- hiding a tab is presentation, refusing
+    // a request is the boundary.
+    function updateBackstageNotesVisibility(snapshot) {
+      const isBackstage = String(snapshot?.theater_context?.kind || "") === "backstage";
+      if (chatBackstageTab) chatBackstageTab.hidden = !isBackstage;
+      if (!isBackstage && chatBackstagePanel && !chatBackstagePanel.hidden) {
+        setChatTab("chat");
+      }
+      if (isBackstage) renderBackstageNotes();
+    }
+
+    async function renderBackstageNotes() {
+      if (!chatBackstageLog) return;
+      const sessionId = currentSnapshot?.session?.id || "";
+      if (!sessionId) return;
+      try {
+        const res = await fetch(`/api/backstage-notes?session_id=${encodeURIComponent(sessionId)}`, { credentials: "include" });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.ok) return;
+        const notes = payload.data.notes || [];
+        chatBackstageLog.replaceChildren();
+        if (notes.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "chat-sidebar-copy";
+          empty.textContent = "No backstage notes yet.";
+          chatBackstageLog.appendChild(empty);
+          return;
+        }
+        for (const note of notes) {
+          const row = document.createElement("div");
+          row.className = "chat-line";
+          const subject = document.createElement("strong");
+          subject.textContent = note.subject || "Backstage Note";
+          const body = document.createElement("div");
+          // textContent, never innerHTML: the body embeds a Player's own
+          // freeform words verbatim (S8.3's "source Player text is escaped").
+          body.textContent = note.body || "";
+          body.style.whiteSpace = "pre-line";
+          row.append(subject, body);
+          chatBackstageLog.appendChild(row);
+        }
+        chatBackstageLog.scrollTop = chatBackstageLog.scrollHeight;
+      } catch (err) {
+        console.error("failed to load backstage notes", err);
       }
     }
 
@@ -2207,6 +2281,11 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       setDragState(value) {
         dragState = value;
       },
+      // Kernel 74 hotspot support. Size is resolved here rather than in the
+      // node factory because only the runtime knows the current playable
+      // bounds the normalized 0-1 width/height multiply against.
+      hotspotPixelSize: (model) => hotspotPixelSize(model),
+      activateHotspot: (model) => activateHotspotModel(model),
     }) || null;
 
     tokenUi = stageEngineTokenUiModule?.createTokenUi?.({
@@ -2336,6 +2415,16 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       setCurrentSelection: (value) => { currentSelection = value; },
       replaceProjectedState: (...args) => projectedState?.replaceFromSnapshot?.(...args),
       buildObjects: (...args) => buildObjects(...args),
+      setLocalProjection: (value) => {
+        const nextID = String(value?.scene_id || "");
+        const prevID = String(currentLocalProjection?.scene_id || "");
+        currentLocalProjection = value || null;
+        // Entering, leaving, or switching projections supersedes the current
+        // backdrop texture. Clearing forces ensureVenueMapTexture down its
+        // load-and-unload path rather than short-circuiting on a stale
+        // cached texture whose URL no longer matches.
+        if (nextID !== prevID) clearVenueMapTexture();
+      },
       applyVenueFocusPing: (...args) => applyVenueFocusPing(...args),
       updateStatusSummary: (...args) => updateStatusSummary(...args),
       setStageStatus: (...args) => setStageStatus(...args),
@@ -2399,6 +2488,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       setStageStatus: (...args) => setStageStatus(...args),
       updateStageCueControls: (...args) => updateStageCueControls(...args),
       updateTheaterContextPresentation: (...args) => updateTheaterContextPresentation(...args),
+      renderBackstageNotes: () => renderBackstageNotes(),
     }) || null;
 
     editors = stageEngineEditorsModule?.createEditorControllers?.({
@@ -2917,10 +3007,105 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
             setStageStatus("Interactions are unavailable right now.");
             return;
           }
-          controller.openInteraction(interactionId, bindingButton.textContent);
+          controller.openInteraction(interactionId, bindingButton.textContent, binding.interaction_type);
         });
         selectedActions.appendChild(bindingButton);
       }
+    }
+
+    // --- Kernel 74: interaction hotspots -----------------------------------
+
+    // hotspotPixelSize converts a hotspot's normalized 0-1 size into pixels
+    // against the current playable bounds, matching how composition
+    // positions are already resolved (geometry.js's 0-1 special case). The
+    // hotspot therefore stays aligned with the map art it covers when the
+    // window resizes, instead of drifting off the door.
+    function hotspotPixelSize(model) {
+      const width = Number(pixiApp?.screen?.width) || 1280;
+      const height = Number(pixiApp?.screen?.height) || 720;
+      const bounds = computeStagePlayableBounds(width, height);
+      const w = Number(model?.hotspotWidth);
+      const h = Number(model?.hotspotHeight);
+      return {
+        width: Math.max(24, (Number.isFinite(w) ? w : 0.1) * bounds.width),
+        height: Math.max(24, (Number.isFinite(h) ? h : 0.1) * bounds.height),
+      };
+    }
+
+    // activateHotspotModel is the single activation path for click, touch,
+    // and keyboard -- see renderStageHotspotControls below for the keyboard
+    // half. Opening is still only a request: the server re-checks
+    // eligibility on every attempt, so a forged activation is refused.
+    function activateHotspotModel(model) {
+      const binding = model?.source?.data?.binding;
+      const interactionId = binding?.participant_interaction_id ? String(binding.participant_interaction_id) : "";
+      if (!interactionId || !binding?.enabled) {
+        setStageStatus(`${model?.label || "This"} cannot be used right now.`);
+        return;
+      }
+      if (normalizeRole(currentRole) === "audience") return;
+      const controller = getParticipantInteractionsController();
+      if (!controller) {
+        setStageStatus("Interactions are unavailable right now.");
+        return;
+      }
+      controller.openInteraction(interactionId, binding.stage_button_label || model.label, binding.interaction_type);
+    }
+
+    // renderStageHotspotControls mirrors every visible hotspot into a real
+    // focusable DOM button beside the Cue buttons.
+    //
+    // This is not a duplicate control -- it is the keyboard and screen-
+    // reader affordance S6.3 requires. PIXI draws to a canvas and has no
+    // focus or accessibility tree of its own, so a canvas-only hotspot would
+    // be unreachable without a mouse. Both paths call activateHotspotModel.
+    function renderStageHotspotControls(container) {
+      let list = container.querySelector("#kernel74-hotspot-buttons");
+      const hotspots = currentObjects.filter((model) => {
+        if (model?.kind !== "hotspot") return false;
+        const binding = model?.source?.data?.binding;
+        return Boolean(binding?.participant_interaction_id) && Boolean(binding?.enabled);
+      });
+      if (hotspots.length === 0 || normalizeRole(currentRole) === "audience") {
+        list?.remove();
+        return;
+      }
+      if (!list) {
+        list = document.createElement("div");
+        list.id = "kernel74-hotspot-buttons";
+        list.style.cssText = "pointer-events:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;";
+        container.appendChild(list);
+      }
+      list.replaceChildren();
+      for (const model of hotspots) {
+        const binding = model.source.data.binding;
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = binding.stage_button_label || model.label || "Interact";
+        button.setAttribute("aria-label", `${model.label || "Hotspot"}: ${button.textContent}`);
+        button.style.cssText = "background:rgba(255,233,197,0.16);color:#f0d3a4;border:1px solid rgba(255,233,197,0.35);padding:10px 18px;border-radius:999px;font-weight:700;cursor:pointer;font-size:0.86rem;";
+        button.addEventListener("click", () => activateHotspotModel(model));
+        list.appendChild(button);
+      }
+    }
+
+    // renderLocalProjectionBanner tells the Player, plainly, that what they
+    // are looking at is their own view -- important because the shared Show
+    // has NOT moved and a Director may still be describing the Courtyard.
+    function renderLocalProjectionBanner(container, snapshot) {
+      let banner = container.querySelector("#kernel74-local-projection-banner");
+      const projection = snapshot?.session?.local_projection;
+      if (!projection) {
+        banner?.remove();
+        return;
+      }
+      if (!banner) {
+        banner = document.createElement("div");
+        banner.id = "kernel74-local-projection-banner";
+        banner.style.cssText = "pointer-events:none;background:rgba(20,15,10,0.92);border:1px solid rgba(255,233,197,0.25);color:#f0d3a4;padding:8px 14px;border-radius:12px;font-size:0.8rem;font-weight:700;max-width:340px;text-align:right;";
+        container.appendChild(banner);
+      }
+      banner.textContent = `${projection.scene_title || "Tutorial handoff"} — your view only.`;
     }
 
     function showCardEditorFor(model) { return editors?.showCardEditorFor?.(model); }
@@ -2965,6 +3150,25 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     async function refreshVenueGridConfig() { return editors?.refreshVenueGridConfig?.(); }
 
     function venueMapTextureURLForState(state) {
+      // Kernel 74: a Player inside a participant-local projection resolves
+      // their projection Scene's backdrop instead of the venue map.
+      //
+      // Substituting at this ONE function is what makes the whole existing
+      // texture lifecycle apply unchanged -- ensureVenueMapTexture's dedupe,
+      // its explicit PIXI.Assets.unload of the superseded URL, the
+      // failed-URL short circuit, and the WebGL context-restore reload all
+      // key off this function's return value. Swapping the sprite anywhere
+      // else would have leaked a full-resolution texture per projection
+      // change, which is precisely what the unload below exists to prevent.
+      const localBackdrop = String(currentLocalProjection?.backdrop_url || "").trim();
+      if (localBackdrop) {
+        // Cache-busted on scene id rather than updated_at: a projection's
+        // backdrop is identified by which Scene it came from, and this keeps
+        // the projection URL distinct from the venue map's so a swap in
+        // either direction still unloads the other.
+        const id = encodeURIComponent(String(currentLocalProjection.scene_id || "local"));
+        return `${localBackdrop}${localBackdrop.includes("?") ? "&" : "?"}lp=${id}`;
+      }
       const assetURL = String(state?.asset?.content_url || "").trim();
       if (!assetURL) {
         return "";
@@ -3518,6 +3722,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     const makeCardNode = (model) => sceneNodeFactory?.makeCardNode?.(model) || null;
     const makeFireNode = (model) => sceneNodeFactory?.makeFireNode?.(model) || null;
     const makeTokenNode = (model) => sceneNodeFactory?.makeTokenNode?.(model) || null;
+    const makeHotspotNode = (model) => sceneNodeFactory?.makeHotspotNode?.(model) || null;
     const makePlaceholderNode = (model) => (isTokenObject(model) ? makeTokenNode(model) : makeCardNode(model));
 
     function createIndexCardFromMenu() { return sessionSync?.createIndexCardFromMenu?.(); }
@@ -3799,6 +4004,11 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
           node = makeTokenNode(model);
         } else if (model.kind === "card" && model.live) {
           node = makeCardNode(model);
+        } else if (model.kind === "hotspot") {
+          // Kernel 74: hotspots are composition-only (live === false), so
+          // they must be dispatched BEFORE the live checks above would fall
+          // through to makePlaceholderNode and draw token art over the door.
+          node = makeHotspotNode(model);
         } else {
           node = makePlaceholderNode(model);
         }
@@ -4729,6 +4939,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     chatDiceTab?.addEventListener("click", () => setChatTab("dice"));
     chatGameEventsTab?.addEventListener("click", () => setChatTab("game_events"));
     chatHelpTab?.addEventListener("click", () => setChatTab("help"));
+    chatBackstageTab?.addEventListener("click", () => setChatTab("backstage"));
     setChatTab("chat");
 
     cameraZoomOutButton?.addEventListener("click", () => {

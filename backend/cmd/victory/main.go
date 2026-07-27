@@ -283,6 +283,15 @@ func main() {
 	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/haggle", merchant.HandleInteractionHaggle(pool))
 	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/purchase", merchant.HandleInteractionPurchase(pool, hub))
 	mux.HandleFunc("GET /api/characters/{character_card_id}/inventory", merchant.HandleCharacterInventory(pool))
+	// Kernel 74: the Player-controlled tutorial tail. /complete is "Leave
+	// Kessa's Stall", /submit is the freeform door intention, and
+	// /dialogue/{action} is Ra's guided conversation. None of them has a
+	// Director GO counterpart -- that absence is the point.
+	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/complete", merchant.HandleInteractionComplete(pool, hub))
+	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/submit", merchant.HandleInteractionSubmit(pool, hub))
+	mux.HandleFunc("POST /api/participant-interactions/{interaction_id}/dialogue/{action}", merchant.HandleInteractionDialogue(pool, hub))
+	mux.HandleFunc("GET /api/shows/{show_id}/tutorial-progress", merchant.HandleShowTutorialProgress(pool))
+	mux.HandleFunc("DELETE /api/shows/{show_id}/local-projections/{user_id}", merchant.HandleClearLocalProjection(pool, hub))
 	mux.HandleFunc("POST /api/shows/{show_id}/prepare-locked-courtyard-opening", merchant.HandlePrepareLockedCourtyardOpening(pool))
 	mux.HandleFunc("GET /api/shows/{show_id}/kessa-reachability", merchant.HandleKessaReachabilityDiagnostics(pool))
 	mux.HandleFunc("GET /api/venues/{venue_slug}/equipment", merchant.HandleVenueEquipmentCollection(pool))
@@ -326,6 +335,9 @@ func main() {
 	mux.HandleFunc("POST /api/messages", messages.HandleMessages(pool))
 	mux.HandleFunc("GET /api/messages/{id}", messages.HandleMessageByID(pool))
 	mux.HandleFunc("POST /api/note-cards", messages.HandleNoteCards(pool))
+	// Kernel 74 S8.1: Directors+ read the door-intention note inside
+	// Catharsis, without opening Stage Management or the mailbox.
+	mux.HandleFunc("GET /api/backstage-notes", messages.HandleBackstageNotes(pool))
 	mux.HandleFunc("/api/index-cards", network.HandleIndexCardSave(hub, pool))
 
 	mux.HandleFunc("/api/map/visibility", func(w http.ResponseWriter, r *http.Request) {

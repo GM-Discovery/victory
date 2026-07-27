@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/showings"
+	"victory/backend/internal/tutorial"
 )
 
 type Snapshot struct {
@@ -62,6 +63,29 @@ type Session struct {
 	// isn't linked to a Show, or the Show has no current placement.
 	ShowID                      string `json:"show_id,omitempty"`
 	CurrentShowScenePlacementID string `json:"current_show_scene_placement_id,omitempty"`
+	// LocalProjection is Kernel 74's participant-local tutorial-handoff
+	// presentation, present only for the one viewer who entered it. When
+	// set, this viewer's Elements and backdrop come from the projection's
+	// Scene instead of the current placement's -- but
+	// CurrentShowScenePlacementID above still reports the UNCHANGED shared
+	// Scene, which is what makes "the shared current Scene did not move"
+	// directly assertable from a Player's own snapshot.
+	LocalProjection *LocalProjection `json:"local_projection,omitempty"`
+}
+
+// LocalProjection is the curated, viewer-facing shape of an active
+// participant-local projection -- deliberately not the whole row (no
+// cleared_at, no origin placement, no other Player's identity), mirroring
+// how cues.PlayerVisibleCue curates a Cue.
+type LocalProjection struct {
+	SceneID    string `json:"scene_id"`
+	SceneSlug  string `json:"scene_slug"`
+	SceneTitle string `json:"scene_title"`
+	// BackdropURL is the projection Scene's map_backdrop content URL, if it
+	// authored one. Supplied here so the stage renderer can swap backdrops
+	// through its existing texture lifecycle without a second fetch.
+	BackdropURL string `json:"backdrop_url,omitempty"`
+	GridEnabled bool   `json:"grid_enabled"`
 }
 
 type Showing = showings.Showing
@@ -413,8 +437,53 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, view
 	// *is* for the Scene that's current, computed fresh on every read
 	// (same "not persisted, computed on read" model this function already
 	// uses for the actions-log replay above), not a client-interpreted event.
-	if snap.Session.CurrentShowScenePlacementID != "" {
-		compositionElements, err := loadSceneCompositionAsPlacedElements(ctx, pool, snap.Session.CurrentShowScenePlacementID)
+	//
+	// Kernel 74 moved resolveTheaterContext above this block (it used to run
+	// after the visibility filter) because composition loading now needs the
+	// viewer's own participation identity -- specifically the selected
+	// Character -- to decide whether a milestone-gated hotspot is part of
+	// this viewer's stage at all. Nothing about the context computation
+	// itself changed.
+	theaterContext, err := resolveTheaterContext(ctx, pool, viewerUserID, viewerRole, snap.Session.ID, showID)
+	if err != nil {
+		return nil, err
+	}
+	snap.TheaterContext = theaterContext
+
+	// Kernel 74: a viewer with an active participant-local projection
+	// resolves a DIFFERENT Scene's composition -- their own tutorial-handoff
+	// map -- while every other viewer, the Audience, and
+	// snap.Session.CurrentShowScenePlacementID above are all untouched.
+	//
+	// Note what is substituted and what is not: only WHICH Scene's elements
+	// are loaded. The elements themselves then fall through the identical
+	// role-based visibility filter below. There is still exactly one object
+	// model, which is the constraint cues/types.go:43-48 recorded.
+	localProjection, err := loadLocalProjectionForViewer(ctx, pool, viewerUserID, showID)
+	if err != nil {
+		return nil, err
+	}
+	snap.Session.LocalProjection = localProjection
+
+	participation := tutorial.Participation{
+		UserID:          viewerUserID,
+		CharacterCardID: theaterContext.SelectedCharacterID,
+		ShowID:          showID,
+	}
+	// Backstage viewers see milestone-gated elements unconditionally so
+	// Directors can author and preview the door without first playing the
+	// tutorial as a Player (S6.2).
+	gate := milestoneGate{pool: pool, participation: participation, bypass: isBackstageRole(viewerRole)}
+
+	switch {
+	case localProjection != nil:
+		compositionElements, err := loadSceneBaseCompositionAsPlacedElements(ctx, pool, localProjection.SceneID, gate)
+		if err != nil {
+			return nil, err
+		}
+		snap.Elements = append(snap.Elements, compositionElements...)
+	case snap.Session.CurrentShowScenePlacementID != "":
+		compositionElements, err := loadSceneCompositionAsPlacedElements(ctx, pool, snap.Session.CurrentShowScenePlacementID, gate)
 		if err != nil {
 			return nil, err
 		}
@@ -461,12 +530,6 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, view
 	}
 	snap.Elements = filtered
 
-	theaterContext, err := resolveTheaterContext(ctx, pool, viewerUserID, viewerRole, snap.Session.ID, showID)
-	if err != nil {
-		return nil, err
-	}
-	snap.TheaterContext = theaterContext
-
 	return &snap, nil
 }
 
@@ -495,7 +558,7 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, view
 // those rows support; they are edited exclusively through
 // backend/internal/scenes' own stage-element endpoints and simply re-read
 // fresh on every snapshot call (never mutated by an action replay).
-func loadSceneCompositionAsPlacedElements(ctx context.Context, pool *pgxpool.Pool, placementID string) ([]PlacedElement, error) {
+func loadSceneCompositionAsPlacedElements(ctx context.Context, pool *pgxpool.Pool, placementID string, gate milestoneGate) ([]PlacedElement, error) {
 	var sceneID string
 	if err := pool.QueryRow(ctx, `
 		SELECT scene_id::text FROM show_scene_placements WHERE id = $1
@@ -508,20 +571,40 @@ func loadSceneCompositionAsPlacedElements(ctx context.Context, pool *pgxpool.Poo
 		}
 		return nil, err
 	}
+	return loadCompositionRows(ctx, pool, sceneID, placementID, gate)
+}
+
+// loadSceneBaseCompositionAsPlacedElements is the Kernel 74 sibling used by
+// a participant-local projection: it renders a Scene's Base layer with no
+// Show-layer overrides, because a local projection is not a Show Scene
+// Placement and therefore has no placement-scoped layer to resolve. Passing
+// an empty placementID makes the Show-layer predicate match nothing, which
+// is exactly the intended semantics rather than an accident of SQL.
+func loadSceneBaseCompositionAsPlacedElements(ctx context.Context, pool *pgxpool.Pool, sceneID string, gate milestoneGate) ([]PlacedElement, error) {
+	return loadCompositionRows(ctx, pool, sceneID, "", gate)
+}
+
+func loadCompositionRows(ctx context.Context, pool *pgxpool.Pool, sceneID, placementID string, gate milestoneGate) ([]PlacedElement, error) {
+	var placementArg any
+	if strings.TrimSpace(placementID) != "" {
+		placementArg = placementID
+	}
 
 	rows, err := pool.Query(ctx, `
 		SELECT
 			sse.id::text, sse.kind, COALESCE(sse.label, ''),
 			CASE WHEN sse.show_scene_placement_id IS NULL THEN 'base' ELSE 'show' END,
 			sse.data::text, sse.position::text, sse.visibility::text,
+			sse.width, sse.height,
 			COALESCE(seb.binding_type, ''), COALESCE(seb.participant_interaction_id::text, ''),
-			COALESCE(pi.stage_button_label, ''), COALESCE(pi.enabled, FALSE)
+			COALESCE(pi.stage_button_label, ''), COALESCE(pi.enabled, FALSE),
+			COALESCE(pi.interaction_type, ''), COALESCE(seb.requires_milestone, '')
 		FROM scene_stage_elements sse
 		LEFT JOIN stage_element_bindings seb ON seb.scene_stage_element_id = sse.id AND seb.binding_type = 'participant_interaction'
 		LEFT JOIN participant_interactions pi ON pi.id = seb.participant_interaction_id
-		WHERE sse.scene_id = $1 AND (sse.show_scene_placement_id IS NULL OR sse.show_scene_placement_id = $2)
+		WHERE sse.scene_id = $1 AND (sse.show_scene_placement_id IS NULL OR sse.show_scene_placement_id = $2::uuid)
 		ORDER BY (sse.show_scene_placement_id IS NULL) DESC, sse.sort_order ASC, sse.created_at ASC
-	`, sceneID, placementID)
+	`, sceneID, placementArg)
 	if err != nil {
 		return nil, err
 	}
@@ -529,10 +612,29 @@ func loadSceneCompositionAsPlacedElements(ctx context.Context, pool *pgxpool.Poo
 
 	var out []PlacedElement
 	for rows.Next() {
-		var id, kind, label, layer, dataText, positionText, visibilityText, bindingType, bindingInteractionID, bindingLabel string
+		var id, kind, label, layer, dataText, positionText, visibilityText, bindingType, bindingInteractionID, bindingLabel, bindingInteractionType, requiresMilestone string
 		var bindingEnabled bool
-		if err := rows.Scan(&id, &kind, &label, &layer, &dataText, &positionText, &visibilityText, &bindingType, &bindingInteractionID, &bindingLabel, &bindingEnabled); err != nil {
+		var width, height *float64
+		if err := rows.Scan(&id, &kind, &label, &layer, &dataText, &positionText, &visibilityText,
+			&width, &height, &bindingType, &bindingInteractionID, &bindingLabel, &bindingEnabled,
+			&bindingInteractionType, &requiresMilestone); err != nil {
 			return nil, err
+		}
+
+		// Kernel 74 S6.2: the reveal gate is applied HERE, by omitting the
+		// element from the snapshot entirely, rather than by shipping it
+		// with a "hidden" flag the client is trusted to honor. A Player who
+		// has not completed Kessa has no door element in their payload at
+		// all, so forging client state cannot reveal it -- and the submit
+		// endpoint refuses independently even if they synthesize one.
+		if requiresMilestone != "" {
+			allowed, err := gate.allows(ctx, requiresMilestone)
+			if err != nil {
+				return nil, err
+			}
+			if !allowed {
+				continue
+			}
 		}
 
 		data := decodeJSONMap([]byte(dataText))
@@ -542,12 +644,24 @@ func loadSceneCompositionAsPlacedElements(ctx context.Context, pool *pgxpool.Poo
 		data["scene_stage_element_id"] = id
 		data["kind"] = kind
 		data["layer"] = layer
+		if width != nil {
+			data["width"] = *width
+		}
+		if height != nil {
+			data["height"] = *height
+		}
 		if bindingInteractionID != "" {
 			data["binding"] = map[string]any{
 				"binding_type":               bindingType,
 				"participant_interaction_id": bindingInteractionID,
 				"stage_button_label":         bindingLabel,
 				"enabled":                    bindingEnabled,
+				// Kernel 74: the client needs the type to know WHICH Program
+				// to open -- Equip Mode, the freeform door prompt, or Ra's
+				// guided dialogue. It is a curated authoring label, not
+				// configuration: no packet slug, prompt text, or milestone key
+				// crosses to the Player here.
+				"interaction_type": bindingInteractionType,
 			}
 		}
 

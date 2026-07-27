@@ -88,12 +88,21 @@
   // have no equivalent generic per-element node in this pipeline (the
   // venue map/backdrop and grid are rendered as a separate background
   // layer, not a per-element node) -- composition rows of those two kinds
-  // are intentionally not converted into stage objects here yet (Kernel
-  // 74 follow-up), not silently mis-rendered as a token/card.
+  // are intentionally not converted into stage objects here yet, not
+  // silently mis-rendered as a token/card. Kernel 74 reads map_backdrop
+  // server-side instead (world/kernel74_local_projection.go), which is why
+  // they still produce no node here.
+  //
+  // Kernel 74 adds "interaction_hotspot": a positioned, resizable region
+  // aligned over artwork that already exists in the map (the Courtyard's
+  // door). It gets its own node kind rather than reusing "token" precisely
+  // because it must NOT draw token art over the door it sits on -- the
+  // whole point is that the door is already painted into the map.
   function sceneCompositionNodeKind(dataKind) {
     const kind = String(dataKind || "").trim().toLowerCase();
     if (kind === "token") return "token";
     if (kind === "index_card") return "card";
+    if (kind === "interaction_hotspot") return "hotspot";
     return ""; // map_backdrop, grid_config, or unknown -- no node yet.
   }
 
@@ -185,6 +194,14 @@
       snapMode: String(data.snap_mode ?? data.snapMode ?? "").trim().toLowerCase(),
       tokenLayer: tokenLayer === "director" ? "director" : "public",
       scale: clampNumber(data.scale ?? 100, 25, 500, 100),
+      // Kernel 74 normalized 0-1 size. Only interaction_hotspot authors it
+      // today; every other kind leaves these null and keeps its intrinsic
+      // size. The defaults are a visible-but-modest box so a hotspot whose
+      // width/height never got authored is still findable and draggable in
+      // Scene Setup rather than being a zero-area invisible target.
+      hotspotWidth: kind === "hotspot" ? clampNumber(data.width ?? 0.1, 0.01, 1, 0.1) : null,
+      hotspotHeight: kind === "hotspot" ? clampNumber(data.height ?? 0.1, 0.01, 1, 0.1) : null,
+      nameplateVisible: data.nameplate_visible !== false,
       position,
       state,
       visibility,

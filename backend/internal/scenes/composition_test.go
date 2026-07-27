@@ -142,11 +142,11 @@ func TestStageElementBindingLifecycle(t *testing.T) {
 		t.Fatalf("insert participant_interaction fixture: %v", err)
 	}
 
-	if _, err := CreateStageElementBinding(context.Background(), pool, producer, el.ID, "00000000-0000-0000-0000-000000000000"); err == nil {
+	if _, err := CreateStageElementBinding(context.Background(), pool, producer, el.ID, "00000000-0000-0000-0000-000000000000", ""); err == nil {
 		t.Fatal("expected a nonexistent participant_interaction_id to be rejected")
 	}
 
-	binding, err := CreateStageElementBinding(context.Background(), pool, producer, el.ID, interactionID)
+	binding, err := CreateStageElementBinding(context.Background(), pool, producer, el.ID, interactionID, "")
 	if err != nil {
 		t.Fatalf("create binding: %v", err)
 	}

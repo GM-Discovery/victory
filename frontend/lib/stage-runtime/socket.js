@@ -82,6 +82,22 @@
         return { kind: "show_stage_updated", showId: String(msg.show_id || ""), message: msg };
       }
 
+      // Kernel 74: a targeted, per-user nudge that this ONE viewer's stage
+      // changed -- their tutorial progress revealed the door, or they
+      // entered the handoff projection. Deliberately distinct from
+      // show/stage_updated, which means the shared Show moved for everyone.
+      // Sent only via hub.BroadcastToSessionUser, never session-wide.
+      if (msg.type === "tutorial/stage_refresh") {
+        return { kind: "show_stage_updated", showId: String(msg.show_id || ""), message: msg };
+      }
+
+      // Kernel 74: a Directors+ backstage note arrived. Pushed per resolved
+      // recipient, so simply receiving this is already role-scoped -- but
+      // the read endpoint re-checks the caller's role anyway.
+      if (msg.type === "backstage/note_created") {
+        return { kind: "backstage_note_created", message: msg };
+      }
+
       if (msg.type === "character/projection_updated") {
         return {
           kind: "character_projection_updated",

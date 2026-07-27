@@ -22,7 +22,16 @@ type StageElement struct {
 	Position             json.RawMessage `json:"position,omitempty"`
 	Visibility           json.RawMessage `json:"visibility,omitempty"`
 	SortOrder            int             `json:"sort_order"`
-	CreatedByUserID      *string         `json:"created_by_user_id,omitempty"`
+
+	// Width/Height are Kernel 74's normalized 0-1 size, matching the
+	// normalized 0-1 coordinates already used in Position. Nil for the many
+	// element kinds whose size is intrinsic (a token's art, an index card's
+	// text) -- an interaction_hotspot needs them because it has no visual of
+	// its own and must be stretched to cover existing map artwork.
+	Width  *float64 `json:"width,omitempty"`
+	Height *float64 `json:"height,omitempty"`
+
+	CreatedByUserID *string `json:"created_by_user_id,omitempty"`
 	CreatedAt            time.Time       `json:"created_at"`
 	UpdatedAt            time.Time       `json:"updated_at"`
 
@@ -40,6 +49,14 @@ const (
 	StageElementKindIndexCard   = "index_card"
 	StageElementKindMapBackdrop = "map_backdrop"
 	StageElementKindGridConfig  = "grid_config"
+
+	// StageElementKindInteractionHotspot is Kernel 74's positioned,
+	// resizable, keyboard-focusable region aligned over artwork that already
+	// exists in the map -- e.g. the Courtyard's ironbound oak door. It
+	// deliberately renders no art of its own (S1.1: "Do not create a
+	// separate visible door token merely to duplicate the artwork"); the
+	// Player sees the existing door plus a nameplate and a focus highlight.
+	StageElementKindInteractionHotspot = "interaction_hotspot"
 )
 
 // ValidStageElementKinds is the exhaustive list enforced by the DB's CHECK
@@ -49,7 +66,8 @@ var ValidStageElementKinds = map[string]bool{
 	StageElementKindToken:       true,
 	StageElementKindIndexCard:   true,
 	StageElementKindMapBackdrop: true,
-	StageElementKindGridConfig:  true,
+	StageElementKindGridConfig:         true,
+	StageElementKindInteractionHotspot: true,
 }
 
 // CreateStageElementInput is the caller-supplied subset of a new element.
@@ -60,6 +78,8 @@ type CreateStageElementInput struct {
 	Position   map[string]any
 	Visibility map[string]any
 	SortOrder  int
+	Width      *float64
+	Height     *float64
 }
 
 // UpdateStageElementPatch carries only the fields being changed.
@@ -69,6 +89,8 @@ type UpdateStageElementPatch struct {
 	Position   *map[string]any
 	Visibility *map[string]any
 	SortOrder  *int
+	Width      *float64
+	Height     *float64
 }
 
 // StageElementBinding is one row of stage_element_bindings -- binds a
@@ -79,7 +101,15 @@ type StageElementBinding struct {
 	SceneStageElementID      string    `json:"scene_stage_element_id"`
 	BindingType              string    `json:"binding_type"`
 	ParticipantInteractionID string    `json:"participant_interaction_id"`
-	CreatedByUserID          *string   `json:"created_by_user_id,omitempty"`
+
+	// RequiresMilestone is Kernel 74's server-authoritative reveal gate: a
+	// non-empty tutorial milestone key hides the bound element from a
+	// Player's snapshot entirely until that Player's participation has
+	// recorded it (S6.2). Empty means always reachable, which is every
+	// Kernel 73A binding's behavior unchanged.
+	RequiresMilestone string `json:"requires_milestone,omitempty"`
+
+	CreatedByUserID *string `json:"created_by_user_id,omitempty"`
 	CreatedAt                time.Time `json:"created_at"`
 	UpdatedAt                time.Time `json:"updated_at"`
 }

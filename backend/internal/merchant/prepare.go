@@ -8,9 +8,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"victory/backend/internal/dialogue"
+	"victory/backend/internal/projection"
 	"victory/backend/internal/scenes"
 	"victory/backend/internal/showruns"
 	"victory/backend/internal/shows"
+	"victory/backend/internal/tutorial"
 )
 
 // PrepareCourtyardOpeningResult is both the outcome of the idempotent
@@ -38,6 +41,21 @@ type PrepareCourtyardOpeningResult struct {
 	VenueSceneComposerEnabled           bool     `json:"venue_scene_composer_enabled"`
 	Ready                               bool     `json:"ready"`
 	Gaps                                []string `json:"gaps,omitempty"`
+
+	// Kernel 74 additions: the rest of the tutorial tail. Reported with the
+	// same explicit found/created granularity as the Kessa fields above, so
+	// a Director can see exactly which link is missing rather than only that
+	// the path is not Ready.
+	DoorInteractionID         string `json:"door_interaction_id,omitempty"`
+	DoorInteractionCreated    bool   `json:"door_interaction_created"`
+	DoorElementID             string `json:"door_element_id,omitempty"`
+	DoorElementCreated        bool   `json:"door_element_created"`
+	DoorBindingID             string `json:"door_binding_id,omitempty"`
+	DoorBindingCreated        bool   `json:"door_binding_created"`
+	RaInteractionID           string `json:"ra_interaction_id,omitempty"`
+	RaInteractionCreated      bool   `json:"ra_interaction_created"`
+	RaDialoguePacketFound     bool   `json:"ra_dialogue_packet_found"`
+	TutorialHandoffSceneFound bool   `json:"tutorial_handoff_scene_found"`
 }
 
 // PrepareLockedCourtyardOpening is the idempotent Director action that
@@ -227,7 +245,7 @@ func PrepareLockedCourtyardOpening(ctx context.Context, pool *pgxpool.Pool, acto
 			return PrepareCourtyardOpeningResult{}, err
 		}
 		if bindingID == "" {
-			b, err := scenes.CreateStageElementBinding(ctx, pool, actorUserID, elementID, interactionID)
+			b, err := scenes.CreateStageElementBinding(ctx, pool, actorUserID, elementID, interactionID, "")
 			if err != nil {
 				return PrepareCourtyardOpeningResult{}, err
 			}
@@ -237,10 +255,163 @@ func PrepareLockedCourtyardOpening(ctx context.Context, pool *pgxpool.Pool, acto
 		result.BindingID = bindingID
 	}
 
+	// Kernel 74 steps 6-8: the rest of the tutorial tail, prepared by the
+	// same check-then-create discipline so the whole Kessa -> door -> Ra ->
+	// handoff path is reachable from one idempotent Director action rather
+	// than three hand-authored records.
+	if err := prepareKernel74TutorialTail(ctx, pool, actorUserID, sr.LocationID, sceneID, placementID, &result); err != nil {
+		return PrepareCourtyardOpeningResult{}, err
+	}
+
 	result.Ready = result.SceneFound && result.PlacementID != "" && result.MerchantPacketFound &&
 		result.InteractionID != "" && result.InteractionEnabled && result.StageElementID != "" &&
-		result.BindingID != "" && result.VenueParticipantInteractionsEnabled && result.VenueSceneComposerEnabled
+		result.BindingID != "" && result.VenueParticipantInteractionsEnabled && result.VenueSceneComposerEnabled &&
+		result.DoorInteractionID != "" && result.DoorBindingID != "" && result.RaInteractionID != ""
 	return result, nil
+}
+
+// prepareKernel74TutorialTail ensures the door hotspot, its freeform
+// interaction, the milestone-gated binding, and Ra's guided-dialogue
+// interaction.
+//
+// The door hotspot is created over the EXISTING door in the Courtyard map
+// art (S1.1) -- it renders no art of its own, which is why it needs an
+// explicit width/height while Kessa's token does not. The default box is a
+// starting position a Director drags and resizes in Scene Setup to match
+// whatever Courtyard art is current; nothing here assumes final artwork.
+func prepareKernel74TutorialTail(ctx context.Context, pool *pgxpool.Pool, actorUserID, locationID, sceneID, placementID string, result *PrepareCourtyardOpeningResult) error {
+	// Ra's authored packet -- seeded by migration 066, never created here,
+	// for the same reason Kessa's merchant packet is not created here.
+	if _, err := dialogue.LoadPacketBySlug(ctx, pool, locationID, "ra"); err != nil {
+		result.Gaps = append(result.Gaps, "ra_dialogue_packet_not_found")
+	} else {
+		result.RaDialoguePacketFound = true
+	}
+	if _, err := projection.ResolveDestinationScene(ctx, pool, locationID, "tutorial-handoff"); err != nil {
+		result.Gaps = append(result.Gaps, "tutorial_handoff_scene_not_found")
+	} else {
+		result.TutorialHandoffSceneFound = true
+	}
+
+	// Step 6: Ra's guided_dialogue interaction. Created before the door so
+	// the door's next_interaction_slug always resolves to a real row.
+	raID, created, err := ensureInteraction(ctx, pool, actorUserID, placementID, InteractionTypeGuidedDialogue,
+		"ra_gate_dialogue", "Speak with Ra", map[string]any{"packet_slug": "ra"})
+	if err != nil {
+		return err
+	}
+	result.RaInteractionID = raID
+	result.RaInteractionCreated = created
+
+	// Step 7: the door's freeform_submission interaction.
+	doorID, created, err := ensureInteraction(ctx, pool, actorUserID, placementID, InteractionTypeFreeformSubmission,
+		"locked_courtyard_door", "Try the Door", map[string]any{
+			"title": "The Locked Door",
+			// S1.3's authored description, deliberately establishing that no
+			// ordinary lock is visible from this side -- the state Ra's
+			// closing narration later reveals a concealed mechanism behind.
+			"description": "The oak door is heavy, reinforced with black iron bands. There is no obvious lock or keyhole on this side.",
+			"prompt":      "What does your Character try?",
+			"submit_label": "Make the Attempt",
+			"max_length":  defaultFreeformMaxLength,
+			// Chained by internal_name, resolved server-side -- the Player
+			// never names what comes next.
+			"next_interaction_slug": "ra_gate_dialogue",
+			"note_subject":          "Unresolved Door Intention",
+			"note_suffix":           "Interrupted by Ra before completion.",
+		})
+	if err != nil {
+		return err
+	}
+	result.DoorInteractionID = doorID
+	result.DoorInteractionCreated = created
+
+	// Step 8: the hotspot element and its milestone-gated binding.
+	var doorElementID string
+	err = pool.QueryRow(ctx, `
+		SELECT id::text FROM scene_stage_elements
+		WHERE scene_id = $1 AND show_scene_placement_id IS NULL
+		  AND kind = 'interaction_hotspot' AND label = 'Locked Courtyard Door'
+		LIMIT 1
+	`, sceneID).Scan(&doorElementID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	if doorElementID == "" {
+		if !result.VenueSceneComposerEnabled {
+			result.Gaps = append(result.Gaps, "door_hotspot_not_created_composer_disabled")
+			return nil
+		}
+		w, h := 0.12, 0.28
+		e, err := scenes.CreateSceneStageElement(ctx, pool, actorUserID, sceneID, scenes.CreateStageElementInput{
+			Kind:     scenes.StageElementKindInteractionHotspot,
+			Label:    "Locked Courtyard Door",
+			Data:     map[string]any{"nameplate_visible": true, "highlight_on_focus": true},
+			Position: map[string]any{"x": 0.5, "y": 0.35},
+			Width:    &w,
+			Height:   &h,
+		})
+		if err != nil {
+			return err
+		}
+		doorElementID = e.ID
+		result.DoorElementCreated = true
+	}
+	result.DoorElementID = doorElementID
+
+	if doorElementID != "" && doorID != "" {
+		var bindingID string
+		var storedMilestone string
+		err = pool.QueryRow(ctx, `
+			SELECT id::text, COALESCE(requires_milestone, '') FROM stage_element_bindings
+			WHERE scene_stage_element_id = $1 AND binding_type = 'participant_interaction'
+		`, doorElementID).Scan(&bindingID, &storedMilestone)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		// Re-create when the gate is missing as well as when the binding is:
+		// a binding without requires_milestone would show the door to every
+		// Player from the start, which is precisely the bug this gate exists
+		// to prevent, and a pre-Kernel-74 row would look "already prepared".
+		if bindingID == "" || storedMilestone != tutorial.MilestoneKessaIntroCompleted {
+			b, err := scenes.CreateStageElementBinding(ctx, pool, actorUserID, doorElementID, doorID,
+				tutorial.MilestoneKessaIntroCompleted)
+			if err != nil {
+				return err
+			}
+			bindingID = b.ID
+			result.DoorBindingCreated = true
+		}
+		result.DoorBindingID = bindingID
+	}
+	return nil
+}
+
+// ensureInteraction is the check-then-create the Kernel 73A steps do inline,
+// factored out once the third and fourth callers appeared.
+func ensureInteraction(ctx context.Context, pool *pgxpool.Pool, actorUserID, placementID, interactionType, internalName, buttonLabel string, config map[string]any) (string, bool, error) {
+	var id string
+	err := pool.QueryRow(ctx, `
+		SELECT id::text FROM participant_interactions
+		WHERE show_scene_placement_id = $1 AND interaction_type = $2 AND internal_name = $3
+		ORDER BY created_at ASC LIMIT 1
+	`, placementID, interactionType, internalName).Scan(&id)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return "", false, err
+	}
+	if id != "" {
+		return id, false, nil
+	}
+	it, err := CreateInteraction(ctx, pool, actorUserID, placementID, CreateInteractionInput{
+		InternalName:     internalName,
+		StageButtonLabel: buttonLabel,
+		InteractionType:  interactionType,
+		Configuration:    config,
+	})
+	if err != nil {
+		return "", false, err
+	}
+	return it.ID, true, nil
 }
 
 // KessaReachabilityDiagnostics is a read-only variant of the same checks

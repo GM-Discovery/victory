@@ -357,7 +357,99 @@
       return node;
     }
 
-    return { clearSceneNodes, refreshNodeSelection, makeCardNode, makeFireNode, makeTokenNode };
+    // Kernel 74: an interaction hotspot aligned over map artwork that
+    // already exists (the Courtyard's ironbound oak door).
+    //
+    // It draws no art of its own -- deliberately. S1.1 rejects "a separate
+    // visible door token merely to duplicate the artwork", so what a Player
+    // sees is the painted door, a nameplate, and a faint outline that
+    // strengthens on hover/focus. The node exists to be a hit target and an
+    // accessible control, not a picture.
+    function makeHotspotNode(model) {
+      const container = new PIXI.Container();
+      container.sortableChildren = true;
+
+      const bounds = deps.hotspotPixelSize?.(model) || { width: 96, height: 220 };
+      const width = Math.max(24, Number(bounds.width) || 96);
+      const height = Math.max(24, Number(bounds.height) || 220);
+
+      const region = new PIXI.Graphics();
+      const paint = (strength) => {
+        region.clear();
+        // A near-transparent fill rather than zero alpha: PIXI needs a filled
+        // area for hit-testing, and a hotspot the Player cannot click is
+        // worse than one they can faintly see.
+        region.beginFill(0xffffff, 0.001 + strength * 0.06);
+        region.lineStyle(strength > 0 ? 2 : 1, 0xd9c7a6, strength > 0 ? 0.85 : 0.25);
+        region.drawRoundedRect(-width / 2, -height / 2, width, height, 8);
+        region.endFill();
+      };
+      paint(0);
+      region.eventMode = "static";
+      region.cursor = "pointer";
+      region.hitArea = new PIXI.Rectangle(-width / 2, -height / 2, width, height);
+      container.addChild(region);
+
+      const nameplate = new PIXI.Text(model.label || "Hotspot", new PIXI.TextStyle({
+        fontFamily: "Arial",
+        fontSize: 13,
+        fontWeight: "700",
+        fill: 0xf2e8d5,
+        stroke: 0x1a1512,
+        strokeThickness: 3,
+        align: "center",
+      }));
+      nameplate.anchor.set(0.5, 0.5);
+      nameplate.position.set(0, height / 2 + 14);
+      nameplate.visible = model.nameplateVisible !== false;
+      nameplate.eventMode = "static";
+      nameplate.cursor = "pointer";
+      container.addChild(nameplate);
+
+      container.eventMode = "static";
+      container.cursor = "pointer";
+      container.zIndex = 30;
+
+      // S6.3 requires keyboard focus. PIXI has no focus model, so the node
+      // publishes an activation callback and runtime.js mirrors every
+      // hotspot into a real focusable DOM button in the stage's accessible
+      // control strip -- the same pattern the Cue stage buttons already use.
+      // Click, Enter/Space, and touch all land on this one function.
+      const activate = () => {
+        selectObject(model, `${model.label} selected.`);
+        deps.activateHotspot?.(model);
+      };
+
+      const onOver = () => paint(1);
+      const onOut = () => paint(stageState.currentSelection?.key === model.key ? 1 : 0);
+      for (const target of [container, region, nameplate]) {
+        target.on("pointerover", onOver);
+        target.on("pointerout", onOut);
+        target.on("pointertap", (event) => {
+          if (event?.data?.button === 2 || event.button === 2) return;
+          event.stopPropagation?.();
+          activate();
+        });
+        target.on("rightdown", (event) => {
+          if (wasContextMenuHandled(event)) return;
+          cancelContextMenuEvent(event);
+          selectObject(model, `${model.label} selected.`);
+          openResolvedContextMenu(event);
+        });
+      }
+
+      return {
+        model,
+        container,
+        activate,
+        updateSelected(selected) {
+          paint(selected ? 1 : 0);
+          nameplate.visible = model.nameplateVisible !== false;
+        },
+      };
+    }
+
+    return { clearSceneNodes, refreshNodeSelection, makeCardNode, makeFireNode, makeTokenNode, makeHotspotNode };
   }
 
   return { createSceneNodeFactory };

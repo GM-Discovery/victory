@@ -59,7 +59,14 @@ func writeError(w http.ResponseWriter, err error) {
 		code == "insufficient_role",
 		code == "character_not_owned",
 		code == "interaction_disabled",
-		code == "scene_not_current":
+		code == "scene_not_current",
+		// Kernel 74: the reveal gate refusing an invocation. 403 rather than
+		// 404 because the interaction genuinely exists -- this caller simply
+		// has not earned it yet.
+		code == "milestone_required",
+		code == "topic_locked",
+		code == "required_topics_unseen",
+		code == "interaction_type_mismatch":
 		status = http.StatusForbidden
 	case strings.HasSuffix(code, "_not_found"),
 		code == "no_active_session",
@@ -232,12 +239,44 @@ func HandleInteractionOpen(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		interactionID := strings.TrimSpace(r.PathValue("interaction_id"))
-		out, err := OpenEquipMode(ctx, pool, userID, interactionID)
+
+		// Kernel 74: /open is the one "show me this Program" verb for all
+		// three interaction types, dispatched on the interaction's own stored
+		// type rather than on anything the client sends. A client that lies
+		// about the type gets the Program its interaction actually is.
+		//
+		// All three are pure reads that never change the shared Show Scene.
+		// Only guided_dialogue records anything (ra_intro_started), because
+		// "the Player has begun hearing Ra" is a real milestone; looking at
+		// the door or the shop is not.
+		it, err := LoadInteractionByID(ctx, pool, interactionID)
 		if err != nil {
 			writeError(w, err)
 			return
 		}
-		writeOK(w, out)
+		switch it.InteractionType {
+		case InteractionTypeFreeformSubmission:
+			out, err := OpenFreeform(ctx, pool, userID, interactionID)
+			if err != nil {
+				writeError(w, err)
+				return
+			}
+			writeOK(w, out)
+		case InteractionTypeGuidedDialogue:
+			state, err := OpenDialogue(ctx, pool, userID, interactionID)
+			if err != nil {
+				writeError(w, err)
+				return
+			}
+			writeOK(w, map[string]any{"dialogue": state})
+		default:
+			out, err := OpenEquipMode(ctx, pool, userID, interactionID)
+			if err != nil {
+				writeError(w, err)
+				return
+			}
+			writeOK(w, out)
+		}
 	}
 }
 

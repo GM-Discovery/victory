@@ -22,6 +22,7 @@
     const setCurrentSelection = typeof deps.setCurrentSelection === "function" ? deps.setCurrentSelection : () => {};
     const replaceProjectedState = typeof deps.replaceProjectedState === "function" ? deps.replaceProjectedState : () => {};
     const buildObjects = typeof deps.buildObjects === "function" ? deps.buildObjects : () => [];
+    const setLocalProjection = typeof deps.setLocalProjection === "function" ? deps.setLocalProjection : () => {};
     const applyVenueFocusPing = typeof deps.applyVenueFocusPing === "function" ? deps.applyVenueFocusPing : () => {};
     const updateStatusSummary = typeof deps.updateStatusSummary === "function" ? deps.updateStatusSummary : () => {};
     const setStageStatus = typeof deps.setStageStatus === "function" ? deps.setStageStatus : () => {};
@@ -81,6 +82,7 @@
     const getVenueSlug = typeof deps.getVenueSlug === "function" ? deps.getVenueSlug : () => "";
     const updateStageCueControls = typeof deps.updateStageCueControls === "function" ? deps.updateStageCueControls : () => {};
     const updateTheaterContextPresentation = typeof deps.updateTheaterContextPresentation === "function" ? deps.updateTheaterContextPresentation : () => {};
+    const renderBackstageNotes = typeof deps.renderBackstageNotes === "function" ? deps.renderBackstageNotes : () => {};
     const smokeMode = Boolean(deps.smokeMode);
 
     let currentSnapshot = null;
@@ -97,6 +99,12 @@
     }
 
     function applySnapshot(snapshot) {
+      // Kernel 74: publish the participant-local projection FIRST, before
+      // anything renders. venueMapTextureURLForState reads it to decide
+      // which backdrop the stage resolves, so setting it after
+      // renderPixiScene below would draw one frame of the shared Courtyard
+      // map before swapping -- a visible flash on every refresh.
+      setLocalProjection(snapshot?.session?.local_projection || null);
       replaceProjectedState(snapshot, { viewerRole: getCurrentRole() });
       setSnapshot(snapshot);
       setCurrentSnapshot(snapshot || null);
@@ -517,6 +525,15 @@
       // triggering the refetch.
       if (msg.kind === "show_stage_updated") {
         await refreshWorld();
+        return msg;
+      }
+
+      // Kernel 74: a Directors+ backstage note arrived for THIS user (the
+      // push is per-recipient, never session-wide). Re-read the notes list
+      // rather than appending the pushed payload -- the message carries no
+      // note body precisely so that a mis-targeted push could not leak one.
+      if (msg.kind === "backstage_note_created") {
+        renderBackstageNotes();
         return msg;
       }
 

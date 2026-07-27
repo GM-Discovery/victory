@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/showruns"
+	"victory/backend/internal/tutorial"
 )
 
 // SceneComposerEnabled checks the venues.config scene_composer_enabled
@@ -77,7 +78,7 @@ func composerVenueSlugForPlacement(ctx context.Context, pool *pgxpool.Pool, plac
 
 const stageElementColumns = `
 	id::text, scene_id::text, show_scene_placement_id::text, kind, COALESCE(label, ''),
-	data::text, position::text, visibility::text, sort_order,
+	data::text, position::text, visibility::text, sort_order, width, height,
 	created_by_user_id::text, created_at, updated_at
 `
 
@@ -87,7 +88,7 @@ func scanStageElement(row pgx.Row) (StageElement, error) {
 	var dataText, positionText, visibilityText string
 	if err := row.Scan(
 		&e.ID, &e.SceneID, &placementID, &e.Kind, &e.Label,
-		&dataText, &positionText, &visibilityText, &e.SortOrder,
+		&dataText, &positionText, &visibilityText, &e.SortOrder, &e.Width, &e.Height,
 		&createdByUserID, &e.CreatedAt, &e.UpdatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -203,19 +204,21 @@ func createStageElement(ctx context.Context, pool *pgxpool.Pool, actorUserID, sc
 		visJSON, _ := json.Marshal(in.Visibility)
 		row = pool.QueryRow(ctx, `
 			INSERT INTO scene_stage_elements (
-				scene_id, show_scene_placement_id, kind, label, data, position, visibility, sort_order, created_by_user_id
+				scene_id, show_scene_placement_id, kind, label, data, position, visibility, sort_order, width, height, created_by_user_id
 			)
-			VALUES ($1, $2, $3, NULLIF($4, ''), $5::jsonb, $6::jsonb, $7::jsonb, $8, $9::uuid)
+			VALUES ($1, $2, $3, NULLIF($4, ''), $5::jsonb, $6::jsonb, $7::jsonb, $8, $9, $10, $11::uuid)
 			RETURNING `+stageElementColumns,
-			sceneID, placementID, kind, in.Label, dataJSON, positionJSON, visJSON, in.SortOrder, actorUserID)
+			sceneID, placementID, kind, in.Label, dataJSON, positionJSON, visJSON, in.SortOrder,
+			clampNormalized(in.Width), clampNormalized(in.Height), actorUserID)
 	} else {
 		row = pool.QueryRow(ctx, `
 			INSERT INTO scene_stage_elements (
-				scene_id, show_scene_placement_id, kind, label, data, position, sort_order, created_by_user_id
+				scene_id, show_scene_placement_id, kind, label, data, position, sort_order, width, height, created_by_user_id
 			)
-			VALUES ($1, $2, $3, NULLIF($4, ''), $5::jsonb, $6::jsonb, $7, $8::uuid)
+			VALUES ($1, $2, $3, NULLIF($4, ''), $5::jsonb, $6::jsonb, $7, $8, $9, $10::uuid)
 			RETURNING `+stageElementColumns,
-			sceneID, placementID, kind, in.Label, dataJSON, positionJSON, in.SortOrder, actorUserID)
+			sceneID, placementID, kind, in.Label, dataJSON, positionJSON, in.SortOrder,
+			clampNormalized(in.Width), clampNormalized(in.Height), actorUserID)
 	}
 	return scanStageElement(row)
 }
@@ -280,15 +283,46 @@ func UpdateStageElement(ctx context.Context, pool *pgxpool.Pool, actorUserID, el
 	if patch.SortOrder != nil {
 		sortOrder = *patch.SortOrder
 	}
+	// Size follows the same present-means-change rule as every other patch
+	// field: a nil Width/Height leaves the stored value alone rather than
+	// clearing it, so a drag that only moves an element cannot silently
+	// reset its size.
+	width := e.Width
+	if patch.Width != nil {
+		width = clampNormalized(patch.Width)
+	}
+	height := e.Height
+	if patch.Height != nil {
+		height = clampNormalized(patch.Height)
+	}
 
 	row := pool.QueryRow(ctx, `
 		UPDATE scene_stage_elements
 		SET label = NULLIF($2, ''), data = $3::jsonb, position = $4::jsonb, visibility = $5::jsonb,
-		    sort_order = $6, updated_at = NOW()
+		    sort_order = $6, width = $7, height = $8, updated_at = NOW()
 		WHERE id = $1
 		RETURNING `+stageElementColumns,
-		elementID, label, dataJSON, positionJSON, visibilityJSON, sortOrder)
+		elementID, label, dataJSON, positionJSON, visibilityJSON, sortOrder, width, height)
 	return scanStageElement(row)
+}
+
+// clampNormalized keeps a stored size inside the same 0-1 normalized space
+// the composer's coordinates use. A hotspot sized outside that range would
+// either vanish or swallow the whole stage, and the composer's drag handles
+// cannot produce it -- so an out-of-range value only ever arrives from a
+// hand-crafted request, and clamping is the quiet correct answer.
+func clampNormalized(v *float64) *float64 {
+	if v == nil {
+		return nil
+	}
+	out := *v
+	if out < 0 {
+		out = 0
+	}
+	if out > 1 {
+		out = 1
+	}
+	return &out
 }
 
 // DeleteStageElement removes a composition element outright (no archive
@@ -382,7 +416,7 @@ func LoadResolvedComposition(ctx context.Context, pool *pgxpool.Pool, placementI
 		}
 		bindRows, err := pool.Query(ctx, `
 			SELECT id::text, scene_stage_element_id::text, binding_type, participant_interaction_id::text,
-			       created_by_user_id::text, created_at, updated_at
+			       COALESCE(requires_milestone, ''), created_by_user_id::text, created_at, updated_at
 			FROM stage_element_bindings
 			WHERE scene_stage_element_id = ANY($1::uuid[])
 		`, ids)
@@ -394,7 +428,7 @@ func LoadResolvedComposition(ctx context.Context, pool *pgxpool.Pool, placementI
 			var b StageElementBinding
 			var createdBy *string
 			if err := bindRows.Scan(&b.ID, &b.SceneStageElementID, &b.BindingType, &b.ParticipantInteractionID,
-				&createdBy, &b.CreatedAt, &b.UpdatedAt); err != nil {
+				&b.RequiresMilestone, &createdBy, &b.CreatedAt, &b.UpdatedAt); err != nil {
 				return ResolvedComposition{}, err
 			}
 			b.CreatedByUserID = createdBy
@@ -420,7 +454,7 @@ func LoadResolvedComposition(ctx context.Context, pool *pgxpool.Pool, placementI
 // Crew's non-destructive-edit right). The FK on participant_interaction_id
 // is the source of truth for "does this interaction exist" -- a bad id
 // surfaces as a foreign-key violation, translated to a stable error code.
-func CreateStageElementBinding(ctx context.Context, pool *pgxpool.Pool, actorUserID, elementID, participantInteractionID string) (StageElementBinding, error) {
+func CreateStageElementBinding(ctx context.Context, pool *pgxpool.Pool, actorUserID, elementID, participantInteractionID, requiresMilestone string) (StageElementBinding, error) {
 	actorUserID = strings.TrimSpace(actorUserID)
 	if actorUserID == "" {
 		return StageElementBinding{}, errors.New("not_authenticated")
@@ -428,6 +462,13 @@ func CreateStageElementBinding(ctx context.Context, pool *pgxpool.Pool, actorUse
 	participantInteractionID = strings.TrimSpace(participantInteractionID)
 	if participantInteractionID == "" {
 		return StageElementBinding{}, errors.New("participant_interaction_id_required")
+	}
+	// Kernel 74: an unrecognized milestone key would silently hide the
+	// element from every Player forever, since the gate is fail-closed.
+	// Reject it at authoring time instead.
+	requiresMilestone = strings.TrimSpace(requiresMilestone)
+	if requiresMilestone != "" && !tutorial.IsMilestone(requiresMilestone) {
+		return StageElementBinding{}, errors.New("invalid_milestone")
 	}
 	e, err := LoadStageElementByID(ctx, pool, elementID)
 	if err != nil {
@@ -446,18 +487,19 @@ func CreateStageElementBinding(ctx context.Context, pool *pgxpool.Pool, actorUse
 	}
 
 	row := pool.QueryRow(ctx, `
-		INSERT INTO stage_element_bindings (scene_stage_element_id, binding_type, participant_interaction_id, created_by_user_id)
-		VALUES ($1, 'participant_interaction', $2, $3::uuid)
+		INSERT INTO stage_element_bindings (scene_stage_element_id, binding_type, participant_interaction_id, requires_milestone, created_by_user_id)
+		VALUES ($1, 'participant_interaction', $2, $3, $4::uuid)
 		ON CONFLICT (scene_stage_element_id, binding_type)
-		DO UPDATE SET participant_interaction_id = EXCLUDED.participant_interaction_id, updated_at = NOW()
+		DO UPDATE SET participant_interaction_id = EXCLUDED.participant_interaction_id,
+		              requires_milestone = EXCLUDED.requires_milestone, updated_at = NOW()
 		RETURNING id::text, scene_stage_element_id::text, binding_type, participant_interaction_id::text,
-		          created_by_user_id::text, created_at, updated_at
-	`, elementID, participantInteractionID, actorUserID)
+		          COALESCE(requires_milestone, ''), created_by_user_id::text, created_at, updated_at
+	`, elementID, participantInteractionID, requiresMilestone, actorUserID)
 
 	var b StageElementBinding
 	var createdBy *string
 	if err := row.Scan(&b.ID, &b.SceneStageElementID, &b.BindingType, &b.ParticipantInteractionID,
-		&createdBy, &b.CreatedAt, &b.UpdatedAt); err != nil {
+		&b.RequiresMilestone, &createdBy, &b.CreatedAt, &b.UpdatedAt); err != nil {
 		if strings.Contains(err.Error(), "stage_element_bindings_participant_interaction_id_fkey") {
 			return StageElementBinding{}, errors.New("participant_interaction_not_found")
 		}
