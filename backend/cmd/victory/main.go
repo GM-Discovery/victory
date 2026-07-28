@@ -302,6 +302,10 @@ func main() {
 	// swallow a sibling route.
 	mux.HandleFunc("GET /api/characters/{character_card_id}/story-so-far", merchant.HandleCharacterStorySoFar(pool))
 	mux.HandleFunc("PATCH /api/story-events/{event_id}", merchant.HandleStoryEventVisibility(pool))
+	// Director-authored Character moments (S1.9/S6.4). Reuses the existing
+	// character_journals store; a separate route so the Player's own journal
+	// handler keeps its stricter "your active Character only" rule.
+	mux.HandleFunc("POST /api/characters/{character_card_id}/director-journal", merchant.HandleDirectorCharacterJournal(pool))
 	mux.HandleFunc("GET /api/player-recognition/me", merchant.HandleMyRecognition(pool))
 	// Aftercare (Kernel 75 S8). Show-keyed rather than interaction-keyed so
 	// a Player can write it later from the Greenroom, when no Program is on

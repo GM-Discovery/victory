@@ -565,3 +565,91 @@ func TestKernel75TrailerFaceCarriesNoStoryEvents(t *testing.T) {
 		t.Fatalf("character_story_events must not be exposed through any view, found %d references", refs)
 	}
 }
+
+// TestKernel75DirectorJournalProvenance proves S1.9 and S6.4: a Director may
+// add a Character moment through the existing journal store, that moment
+// keeps the Director's identity, it is private by default, and it is
+// distinguishable from generated history rather than merged anonymously
+// into it (S1.8).
+func TestKernel75DirectorJournalProvenance(t *testing.T) {
+	pool := dbtest.OpenTestPool(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	suffix := time.Now().UTC().Format("150405.000000")
+
+	var locationID string
+	if err := pool.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = 'amurray-family' LIMIT 1`).Scan(&locationID); err != nil {
+		t.Fatalf("lookup location: %v", err)
+	}
+	mustUser := func(handle string) string {
+		var id string
+		if err := pool.QueryRow(ctx, `INSERT INTO users (handle, display_name) VALUES ($1, $1) RETURNING id::text`, handle).Scan(&id); err != nil {
+			t.Fatalf("insert user: %v", err)
+		}
+		return id
+	}
+	directorUserID := mustUser("k75dj_director_" + suffix)
+	playerUserID := mustUser("k75dj_player_" + suffix)
+
+	var characterID string
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO character_cards (owner_user_id, location_id, name) VALUES ($1, $2, $3) RETURNING id::text
+	`, playerUserID, locationID, "K75DJ Character").Scan(&characterID); err != nil {
+		t.Fatalf("insert character: %v", err)
+	}
+
+	t.Cleanup(func() {
+		cctx, ccancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer ccancel()
+		_, _ = pool.Exec(cctx, `DELETE FROM character_story_events WHERE character_card_id = $1`, characterID)
+		_, _ = pool.Exec(cctx, `DELETE FROM character_journals WHERE character_card_id = $1`, characterID)
+		_, _ = pool.Exec(cctx, `DELETE FROM character_cards WHERE id = $1`, characterID)
+		_, _ = pool.Exec(cctx, `DELETE FROM users WHERE id IN ($1, $2)`, directorUserID, playerUserID)
+	})
+
+	// The mirror path, exercised directly: a Director-authored moment keeps
+	// its author and stays private.
+	const note = "You hesitated at the gate longer than anyone else did. I noticed."
+	if err := storysofar.RecordAuthored(ctx, pool, storysofar.Ref{
+		CharacterCardID: characterID,
+		OwnerUserID:     playerUserID,
+	}, directorUserID, storysofar.DraftEvent{
+		EventType:  storysofar.EventDirectorMoment,
+		Title:      "A moment your Director recorded",
+		Summary:    note,
+		SourceKind: storysofar.SourceCharacterJournal,
+		SourceRef:  "journal-1",
+	}); err != nil {
+		t.Fatalf("RecordAuthored: %v", err)
+	}
+
+	events, err := storysofar.ListForCharacter(ctx, pool, characterID, true)
+	if err != nil {
+		t.Fatalf("ListForCharacter: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected one Director moment, got %d", len(events))
+	}
+	moment := events[0]
+	if moment.AuthoredByUserID != directorUserID {
+		t.Fatalf("S6.4: the Director's identity must be preserved, got %q", moment.AuthoredByUserID)
+	}
+	if moment.Generated() {
+		t.Fatal("a Director-authored moment must not read as generated")
+	}
+	if moment.VisibilityState != storysofar.VisibilityPrivate {
+		t.Fatalf("Director moments are private by default, got %q", moment.VisibilityState)
+	}
+	if moment.Summary != note {
+		t.Fatal("the Director's words must be stored verbatim")
+	}
+
+	// S6.4: a Director must not be able to publish it either -- the reveal
+	// control belongs to the Character's owner alone.
+	if _, err := storysofar.SetVisibility(ctx, pool, directorUserID, moment.ID, storysofar.VisibilityTable); err == nil {
+		t.Fatal("a Director must not be able to publish a moment on someone's Character")
+	}
+	if _, err := storysofar.SetVisibility(ctx, pool, playerUserID, moment.ID, storysofar.VisibilityTable); err != nil {
+		t.Fatalf("the Character's owner must be able to share it: %v", err)
+	}
+}
