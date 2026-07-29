@@ -1,0 +1,8 @@
+/* Shared Catharsis palette for the Trailers workbook and companion pages. */
+:root { --bg:#090708; --panel:rgba(18,10,13,.94); --line:rgba(229,191,118,.24); --accent:#e5bf76; --accent-strong:#f2d99e; --muted:#cbbfc0; --danger:#c94a55; --danger-strong:#ef7b84; }
+body { background:radial-gradient(circle at 50% 0%,rgba(139,25,42,.34),transparent 36%),linear-gradient(180deg,#17090d 0%,#090708 58%,#050405 100%) !important; color:#f5e9df !important; }
+.panel,.card,.section,.person-row,.empty-state,.workbook-card,.notes-card,.trailer-card { background:var(--panel) !important; border-color:var(--line) !important; }
+button,.button,.chip,input,textarea,select { border-color:rgba(229,191,118,.34) !important; }
+button:not(.secondary),.button:not(.secondary),.chip.primary { background:linear-gradient(180deg,#7c1827 0%,#4a0d17 100%) !important; color:var(--accent-strong) !important; }
+input,textarea,select { background:#120b0e !important; color:#f5e9df !important; }
+a,.eyebrow,.section-title,.entry-title,.person-name { color:var(--accent) !important; }

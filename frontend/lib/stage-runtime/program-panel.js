@@ -29,6 +29,25 @@
         padding: 24px;
       }
       .victory-program-panel-backdrop[hidden] { display: none; }
+      .victory-program-speaker {
+        position: fixed;
+        inset: 0;
+        z-index: 2010;
+        pointer-events: none;
+      }
+      .victory-program-speaker[hidden] { display: none; }
+      .victory-program-speaker__image {
+        position: absolute;
+        bottom: 0;
+        width: 33.333vw;
+        height: 66.666vh;
+        object-fit: contain;
+        object-position: bottom center;
+        filter: drop-shadow(0 18px 18px rgba(0, 0, 0, 0.38));
+      }
+      .victory-program-speaker--left .victory-program-speaker__image { left: 0; }
+      .victory-program-speaker--right .victory-program-speaker__image { right: 0; }
+      .victory-program-speaker--mirrored .victory-program-speaker__image { transform: scaleX(-1); }
       .victory-program-panel {
         width: min(560px, 100%);
         max-height: min(80vh, 720px);
@@ -142,6 +161,8 @@
     let imageEl = null;
     let bodyEl = null;
     let closeButton = null;
+    let speaker = null;
+    let speakerImage = null;
     let onCloseCallback = null;
     let lastFocusedElement = null;
 
@@ -191,7 +212,6 @@
       panel.appendChild(header);
       panel.appendChild(bodyEl);
       backdrop.appendChild(panel);
-      doc.body.appendChild(backdrop);
 
       backdrop.addEventListener("click", (event) => {
         if (event.target === backdrop) close();
@@ -216,6 +236,16 @@
           }
         }
       });
+
+      speaker = doc.createElement("div");
+      speaker.className = "victory-program-speaker";
+      speaker.hidden = true;
+      speakerImage = doc.createElement("img");
+      speakerImage.className = "victory-program-speaker__image";
+      speakerImage.alt = "";
+      speaker.appendChild(speakerImage);
+      backdrop.appendChild(speaker);
+      doc.body.appendChild(backdrop);
     }
 
     function open(config) {
@@ -240,11 +270,32 @@
     function close() {
       if (!backdrop || backdrop.hidden) return;
       backdrop.hidden = true;
+      hideSpeaker();
       bodyEl.innerHTML = "";
       if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
         lastFocusedElement.focus({ preventScroll: true });
       }
       if (onCloseCallback) onCloseCallback();
+    }
+
+    function showSpeaker(config) {
+      build();
+      const speakerConfig = config || {};
+      const imageUrl = String(speakerConfig.imageUrl || "").trim();
+      if (!imageUrl) {
+        hideSpeaker();
+        return;
+      }
+      speaker.className = `victory-program-speaker victory-program-speaker--${speakerConfig.side === "right" ? "right" : "left"}${speakerConfig.mirrored ? " victory-program-speaker--mirrored" : ""}`;
+      speakerImage.src = imageUrl;
+      speakerImage.alt = String(speakerConfig.alt || speakerConfig.label || "");
+      speaker.hidden = false;
+    }
+
+    function hideSpeaker() {
+      if (!speaker) return;
+      speaker.hidden = true;
+      speakerImage.removeAttribute("src");
     }
 
     function setBody(html) {
@@ -285,7 +336,7 @@
       return Boolean(backdrop && !backdrop.hidden);
     }
 
-    return { open, close, setBody, setLoading, setError, isOpen, updateHeader };
+    return { open, close, setBody, setLoading, setError, isOpen, updateHeader, showSpeaker, hideSpeaker };
   }
 
   return { createProgramPanel, escapeHtml };

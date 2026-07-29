@@ -1,10 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Workbook — Trailers</title>
   <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <link rel="stylesheet" href="/styles/trailers-theme.css?v=crimson-1" />
   <style>
     :root {
       color-scheme: dark;
@@ -212,6 +215,41 @@
 
     .empty-note { color: var(--muted); text-align: center; padding: 24px; }
   </style>
+  <link rel="stylesheet" href="/styles/trailers-theme.css?v=crimson-1" />
+  <style>
+    /* Workbook refresh: editorial spacing and game-like controls. */
+    body { font-family: "Avenir Next", "Segoe UI", sans-serif; }
+    .header { padding: clamp(32px, 6vw, 72px) 24px 28px; }
+    .eyebrow { font-size: .7rem; letter-spacing: .22em; opacity: .82; }
+    h1 { font-family: Georgia, serif; font-weight: 600; letter-spacing: -.02em; }
+    .subtitle { max-width: 60ch; font-size: 1.02rem; line-height: 1.7; }
+    .launchbar, .tabbar { gap: 12px; }
+    .chip { padding: 12px 18px; transition: transform .18s ease, background .18s ease; }
+    .chip:hover { transform: translateY(-1px); }
+    .stage { padding: 12px 24px 72px; gap: 24px; grid-template-columns: minmax(220px, 280px) minmax(0, 720px); justify-content: center; }
+    .card { border-radius: 22px; padding: clamp(24px, 4vw, 38px); box-shadow: 0 24px 80px rgba(0,0,0,.34); }
+    .page-nav { padding: 14px; }
+    .page-nav-item { padding: 15px 16px; border-radius: 14px; line-height: 1.35; }
+    .page-nav-item[aria-current="true"] { box-shadow: inset 3px 0 0 var(--accent); }
+    .page-title { font-size: clamp(1.55rem, 3vw, 2rem); margin-bottom: 10px; }
+    .page-description { font-size: 1rem; line-height: 1.7; margin-bottom: 30px; }
+    .field { gap: 10px; margin-bottom: 28px; }
+    .field label { font-size: 1rem; }
+    input[type="text"], input[type="url"], textarea, select { min-height: 48px; border-radius: 14px; padding: 14px 16px; }
+    textarea { min-height: 120px; }
+    .option-checks { gap: 10px; }
+    .option-checks label { padding: 12px 14px; border: 1px solid rgba(229,191,118,.12); border-radius: 12px; background: rgba(255,255,255,.025); }
+    .button { padding: 14px 24px; box-shadow: 0 10px 24px rgba(80,10,20,.24); }
+    .history-card { border-radius: 16px; padding: 20px; background: rgba(8,7,8,.34); }
+    .favorite-choosers { display: grid; gap: 10px; }
+    .ttrpg-group { border: 1px solid rgba(229,191,118,.16); border-radius: 14px; margin-top: 10px; background: rgba(8,7,8,.22); overflow: hidden; }
+    .ttrpg-group summary { cursor: pointer; padding: 15px 16px; color: var(--accent-strong); font-weight: 700; }
+    .ttrpg-group-list { padding: 0 12px 12px; display: grid; gap: 6px; }
+    .ttrpg-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(190px, 260px); gap: 12px; align-items: center; padding: 8px 4px; color: var(--muted); }
+    .ttrpg-row select { min-height: 40px; padding: 9px 12px; }
+    @media (max-width: 620px) { .ttrpg-row { grid-template-columns: 1fr; gap: 6px; } }
+    @media (max-width: 860px) { .header, .stage { padding-left: 18px; padding-right: 18px; } .stage { display: block; } .card { margin-bottom: 18px; } }
+  </style>
 </head>
 <body>
   <div id="forbidden-screen" class="forbidden-screen" hidden>
@@ -358,7 +396,10 @@
       const answers = {};
       for (const field of page.fields) {
         const current = currentFactValue(field.field_key);
-        if (fieldTypeIsCollection(field.field_type)) {
+        if (field.field_type === "ttrpg_matrix") {
+          const current = currentFactValue(field.field_key);
+          answers[field.field_key] = current && typeof current === "object" && !Array.isArray(current) ? { ...current } : {};
+        } else if (fieldTypeIsCollection(field.field_type)) {
           answers[field.field_key] = Array.isArray(current) ? current.slice() : [];
         } else {
           answers[field.field_key] = typeof current === "string" ? current : (current == null ? "" : String(current));
@@ -502,6 +543,28 @@
       const values = state.pageAnswers[state.activePageKey][field.field_key] || [];
       const options = field.options || [];
 
+      if (field.field_key === "favorite_ttrpgs") {
+        const chooser = document.createElement("div");
+        chooser.className = "favorite-choosers";
+        for (let index = 0; index < 3; index += 1) {
+          const select = document.createElement("select");
+          select.setAttribute("aria-label", `Favorite TTRPG ${index + 1}`);
+          const blank = document.createElement("option"); blank.value = ""; blank.textContent = `${index + 1}. Choose a favorite`;
+          select.appendChild(blank);
+          for (const opt of options) { const el = document.createElement("option"); el.value = opt; el.textContent = opt; select.appendChild(el); }
+          select.value = values[index] || "";
+          select.addEventListener("change", () => {
+            const next = Array.from(chooser.querySelectorAll("select")).map((item) => item.value).filter(Boolean);
+            state.pageAnswers[state.activePageKey][field.field_key] = [...new Set(next)];
+          });
+          chooser.appendChild(select);
+        }
+        wrap.appendChild(chooser);
+        appendHelpAndError(wrap, field);
+        container.appendChild(wrap);
+        return;
+      }
+
       const checksWrap = document.createElement("div");
       checksWrap.className = "option-checks";
       for (const opt of options) {
@@ -593,6 +656,30 @@
       container.appendChild(wrap);
     }
 
+    function renderTTRPGMatrixField(field, container) {
+      const wrap = document.createElement("div");
+      wrap.className = "field ttrpg-matrix";
+      const label = document.createElement("label"); label.textContent = field.field_label; wrap.appendChild(label);
+      const values = state.pageAnswers[state.activePageKey][field.field_key] || {};
+      for (const group of field.option_groups || []) {
+        const details = document.createElement("details"); details.className = "ttrpg-group";
+        const summary = document.createElement("summary"); summary.textContent = group.category; details.appendChild(summary);
+        const list = document.createElement("div"); list.className = "ttrpg-group-list";
+        for (const game of group.options || []) {
+          const row = document.createElement("label"); row.className = "ttrpg-row";
+          const name = document.createElement("span"); name.textContent = game;
+          const select = document.createElement("select"); select.setAttribute("aria-label", `${game} experience`);
+          const blank = document.createElement("option"); blank.value = ""; blank.textContent = "Not rated"; select.appendChild(blank);
+          for (const status of field.options || []) { const option = document.createElement("option"); option.value = status; option.textContent = status; select.appendChild(option); }
+          select.value = values[game] || "";
+          select.addEventListener("change", () => { if (select.value) values[game] = select.value; else delete values[game]; state.pageAnswers[state.activePageKey][field.field_key] = values; });
+          row.append(name, select); list.appendChild(row);
+        }
+        details.appendChild(list); wrap.appendChild(details);
+      }
+      appendHelpAndError(wrap, field); container.appendChild(wrap);
+    }
+
     function appendHelpAndError(wrap, field) {
       if (field.help_text) {
         const help = document.createElement("p");
@@ -628,6 +715,8 @@
           renderSingleSelectField(field, form);
         } else if (field.field_type === "multi_select_custom") {
           renderMultiSelectField(field, form);
+        } else if (field.field_type === "ttrpg_matrix") {
+          renderTTRPGMatrixField(field, form);
         }
       }
       renderPageNav();
@@ -987,3 +1076,5 @@
   </script>
 </body>
 </html>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />

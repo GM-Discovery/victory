@@ -3328,6 +3328,13 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     function renderVenueGridLayer(bounds, config = null) {
       if (!gridLayer || !window.PIXI) return;
       const resolvedBounds = bounds || getPlayableBounds();
+      const projection = currentLocalProjection;
+      if (projection && projection.grid_enabled === false) {
+        // A participant-local handoff owns its presentation settings. Do not
+        // carry the courtyard's shared grid into the handoff artwork.
+        gridLayer.removeChildren?.();
+        return;
+      }
       window.VictoryPixiGrid?.render?.(gridLayer, config || currentVenueGridConfig, resolvedBounds);
     }
 

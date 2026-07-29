@@ -247,6 +247,17 @@
       // behind the header chrome, while a real token at the same authored
       // position (60% down, center) rendered correctly.
       if (String(model?.source?.context_class || "").trim().toLowerCase() === "scene_composition") {
+        if (modelKind === "hotspot") {
+          // Hotspots cover artwork inside the playable map, not the full
+          // browser canvas. Resolve both position and size against the same
+          // aspect-ratio-safe playable bounds so the Courtyard door remains
+          // on the door when the header or viewport changes.
+          const playable = getPlayableBounds();
+          return {
+            x: Number(playable.x || 0) + tokenX * Number(playable.width || 0),
+            y: Number(playable.y || 0) + tokenY * Number(playable.height || 0),
+          };
+        }
         return { x: tokenX * Number(size.width || 0), y: tokenY * Number(size.height || 0) };
       }
       return { x: tokenX, y: tokenY };

@@ -21,6 +21,7 @@ const soilExpertsState = {
 const mapState = {
   venues: [],
 };
+const ONBOARDING_KEY = "victory:map-onboarding-v1";
 
 const hiddenMainMapVenueSlugs = new Set([
   "gateway-thread",
@@ -237,6 +238,9 @@ function createVenuePin(venue, assetURL, fallbackPositions) {
   if (venue.slug === "third-place") {
     pin.classList.add("venue-pin--third-place");
   }
+  if (venue.slug === "audition-hall") {
+    pin.classList.add("venue-pin--audition-hall");
+  }
   if (venue.slug === "info-booth") {
     pin.classList.add("venue-pin--info-booth");
   }
@@ -425,6 +429,34 @@ function renderMapMenu() {
   }
 }
 
+function maybeShowMapOnboarding() {
+  if (localStorage.getItem(ONBOARDING_KEY)) return;
+  const overlay = document.getElementById("onboarding-overlay");
+  const dismissButton = document.getElementById("onboarding-dismiss-button");
+  if (!overlay || !dismissButton) return;
+
+  const dismiss = () => {
+    overlay.hidden = true;
+    document.body.classList.remove("modal-open");
+    localStorage.setItem(ONBOARDING_KEY, "1");
+  };
+
+  overlay.hidden = false;
+  document.body.classList.add("modal-open");
+  dismissButton.addEventListener("click", dismiss, { once: true });
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) dismiss();
+  }, { once: true });
+
+  const onKeydown = (event) => {
+    if (event.key === "Escape" && !overlay.hidden) {
+      dismiss();
+      document.removeEventListener("keydown", onKeydown);
+    }
+  };
+  document.addEventListener("keydown", onKeydown);
+}
+
 // Map positions are known even when a venue is hidden (fallbackPositions is
 // fixed per slug), so a cloud puff can sit exactly over where the tile will
 // appear once unlocked. Every venue gets one (info-booth excluded -- it's a
@@ -540,7 +572,15 @@ const ANONYMOUS_CENTER_FOG_LAYOUT = [
   { x: 38, y: 48, scale: 1.1, drift: "slow" }, { x: 58, y: 42, scale: 0.95, drift: "med" },
   { x: 46, y: 58, scale: 1.2, drift: "fast" }, { x: 62, y: 60, scale: 0.9, drift: "slow" },
   { x: 34, y: 62, scale: 1.0, drift: "med" }, { x: 54, y: 34, scale: 1.05, drift: "fast" },
+  { x: 24, y: 46, scale: 0.82, drift: "fast" }, { x: 76, y: 50, scale: 0.88, drift: "med" },
+  { x: 43, y: 28, scale: 0.76, drift: "slow" }, { x: 68, y: 72, scale: 0.8, drift: "fast" },
 ];
+
+const WIDE_VENUE_FOG = {
+  catharsis: { scale: 1.35, shape: "wide-left" },
+  "third-place": { scale: 1.5, shape: "wide-right" },
+  "first-theater": { scale: 1.4, shape: "wide-left" },
+};
 
 function renderAmbientFog(fogLayer) {
   fogLayer.querySelectorAll(".map-fog-puff--ambient, .map-fog-puff--anon-center").forEach((el) => el.remove());
@@ -579,7 +619,7 @@ function renderMapFog(venues, fallbackPositions) {
   const visibleSlugs = new Set(venues.map((v) => v.slug));
 
   if (fogBase) {
-    const opacity = Math.max(0.15, 0.55 - venues.length * 0.02);
+    const opacity = Math.max(0.08, 0.28 - venues.length * 0.012);
     fogBase.style.opacity = String(opacity);
   }
 
@@ -591,6 +631,11 @@ function renderMapFog(venues, fallbackPositions) {
     if (!pos) continue;
     const puff = document.createElement("div");
     puff.className = "map-fog-puff";
+    const fogStyle = WIDE_VENUE_FOG[slug];
+    if (fogStyle) {
+      puff.classList.add("map-fog-puff--venue-wide", `map-fog-puff--${fogStyle.shape}`);
+      puff.style.setProperty("--puff-scale", String(fogStyle.scale));
+    }
     if (visibleSlugs.has(slug)) {
       puff.classList.add("map-fog-puff--receded");
     }
@@ -698,11 +743,19 @@ async function loadAccountLink() {
   const accountMenuToggle = document.getElementById("account-menu-toggle");
   const accountProfileLink = document.getElementById("account-profile-link");
   const accountLogoutButton = document.getElementById("account-logout-button");
+  const infoBoothGuestActions = document.getElementById("info-booth-guest-actions");
+  const infoBoothMailbox = document.getElementById("info-booth-mailbox");
   const appShell = document.querySelector(".app-shell");
   const mapLayerEl = document.querySelector(".map-layer");
   if (!accountLink) return;
 
   const setMapSignedInState = (signedIn) => {
+    if (infoBoothGuestActions) {
+      infoBoothGuestActions.hidden = Boolean(signedIn);
+    }
+    if (infoBoothMailbox) {
+      infoBoothMailbox.hidden = !signedIn;
+    }
     if (appShell) {
       appShell.classList.toggle("app-shell--signed-in", Boolean(signedIn));
       appShell.classList.toggle("app-shell--anonymous", !signedIn);
@@ -834,6 +887,7 @@ async function loadAccountLink() {
       if (accountProfileLink) accountProfileLink.href = "/account/";
       closeMenu();
       renderMapMenu();
+      maybeShowMapOnboarding();
       return;
     }
 

@@ -400,34 +400,77 @@ body {
 .map-fog-base {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at center, rgba(12, 11, 16, 0) 0%, rgba(10, 9, 14, 0.65) 100%);
-  opacity: 0.55;
+  background: radial-gradient(ellipse at center, rgba(12, 11, 16, 0) 0%, rgba(10, 9, 14, 0.45) 100%);
+  opacity: 0.28;
   transition: opacity 900ms ease;
 }
 
 .map-fog-puff {
   --puff-scale: 1;
   position: absolute;
-  width: calc(16% * var(--puff-scale));
-  padding-top: calc(16% * var(--puff-scale));
+  width: calc(19% * var(--puff-scale));
+  aspect-ratio: 1.65 / 1;
   transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(226, 226, 238, 0.92) 0%, rgba(226, 226, 238, 0.55) 55%, rgba(226, 226, 238, 0) 78%);
-  filter: blur(6px);
-  opacity: 1;
+  border-radius: 46% 58% 51% 44% / 54% 42% 57% 46%;
+  background:
+    radial-gradient(ellipse at 30% 55%, rgba(226, 226, 238, 0.52) 0 24%, transparent 58%),
+    radial-gradient(ellipse at 55% 35%, rgba(234, 234, 243, 0.56) 0 27%, transparent 61%),
+    radial-gradient(ellipse at 76% 59%, rgba(218, 219, 232, 0.48) 0 23%, transparent 57%);
+  filter: blur(7px);
+  opacity: 0.62;
   transition: opacity 1400ms ease;
+}
+
+.map-fog-puff::before,
+.map-fog-puff::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(232, 232, 241, 0.44) 0 35%, rgba(226, 226, 238, 0) 72%);
+}
+
+.map-fog-puff::before {
+  width: 58%;
+  height: 82%;
+  left: 8%;
+  top: -12%;
+}
+
+.map-fog-puff::after {
+  width: 65%;
+  height: 76%;
+  right: -5%;
+  bottom: -13%;
 }
 
 .map-fog-puff.map-fog-puff--receded {
   opacity: 0;
 }
 
+.map-fog-puff--venue-wide {
+  aspect-ratio: 2.05 / 1;
+}
+
+.map-fog-puff--wide-left {
+  margin-left: -2.5%;
+  rotate: -7deg;
+}
+
+.map-fog-puff--wide-right {
+  margin-left: 2.5%;
+  rotate: 6deg;
+}
+
 .map-fog-puff--ambient {
-  opacity: 0.65;
+  opacity: 0.32;
 }
 
 .map-fog-puff--woods {
-  opacity: 0.325;
+  opacity: 0.18;
+}
+
+.map-fog-puff--anon-center {
+  opacity: 0.42;
 }
 
 .map-fog-puff--drift-slow {
@@ -591,6 +634,103 @@ body {
 .venue-pin--info-booth .venue-label {
   opacity: 1;
   transform: scale(1);
+  color: #fff6d8;
+  border-color: rgba(255, 220, 132, 0.5);
+  background: rgba(24, 17, 8, 0.82);
+  box-shadow:
+    0 0 0 1px rgba(255, 234, 180, 0.12),
+    0 0 18px rgba(255, 194, 82, 0.42),
+    0 7px 18px rgba(0, 0, 0, 0.55);
+  font-weight: 650;
+  letter-spacing: 0.025em;
+}
+
+.venue-pin--info-booth {
+  z-index: 31;
+}
+
+.venue-pin--info-booth::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 78%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  translate: -50% -50%;
+  background: radial-gradient(circle, rgba(255, 213, 112, 0.3) 0%, rgba(255, 192, 70, 0.12) 42%, transparent 72%);
+  filter: blur(5px);
+  animation: info-booth-beacon 3.2s ease-in-out infinite;
+}
+
+.venue-pin--info-booth img {
+  position: relative;
+  filter:
+    brightness(1.12)
+    saturate(1.18)
+    drop-shadow(0 0 7px rgba(255, 221, 139, 0.62))
+    drop-shadow(0 8px 16px rgba(0, 0, 0, 0.56));
+}
+
+.venue-pin--audition-hall {
+  z-index: 29;
+}
+
+.venue-pin--audition-hall::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 72%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  translate: -50% -50%;
+  background: radial-gradient(circle, rgba(255, 203, 140, 0.22) 0%, rgba(171, 92, 53, 0.14) 45%, transparent 74%);
+  filter: blur(4px);
+  pointer-events: none;
+}
+
+.venue-pin--audition-hall img {
+  transform: scale(1.03);
+  filter:
+    brightness(1.08)
+    saturate(1.12)
+    contrast(1.08)
+    drop-shadow(0 0 8px rgba(255, 198, 126, 0.34))
+    drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5));
+}
+
+.venue-pin--audition-hall:hover img,
+.venue-pin--audition-hall:focus-visible img {
+  transform: scale(1.08);
+  filter:
+    brightness(1.14)
+    saturate(1.16)
+    contrast(1.12)
+    drop-shadow(0 0 12px rgba(255, 198, 126, 0.46))
+    drop-shadow(0 10px 18px rgba(0, 0, 0, 0.54));
+}
+
+.venue-pin--audition-hall .venue-label {
+  opacity: 0.96;
+  transform: scale(0.82);
+  background: rgba(14, 10, 9, 0.76);
+  border-color: rgba(255, 200, 140, 0.22);
+  color: #ffe8cf;
+  box-shadow:
+    0 0 0 1px rgba(255, 226, 190, 0.08),
+    0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+@keyframes info-booth-beacon {
+  0%, 100% { opacity: 0.66; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .venue-pin--info-booth::before {
+    animation: none;
+  }
 }
 
 .venue-pin:focus-visible {
@@ -742,6 +882,23 @@ body {
   margin-bottom: 4px;
 }
 
+.booth-footer-copy {
+  flex: 1 1 260px;
+}
+
+.booth-actions,
+.booth-guest-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.booth-actions {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+
 .booth-button {
   display: inline-flex;
   align-items: center;
@@ -754,6 +911,39 @@ body {
   text-decoration: none;
   font-weight: 700;
   box-shadow: var(--shadow);
+}
+
+.booth-button--secondary {
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #f7efe3;
+}
+
+.booth-button--placeholder:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+  background: rgba(255, 255, 255, 0.035);
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.booth-button--mailbox {
+  margin-left: 14px;
+}
+
+.booth-guest-actions[hidden],
+.booth-button[hidden] {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .booth-actions {
+    justify-content: flex-start;
+  }
+
+  .booth-button--mailbox {
+    margin-left: 0;
+  }
 }
 
 .map-menu {

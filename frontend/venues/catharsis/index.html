@@ -339,18 +339,39 @@
     .catharsis-onboarding__panel {
       display: grid;
       gap: 12px;
+      background:
+        radial-gradient(circle at top right, rgba(180, 56, 61, 0.08), transparent 34%),
+        radial-gradient(circle at bottom left, rgba(255, 255, 255, 0.04), transparent 28%),
+        linear-gradient(180deg, rgba(25, 17, 18, 0.98), rgba(14, 10, 11, 0.98));
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow:
+        0 22px 66px rgba(0, 0, 0, 0.38),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
     }
 
     .catharsis-onboarding__panel h2 {
       margin: 0;
       font-size: clamp(1.8rem, 3vw, 2.6rem);
+      color: #f1ce89;
     }
 
     .catharsis-onboarding__panel p {
       margin: 0;
-      color: rgba(247, 239, 227, 0.84);
+      color: rgba(247, 226, 227, 0.88);
       line-height: 1.6;
       max-width: 74ch;
+    }
+
+    #catharsis-onboarding-intro {
+      background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 28%),
+        radial-gradient(circle at top right, rgba(241, 206, 137, 0.12), transparent 34%),
+        linear-gradient(180deg, rgba(22, 18, 19, 0.98), rgba(13, 10, 11, 0.98));
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    #catharsis-onboarding-intro .eyebrow {
+      color: #f1ce89;
     }
 
     .catharsis-onboarding__chapter,
@@ -377,6 +398,14 @@
       min-height: 1.5rem;
       color: #f2d5a6;
       font-weight: 700;
+    }
+
+    .catharsis-onboarding__actions--reveal {
+      justify-content: center;
+    }
+
+    .catharsis-onboarding__actions--reveal button {
+      min-width: 180px;
     }
 
     .catharsis-onboarding__build {
@@ -436,8 +465,10 @@
       margin: 0 auto;
       padding: 18px;
       border-radius: 20px;
-      background: rgba(12, 10, 9, 0.72);
-      border: 1px solid rgba(255, 225, 180, 0.14);
+      background:
+        radial-gradient(circle at top left, rgba(255, 225, 180, 0.08), transparent 28%),
+        rgba(12, 10, 9, 0.72);
+      border: 1px solid rgba(241, 206, 137, 0.18);
       backdrop-filter: blur(10px);
       display: grid;
       gap: 14px;
@@ -465,8 +496,10 @@
     .catharsis-build-metric {
       padding: 10px 11px;
       border-radius: 14px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 225, 180, 0.1);
+      background:
+        radial-gradient(circle at top, rgba(255, 225, 180, 0.1), transparent 42%),
+        rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(241, 206, 137, 0.14);
       display: grid;
       gap: 4px;
     }
@@ -488,7 +521,7 @@
       border-radius: 999px;
       overflow: hidden;
       background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 225, 180, 0.12);
+      border: 1px solid rgba(241, 206, 137, 0.14);
     }
 
     .catharsis-build-meter span {
@@ -496,8 +529,8 @@
       height: 100%;
       width: 18%;
       border-radius: inherit;
-      background: linear-gradient(90deg, #7c5330, #d7a45f, #f7d9a0);
-      box-shadow: 0 0 26px rgba(247, 217, 160, 0.38);
+      background: linear-gradient(90deg, #7c6330, #d1a75d, #f1ce89);
+      box-shadow: 0 0 26px rgba(241, 206, 137, 0.28);
       transition: width 220ms ease;
     }
 
@@ -513,7 +546,7 @@
       padding: 10px 12px;
       border-radius: 14px;
       background: rgba(255, 255, 255, 0.035);
-      border: 1px solid rgba(255, 225, 180, 0.08);
+      border: 1px solid rgba(241, 206, 137, 0.1);
       line-height: 1.35;
     }
 
@@ -530,8 +563,8 @@
     }
 
     .catharsis-wheel-window__slot--current {
-      border-color: rgba(240, 208, 155, 0.26);
-      background: rgba(240, 208, 155, 0.12);
+      border-color: rgba(241, 206, 137, 0.22);
+      background: rgba(241, 206, 137, 0.12);
     }
 
     .catharsis-build-stage {
@@ -543,9 +576,9 @@
     .catharsis-build-stage__frame {
       min-height: 320px;
       border-radius: 22px;
-      border: 1px solid rgba(255, 225, 180, 0.12);
+      border: 1px solid rgba(241, 206, 137, 0.14);
       background:
-        radial-gradient(circle at 50% 20%, rgba(247, 217, 160, 0.16), transparent 32%),
+        radial-gradient(circle at 50% 20%, rgba(241, 206, 137, 0.14), transparent 32%),
         linear-gradient(180deg, rgba(22, 16, 14, 0.9), rgba(9, 8, 9, 0.96));
       padding: 18px;
       display: grid;
@@ -558,11 +591,11 @@
       width: 112px;
       aspect-ratio: 1;
       border-radius: 50%;
-      border: 2px solid rgba(247, 217, 160, 0.26);
+      border: 2px solid rgba(241, 206, 137, 0.28);
       background:
         radial-gradient(circle, rgba(255, 255, 255, 0.08), transparent 58%),
-        conic-gradient(from 0deg, rgba(247, 217, 160, 0.08), rgba(247, 217, 160, 0.58), rgba(247, 217, 160, 0.08));
-      box-shadow: 0 0 44px rgba(247, 217, 160, 0.18);
+        conic-gradient(from 0deg, rgba(241, 206, 137, 0.08), rgba(241, 206, 137, 0.58), rgba(241, 206, 137, 0.08));
+      box-shadow: 0 0 44px rgba(241, 206, 137, 0.18);
       animation: catharsis-spin 5s linear infinite;
     }
 
@@ -579,9 +612,10 @@
     .catharsis-onboarding__actions button {
       padding: 11px 16px;
       border-radius: 999px;
-      border: 1px solid rgba(255, 232, 190, 0.22);
-      background: rgba(255, 255, 255, 0.04);
-      color: #fff2d0;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+      color: #fff4db;
       font: inherit;
       font-weight: 700;
       cursor: pointer;
@@ -589,10 +623,30 @@
     }
 
     .catharsis-onboarding__actions button:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 232, 190, 0.34);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+      border-color: rgba(241, 206, 137, 0.28);
       transform: translateY(-1px);
       box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2);
+    }
+
+    .catharsis-onboarding__actions button:focus-visible {
+      outline: 2px solid rgba(241, 206, 137, 0.8);
+      outline-offset: 2px;
+    }
+
+    .catharsis-onboarding__actions--reveal button {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04));
+      color: #fff7ea;
+      border-color: rgba(255, 255, 255, 0.16);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+    }
+
+    .catharsis-onboarding__actions--reveal button:hover {
+      border-color: rgba(241, 206, 137, 0.34);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06));
     }
 
     .catharsis-roll-prompt {
@@ -600,8 +654,10 @@
       gap: 14px;
       padding: 16px;
       border-radius: 18px;
-      border: 1px solid rgba(255, 225, 180, 0.12);
-      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background:
+        radial-gradient(circle at top right, rgba(241, 206, 137, 0.08), transparent 34%),
+        rgba(255, 255, 255, 0.03);
     }
 
     .catharsis-roll-prompt__summary {
@@ -611,7 +667,7 @@
 
     .catharsis-roll-prompt__summary strong {
       font-size: 1.08rem;
-      color: #f7e0b4;
+      color: #f1ce89;
     }
 
     .catharsis-roll-prompt__summary span {
@@ -630,29 +686,33 @@
       gap: 4px;
       padding: 12px;
       border-radius: 16px;
-      border: 1px solid rgba(255, 225, 180, 0.12);
-      background: rgba(12, 10, 9, 0.56);
+      border: 1px solid rgba(241, 206, 137, 0.14);
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 42%),
+        rgba(12, 10, 9, 0.56);
     }
 
     .catharsis-roll-result span {
       font-size: 0.74rem;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: rgba(242, 214, 180, 0.7);
+      color: rgba(241, 206, 137, 0.76);
     }
 
     .catharsis-roll-result strong {
       font-size: 1.2rem;
-      color: #fff1d1;
+      color: #fff6dd;
     }
 
     .catharsis-roll-result--total {
-      background: rgba(240, 208, 155, 0.12);
-      border-color: rgba(240, 208, 155, 0.22);
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 42%),
+        rgba(241, 206, 137, 0.12);
+      border-color: rgba(241, 206, 137, 0.2);
     }
 
     .catharsis-roll-result--total strong {
-      color: #ffe6ad;
+      color: #fff0c6;
     }
 
     .catharsis-childhood-roll-actions {
@@ -680,6 +740,40 @@
       border: 1px solid rgba(240, 208, 155, 0.22);
       border-radius: 8px;
       background: rgba(0, 0, 0, 0.18);
+    }
+
+    .catharsis-build-card {
+      border-radius: 22px;
+      background:
+        radial-gradient(circle at top left, rgba(255, 210, 131, 0.14), transparent 28%),
+        radial-gradient(circle at top right, rgba(180, 56, 61, 0.18), transparent 30%),
+        linear-gradient(180deg, rgba(28, 12, 14, 0.98), rgba(12, 8, 9, 0.98));
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.04),
+        0 20px 48px rgba(0, 0, 0, 0.32);
+    }
+
+    .catharsis-build-copy {
+      color: rgba(247, 226, 227, 0.88);
+    }
+
+    .catharsis-wheel-window__slot {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .catharsis-wheel-window__slot--current {
+      border-color: rgba(240, 208, 155, 0.3);
+      background: rgba(180, 56, 61, 0.12);
+    }
+
+    .catharsis-build-stage__frame {
+      border-radius: 20px;
+      background:
+        radial-gradient(circle at center, rgba(180, 56, 61, 0.08), transparent 50%),
+        rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     .catharsis-chapter2-bonus-choice label,
@@ -3867,10 +3961,13 @@
         <p class="eyebrow">Catharsis Welcome</p>
         <h2 id="catharsis-onboarding-title">This venue has four trays.</h2>
         <p>
-          The header up top is one of them. The left tray holds presence and diagnostics, the chat tray lives along the bottom, and the right tray holds your character tools. Use the tray tour whenever you need a reminder of what lives where.
+          The top tray holds the header. The left tray holds presence and diagnostics. The chat tray lives along the bottom.
         </p>
         <p>
-          New here? Push your mouse to the right edge of the screen to open the right tray &mdash; the <strong>Make a Character</strong> button is waiting there. Character creation only starts when you explicitly ask for it.
+          The right tray holds your character tools. Open it whenever you want to begin building a character.
+        </p>
+        <p>
+          New here? Push your mouse to the right edge of the screen and use the <strong>Make a Character</strong> button when you are ready.
         </p>
         <div class="catharsis-onboarding__actions">
           <button id="catharsis-onboarding-continue" type="button">Continue</button>
@@ -3881,10 +3978,13 @@
         <p class="eyebrow">Ready to roll?</p>
         <h2>The first thing to know is where you began.</h2>
         <p>
-          In tabletop roleplaying games, there are circumstances and things that seem beyond our control. To simulate them, we roll dice. The first thing to know about you is actually the stuff before you, so this game starts with a facsimile of your socio-economic status as determined by the kind of family you were born into.
+          In tabletop roleplaying games, there are circumstances and things that seem beyond our control. To simulate them, we roll dice.
         </p>
         <p>
-          You can roll the dice individually or together. If any roll a 20, add that to the total and roll that die one more time, adding again. You roll 3 dice, up to 6 total rolls if you get a lot of 20s. Bigger numbers generally mean a more secure situation for your character.
+          The first thing to know about you is actually the stuff before you, so this game starts with a facsimile of your socio-economic status as determined by the kind of family you were born into.
+        </p>
+        <p>
+          You can roll the dice individually or together. If any roll a 20, add that to the total and roll that die one more time, adding again. You roll 3 dice, up to 6 total rolls if you get a lot of 20s.
         </p>
         <div class="catharsis-roll-prompt">
           <div class="catharsis-roll-prompt__summary">
@@ -3917,6 +4017,9 @@
           <button id="catharsis-roll-all" type="button">All dice</button>
         </div>
         <p id="catharsis-onboarding-socio-status" class="catharsis-onboarding__status" aria-live="polite"></p>
+        <div class="catharsis-onboarding__actions catharsis-onboarding__actions--reveal">
+          <button id="catharsis-onboarding-socio-continue" type="button" hidden>Continue to reveal</button>
+        </div>
         <div class="catharsis-onboarding__actions">
           <button id="catharsis-onboarding-dismiss" type="button">Not now</button>
         </div>
@@ -3956,6 +4059,7 @@
             <p id="catharsis-build-status" class="catharsis-onboarding__status" aria-live="polite"></p>
           </div>
           <div class="catharsis-onboarding__actions">
+            <button id="catharsis-build-reveal" type="button" hidden>Reveal result</button>
             <button id="catharsis-build-lock-in" type="button">Lock it in</button>
             <button id="catharsis-build-reroll" type="button">Reroll</button>
           </div>
@@ -4098,8 +4202,8 @@
   <script src="/venues/catharsis/venue.js?v=kernel72-1"></script>
   <script src="/lib/stage-runtime/state.js?v=kernel72-1"></script>
   <script src="/lib/stage-runtime/socket.js?v=kernel72-1"></script>
-  <script src="/lib/stage-runtime/logic.js?v=kernel72-1"></script>
-  <script src="/lib/stage-runtime/geometry.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/logic.js?v=kernel75-1"></script>
+  <script src="/lib/stage-runtime/geometry.js?v=kernel72-2"></script>
   <script src="/lib/stage-runtime/stage-controls.js?v=kernel72-1"></script>
   <script src="/lib/stage-runtime/map-grid.js?v=kernel72-1"></script>
   <script src="/lib/stage-runtime/scene-nodes.js?v=kernel72-1"></script>
@@ -4111,8 +4215,8 @@
   <script src="/lib/stage-runtime/editors.js?v=kernel72-1"></script>
   <script src="/lib/stage-runtime/lifecycle.js?v=kernel72-1"></script>
   <script src="/lib/stage-runtime/context.js?v=kernel72-1"></script>
-  <script src="/lib/stage-runtime/program-panel.js?v=kernel73-1"></script>
-  <script src="/lib/stage-runtime/participant-interactions.js?v=kernel73-1"></script>
+  <script src="/lib/stage-runtime/program-panel.js?v=kernel73-2"></script>
+  <script src="/lib/stage-runtime/participant-interactions.js?v=kernel73-4"></script>
   <script>
     window.VictoryDiscordAudio?.mount({
       venueSlug: "catharsis",
@@ -4125,7 +4229,7 @@
       window.__catharsisBootWiring = true;
 
       const script = document.createElement("script");
-      script.src = "/lib/stage-runtime/runtime.js?v=kernel72-1";
+      script.src = "/lib/stage-runtime/runtime.js?v=kernel75-3";
       script.dataset.victoryRuntime = "catharsis";
       script.addEventListener("load", () => {
         window.VictoryStage?.start?.();
@@ -4134,6 +4238,6 @@
     })();
   </script>
   <script src="/venues/catharsis/chapter3-quiz-data.js?v=kernel55-1"></script>
-  <script src="/venues/catharsis/onboarding.js?v=kernel55-1"></script>
+  <script src="/venues/catharsis/onboarding.js?v=kernel55-9"></script>
 </body>
 </html>

@@ -86,6 +86,29 @@ func validateFieldValue(field CatalogueField, value any) (any, error) {
 		}
 		return cleaned, nil
 
+	case FieldTypeTTRPGMatrix:
+		input, ok := value.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("invalid_value_type:%s", field.FieldKey)
+		}
+		out := map[string]string{}
+		allowed := map[string]bool{}
+		for _, status := range field.Options {
+			allowed[strings.ToLower(status)] = true
+		}
+		for key, raw := range input {
+			status, ok := raw.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid_value_type:%s", field.FieldKey)
+			}
+			status = strings.TrimSpace(status)
+			if status != "" && !allowed[strings.ToLower(status)] {
+				return nil, fmt.Errorf("invalid_option:%s", field.FieldKey)
+			}
+			out[strings.TrimSpace(key)] = status
+		}
+		return out, nil
+
 	default:
 		return nil, fmt.Errorf("invalid_field_type:%s", field.FieldKey)
 	}

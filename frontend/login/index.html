@@ -7,70 +7,121 @@
   <link rel="icon" type="image/png" href="/assets/favicon.png" />
   <link rel="apple-touch-icon" href="/assets/favicon.png" />
   <style>
+    :root {
+      color-scheme: dark;
+      --black: #050505;
+      --panel: #0d0b0c;
+      --field: #151113;
+      --crimson: #a30d2d;
+      --crimson-bright: #d31943;
+      --crimson-dark: #5f071b;
+      --text: #f6edf0;
+      --muted: #bda9ae;
+      --line: rgba(211, 25, 67, 0.28);
+    }
+
+    * { box-sizing: border-box; }
+
     body {
       margin: 0;
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #14100c;
-      color: #f3e7d1;
-      font-family: Arial, Helvetica, sans-serif;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(163, 13, 45, 0.22), transparent 34%),
+        linear-gradient(135deg, #020202 0%, #0b0708 52%, #030303 100%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(115deg, transparent 0 47%, rgba(211, 25, 67, 0.05) 47.2% 47.8%, transparent 48%),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 72px);
     }
 
     .panel {
       width: min(420px, calc(100vw - 32px));
-      padding: 24px;
-      border-radius: 12px;
-      background: #1f1812;
-      border: 1px solid rgba(255,255,255,0.08);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      position: relative;
+      padding: 34px;
+      border-radius: 6px;
+      background: linear-gradient(155deg, rgba(17, 14, 15, 0.98), rgba(7, 7, 7, 0.99));
+      border: 1px solid var(--line);
+      border-top: 3px solid var(--crimson);
+      box-shadow: 0 26px 80px rgba(0,0,0,0.72), 0 0 34px rgba(163,13,45,0.1);
     }
 
     h1 {
       margin-top: 0;
       margin-bottom: 8px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(2.2rem, 8vw, 3.2rem);
+      font-weight: 500;
+      letter-spacing: -0.035em;
+      line-height: 1;
     }
 
     p {
-      color: #d7c5a6;
+      color: var(--muted);
+      line-height: 1.5;
     }
 
     .field {
-      margin-bottom: 14px;
+      margin-bottom: 17px;
     }
 
     label {
       display: block;
-      margin-bottom: 6px;
-      font-weight: 600;
+      margin-bottom: 7px;
+      color: #e7d9dd;
+      font-size: 0.78rem;
+      font-weight: 750;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
     }
 
     input {
       width: 100%;
-      box-sizing: border-box;
-      padding: 10px 12px;
-      border-radius: 8px;
-      border: 1px solid rgba(255,255,255,0.12);
-      background: #2a2119;
-      color: white;
+      padding: 12px 13px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.13);
+      background: var(--field);
+      color: var(--text);
       font-size: 1rem;
+      outline: none;
+      transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+    }
+
+    input:focus {
+      border-color: var(--crimson-bright);
+      background: #1a1114;
+      box-shadow: 0 0 0 3px rgba(211,25,67,0.16);
     }
 
     button {
       width: 100%;
-      padding: 10px 14px;
-      border: 0;
-      border-radius: 8px;
-      background: #7a4c1f;
-      color: white;
+      padding: 12px 14px;
+      border: 1px solid #d92b50;
+      border-radius: 4px;
+      background: linear-gradient(180deg, var(--crimson-bright), #8b0926);
+      color: #fff7f9;
       font-size: 1rem;
-      font-weight: 600;
+      font-weight: 750;
+      letter-spacing: 0.025em;
       cursor: pointer;
+      box-shadow: 0 8px 24px rgba(163,13,45,0.22);
+      transition: filter 160ms ease, transform 160ms ease;
     }
 
     button:hover {
-      background: #955b24;
+      filter: brightness(1.13);
+      transform: translateY(-1px);
     }
 
     .provider-divider {
@@ -78,7 +129,7 @@
       align-items: center;
       gap: 10px;
       margin: 18px 0 14px;
-      color: #8e7a62;
+      color: #7f6a70;
       font-size: 0.9rem;
       text-transform: uppercase;
       letter-spacing: 0.04em;
@@ -89,7 +140,7 @@
       content: "";
       flex: 1;
       height: 1px;
-      background: rgba(255,255,255,0.08);
+      background: var(--line);
     }
 
     .discord-button {
@@ -97,9 +148,10 @@
       width: 100%;
       box-sizing: border-box;
       padding: 10px 14px;
-      border-radius: 8px;
-      background: #5865f2;
-      color: white;
+      border-radius: 4px;
+      border: 1px solid rgba(211,25,67,0.42);
+      background: #100d0e;
+      color: var(--text);
       font-size: 1rem;
       font-weight: 600;
       text-align: center;
@@ -107,7 +159,8 @@
     }
 
     .discord-button:hover {
-      background: #6a77f4;
+      background: #1d1014;
+      border-color: var(--crimson-bright);
     }
 
     .discord-button[aria-disabled="true"] {
@@ -117,22 +170,24 @@
 
     .provider-note {
       margin-top: 8px;
-      color: #8e7a62;
+      color: #8f7c81;
       font-size: 0.92rem;
     }
 
     .status {
       margin-top: 14px;
       min-height: 1.2em;
-      color: #f3d18b;
+      color: #ff6d8e;
     }
 
     .back-link {
       display: inline-block;
       margin-top: 16px;
-      color: #f3d18b;
+      color: #ff6d8e;
       text-decoration: none;
     }
+
+    a:hover { color: #ff9aaf; }
   </style>
 </head>
 <body>
@@ -159,7 +214,7 @@
     <div id="provider-note" class="provider-note"></div>
 
     <p style="margin-top:16px;">
-    Need an account? <a href="/signup/" style="color:#f3d18b;">Sign up</a>
+    Need an account? <a href="/signup/" style="color:#ff6d8e;">Sign up</a>
     </p>
 
     <div id="status" class="status"></div>

@@ -8,6 +8,7 @@
   const chapterPanel = document.getElementById("catharsis-onboarding-chapter");
   const introButton = document.getElementById("catharsis-onboarding-continue");
   const dismissButton = document.getElementById("catharsis-onboarding-dismiss");
+  const revealContinueButton = document.getElementById("catharsis-onboarding-socio-continue");
   const socioStatus = document.getElementById("catharsis-onboarding-socio-status");
   const chapterContinueButton = document.getElementById("catharsis-onboarding-chapter-continue");
   const chapter2Panel = document.getElementById("catharsis-onboarding-chapter2");
@@ -70,6 +71,7 @@
   const buildMeter = document.getElementById("catharsis-build-meter");
   const buildStatus = document.getElementById("catharsis-build-status");
   const buildWheelWindow = document.getElementById("catharsis-wheel-window");
+  const buildRevealButton = document.getElementById("catharsis-build-reveal");
   const buildLockButton = document.getElementById("catharsis-build-lock-in");
   const buildRerollButton = document.getElementById("catharsis-build-reroll");
   const characterTrayButton = document.getElementById("character-tray-button");
@@ -187,6 +189,7 @@
         selectedThisQuestion: [],
       },
     },
+    revealPending: false,
   };
 
   let buildSequenceToken = 0;
@@ -212,6 +215,16 @@
     }
     state.draftToken = token;
     return token;
+  };
+
+  const resetDraftToken = () => {
+    try {
+      localStorage.removeItem(draftTokenKey);
+    } catch (error) {
+      // ignore; a stale token only affects the next fresh build attempt.
+    }
+    state.draftToken = "";
+    state.donorRolls = { egg_donor: null, sperm_donor: null };
   };
 
   const donorEventKeyForPhase = () => (state.phase === 1 ? "egg_donor" : "sperm_donor");
@@ -280,7 +293,7 @@
     ? "Roll the dice for the first parent."
     : "You have two parents so we're doing the process a second time to see about your other parent.");
 
-  const phaseLockLabel = () => (state.phase === 1 ? "Lock first parent" : "Lock it in");
+  const phaseLockLabel = () => (state.phase === 1 ? "Continue to second parent" : "Lock it in");
 
   const formatRollRange = (entry) => {
     if (!entry) return "Unknown";
@@ -1877,6 +1890,7 @@
     state.dieTotals = [null, null, null];
     state.totalRoll = null;
     state.revealEntry = null;
+    state.revealPending = false;
     buildSequenceToken += 1;
     rollButtons.forEach((button, index) => {
       button.disabled = !editable || !state.canDraft;
@@ -1900,6 +1914,14 @@
     buildCredit.textContent = "--";
     buildMeter.style.width = "18%";
     buildStatus.textContent = "";
+    if (buildRevealButton) {
+      buildRevealButton.hidden = true;
+      buildRevealButton.disabled = false;
+    }
+    if (revealContinueButton) {
+      revealContinueButton.hidden = true;
+      revealContinueButton.disabled = false;
+    }
     buildWheelWindow.innerHTML = '<div class="catharsis-wheel-window__slot"><span>Wheel</span><strong>Roll all three dice to reveal your place.</strong></div>';
   };
 
@@ -1929,6 +1951,15 @@
     rollTotalNode.textContent = rolledCount ? String(total) : "--";
 
     if (rolledCount < 3) {
+      state.revealPending = false;
+      if (buildRevealButton) {
+        buildRevealButton.hidden = true;
+        buildRevealButton.disabled = false;
+      }
+      if (revealContinueButton) {
+        revealContinueButton.hidden = true;
+        revealContinueButton.disabled = false;
+      }
       buildLockButton.disabled = true;
       buildRerollButton.disabled = rolledCount === 0;
       setBuildStatus(rolledCount ? `${rolledCount} of 3 dice are locked in.` : "Roll one die at a time, or all three together.");
@@ -1940,20 +1971,26 @@
 
     state.totalRoll = total;
     state.revealEntry = findParentageEntry(total);
-    buildTitle.textContent = state.phase === 1 ? "First parent revealed" : "Second parent revealed";
-    buildRoll.textContent = String(total);
-    buildClass.textContent = state.revealEntry?.social_class || "Unknown";
-    buildCredit.textContent = String(state.revealEntry?.starting_credit ?? "--");
-    buildCopy.textContent = state.revealEntry
-      ? `${state.revealEntry.description} Nearby slots are shown below so you can see the strata around you.`
-      : "The chart is ready, but the roll did not resolve to a known slot.";
+    state.revealPending = true;
+    if (buildRevealButton) {
+      buildRevealButton.hidden = true;
+      buildRevealButton.disabled = false;
+    }
+    buildLockButton.disabled = true;
+    buildRerollButton.disabled = false;
+    if (revealContinueButton) {
+      revealContinueButton.hidden = false;
+      revealContinueButton.textContent = "Continue to reveal";
+      revealContinueButton.focus();
+    }
+    buildTitle.textContent = "The wheel is holding its breath";
+    buildRoll.textContent = "--";
+    buildClass.textContent = "--";
+    buildCredit.textContent = "--";
+    buildCopy.textContent = "The three dice are locked. Continue when you want the result to appear.";
     buildMeter.style.width = `${Math.max(18, Math.min(100, Math.round(18 + (total / 120) * 62)))}%`;
     renderWheelWindow(total);
-    buildLockButton.disabled = false;
-    buildRerollButton.disabled = false;
-    buildLockButton.textContent = phaseLockLabel();
-    buildRerollButton.textContent = state.phase === 1 ? "Reroll first parent" : "Reroll second parent";
-    setBuildStatus("The wheel is ready.");
+    setBuildStatus("Roll complete. Continue to reveal the parentage result.");
     setSocioStatus("");
   };
 
@@ -2000,7 +2037,50 @@
       : "Lock it in and Catharsis will stamp both parent rolls into your draft.";
     buildLockButton.textContent = phaseLockLabel();
     buildRerollButton.textContent = state.phase === 1 ? "Reroll first parent" : "Reroll second parent";
+    if (buildRevealButton) {
+      buildRevealButton.hidden = !state.revealPending;
+      buildRevealButton.disabled = !state.revealPending;
+    }
     document.body.classList.add("modal-open");
+    if (state.revealPending && buildRevealButton) {
+      buildRevealButton.focus();
+    }
+    if (state.revealPending && !buildRevealButton) {
+      revealPendingRoll();
+    }
+  };
+
+  const revealPendingRoll = () => {
+    if (!state.revealPending) return;
+    state.revealPending = false;
+    if (buildRevealButton) {
+      buildRevealButton.hidden = true;
+      buildRevealButton.disabled = false;
+    }
+    if (revealContinueButton) {
+      revealContinueButton.hidden = true;
+      revealContinueButton.disabled = false;
+    }
+    buildTitle.textContent = state.phase === 1 ? "First parent revealed" : "Second parent revealed";
+    buildRoll.textContent = String(state.totalRoll || "--");
+    buildClass.textContent = state.revealEntry?.social_class || "Unknown";
+    buildCredit.textContent = String(state.revealEntry?.starting_credit ?? "--");
+    buildCopy.textContent = state.revealEntry
+      ? `${state.revealEntry.description} Nearby slots are shown below so you can see the strata around you.`
+      : "The chart is ready, but the roll did not resolve to a known slot.";
+    buildLockButton.disabled = false;
+    buildLockButton.textContent = phaseLockLabel();
+    buildRerollButton.disabled = false;
+    buildRerollButton.textContent = state.phase === 1 ? "Reroll first parent" : "Reroll second parent";
+    setBuildStatus("The wheel is ready.");
+  };
+
+  const rerollCurrentParent = () => {
+    if (state.phase === 1) {
+      resetDraftToken();
+    }
+    resetRollState(true);
+    showSocioPrompt();
   };
 
   const loadParentageChart = async () => {
@@ -2081,13 +2161,11 @@
     renderRollState();
 
     if (state.dieTotals.every((value) => Number.isFinite(value))) {
-      showBuildPanel();
-      renderRollState();
-      setBuildStatus("The wheel is settling.");
-      await sleep(260);
-      if (token !== buildSequenceToken) return;
-      setBuildStatus(`${phaseLabel()[0].toUpperCase()}${phaseLabel().slice(1)} revealed.`);
-      buildLockButton.focus();
+      // Stay on the dice panel until the player explicitly asks to reveal the
+      // result. Moving to the build panel here hid the reveal button inside
+      // the previous panel and left the visible lock button disabled.
+      setSocioStatus("All three dice are locked. Continue when you are ready to reveal the result.");
+      revealContinueButton?.focus();
       localStorage.setItem(introKey, "1");
       return;
     }
@@ -2107,13 +2185,16 @@
     }
   };
 
-  const advanceToSecondParent = async () => {
+  const advanceToSecondParent = () => {
+    if (state.phase !== 1 || !state.dieTotals.every((value) => Number.isFinite(value))) {
+      setBuildStatus("Roll and reveal all three dice before continuing.");
+      return;
+    }
     const firstRoll = state.totalRoll ?? state.dieTotals.reduce((sum, value) => sum + Number(value || 0), 0);
     state.parentRolls[0] = firstRoll;
     state.phase = 2;
-    resetRollState(true);
     showSocioPrompt();
-    setSocioStatus("You have two parents so we're doing the process a second time to see about your other parent.");
+    setSocioStatus("You have two parents, so we're doing the process a second time to see about your other parent.");
   };
 
   const createCharacterFromRoll = async () => {
@@ -2404,6 +2485,14 @@
     closeOverlay();
   });
 
+  revealContinueButton?.addEventListener("click", () => {
+    showBuildPanel();
+  });
+
+  buildRevealButton?.addEventListener("click", () => {
+    revealPendingRoll();
+  });
+
   dismissButton.addEventListener("click", () => {
     localStorage.setItem(introKey, "1");
     buildSequenceToken += 1;
@@ -2422,16 +2511,19 @@
 
   buildLockButton.addEventListener("click", () => {
     if (state.phase === 1) {
-      void advanceToSecondParent();
+      buildLockButton.disabled = true;
+      setBuildStatus("First parent locked. Moving to the second parent...");
+      setSocioStatus("First parent locked.");
+      advanceToSecondParent();
       return;
     }
+    buildLockButton.disabled = true;
     void createCharacterFromRoll();
   });
 
   buildRerollButton.addEventListener("click", () => {
     buildSequenceToken += 1;
-    resetRollState(true);
-    showSocioPrompt();
+    rerollCurrentParent();
   });
 
   chapterContinueButton.addEventListener("click", () => {

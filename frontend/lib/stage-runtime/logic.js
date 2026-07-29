@@ -58,7 +58,11 @@
   }
 
   function viewerCanSeeHiddenCards(role) {
-    return String(role || "").trim().toLowerCase() !== "audience";
+    // Hidden authored cards are backstage material. Cast/Player views must
+    // honor the backend's visibility decision just like the audience does.
+    return ["director", "producer", "crew", "operator"].includes(
+      String(role || "").trim().toLowerCase(),
+    );
   }
 
   function isCardObject(model) {

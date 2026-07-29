@@ -19,6 +19,7 @@
     sympathize: "Sympathize",
   };
   const STANCE_ORDER = ["command", "convince", "insight", "follow", "sympathize"];
+  const KESSA_PORTRAIT_FALLBACK = "/assets/Kessa.png";
 
   function newIdempotencyKey() {
     if (typeof globalThis !== "undefined" && globalThis.crypto && globalThis.crypto.randomUUID) {
@@ -44,6 +45,12 @@
     const panel = deps.panel;
     const escapeHtml = deps.escapeHtml || ((v) => String(v ?? ""));
     const setStageStatus = deps.setStageStatus || (() => {});
+
+    function portraitURL(assetId, portraitURLValue) {
+      return assetId
+        ? `/api/assets/${encodeURIComponent(assetId)}/content?variant=stage`
+        : String(portraitURLValue || "");
+    }
 
     let currentInteractionId = null;
     let currentContext = null; // last OpenEquipMode response
@@ -317,7 +324,14 @@
       // The client never derives either one -- a locked topic is disabled
       // here for clarity, and refused again server-side if posted anyway.
       const topics = Array.isArray(state.topics) ? state.topics : [];
-      const topicButtons = topics.map((topic) => {
+      // Ra's opening beat is a deliberate single invitation. Once the
+      // Player asks it, the server response is rendered without showOpening
+      // and the rest of the authored topic tree appears normally.
+      const firstBeat = options.showOpening && !topics.some((topic) => topic.seen);
+      const visibleTopics = firstBeat
+        ? topics.filter((topic) => topic.topic_key === "why-looking")
+        : topics;
+      const topicButtons = visibleTopics.map((topic) => {
         const attrs = topic.unlocked ? "" : "disabled";
         const seenMark = topic.seen ? " ✓" : "";
         const hint = topic.unlocked ? "" : " (not yet)";
@@ -722,7 +736,8 @@
         // to render the response, never what to request.
         const data = await fetchJSON(`/api/participant-interactions/${encodeURIComponent(interactionId)}/open`, { method: "POST" });
 
-        if (type === "freeform_submission") {
+      if (type === "freeform_submission") {
+          panel.hideSpeaker?.();
           panel.updateHeader({ title: buttonLabel || "The Locked Door", subtitle: "" });
           // Re-opening after submitting shows the committed words rather
           // than an empty field: the intention cannot be edited once Ra's
@@ -736,11 +751,13 @@
         }
         if (type === "guided_dialogue") {
           currentContext = data.dialogue;
+          const raPortrait = portraitURL(data.dialogue.portrait_asset_id, data.dialogue.portrait_url);
+          panel.showSpeaker?.({ imageUrl: raPortrait, side: "right", label: data.dialogue.npc_name || "Ra" });
           panel.updateHeader({
             title: data.dialogue.npc_name,
             subtitle: buttonLabel || "",
             imageUrl: data.dialogue.portrait_asset_id
-              ? `/api/assets/${encodeURIComponent(data.dialogue.portrait_asset_id)}/content?variant=thumbnail`
+              ? portraitURL(data.dialogue.portrait_asset_id, data.dialogue.portrait_url)
               : (data.dialogue.portrait_url || ""),
           });
           renderDialogue(data.dialogue, { showOpening: true });
@@ -749,10 +766,12 @@
         }
 
         currentContext = data;
+        const kessaPortrait = portraitURL(data.packet.portrait_asset_id, data.packet.portrait_url) || KESSA_PORTRAIT_FALLBACK;
+        panel.showSpeaker?.({ imageUrl: kessaPortrait, side: "left", mirrored: true, label: data.packet.display_name || "Kessa" });
         panel.updateHeader({
           title: data.packet.display_name,
           subtitle: buttonLabel || "",
-          imageUrl: data.packet.portrait_asset_id ? `/api/assets/${encodeURIComponent(data.packet.portrait_asset_id)}/content?variant=thumbnail` : "",
+          imageUrl: kessaPortrait,
         });
         renderMain();
       } catch (error) {

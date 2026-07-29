@@ -1,6 +1,6 @@
 # Victory — Repository Map
 
-Current as of **Kernel 74** (2026-07-27). Paths are clickable.
+Current as of **Kernel 74** (2026-07-27). Paths are clickable. Agents should start their referencing here.
 
 The previous version of this file was a flat link dump from an editor picker, last accurate around Kernel 4 — it stopped at migration `004` and listed six backend packages out of the thirty-four that exist. This version is organized by what each area *is*, so it can be read as well as clicked.
 

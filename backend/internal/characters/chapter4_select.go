@@ -389,6 +389,32 @@ func CommitChapter4FirstSkill(ctx context.Context, pool *pgxpool.Pool, actorUser
 		return Chapter4SelectResult{}, nil, err
 	}
 
+	// Completing the first trained skill is the Catharsis tutorial's
+	// approval moment. Put the newly completed Character into any currently
+	// active Catharsis Show Run so the live stage can project Player controls
+	// immediately, without requiring a separate ticket or roster screen.
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO show_run_roster_members
+			(show_run_id, user_id, role, program_visible, added_by_user_id, character_card_id)
+		SELECT sr.id, $1::uuid, 'player', TRUE, $1::uuid, $2::uuid
+		FROM show_runs sr
+		WHERE sr.status = 'active'
+		  AND EXISTS (
+			SELECT 1
+			FROM lots l
+			JOIN venues v ON v.lot_id = l.id
+			WHERE l.location_id = sr.location_id
+			  AND v.slug = 'catharsis'
+		  )
+		ON CONFLICT (show_run_id, user_id) WHERE removed_at IS NULL
+		DO UPDATE SET
+			role = 'player',
+			program_visible = TRUE,
+			character_card_id = EXCLUDED.character_card_id
+	`, actorUserID, cardID); err != nil {
+		return Chapter4SelectResult{}, nil, err
+	}
+
 	displayName := strings.TrimSpace(cardName)
 	if displayName == "" {
 		displayName = "The character"

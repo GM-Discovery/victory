@@ -382,9 +382,21 @@ func SelectCharacter(ctx context.Context, pool *pgxpool.Pool, actorUserID, showR
 		WHERE show_run_id = $1 AND user_id = $2 AND removed_at IS NULL
 	`, showRunID, actorUserID).Scan(&memberID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return RosterMember{}, errors.New("not_a_roster_member")
+			// Open-enrollment runs are allowed to complete the self-join as
+			// part of choosing a Character. This keeps the Character picker
+			// usable for walk-up Players while preserving the roster guard for
+			// approval-only runs.
+			joined, joinErr := SelfJoinAsPlayer(ctx, pool, actorUserID, showRunID)
+			if joinErr != nil {
+				if joinErr.Error() == "open_enrollment_disabled" {
+					return RosterMember{}, errors.New("not_a_roster_member")
+				}
+				return RosterMember{}, joinErr
+			}
+			memberID = joined.ID
+		} else {
+			return RosterMember{}, err
 		}
-		return RosterMember{}, err
 	}
 
 	if characterCardID != "" {

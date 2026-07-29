@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
-// Kernel 75 golden-journey browser proof (spec §11.1).
+// Kernel 75 golden-journey browser proof (spec §11.1). Noting
 //
 // Walks the complete first-time path with fresh accounts:
 //

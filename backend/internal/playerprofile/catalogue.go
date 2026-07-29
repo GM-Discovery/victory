@@ -43,6 +43,7 @@ const (
 	FieldTypeSingleSelect       = "single_select"
 	FieldTypeSingleSelectCustom = "single_select_custom"
 	FieldTypeMultiSelectCustom  = "multi_select_custom"
+	FieldTypeTTRPGMatrix        = "ttrpg_matrix"
 )
 
 var validFieldTypes = map[string]bool{
@@ -52,10 +53,11 @@ var validFieldTypes = map[string]bool{
 	FieldTypeSingleSelect:       true,
 	FieldTypeSingleSelectCustom: true,
 	FieldTypeMultiSelectCustom:  true,
+	FieldTypeTTRPGMatrix:        true,
 }
 
 func fieldTypeAllowsOptions(t string) bool {
-	return t == FieldTypeSingleSelect || t == FieldTypeSingleSelectCustom || t == FieldTypeMultiSelectCustom
+	return t == FieldTypeSingleSelect || t == FieldTypeSingleSelectCustom || t == FieldTypeMultiSelectCustom || t == FieldTypeTTRPGMatrix
 }
 
 func fieldTypeIsCollection(t string) bool {
@@ -70,17 +72,23 @@ const FavoriteTTRPGsMaxItems = 3
 
 // CatalogueField is one question on a Player Workbook page (Kernel 61 §6.2).
 type CatalogueField struct {
-	FieldKey        string   `json:"field_key"`
-	FieldLabel      string   `json:"field_label"`
-	FieldType       string   `json:"field_type"`
-	Required        bool     `json:"required"`
-	Options         []string `json:"options,omitempty"`
-	AllowCustom     bool     `json:"allow_custom,omitempty"`
-	MaxItems        int      `json:"max_items,omitempty"`
-	FaceEligible    bool     `json:"face_eligible"`
-	FaceRegion      string   `json:"face_region,omitempty"`
-	DefaultPriority int      `json:"default_priority"`
-	HelpText        string   `json:"help_text,omitempty"`
+	FieldKey        string                 `json:"field_key"`
+	FieldLabel      string                 `json:"field_label"`
+	FieldType       string                 `json:"field_type"`
+	Required        bool                   `json:"required"`
+	Options         []string               `json:"options,omitempty"`
+	AllowCustom     bool                   `json:"allow_custom,omitempty"`
+	MaxItems        int                    `json:"max_items,omitempty"`
+	FaceEligible    bool                   `json:"face_eligible"`
+	FaceRegion      string                 `json:"face_region,omitempty"`
+	DefaultPriority int                    `json:"default_priority"`
+	HelpText        string                 `json:"help_text,omitempty"`
+	OptionGroups    []CatalogueOptionGroup `json:"option_groups,omitempty"`
+}
+
+type CatalogueOptionGroup struct {
+	Category string   `json:"category"`
+	Options  []string `json:"options"`
 }
 
 // CataloguePage is one Player Workbook page (Kernel 61 §6.2, §7).

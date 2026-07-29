@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Third Place — Victory</title>
@@ -8,23 +10,25 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg: #17120e;
-      --panel: rgba(27, 21, 17, 0.92);
-      --panel-strong: rgba(19, 15, 12, 0.96);
-      --line: rgba(255, 233, 197, 0.12);
-      --accent: #f0d3a4;
-      --accent-strong: #fff2d7;
-      --muted: #d0bfa6;
+      --bg: #080607;
+      --panel: rgba(17, 13, 14, 0.9);
+      --panel-strong: rgba(11, 8, 9, 0.96);
+      --line: rgba(255, 255, 255, 0.1);
+      --accent: #d84b4f;
+      --accent-strong: #ffd1d3;
+      --muted: #c6b7b8;
+      --accent-soft: rgba(216, 75, 79, 0.16);
     }
 
     body {
       margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
+      font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
       background:
-        radial-gradient(circle at 15% 10%, rgba(172, 120, 64, 0.28), transparent 30%),
-        radial-gradient(circle at 85% 0%, rgba(82, 119, 167, 0.18), transparent 28%),
-        linear-gradient(180deg, #17120e 0%, #0e0b09 100%);
-      color: #f6ecdd;
+        radial-gradient(circle at 16% 10%, rgba(180, 56, 61, 0.24), transparent 28%),
+        radial-gradient(circle at 84% 4%, rgba(255, 255, 255, 0.07), transparent 24%),
+        radial-gradient(circle at 50% 100%, rgba(92, 25, 28, 0.24), transparent 30%),
+        linear-gradient(180deg, #0d0a0b 0%, #060506 100%);
+      color: #f7eef0;
     }
 
     .header {
@@ -38,7 +42,7 @@
     .eyebrow {
       text-transform: uppercase;
       letter-spacing: 0.18em;
-      color: #d7ab6f;
+      color: #d86b70;
       font-size: 0.76rem;
       margin: 0 0 8px;
     }
@@ -52,13 +56,26 @@
     .chip {
       display: inline-flex; align-items: center; justify-content: center; gap: 8px;
       border-radius: 999px; text-decoration: none; border: 1px solid var(--line);
-      padding: 11px 16px; color: var(--accent-strong); background: rgba(255, 255, 255, 0.03);
+      padding: 11px 16px; color: var(--accent-strong); background: rgba(255, 255, 255, 0.04);
       font-weight: 700; cursor: pointer; font: inherit;
+      transition: transform 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
     }
 
     .chip:disabled { opacity: 0.6; cursor: default; }
 
-    .chip.danger { border-color: rgba(240, 130, 100, 0.4); color: #ffd6c4; }
+    .chip:hover:not(:disabled),
+    .chip:focus-visible {
+      transform: translateY(-1px);
+      background: rgba(255, 255, 255, 0.07);
+      border-color: rgba(216, 75, 79, 0.32);
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.24);
+    }
+
+    .chip.danger {
+      border-color: rgba(216, 75, 79, 0.42);
+      color: #ffd7d8;
+      background: rgba(216, 75, 79, 0.08);
+    }
 
     .stage {
       max-width: 1100px; width: 100%; margin: 0 auto; padding: 8px 24px 48px;
@@ -69,7 +86,10 @@
 
     .card {
       background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
-      padding: 22px; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.24);
+      padding: 22px; box-shadow:
+        0 18px 60px rgba(0, 0, 0, 0.34),
+        inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(10px);
     }
 
     .my-headshot-status { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px; justify-content: space-between; }
@@ -88,7 +108,18 @@
 
     input[type="text"], select {
       width: 100%; box-sizing: border-box; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
-      background: #211913; color: #fff6e9; padding: 12px 14px; font: inherit;
+      background: rgba(12, 9, 10, 0.9); color: #fff4f4; padding: 12px 14px; font: inherit;
+    }
+
+    input[type="text"]::placeholder {
+      color: #9e8f90;
+    }
+
+    input[type="text"]:focus,
+    select:focus {
+      outline: none;
+      border-color: rgba(216, 75, 79, 0.5);
+      box-shadow: 0 0 0 3px rgba(216, 75, 79, 0.14);
     }
 
     .headshot-grid {
@@ -96,33 +127,39 @@
     }
 
     .headshot-card {
-      background: rgba(255,255,255,0.02); border: 1px solid var(--line); border-radius: 16px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015)),
+        rgba(11, 8, 9, 0.78);
+      border: 1px solid var(--line); border-radius: 16px;
       padding: 18px; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box;
       position: relative;
     }
 
-    .headshot-card.is-you { border-color: rgba(240, 211, 164, 0.5); }
+    .headshot-card.is-you {
+      border-color: rgba(216, 75, 79, 0.42);
+      box-shadow: 0 0 0 1px rgba(216, 75, 79, 0.08);
+    }
 
     .you-badge {
       position: absolute; top: 14px; right: 14px; border-radius: 999px; padding: 3px 10px;
-      font-size: 0.72rem; font-weight: 700; border: 1px solid rgba(255,255,255,0.24); color: var(--accent);
-      background: rgba(240, 211, 164, 0.1);
+      font-size: 0.72rem; font-weight: 700; border: 1px solid rgba(216, 75, 79, 0.38); color: var(--accent-strong);
+      background: var(--accent-soft);
     }
 
     .headshot-portrait-row { display: flex; align-items: center; gap: 12px; }
 
     .thumb {
       width: 64px; height: 64px; border-radius: 12px; object-fit: cover;
-      border: 1px solid rgba(255,255,255,0.12); background: #241b15; flex-shrink: 0;
+      border: 1px solid rgba(255,255,255,0.12); background: #1d1314; flex-shrink: 0;
     }
 
     .thumb-empty {
       width: 64px; height: 64px; border-radius: 12px; display: grid; place-items: center;
-      border: 1px dashed rgba(255,255,255,0.16); color: var(--muted); font-size: 1.4rem; background: #201813;
+      border: 1px dashed rgba(255,255,255,0.16); color: var(--muted); font-size: 1.4rem; background: rgba(18, 12, 13, 0.9);
       flex-shrink: 0;
     }
 
-    .headshot-name { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--accent-strong); }
+    .headshot-name { margin: 0; font-size: 1.1rem; font-weight: 700; color: #ffe4e5; }
 
     .headshot-placed { margin: 2px 0 0; color: var(--muted); font-size: 0.82rem; }
 
@@ -137,7 +174,7 @@
     .headshot-card-actions .chip { padding: 9px 14px; font-size: 0.86rem; }
 
     .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
-    .empty-state h2 { color: #f6ecdd; margin: 0 0 8px; }
+    .empty-state h2 { color: #fff2f3; margin: 0 0 8px; }
 
     .status-line { color: var(--muted); min-height: 1.4em; }
 
@@ -148,6 +185,7 @@
     .history-row {
       display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
       border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; color: var(--muted); font-size: 0.9rem;
+      background: rgba(255, 255, 255, 0.02);
     }
 
     .history-row .badge {
@@ -155,7 +193,11 @@
       border: 1px solid rgba(255,255,255,0.2); color: var(--muted); white-space: nowrap;
     }
 
-    .history-row .badge.active { color: var(--accent); border-color: rgba(240, 211, 164, 0.4); }
+    .history-row .badge.active {
+      color: var(--accent-strong);
+      border-color: rgba(216, 75, 79, 0.4);
+      background: rgba(216, 75, 79, 0.1);
+    }
 
     @media (max-width: 560px) {
       .headshot-grid { grid-template-columns: 1fr; }
@@ -173,6 +215,7 @@
     .show-run-picker-item {
       display: flex; justify-content: space-between; align-items: center; gap: 10px;
       border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;
+      background: rgba(255, 255, 255, 0.02);
     }
     .show-run-picker-empty { color: var(--muted); }
   </style>
@@ -645,3 +688,5 @@
   </script>
 </body>
 </html>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />

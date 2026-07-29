@@ -1,15 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Audition Hall</title>
   <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090607;
+      --panel: #171013;
+      --panel-soft: #201518;
+      --line: rgba(255, 255, 255, 0.1);
+      --line-strong: rgba(216, 75, 79, 0.28);
+      --text: #f7eff0;
+      --muted: #c9b8ba;
+      --gold: #d1a75d;
+      --gold-strong: #f1ce89;
+      --red: #d84b4f;
+      --red-strong: #ff8d90;
+    }
+
     body {
       margin: 0;
-      background: #14100c;
-      color: #f2e7d0;
-      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at 16% 10%, rgba(180, 56, 61, 0.22), transparent 28%),
+        radial-gradient(circle at 84% 2%, rgba(255, 255, 255, 0.05), transparent 24%),
+        radial-gradient(circle at 50% 100%, rgba(92, 25, 28, 0.2), transparent 30%),
+        linear-gradient(180deg, #0d0a0b 0%, #060506 100%);
+      color: var(--text);
+      font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     }
 
     .shell {
@@ -19,21 +40,58 @@
     }
 
     .panel {
-      background: #1f1812;
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 12px;
+      background:
+        radial-gradient(circle at top right, rgba(216, 75, 79, 0.08), transparent 34%),
+        linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)),
+        var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
       padding: 20px;
       margin-bottom: 20px;
+      box-shadow:
+        0 18px 50px rgba(0, 0, 0, 0.34),
+        inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(8px);
     }
 
     h1, h2 {
       margin-top: 0;
     }
 
+    h1 {
+      font-size: clamp(2rem, 4vw, 3rem);
+      letter-spacing: 0.01em;
+    }
+
+    h2 {
+      color: var(--gold-strong);
+      font-size: 1.1rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      margin-bottom: 0.8rem;
+    }
+
+    .panel h2 {
+      position: relative;
+      padding-bottom: 0.35rem;
+    }
+
+    .panel h2::after {
+      content: "";
+      display: block;
+      width: 3.5rem;
+      height: 2px;
+      margin-top: 0.45rem;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--gold-strong), rgba(216, 75, 79, 0.65));
+      opacity: 0.9;
+    }
+
     label {
       display: block;
       margin: 0 0 6px;
       font-weight: 600;
+      color: var(--gold-strong);
     }
 
     input, select, textarea, button {
@@ -45,10 +103,16 @@
       box-sizing: border-box;
       padding: 10px 12px;
       border-radius: 8px;
-      border: 1px solid rgba(255,255,255,0.12);
-      background: #2a2119;
-      color: white;
+      border: 1px solid rgba(216, 75, 79, 0.22);
+      background: var(--panel-soft);
+      color: var(--text);
       margin-bottom: 14px;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: rgba(241, 206, 137, 0.5);
+      box-shadow: 0 0 0 3px rgba(216, 75, 79, 0.16);
     }
 
     textarea {
@@ -60,31 +124,37 @@
       padding: 10px 14px;
       border: 0;
       border-radius: 8px;
-      background: #7a4c1f;
-      color: white;
+      background: linear-gradient(180deg, #74262b 0%, #4f171b 100%);
+      color: #fff3f4;
       cursor: pointer;
+      font-weight: 700;
+      border: 1px solid rgba(216, 75, 79, 0.32);
+      box-shadow: 0 10px 18px rgba(0, 0, 0, 0.18);
+      transition: transform 140ms ease, filter 140ms ease, background 140ms ease;
     }
 
     button:hover {
-      background: #955b24;
+      transform: translateY(-1px);
+      filter: brightness(1.06);
+      background: linear-gradient(180deg, #8a3238 0%, #5d181d 100%);
     }
 
     .status {
       min-height: 1.2em;
-      color: #f3d18b;
+      color: var(--gold-strong);
       margin-top: 10px;
     }
 
     .request-row {
       padding: 12px;
       border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 8px;
+      border-radius: 10px;
       margin-bottom: 10px;
-      background: #18120e;
+      background: rgba(255, 255, 255, 0.02);
     }
 
     .muted {
-      color: #cdbb9f;
+      color: var(--muted);
     }
 
     .hidden {
@@ -94,9 +164,9 @@
     .ticket-row {
       padding: 12px;
       border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 8px;
+      border-radius: 10px;
       margin-bottom: 10px;
-      background: #18120e;
+      background: rgba(255, 255, 255, 0.02);
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -114,11 +184,25 @@
     }
 
     .distinction-note {
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 8px;
+      border: 1px solid rgba(241, 206, 137, 0.16);
+      border-radius: 10px;
       padding: 12px 14px;
-      background: #211913;
+      background:
+        radial-gradient(circle at top right, rgba(241, 206, 137, 0.08), transparent 38%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.012));
       font-size: 0.92rem;
+    }
+
+    .distinction-note strong {
+      color: var(--gold-strong);
+    }
+
+    .panel p a {
+      color: var(--gold-strong);
+    }
+
+    .panel p a:hover {
+      color: #ffe6b9;
     }
 
     .lookup-row {
@@ -135,6 +219,16 @@
       width: auto;
       flex-shrink: 0;
     }
+
+    #director-panel h2,
+    #producer-panel h2 {
+      color: var(--gold);
+    }
+
+    .panel > p.muted:first-of-type {
+      font-size: 0.98rem;
+      line-height: 1.55;
+    }
   </style>
 </head>
 <body>
@@ -144,7 +238,7 @@
       <p class="muted">
         Ticketing for events happens in ticket booth back on the main map. This space is for requesting access to participate in events as cast, crew, or director. If you're here, you likely already have an account and are signed in. If not, please create an account and sign in before requesting access.
       </p>
-      <p><a href="/" style="color:#f3d18b;">Back to map</a></p>
+      <p><a href="/">Back to map</a></p>
     </div>
 
     <div class="panel">
@@ -541,3 +635,5 @@
   <script src="/lib/venue-account-badge.js?v=nav-1"></script>
 </body>
 </html>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />

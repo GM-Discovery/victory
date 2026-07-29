@@ -43,6 +43,18 @@
     </section>
   </main>
 
+  <div id="onboarding-overlay" class="intro-overlay" hidden>
+    <div class="intro-modal" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+      <h2 id="onboarding-title">Welcome to Victory</h2>
+      <p>
+        To continue the tutorial, click <strong>Audition Hall</strong> on the left. To change your profile settings, click <strong>Trailers</strong> on the top right.
+      </p>
+      <div class="intro-actions">
+        <button class="chip primary" type="button" id="onboarding-dismiss-button">Got it</button>
+      </div>
+    </div>
+  </div>
+
   <div id="map-menu" class="map-menu" hidden role="dialog" aria-modal="false" aria-labelledby="map-menu-title">
     <div class="map-menu-sheet">
       <div class="map-menu-header">
@@ -68,10 +80,11 @@
       <div class="booth-grid" aria-label="Info booth lineup">
         <section class="booth-column">
           <h3>Opening Act</h3>
+            <h4>Victory & Socio Tutorials</h4>
           <ul>
-            <li>Learn the world at a glance</li>
-            <li>See how Victory stages play</li>
-            <li>Find your way through the venue map</li>
+            <li>Learn navigating Victory Theaters</li>
+            <li>Make a Socio Character</li>
+            <li>Find your way to the Third Place</li>
           </ul>
         </section>
 
@@ -87,20 +100,26 @@
         <section class="booth-column">
           <h3>Also Featuring</h3>
           <ul>
-            <li>YOUR GAME HERE! Microscope, and other future formats</li>
+            <li>YOUR GAME HERE! Microscope! Other future formats</li>
             <li>Special performances hosted in-app (live audiences up to ~3k)</li>
-            <li>New stages opening soon!</li>
+            <li>New stages (games) opening soon!</li>
           </ul>
         </section>
       </div>
 
       <div class="booth-footer">
-        <div>
+        <div class="booth-footer-copy">
           <strong>Victory Virtual Tabletop Theaters (Victory VTT)</strong>
-          <div class="mini">Spending time in other worlds.</div>
+          <div class="mini">On with the show!</div>
         </div>
-          <button id="account-menu-toggle" class="account-menu-toggle" type="button" hidden aria-label="Account options" aria-expanded="false">▾</button>
-        <a id="info-booth-mailbox" class="booth-button" href="/mailbox/">Open Mailbox</a>
+        <div class="booth-actions" aria-label="Info booth services">
+          <button class="booth-button booth-button--placeholder" type="button" disabled title="Ticketing is coming later">Ticketing</button>
+          <div id="info-booth-guest-actions" class="booth-guest-actions">
+            <a class="booth-button booth-button--secondary" href="/signup/">Register Account</a>
+            <a class="booth-button booth-button--secondary" href="/login/">Log In</a>
+          </div>
+          <a id="info-booth-mailbox" class="booth-button booth-button--mailbox" href="/mailbox/" hidden>Mailbox</a>
+        </div>
       </div>
     </div>
   </div>
@@ -127,6 +146,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=map-2"></script>
+  <script src="/app.js?v=map-4"></script>
 </body>
 </html>
