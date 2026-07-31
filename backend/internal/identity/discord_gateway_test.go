@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/sessions"
 )
@@ -45,7 +48,7 @@ func TestDiscordGatewayStatusReportsRuntimeState(t *testing.T) {
 		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_gateway_settings WHERE location_id = $1`, locationID)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/discord/gateway/status", nil)
+	req := newGatewayStatusRequest(t, pool, "gateway_status_runtime_op")
 	rec := httptest.NewRecorder()
 
 	HandleDiscordGatewayStatus(pool, DiscordGatewayConfig{Enabled: true, BotToken: "bot-token", Intents: 513}).ServeHTTP(rec, req)
@@ -116,7 +119,7 @@ func TestDiscordGatewayStatusResolvesBootstrapSettingsFromDatabase(t *testing.T)
 		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_gateway_settings WHERE location_id = $1`, locationID)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/discord/gateway/status", nil)
+	req := newGatewayStatusRequest(t, pool, "gateway_status_bootstrap_op")
 	rec := httptest.NewRecorder()
 
 	HandleDiscordGatewayStatus(pool, DiscordGatewayConfig{}).ServeHTTP(rec, req)
@@ -166,7 +169,7 @@ func TestDiscordGatewayDebugEnabledPersistsInStatus(t *testing.T) {
 		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.discord_gateway_settings WHERE location_id = $1`, locationID)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/discord/gateway/status", nil)
+	req := newGatewayStatusRequest(t, pool, "gateway_status_debug_op")
 	rec := httptest.NewRecorder()
 
 	HandleDiscordGatewayStatus(pool, DiscordGatewayConfig{}).ServeHTTP(rec, req)
@@ -301,5 +304,86 @@ func TestDiscordGatewayStateUpsertHandlesEmptyIdentifiers(t *testing.T) {
 	}
 	if !row.Enabled || !row.Configured || !row.Running || !row.Connected || row.Intents != 513 {
 		t.Fatalf("unexpected gateway state row: %+v", row)
+	}
+}
+
+// newGatewayStatusRequest builds an authenticated operator request for
+// /api/discord/gateway/status. Kernel 76 (K76-M02) closed that route to
+// anonymous callers, so the status tests now have to arrive as the operator.
+func newGatewayStatusRequest(t *testing.T, pool *pgxpool.Pool, handle string) *http.Request {
+	t.Helper()
+
+	t.Setenv("OPERATOR_HANDLE", handle)
+	locationID := resolveDiscordServerTestLocationID(t, pool, "amurray-family")
+	userID := insertDiscordServerTestUser(t, pool, handle, handle)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.sessions WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM location_memberships WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
+	})
+
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO location_memberships (location_id, user_id, role, active)
+		VALUES ($1, $2, 'producer', TRUE)
+		ON CONFLICT (location_id, user_id, role) DO UPDATE SET active = TRUE
+	`, locationID, userID); err != nil {
+		t.Fatalf("insert membership: %v", err)
+	}
+
+	rawSession, _, err := sessions.CreateSession(context.Background(), pool, userID, 24*time.Hour, httptest.NewRequest(http.MethodGet, "/", nil))
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/discord/gateway/status", nil)
+	req.AddCookie(&http.Cookie{Name: sessions.CookieName, Value: rawSession})
+	return req
+}
+
+func TestDiscordGatewayStatusRejectsAnonymousCallers(t *testing.T) {
+	pool := openDiscordTestPool(t)
+	ensureDiscordServerTestSchema(t, pool)
+	if err := EnsureKernel39DiscordGatewaySurface(context.Background(), pool); err != nil {
+		t.Fatalf("ensure gateway surface: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/discord/gateway/status", nil)
+	rec := httptest.NewRecorder()
+	HandleDiscordGatewayStatus(pool, DiscordGatewayConfig{Enabled: true}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous gateway status should be 401, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); strings.Contains(body, "last_error") || strings.Contains(body, "intents") {
+		t.Fatalf("anonymous rejection leaked gateway state: %s", body)
+	}
+}
+
+func TestDiscordGatewayStatusRejectsNonOperator(t *testing.T) {
+	pool := openDiscordTestPool(t)
+	ensureDiscordServerTestSchema(t, pool)
+	if err := EnsureKernel39DiscordGatewaySurface(context.Background(), pool); err != nil {
+		t.Fatalf("ensure gateway surface: %v", err)
+	}
+
+	t.Setenv("OPERATOR_HANDLE", "gateway_status_real_operator")
+	userID := insertDiscordServerTestUser(t, pool, "gateway_status_bystander", "Bystander")
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM auth.sessions WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
+	})
+
+	rawSession, _, err := sessions.CreateSession(context.Background(), pool, userID, 24*time.Hour, httptest.NewRequest(http.MethodGet, "/", nil))
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/discord/gateway/status", nil)
+	req.AddCookie(&http.Cookie{Name: sessions.CookieName, Value: rawSession})
+	rec := httptest.NewRecorder()
+	HandleDiscordGatewayStatus(pool, DiscordGatewayConfig{Enabled: true}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("non-operator gateway status should be 403, got %d body=%s", rec.Code, rec.Body.String())
 	}
 }

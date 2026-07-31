@@ -315,6 +315,23 @@ func HandleDiscordGatewayStatus(pool *pgxpool.Pool, cfg DiscordGatewayConfig) ht
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
+		// Kernel 76 (K76-M02): this route answered anonymous callers with the
+		// gateway's configured/enabled/connected flags, intent bitfield, thread
+		// counts, and verbatim `last_error` from Discord -- an operations
+		// readout of Grant's infrastructure served to the public internet.
+		userID, err := currentUserID(ctx, pool, r)
+		if err != nil || strings.TrimSpace(userID) == "" {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "not_authenticated"})
+			return
+		}
+		if ok, err := access.IsOperatorUser(ctx, pool, userID); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "operator_lookup_failed"})
+			return
+		} else if !ok {
+			writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "operator_required"})
+			return
+		}
+
 		location, err := resolveProducerOfficeLocation(ctx, pool)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "location_lookup_failed", "detail": err.Error()})

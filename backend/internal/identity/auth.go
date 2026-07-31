@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -41,10 +42,37 @@ type ResetPasswordRequest struct {
 	NewPassword string `json:"new_password"`
 }
 
+// PasswordSignupEnabled reports whether open email/password registration is
+// admitted. Kernel 76 (K76-H01) closes it by default: the route was reachable
+// from the public internet, needed no invite, and granted every caller an
+// active `audience` membership in the amurray-family Location, which was
+// enough to read the Third Place roster of real people. Account establishment
+// now goes through Discord.
+//
+// PASSWORD_SIGNUP_ENABLED=true reopens it for local development. Nothing in
+// the deployed configuration sets it.
+func PasswordSignupEnabled() bool {
+	switch strings.TrimSpace(strings.ToLower(os.Getenv("PASSWORD_SIGNUP_ENABLED"))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
 func HandleSignup(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method_not_allowed"})
+			return
+		}
+
+		if !PasswordSignupEnabled() {
+			writeJSON(w, http.StatusForbidden, map[string]any{
+				"ok":     false,
+				"error":  "password_signup_closed",
+				"detail": "Victory accounts are created by signing in with Discord.",
+			})
 			return
 		}
 
@@ -222,6 +250,16 @@ func HandleLogout(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc {
 	}
 }
 
+// HandleForgotPassword is closed as of Kernel 76 (K76-C01). Victory has no
+// email delivery, so the only way this flow ever returned a token was by
+// printing the raw value into the backend log, where it stayed readable to
+// anyone who could reach `docker logs` and functioned as an account-takeover
+// credential for any address the caller could name.
+//
+// Self-service recovery returns in Kernel 77 once there is a delivery channel
+// to send a token through. Until then the reset token is minted by the
+// operator-only break-glass tool (cmd/victory-recover) and redeemed at
+// /api/auth/password-reset/confirm, which is still live.
 func HandleForgotPassword(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -229,53 +267,12 @@ func HandleForgotPassword(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		var req ForgotPasswordRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid_json"})
-			return
-		}
-
-		email := strings.TrimSpace(strings.ToLower(req.Email))
-		if email == "" {
-			writeJSON(w, http.StatusOK, map[string]any{"ok": true})
-			return
-		}
-
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-		defer cancel()
-
-		var userID string
-		err := pool.QueryRow(ctx, `
-			SELECT id
-			FROM users
-			WHERE lower(email) = $1
-			LIMIT 1
-		`, email).Scan(&userID)
-		if err != nil {
-			writeJSON(w, http.StatusOK, map[string]any{"ok": true})
-			return
-		}
-
-		rawToken, tokenHash, err := newResetToken()
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "token_generation_failed"})
-			return
-		}
-
-		expiresAt := time.Now().UTC().Add(1 * time.Hour)
-
-		_, err = pool.Exec(ctx, `
-			INSERT INTO auth.password_reset_tokens (user_id, token_hash, expires_at, request_ip, request_user_agent)
-			VALUES ($1, $2, $3, $4, $5)
-		`, userID, tokenHash, expiresAt, clientIP(r), r.UserAgent())
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "reset_store_failed"})
-			return
-		}
-
-		log.Printf("PASSWORD RESET TOKEN for %s: %s", email, rawToken)
-
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+		writeJSON(w, http.StatusGone, map[string]any{
+			"ok":    false,
+			"error": "self_service_password_reset_unavailable",
+			"detail": "Password reset is handled by the Victory operator. " +
+				"Sign in with Discord, or contact the operator for a recovery link.",
+		})
 	}
 }
 

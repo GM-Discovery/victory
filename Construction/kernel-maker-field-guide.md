@@ -105,12 +105,12 @@ docker compose up -d postgres
 Run backend from `backend/`:
 ```bash
 cd /opt/victory/backend
-PORT=8081 DATABASE_URL='postgres://victory:REDACTED@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory
+PORT=8081 DATABASE_URL='postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory
 ```
 
 If port `8081` is already occupied, either stop the old backend or use a temporary port:
 ```bash
-PORT=18081 DATABASE_URL='postgres://victory:REDACTED@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory
+PORT=18081 DATABASE_URL='postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory
 ```
 
 Health check:
@@ -128,7 +128,7 @@ docker compose up -d --build
 In install mode:
 - Backend runs in the `victory-backend` container.
 - Postgres host inside Docker is `victory-postgres`.
-- The container `DATABASE_URL` is `postgres://victory:REDACTED@victory-postgres:5432/victory?sslmode=disable`.
+- The container `DATABASE_URL` is `postgres://victory:${POSTGRES_PASSWORD}@victory-postgres:5432/victory?sslmode=disable`.
 - Caddy proxies `/api/*` and `/ws/*` to `localhost:8081`.
 
 ## Ports And Names
@@ -262,14 +262,14 @@ Run from `/opt/victory/backend`.
 One-time (or after a schema change) setup of the dedicated test database:
 ```bash
 cd /opt/victory
-TEST_DATABASE_URL="postgres://victory:REDACTED@127.0.0.1:5432/victory_test?sslmode=disable" \
+TEST_DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/victory_test?sslmode=disable" \
   scripts/test/setup-test-database.sh
 ```
 This creates `victory_test` if missing, applies every migration, and boots the real backend once against it so Go-side `Ensure*Surface` bootstrap (e.g. the `first-theater`/`catharsis`/`middle-school-stage` venues from `internal/access.EnsureKernel16VenueSurface`) runs too - the raw SQL migrations alone don't create everything a live install has. Safe to re-run any time; nothing in it is destructive. For a full wipe-and-rebuild instead, see `scripts/test/reset-test-database.sh` (requires `CONFIRM_TEST_DB_RESET=1` in addition to a validated `TEST_DATABASE_URL`, and will refuse to run against anything that isn't a dedicated test database).
 
 Full suite:
 ```bash
-GOCACHE=/tmp/victory-gocache TEST_DATABASE_URL="postgres://victory:REDACTED@127.0.0.1:5432/victory_test?sslmode=disable" go test ./...
+GOCACHE=/tmp/victory-gocache TEST_DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/victory_test?sslmode=disable" go test ./...
 ```
 
 Focused suites:

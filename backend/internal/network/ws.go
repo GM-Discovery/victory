@@ -222,7 +222,15 @@ func writePump(c *Client) {
 	}
 }
 
+// maxVenueMessageBytes caps a single inbound venue frame. Victory's client
+// messages are commands, chat lines, and index cards; none approach this.
+// Kernel 76 (K76-M03): there was no limit at all, so one authorized socket
+// could stream an arbitrarily large frame straight into the server's memory.
+const maxVenueMessageBytes = 256 << 10
+
 func readPump(hub *Hub, pool *pgxpool.Pool, c *Client, venueSlug string) {
+	c.Conn.SetReadLimit(maxVenueMessageBytes)
+
 	defer func() {
 		hub.Remove(c)
 

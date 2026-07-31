@@ -32,6 +32,20 @@ func requireAuthenticatedUser(ctx context.Context, pool *pgxpool.Pool, r *http.R
 	return userID, nil
 }
 
+// requireCommonsAdmission enforces Third Place's admission rule: a viewer must
+// have a ready Trailer Face of their own before they can see anyone else's.
+// This is the same check that gates placing a Headshot (Kernel 68 §3.2).
+func requireCommonsAdmission(ctx context.Context, pool *pgxpool.Pool, userID string) error {
+	ready, err := playerprofile.TrailerFaceReady(ctx, pool, userID)
+	if err != nil {
+		return err
+	}
+	if !ready.Ready {
+		return errors.New("trailer_face_not_ready")
+	}
+	return nil
+}
+
 func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -74,6 +88,15 @@ func HandleCollection(pool *pgxpool.Pool) http.HandlerFunc {
 
 		viewerUserID, err := requireAuthenticatedUser(ctx, pool, r)
 		if err != nil {
+			writeError(w, err)
+			return
+		}
+
+		// Kernel 76 (K76-H02): being signed in used to be the whole gate here,
+		// so any account -- including one a stranger had just created -- could
+		// read every member's stage name and headline facts. Reading the room
+		// now takes the same Trailer Face readiness that entering it does.
+		if err := requireCommonsAdmission(ctx, pool, viewerUserID); err != nil {
 			writeError(w, err)
 			return
 		}

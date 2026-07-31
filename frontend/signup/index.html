@@ -148,14 +148,40 @@
     }
 
     .links a:hover { color: #ff9aaf; }
+    .discord-button {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 14px;
+      border-radius: 4px;
+      border: 1px solid rgba(211,25,67,0.42);
+      background: #100d0e;
+      color: var(--text);
+      font-size: 1rem;
+      font-weight: 600;
+      text-align: center;
+      text-decoration: none;
+    }
+
+    .discord-button:hover {
+      background: #1d1014;
+      border-color: var(--crimson-bright);
+    }
   </style>
 </head>
 <body>
   <div class="panel">
     <h1>Create Account</h1>
-    <p>Enter your details to join.</p>
+    <p>Victory accounts are created by signing in with Discord.</p>
 
-    <form id="signup-form">
+    <a class="discord-button" href="/auth/discord/start">Continue with Discord</a>
+
+    <p class="hint" style="margin-top:16px;">
+      Email and password registration is closed. If you already have a Victory
+      account and cannot get in, ask the operator for a recovery link.
+    </p>
+
+    <form id="signup-form" hidden>
       <div class="field">
         <label for="handle">Handle</label>
         <input id="handle" name="handle" type="text" required />

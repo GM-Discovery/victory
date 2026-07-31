@@ -191,8 +191,20 @@ func handleListProductions(pool *pgxpool.Pool, w http.ResponseWriter, r *http.Re
 			return
 		}
 
-		_, locationID, err := resolveInviteAuthorityScope(ctx, pool, userID)
+		// Kernel 76 (K76-M01): resolveInviteAuthorityScope resolves a Location
+		// for every membership role including audience, so any member of a
+		// Location -- previously, anyone who had just signed up -- got the full
+		// list of that Location's Production names and slugs. Listing the
+		// Productions of a Location is staff work; audience and cast have no
+		// call for it.
+		role, locationID, err := resolveInviteAuthorityScope(ctx, pool, userID)
 		if err != nil {
+			writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "forbidden"})
+			return
+		}
+		switch role {
+		case "producer", "director":
+		default:
 			writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "forbidden"})
 			return
 		}

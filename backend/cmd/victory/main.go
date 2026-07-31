@@ -936,10 +936,18 @@ func main() {
 	mux.HandleFunc("/ws/first-theater", network.ServeVenueWS(hub, pool, discordServerLinkConfig, "first-theater"))
 	mux.HandleFunc("/ws/player-profile", network.ServeProfileWS(hub, pool))
 
+	// Kernel 76 (K76-M03): ReadHeaderTimeout was the only limit configured, so
+	// a slow or oversized body, an idle kept-alive connection, or a huge header
+	// block could hold a connection open indefinitely. WriteTimeout is left off
+	// deliberately -- it would sever long-lived WebSocket upgrades, which share
+	// this server -- so idle and read limits carry the protection instead.
 	server := &http.Server{
 		Addr:              ":" + port,
-		Handler:           loggingMiddleware(mux),
+		Handler:           requestBodyLimit(loggingMiddleware(mux)),
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    64 << 10,
 	}
 
 	log.Printf("victory backend listening on :%s", port)
@@ -1097,6 +1105,28 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+// defaultMaxRequestBodyBytes caps any request that is not an upload. The upload
+// handlers set their own, larger, per-Location MaxBytesReader afterwards, which
+// replaces this one; multipart routes and WebSocket upgrades are skipped here so
+// this cap can never be the thing that truncates them.
+const defaultMaxRequestBodyBytes = 4 << 20
+
+// requestBodyLimit closes the Kernel 76 gap (K76-M03) where every JSON handler
+// decoded from an unbounded r.Body: a single request could stream arbitrarily
+// many bytes into the decoder before any handler logic ran.
+func requestBodyLimit(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		contentType := r.Header.Get("Content-Type")
+		isUpload := strings.HasPrefix(contentType, "multipart/")
+		isWebSocket := strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
+
+		if r.Body != nil && !isUpload && !isWebSocket {
+			r.Body = http.MaxBytesReader(w, r.Body, defaultMaxRequestBodyBytes)
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func loggingMiddleware(next http.Handler) http.Handler {

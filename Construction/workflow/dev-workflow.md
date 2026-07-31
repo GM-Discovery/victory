@@ -26,7 +26,7 @@ docker compose up -d postgres
 Run backend on host:
 ```bash
 cd /opt/victory/backend
-PORT=8081 DATABASE_URL='postgres://victory:REDACTED@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory
+PORT=8081 DATABASE_URL='postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory
 ```
 
 Optional Discord OAuth environment for Kernel 32:
@@ -40,12 +40,12 @@ DISCORD_OAUTH_SCOPES='identify email'
 Operator bootstrap command for Kernel 33:
 ```bash
 cd /opt/victory/backend
-DATABASE_URL='postgres://victory:REDACTED@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory-bootstrap producer --discord-user-id <discord_user_id>
+DATABASE_URL='postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory-bootstrap producer --discord-user-id <discord_user_id>
 ```
 
 If `8081` is occupied:
 ```bash
-PORT=18081 DATABASE_URL='postgres://victory:REDACTED@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory
+PORT=18081 DATABASE_URL='postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory
 ```
 
 ## Install Mode
@@ -60,7 +60,7 @@ docker compose up -d --build
 curl -s http://127.0.0.1:8081/health
 curl -s http://127.0.0.1:8081/api/world/the-cave
 wscat -c ws://127.0.0.1:8081/ws/the-cave
-GOCACHE=/tmp/victory-gocache TEST_DATABASE_URL="postgres://victory:REDACTED@127.0.0.1:5432/victory_test?sslmode=disable" go test ./...
+GOCACHE=/tmp/victory-gocache TEST_DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/victory_test?sslmode=disable" go test ./...
 git diff --check
 ```
 
@@ -108,13 +108,13 @@ docker exec -it victory-postgres psql -U victory -d victory -c '\dt'
 `go test ./...` no longer touches the live `victory` database. Set up the dedicated `victory_test` database once (safe to re-run - non-destructive):
 ```bash
 cd /opt/victory
-TEST_DATABASE_URL="postgres://victory:REDACTED@127.0.0.1:5432/victory_test?sslmode=disable" \
+TEST_DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/victory_test?sslmode=disable" \
   scripts/test/setup-test-database.sh
 ```
 This creates `victory_test` on the same Postgres container if it doesn't exist, applies every migration, and boots the real backend once against it (so Go-side `Ensure*Surface` bootstrap runs too - some venues, like `first-theater`, only exist because of that, not because of any SQL migration). For a full wipe-and-rebuild from empty:
 ```bash
 CONFIRM_TEST_DB_RESET=1 \
-  TEST_DATABASE_URL="postgres://victory:REDACTED@127.0.0.1:5432/victory_test?sslmode=disable" \
+  TEST_DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/victory_test?sslmode=disable" \
   scripts/test/reset-test-database.sh
 ```
 Both scripts refuse to run against anything that isn't clearly a dedicated test database (see `scripts/test/require-isolated-database.sh`). `scripts/smoke/fresh-install.sh --local` is unrelated to this - it manages its own fully disposable database per run.

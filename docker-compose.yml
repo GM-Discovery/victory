@@ -6,7 +6,11 @@ services:
     environment:
       POSTGRES_DB: victory
       POSTGRES_USER: victory
-      POSTGRES_PASSWORD: change_this_now
+      # Kernel 76 (K76-H03): this was the literal string `change_this_now`,
+      # committed to the repository and in use as the live production
+      # credential. The value now comes from .env (chmod 600, gitignored) and
+      # the compose file no longer carries a usable secret.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -21,7 +25,7 @@ services:
     restart: unless-stopped
     environment:
       PORT: ${PORT:-8081}
-      DATABASE_URL: postgres://victory:REDACTED@victory-postgres:5432/victory?sslmode=disable
+      DATABASE_URL: postgres://victory:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@victory-postgres:5432/victory?sslmode=disable
       STORAGE_ROOT: ${STORAGE_ROOT:-/opt/victory/storage}
       OPERATOR_HANDLE: ${OPERATOR_HANDLE:-straturli}
       DEFAULT_LOCATION_SLUG: ${DEFAULT_LOCATION_SLUG:-victory-theater}
