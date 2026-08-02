@@ -21,11 +21,12 @@ type AccountSummary struct {
 }
 
 type AccountUser struct {
-	ID          string `json:"id"`
-	Handle      string `json:"handle"`
-	DisplayName string `json:"display_name"`
-	Email       string `json:"email"`
-	HasPassword bool   `json:"has_password"`
+	ID            string `json:"id"`
+	Handle        string `json:"handle"`
+	DisplayName   string `json:"display_name"`
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"email_verified"`
+	HasPassword   bool   `json:"has_password"`
 }
 
 type AccountAuth struct {
@@ -113,11 +114,12 @@ func loadAccountSummary(ctx context.Context, pool *pgxpool.Pool, userID string) 
 			COALESCE(NULLIF(u.handle, ''), LEFT(u.id::text, 8), 'Unknown Participant'),
 			COALESCE(NULLIF(u.display_name, ''), NULLIF(u.handle, ''), LEFT(u.id::text, 8), 'Unknown Participant'),
 			COALESCE(u.email, ''),
+			u.email_verified_at IS NOT NULL,
 			EXISTS (SELECT 1 FROM auth.password_credentials pc WHERE pc.user_id = u.id)
 		FROM users u
 		WHERE u.id = $1
 		LIMIT 1
-	`, userID).Scan(&account.User.ID, &account.User.Handle, &account.User.DisplayName, &account.User.Email, &account.User.HasPassword); err != nil {
+	`, userID).Scan(&account.User.ID, &account.User.Handle, &account.User.DisplayName, &account.User.Email, &account.User.EmailVerified, &account.User.HasPassword); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return AccountSummary{}, errAccountNotFound
 		}

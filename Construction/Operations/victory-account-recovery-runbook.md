@@ -102,6 +102,36 @@ The raw token is printed once to your terminal and never written to a log.
 
 ---
 
+## 4a. Self-service recovery now exists (Kernel 77)
+
+As of Kernel 77, an ordinary user who is locked out no longer needs the operator at all, as
+long as they previously verified a recovery email address:
+
+1. `/login/forgot.html` — enter the email on file.
+2. If — and only if — that address matches an account **and** the account's
+   `users.email_verified_at` is set, Victory emails a one-time link through the configured
+   SMTP relay (Brevo). The response is identical either way, so this page never reveals
+   whether an address exists or is verified.
+3. The link opens `/login/reset.html?token=…` — the same redemption page break-glass links
+   use, because both mint the identical token shape into `auth.password_reset_tokens`.
+4. Redeeming it sets a password, signs the user in, and revokes every other session on the
+   account.
+
+**Verifying a recovery email** happens from the Account page (`/account/`) — "Verify Email for
+Recovery" sends a link to `/account/verify-email.html?token=…`, valid 24 hours, via
+`auth.email_verification_tokens`. Changing the email on file always clears verification;
+Discord-adopted emails are not verified automatically.
+
+This does not replace anything above. `victory-recover` remains the operator's own path and
+is unaffected — it mints tokens directly rather than emailing them, so it works even if SMTP
+is down or the user's email was never verified. If `RECOVERY_EMAIL_ENABLED` is unset or SMTP
+is not fully configured, `/api/auth/password-reset/request` stays closed (`410`) exactly as
+Kernel 76 left it, and `victory-recover` is the only path — see
+`Construction/Operations/victory-backup-secret-recovery.md` for where the SMTP credentials
+themselves are kept.
+
+---
+
 ## 5. Memberships were lost but the account is fine
 
 ```bash

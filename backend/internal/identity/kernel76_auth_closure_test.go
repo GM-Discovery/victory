@@ -62,12 +62,17 @@ func TestPasswordSignupReopensForLocalDevelopment(t *testing.T) {
 // Kernel 76 (K76-C01): the self-service reset flow is closed because its only
 // delivery mechanism was printing the raw token into the backend log. The
 // response must say so plainly rather than pretending a mail was sent.
+// TestSelfServicePasswordResetIsClosed proves the Kernel 76 closure remains
+// the default: an unconfigured ForgotPasswordConfig (Ready: false, the zero
+// value) keeps this 410, exactly as it was before Kernel 77 added a real
+// delivery path. Kernel 77's open-path behavior (Ready: true, with mail
+// actually configured) is covered separately in account_recovery_test.go.
 func TestSelfServicePasswordResetIsClosed(t *testing.T) {
 	body := strings.NewReader(`{"email":"grant@example.com"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/password-reset/request", body)
 	rec := httptest.NewRecorder()
 
-	HandleForgotPassword(nil).ServeHTTP(rec, req)
+	HandleForgotPassword(nil, ForgotPasswordConfig{}).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusGone {
 		t.Fatalf("closed reset request should be 410, got %d body=%s", rec.Code, rec.Body.String())

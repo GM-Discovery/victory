@@ -98,7 +98,7 @@ func HandleUpdateAccountEmail(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		if _, err := pool.Exec(ctx, `
-			UPDATE users SET email = $1, updated_at = NOW() WHERE id = $2
+			UPDATE users SET email = $1, email_verified_at = NULL, updated_at = NOW() WHERE id = $2
 		`, newEmail, userID); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "update_failed"})
 			return

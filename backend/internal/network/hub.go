@@ -1,10 +1,12 @@
 package network
 
 import (
+	"context"
 	"log"
 	"sync"
 
 	"github.com/gorilla/websocket"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Client struct {
@@ -74,6 +76,49 @@ func (h *Hub) BroadcastSession(sessionID string, msg []byte) {
 		case c.Send <- msg:
 		default:
 			log.Printf("dropping slow websocket client")
+		}
+	}
+}
+
+// RevalidateSessions closes any connected client whose user no longer holds
+// at least one non-revoked, non-expired auth session. Kernel 77 K77-05:
+// revoking a session (logout, password reset, account deletion) previously
+// only prevented a *new* WebSocket connection -- an already-open one kept
+// working until it happened to disconnect on its own. Intended to run on a
+// periodic ticker from main(), not per-request; a per-client DB lookup on
+// every message would be needless load for something that only needs to
+// catch up within a bounded window.
+func (h *Hub) RevalidateSessions(ctx context.Context, pool *pgxpool.Pool) {
+	h.mu.RLock()
+	clients := make([]*Client, 0, len(h.clients))
+	for c := range h.clients {
+		clients = append(clients, c)
+	}
+	h.mu.RUnlock()
+
+	checked := map[string]bool{}
+	for _, c := range clients {
+		if c.UserID == "" {
+			continue
+		}
+		stillValid, ok := checked[c.UserID]
+		if !ok {
+			err := pool.QueryRow(ctx, `
+				SELECT EXISTS (
+					SELECT 1 FROM auth.sessions
+					WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()
+				)
+			`, c.UserID).Scan(&stillValid)
+			if err != nil {
+				// A transient DB error must not disconnect everyone; skip
+				// this user this cycle and try again next tick.
+				continue
+			}
+			checked[c.UserID] = stillValid
+		}
+		if !stillValid {
+			_ = c.Conn.WriteJSON(map[string]any{"type": "error", "error": "session_revoked"})
+			_ = c.Conn.Close()
 		}
 	}
 }

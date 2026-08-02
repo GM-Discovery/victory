@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Verify Email — Victory</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: linear-gradient(180deg, #0f1316 0%, #090c0e 100%);
+      color: #f7fbff;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .panel {
+      width: min(420px, calc(100vw - 32px));
+      padding: 28px;
+      border-radius: 18px;
+      background: rgba(21, 27, 30, 0.94);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+    h1 { margin: 0 0 10px; font-size: 1.8rem; }
+    p { color: #aebbc3; line-height: 1.5; }
+    a.button {
+      display: inline-block;
+      margin-top: 16px;
+      padding: 11px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: linear-gradient(180deg, #5b6d7c 0%, #3e4b55 100%);
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h1>Verify Email</h1>
+    <p id="status">Checking your verification link...</p>
+    <a class="button" href="/account/">Back to Account</a>
+  </div>
+  <script>
+    (async () => {
+      const statusEl = document.getElementById("status");
+      const token = new URL(window.location.href).searchParams.get("token") || "";
+      if (!token) {
+        statusEl.textContent = "This page needs a verification link. Request a new one from your Account page.";
+        return;
+      }
+      try {
+        const response = await fetch("/api/account/email/verify/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ token }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) {
+          statusEl.textContent = payload.error === "invalid_or_expired_token"
+            ? "That verification link has expired or was already used. Request a new one from your Account page."
+            : "Could not verify this email.";
+          return;
+        }
+        statusEl.textContent = "Email verified. Password recovery is now available for this address.";
+      } catch (error) {
+        statusEl.textContent = "Could not reach the server. Try again.";
+      }
+    })();
+  </script>
+</body>
+</html>

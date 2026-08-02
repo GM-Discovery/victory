@@ -1,5 +1,10 @@
 # Kernel 75 — Tutorial Completion, Aftercare, and Director-Controlled Continuation
 
+> **SUPERSEDED.** `kernel-75-tutorial-completion-story-so-far-aftercare-mvp-proof-v0.1.md` is
+> the operator-issued revision and is authoritative where the two disagree (it says so itself).
+> This is the earlier builder-drafted cut, retained for provenance only — do not implement from
+> this file. Cross-referenced 2026-08-01 during Kernel 77 preflight (K77-12).
+
 **Revision:** 0.1 (drafted by the builder at the close of Kernel 74; operator to confirm or re-cut)
 **Primary track:** Golden Journey / playable Socio tutorial
 **Depends on:** Kernel 70/70A, 72/72A, 73/73A, **74**

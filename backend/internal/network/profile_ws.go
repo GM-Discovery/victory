@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/access"
+	"victory/backend/internal/ratelimit"
 )
 
 // ServeProfileWS is a deliberately lightweight websocket endpoint for Player
@@ -25,12 +26,13 @@ import (
 // BroadcastPlayerProfileProjectionInvalidation.
 func ServeProfileWS(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Printf("profile ws upgrade failed: %v", err)
+		if !wsConnectionLimiter.Allow(ratelimit.ClientIP(r)) {
+			http.Error(w, "rate_limited", http.StatusTooManyRequests)
 			return
 		}
 
+		// Kernel 77 K77-08: authenticate before completing the handshake,
+		// matching the same fix in ServeVenueWS.
 		sessionCookie := ""
 		if c, err := r.Cookie("victory_session"); err == nil {
 			sessionCookie = c.Value
@@ -41,8 +43,13 @@ func ServeProfileWS(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 
 		userID, err := access.CurrentUserIDFromRequest(ctx, pool, sessionCookie)
 		if err != nil || strings.TrimSpace(userID) == "" {
-			_ = conn.WriteJSON(map[string]any{"type": "error", "error": "not_authenticated"})
-			_ = conn.Close()
+			http.Error(w, "not_authenticated", http.StatusUnauthorized)
+			return
+		}
+
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Printf("profile ws upgrade failed: %v", err)
 			return
 		}
 
@@ -68,6 +75,10 @@ func readProfilePump(hub *Hub, c *Client) {
 		_, raw, err := c.Conn.ReadMessage()
 		if err != nil {
 			return
+		}
+
+		if !checkMessageRate(c.UserID) {
+			continue
 		}
 
 		var msg map[string]any

@@ -1,0 +1,6 @@
+[Unit]
+Description=Victory backup retention sweep (deletes expired remote archives)
+
+[Service]
+Type=oneshot
+ExecStart=/opt/victory/scripts/backup/retention.sh --apply

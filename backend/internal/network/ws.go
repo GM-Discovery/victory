@@ -15,8 +15,29 @@ import (
 	"victory/backend/internal/access"
 	"victory/backend/internal/actions"
 	"victory/backend/internal/identity"
+	"victory/backend/internal/ratelimit"
 	"victory/backend/internal/world"
 )
+
+// Kernel 77 K77-06: WebSocket connections and messages had no rate limiting
+// at all (K76's own websocket-matrix recorded this as an open item).
+// wsConnectionLimiter bounds new-connection attempts per client IP;
+// wsMessageLimiter bounds inbound messages per connected user, shared
+// across every venue/cave/profile socket that calls checkMessageRate.
+var wsConnectionLimiter = ratelimit.New(10, 20)
+var wsMessageLimiter = ratelimit.New(20, 120)
+
+// checkMessageRate reports whether userID may process another inbound
+// WebSocket message right now. Over-limit messages are dropped silently
+// (not a connection-closing offense -- a burst during normal play, e.g.
+// rapid clicking, should not disconnect a legitimate user), matching the
+// same token-bucket approach already used for HTTP routes.
+func checkMessageRate(userID string) bool {
+	if strings.TrimSpace(userID) == "" {
+		return true
+	}
+	return wsMessageLimiter.Allow(userID)
+}
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -64,12 +85,19 @@ func ServeVenueWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordS
 		venueSlug = "the-cave"
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Printf("ws upgrade failed: %v", err)
+		// Kernel 77 K77-06: bound connection *attempts* per IP, before doing
+		// any authentication work at all.
+		if !wsConnectionLimiter.Allow(ratelimit.ClientIP(r)) {
+			http.Error(w, "rate_limited", http.StatusTooManyRequests)
 			return
 		}
 
+		// Kernel 77 K77-08 (K76-L01): authenticate and authorize before
+		// completing the WebSocket handshake, not after. An anonymous or
+		// unauthorized caller previously drove a full upgrade -- cheap flood
+		// capacity -- and only then learned it would be rejected. Every
+		// check below runs as a plain HTTP request/response; the connection
+		// is only ever upgraded once it's already known to be allowed.
 		sessionCookie := ""
 		if c, err := r.Cookie("victory_session"); err == nil {
 			sessionCookie = c.Value
@@ -80,54 +108,35 @@ func ServeVenueWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordS
 
 		userID, err := access.CurrentUserIDFromRequest(ctx, pool, sessionCookie)
 		if err != nil {
-			log.Printf("ws current user failed: %v", err)
-			_ = conn.WriteJSON(map[string]any{
-				"type":  "error",
-				"error": "not_authenticated",
-			})
-			_ = conn.Close()
+			http.Error(w, "not_authenticated", http.StatusUnauthorized)
 			return
 		}
 
 		allowed, err := access.UserCanAccessVenueSlug(ctx, pool, userID, venueSlug)
 		if err != nil {
-			log.Printf("ws venue access check failed: %v", err)
-			_ = conn.WriteJSON(map[string]any{
-				"type":  "error",
-				"error": "access_check_failed",
-			})
-			_ = conn.Close()
+			http.Error(w, "access_check_failed", http.StatusInternalServerError)
 			return
 		}
-
 		if !allowed {
-			_ = conn.WriteJSON(map[string]any{
-				"type":  "error",
-				"error": "forbidden",
-			})
-			_ = conn.Close()
+			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
 
 		sessionID, err := identity.ResolveActiveVenueSessionID(ctx, pool, userID, venueSlug)
 		if err != nil {
-			log.Printf("ws active session lookup failed: %v", err)
-			_ = conn.WriteJSON(map[string]any{
-				"type":  "error",
-				"error": "not_session_participant",
-			})
-			_ = conn.Close()
+			http.Error(w, "not_session_participant", http.StatusForbidden)
 			return
 		}
 
 		sessionIdentity, err := identity.ResolveSessionIdentityForVenue(ctx, pool, sessionID, userID, venueSlug)
 		if err != nil {
-			log.Printf("ws identity lookup failed: %v", err)
-			_ = conn.WriteJSON(map[string]any{
-				"type":  "error",
-				"error": "not_session_participant",
-			})
-			_ = conn.Close()
+			http.Error(w, "not_session_participant", http.StatusForbidden)
+			return
+		}
+
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Printf("ws upgrade failed: %v", err)
 			return
 		}
 
@@ -250,6 +259,10 @@ func readPump(hub *Hub, pool *pgxpool.Pool, c *Client, venueSlug string) {
 		_, msg, err := c.Conn.ReadMessage()
 		if err != nil {
 			return
+		}
+
+		if !checkMessageRate(c.UserID) {
+			continue
 		}
 
 		var payload map[string]any

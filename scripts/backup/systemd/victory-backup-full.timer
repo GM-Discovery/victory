@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Victory full backup once daily
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

@@ -446,22 +446,25 @@ func TestKernel74TutorialTailEndToEnd(t *testing.T) {
 		return false, false, false, false
 	}
 
-	// S9.3's dependency pattern: crown-bet is locked until why-looking.
-	if _, unlocked, _, found := topicState("crown-bet"); !found || unlocked {
-		t.Fatal("crown-bet must start locked behind why-looking")
-	}
+	// Migration 078 (Kernel 75) retired crown-bet and what-if-succeed from
+	// the live Ra packet in favor of a supervisor-handoff ending: they are
+	// now `active = FALSE` and no longer appear in state.Topics at all, and
+	// why-looking is the sole required_for_completion topic. That same
+	// cleanup deleted every remaining prerequisite edge (crown-bet's, and
+	// beyond-the-door's, which had depended on crown-bet), so no topic in
+	// the live packet is prerequisite-gated any more -- there is currently
+	// no subject left to exercise the "locked topic refused" negative path
+	// this test used to cover via crown-bet.
 	if _, unlocked, _, found := topicState("why-locked"); !found || !unlocked {
 		t.Fatal("why-locked must be open from the start")
 	}
-
-	// S13: posting a locked topic directly is refused, and its authored
-	// response never leaves the server.
-	if _, err := ReadTopic(ctx, pool, playerAUserID, prep.RaInteractionID, "crown-bet"); err == nil {
-		t.Fatal("expected a locked topic to be refused server-side")
+	if _, _, required, found := topicState("why-looking"); !found || !required {
+		t.Fatal("why-looking must be the required gating topic")
 	}
-	// S13: posting Leave without the required topics is refused.
+
+	// S13: posting Leave without the required topic is refused.
 	if _, err := LeaveDialogue(ctx, pool, playerAUserID, prep.RaInteractionID); err == nil {
-		t.Fatal("expected Leave Ra to be refused before required topics are viewed")
+		t.Fatal("expected Leave Ra to be refused before the required topic is viewed")
 	}
 
 	// Ask out of default order -- who-are-you is optional and open.
@@ -472,49 +475,35 @@ func TestKernel74TutorialTailEndToEnd(t *testing.T) {
 	if !strings.Contains(state.CurrentResponse, "Ra") {
 		t.Fatalf("who-are-you response should name Ra, got %q", state.CurrentResponse)
 	}
+	if state.CanLeave {
+		t.Fatal("Leave Ra must stay locked while why-looking is unread")
+	}
 
 	state, err = ReadTopic(ctx, pool, playerAUserID, prep.RaInteractionID, "why-looking")
 	if err != nil {
 		t.Fatalf("ReadTopic(why-looking): %v", err)
 	}
-	topicState = func(key string) (seen, unlocked, required, found bool) {
-		for _, tv := range state.Topics {
-			if tv.TopicKey == key {
-				return tv.Seen, tv.Unlocked, tv.Required, true
-			}
-		}
-		return false, false, false, false
-	}
-	if _, unlocked, _, _ := topicState("crown-bet"); !unlocked {
-		t.Fatal("crown-bet must unlock once why-looking has been read")
-	}
-	if state.CanLeave {
-		t.Fatal("Leave Ra must stay locked while crown-bet is unread")
-	}
-
-	state, err = ReadTopic(ctx, pool, playerAUserID, prep.RaInteractionID, "crown-bet")
-	if err != nil {
-		t.Fatalf("ReadTopic(crown-bet): %v", err)
-	}
-	// S9.4 canonical material.
-	if !strings.Contains(strings.ToLower(state.CurrentResponse), "turtle") ||
-		!strings.Contains(strings.ToLower(state.CurrentResponse), "crown") {
-		t.Fatalf("crown-bet response must deliver the Turtle-continent crown challenge, got %q", state.CurrentResponse)
+	// Post-migration-078 canonical material: Ra hands the Player to his
+	// supervisor at the training camps rather than introducing the Crown
+	// Bet himself.
+	lowerResponse := strings.ToLower(state.CurrentResponse)
+	if !strings.Contains(lowerResponse, "supervisor") || !strings.Contains(lowerResponse, "training camps") {
+		t.Fatalf("why-looking response must deliver the supervisor-handoff beat, got %q", state.CurrentResponse)
 	}
 	if !state.CanLeave {
-		t.Fatal("Leave Ra must unlock once both required topics are read, without every optional topic")
+		t.Fatal("Leave Ra must unlock once the required topic is read")
 	}
 
 	// S5.3: re-reading a seen topic is idempotent.
-	if _, err := ReadTopic(ctx, pool, playerAUserID, prep.RaInteractionID, "crown-bet"); err != nil {
-		t.Fatalf("re-read crown-bet: %v", err)
+	if _, err := ReadTopic(ctx, pool, playerAUserID, prep.RaInteractionID, "why-looking"); err != nil {
+		t.Fatalf("re-read why-looking: %v", err)
 	}
 	var viewCount int
 	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM participant_dialogue_topic_views WHERE show_id = $1 AND user_id = $2`, showID, playerAUserID).Scan(&viewCount); err != nil {
 		t.Fatalf("count topic views: %v", err)
 	}
-	if viewCount != 3 {
-		t.Fatalf("expected 3 distinct topic views after a repeat read, got %d", viewCount)
+	if viewCount != 2 {
+		t.Fatalf("expected 2 distinct topic views after a repeat read, got %d", viewCount)
 	}
 
 	// S9.5: progress survives a fresh open (the refresh case).
@@ -531,8 +520,8 @@ func TestKernel74TutorialTailEndToEnd(t *testing.T) {
 			seenAfterReopen++
 		}
 	}
-	if seenAfterReopen != 3 {
-		t.Fatalf("expected 3 topics still marked seen after reopen, got %d", seenAfterReopen)
+	if seenAfterReopen != 2 {
+		t.Fatalf("expected 2 topics still marked seen after reopen, got %d", seenAfterReopen)
 	}
 
 	// --- S16.12/S16.13/S16.14: Leave Ra ------------------------------------

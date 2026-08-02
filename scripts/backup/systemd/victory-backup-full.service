@@ -1,0 +1,8 @@
+[Unit]
+Description=Victory full (database + assets) encrypted backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/victory/scripts/backup/backup.sh full

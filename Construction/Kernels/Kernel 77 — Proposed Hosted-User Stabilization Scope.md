@@ -1,6 +1,12 @@
 # Kernel 77 — Proposed Hosted-User Stabilization Scope
 
-**Status:** PROPOSAL — not a final specification
+> **SUPERSEDED 2026-08-01.** This proposal has been merged into
+> `Construction/Kernels/Kernel 77 — Private-Client Readiness.md`, the canonical Kernel 77
+> specification, per Grant's decision to merge both documents with that one winning on
+> conflicts. Items K77-05 through K77-12 below are carried forward there as §25 "Merged scope."
+> Kept here for history only — do not implement from this file.
+
+**Status:** PROPOSAL — not a final specification (superseded, see above)
 **Scope source:** Kernel 76 findings (`Construction/Security/kernel-76-findings.md`)
 **Purpose:** advance Victory from readiness Level 3 (invited strangers) to Level 4 (private
 paying clients)

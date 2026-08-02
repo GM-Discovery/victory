@@ -250,29 +250,132 @@ func HandleLogout(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc {
 	}
 }
 
-// HandleForgotPassword is closed as of Kernel 76 (K76-C01). Victory has no
+// RecoveryMailer is the minimal interface HandleForgotPassword needs. It
+// matches mailer.RecoveryMailer without importing that package directly,
+// keeping identity free of a hard SMTP dependency.
+type RecoveryMailer interface {
+	SendPasswordReset(ctx context.Context, recipient, resetURL string) error
+	SendEmailVerification(ctx context.Context, recipient, verifyURL string) error
+}
+
+// ForgotPasswordConfig controls whether self-service reset is open. Ready
+// must only be true when a real delivery channel is configured -- see
+// cmd/victory/main.go, which computes it from RECOVERY_EMAIL_ENABLED plus
+// the presence of SMTP configuration (Kernel 77 §8.2: "fail closed... when
+// recovery is advertised but mail is not configured" -- if the operator
+// flips the flag on without finishing SMTP setup, this stays closed rather
+// than accepting requests that would silently never deliver).
+type ForgotPasswordConfig struct {
+	Ready   bool
+	Mailer  RecoveryMailer
+	BaseURL string
+}
+
+const forgotPasswordGenericMessage = "If that address can receive a Victory recovery message, one has been sent."
+
+// HandleForgotPassword was closed by Kernel 76 (K76-C01): Victory had no
 // email delivery, so the only way this flow ever returned a token was by
-// printing the raw value into the backend log, where it stayed readable to
-// anyone who could reach `docker logs` and functioned as an account-takeover
-// credential for any address the caller could name.
+// printing the raw value into the backend log, an account-takeover
+// credential for any address the caller could name. Kernel 77 reopens it
+// once a real delivery channel exists (cfg.Ready), behind:
+//   - a uniform response whether or not the address exists, is verified, or
+//     delivery succeeds (§8.3) -- the caller learns nothing;
+//   - only proceeding for an address that has completed email verification
+//     (§8.5) -- an unverified users.email never receives a reset link;
+//   - a fresh, single-use, hashed, 1-hour token, mirroring victory-recover's
+//     own break-glass token shape exactly;
+//   - older outstanding tokens for the account invalidated first;
+//   - delivery happening off the request goroutine so a slow or failing
+//     SMTP relay cannot be used to time-probe account existence, and so a
+//     delivery failure never surfaces to the caller.
 //
-// Self-service recovery returns in Kernel 77 once there is a delivery channel
-// to send a token through. Until then the reset token is minted by the
-// operator-only break-glass tool (cmd/victory-recover) and redeemed at
-// /api/auth/password-reset/confirm, which is still live.
-func HandleForgotPassword(pool *pgxpool.Pool) http.HandlerFunc {
+// If cfg.Ready is false, the endpoint stays closed exactly as Kernel 76 left
+// it: break-glass recovery via cmd/victory-recover remains the only path.
+func HandleForgotPassword(pool *pgxpool.Pool, cfg ForgotPasswordConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method_not_allowed"})
 			return
 		}
 
-		writeJSON(w, http.StatusGone, map[string]any{
-			"ok":    false,
-			"error": "self_service_password_reset_unavailable",
-			"detail": "Password reset is handled by the Victory operator. " +
-				"Sign in with Discord, or contact the operator for a recovery link.",
-		})
+		if !cfg.Ready {
+			writeJSON(w, http.StatusGone, map[string]any{
+				"ok":    false,
+				"error": "self_service_password_reset_unavailable",
+				"detail": "Password reset is handled by the Victory operator. " +
+					"Sign in with Discord, or contact the operator for a recovery link.",
+			})
+			return
+		}
+
+		generic := map[string]any{"ok": true, "message": forgotPasswordGenericMessage}
+
+		var req struct {
+			Email string `json:"email"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusOK, generic)
+			return
+		}
+		email := strings.ToLower(strings.TrimSpace(req.Email))
+		if email == "" {
+			writeJSON(w, http.StatusOK, generic)
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		var userID string
+		var emailVerifiedAt *time.Time
+		err := pool.QueryRow(ctx, `
+			SELECT id, email_verified_at FROM users WHERE lower(email) = $1 LIMIT 1
+		`, email).Scan(&userID, &emailVerifiedAt)
+		if err != nil || emailVerifiedAt == nil {
+			// Unknown address or an unverified one: identical response,
+			// nothing sent. See §8.5 -- Victory does not advertise recovery
+			// availability for an address it never confirmed.
+			writeJSON(w, http.StatusOK, generic)
+			return
+		}
+
+		if _, err := pool.Exec(ctx, `
+			UPDATE auth.password_reset_tokens
+			SET consumed_at = NOW()
+			WHERE user_id = $1 AND consumed_at IS NULL AND expires_at > NOW()
+		`, userID); err != nil {
+			writeJSON(w, http.StatusOK, generic)
+			return
+		}
+
+		rawToken, tokenHash, err := newResetToken()
+		if err != nil {
+			writeJSON(w, http.StatusOK, generic)
+			return
+		}
+		expiresAt := time.Now().UTC().Add(1 * time.Hour)
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO auth.password_reset_tokens (user_id, token_hash, expires_at, request_ip)
+			VALUES ($1, $2, $3, $4)
+		`, userID, tokenHash, expiresAt, clientIP(r)); err != nil {
+			writeJSON(w, http.StatusOK, generic)
+			return
+		}
+
+		// /auth/* is reverse-proxied to the backend by Caddy, so the
+		// redemption page lives under the statically served /login/ path --
+		// the same reason cmd/victory-recover's link uses this shape.
+		resetURL := strings.TrimRight(cfg.BaseURL, "/") + "/login/reset.html?token=" + rawToken
+
+		go func(mailer RecoveryMailer, recipient, url string) {
+			sendCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			if err := mailer.SendPasswordReset(sendCtx, recipient, url); err != nil {
+				log.Printf("recovery email delivery failed: %v", err)
+			}
+		}(cfg.Mailer, email, resetURL)
+
+		writeJSON(w, http.StatusOK, generic)
 	}
 }
 

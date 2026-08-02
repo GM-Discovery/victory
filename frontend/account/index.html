@@ -232,6 +232,43 @@
       font-size: 1.1rem;
     }
 
+    .danger-zone {
+      margin-top: 18px;
+      padding: 18px;
+      border-radius: 18px;
+      border: 1px solid rgba(224, 122, 122, 0.35);
+      background: rgba(224, 122, 122, 0.06);
+    }
+
+    .danger-zone h2 {
+      margin: 0 0 6px;
+      font-size: 1.1rem;
+      color: #f0b8b8;
+    }
+
+    .danger-zone .blocker {
+      margin-top: 10px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(224, 122, 122, 0.35);
+      background: rgba(224, 122, 122, 0.08);
+    }
+
+    .danger-zone .blocker p {
+      margin: 4px 0;
+    }
+
+    .danger-button {
+      background: linear-gradient(180deg, #a2504f 0%, #7a3736 100%);
+      border-color: rgba(224, 122, 122, 0.5);
+    }
+
+    #deletion-confirm-form input {
+      width: 100%;
+      box-sizing: border-box;
+      margin-bottom: 8px;
+    }
+
     @media (max-width: 820px) {
       .grid {
         grid-template-columns: 1fr;
@@ -261,6 +298,12 @@
         <button id="logout-button" class="chip" type="button">Logout</button>
       </div>
 
+      <p class="note" style="margin-top:14px;">
+        <a href="/legal/privacy/" style="color:var(--accent);">Privacy Policy</a>
+        &nbsp;·&nbsp;
+        <a href="/legal/terms/" style="color:var(--accent);">Terms of Service</a>
+      </p>
+
       <section class="provider">
         <h2>Operator Bootstrap Note</h2>
         <p class="note">Producer authority is granted inside Victory. Discord login alone does not grant producer access. If this account should be a producer, the server operator must run the bootstrap command. There is no public producer grant button on this page.</p>
@@ -285,7 +328,9 @@
           <div class="meta" id="account-meta"></div>
           <div class="toolbar" style="margin-top: 12px;">
             <button class="chip" type="button" id="edit-email-button" hidden>Change Email</button>
+            <button class="chip" type="button" id="verify-email-button" hidden>Verify Email for Recovery</button>
           </div>
+          <p class="note" id="verify-email-status"></p>
           <div id="email-editor" hidden style="margin-top: 12px;">
             <p class="note" id="email-editor-note"></p>
             <input type="password" id="email-current-password" placeholder="Current password" autocomplete="current-password" style="width:100%; box-sizing:border-box; margin-bottom:8px;" />
@@ -329,6 +374,38 @@
         <div class="toolbar">
           <a class="button" href="/login/">Log in again</a>
         </div>
+      </section>
+
+      <section id="account-data" class="panel" style="margin-top: 18px;" hidden>
+        <p class="label">Your Data</p>
+        <h2 class="profile-name">Export or delete your account</h2>
+        <p class="note">Download a copy of your own data, or permanently delete this account. Shared game history you took part in (Actions, Show records) is kept but stripped of anything identifying you, so other people's history is not damaged.</p>
+        <div class="toolbar" style="margin-top: 10px;">
+          <button class="chip" type="button" id="export-account-button">Export My Data</button>
+        </div>
+        <p class="note" id="export-status"></p>
+
+        <section class="danger-zone">
+          <h2>Delete Account</h2>
+          <p class="note" id="deletion-summary">Checking what deletion would do...</p>
+          <div id="deletion-blockers"></div>
+
+          <div class="toolbar" style="margin-top: 12px;">
+            <button class="danger-button button" type="button" id="start-deletion-button" hidden>Delete My Account</button>
+          </div>
+
+          <div id="deletion-confirm-form" hidden style="margin-top: 12px;">
+            <p class="note">This is permanent. Type your exact handle to confirm, then complete the check below.</p>
+            <input type="text" id="deletion-confirm-handle" placeholder="Type your handle exactly" autocomplete="off" />
+            <input type="password" id="deletion-current-password" placeholder="Current password" autocomplete="current-password" hidden />
+            <p class="note" id="deletion-reauth-note"></p>
+            <div class="toolbar">
+              <button class="danger-button button" type="button" id="confirm-deletion-button">Permanently Delete My Account</button>
+              <button class="chip" type="button" id="cancel-deletion-button">Cancel</button>
+            </div>
+            <p class="note" id="deletion-status"></p>
+          </div>
+        </section>
       </section>
     </section>
   </main>
@@ -496,6 +573,20 @@
           editEmailButton.hidden = false;
           editEmailButton.dataset.hasPassword = user.has_password ? "1" : "0";
         }
+        const verifyEmailButton = document.getElementById("verify-email-button");
+        const verifyEmailStatus = document.getElementById("verify-email-status");
+        if (verifyEmailButton) {
+          if (!user.email) {
+            verifyEmailButton.hidden = true;
+            if (verifyEmailStatus) verifyEmailStatus.textContent = "";
+          } else if (user.email_verified) {
+            verifyEmailButton.hidden = true;
+            if (verifyEmailStatus) verifyEmailStatus.textContent = "Email verified — usable for password recovery.";
+          } else {
+            verifyEmailButton.hidden = false;
+            if (verifyEmailStatus) verifyEmailStatus.textContent = "Email not verified — password recovery is unavailable for this address until you verify it.";
+          }
+        }
 
         if (discordHeading) {
           discordHeading.textContent = auth.discord_linked ? "Discord linked" : "Discord not linked";
@@ -583,6 +674,12 @@
           console.error("profile load failed", profileError);
           profileNote.textContent = "We could not load your profile, but the account session is active.";
         }
+
+        const accountData = document.getElementById("account-data");
+        if (accountData) {
+          accountData.hidden = false;
+          loadDeletionPlan(Boolean(user.has_password));
+        }
       } catch (error) {
         console.error("account bootstrap failed", error);
         if (sessionState) {
@@ -669,9 +766,199 @@
       }
     }
 
+    document.getElementById("verify-email-button").addEventListener("click", async () => {
+      const button = document.getElementById("verify-email-button");
+      const status = document.getElementById("verify-email-status");
+      button.disabled = true;
+      status.textContent = "Sending verification email...";
+      try {
+        const response = await fetch("/api/account/email/verify", { method: "POST", credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          const messages = {
+            no_email_on_file: "Add an email first (Change Email above).",
+            email_delivery_not_configured: "Email delivery isn't configured on this server yet.",
+          };
+          status.textContent = messages[payload?.error] || `Could not send verification email (${payload?.error || response.status}).`;
+          return;
+        }
+        status.textContent = "Verification email sent. Check your inbox and follow the link.";
+      } catch (error) {
+        console.error("verification request failed", error);
+        status.textContent = "Could not reach the server.";
+      } finally {
+        button.disabled = false;
+      }
+    });
+
     document.getElementById("edit-email-button").addEventListener("click", openEmailEditor);
     document.getElementById("cancel-email-button").addEventListener("click", closeEmailEditor);
     document.getElementById("save-email-button").addEventListener("click", saveEmail);
+
+    async function loadDeletionPlan(hasPassword) {
+      const summary = document.getElementById("deletion-summary");
+      const blockersEl = document.getElementById("deletion-blockers");
+      const startButton = document.getElementById("start-deletion-button");
+      blockersEl.innerHTML = "";
+      startButton.hidden = true;
+
+      try {
+        const response = await fetch("/api/account/deletion-plan", { credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          summary.textContent = "Could not check deletion status right now.";
+          return;
+        }
+        const plan = payload.data || {};
+        const counts = plan.private_record_counts || {};
+        const countText = Object.entries(counts)
+          .filter(([, n]) => n > 0)
+          .map(([label, n]) => `${n} ${label.replace(/_/g, " ")}`)
+          .join(", ") || "no private records on file";
+
+        if (plan.can_delete) {
+          summary.textContent = `Deleting will remove your private data (${countText}) and strip your identity from shared history. This account can be deleted.`;
+          startButton.hidden = false;
+          startButton.onclick = () => openDeletionConfirm(hasPassword);
+        } else {
+          summary.textContent = `Deletion is blocked right now (${countText} would otherwise be removed):`;
+          for (const blocker of plan.blockers || []) {
+            const box = document.createElement("div");
+            box.className = "blocker";
+            const reason = document.createElement("p");
+            reason.textContent = blocker.location_name
+              ? `${blocker.location_name}: ${blocker.reason}`
+              : blocker.reason;
+            const resolution = document.createElement("p");
+            resolution.className = "note";
+            resolution.textContent = blocker.resolution || "";
+            box.appendChild(reason);
+            box.appendChild(resolution);
+            blockersEl.appendChild(box);
+          }
+        }
+      } catch (error) {
+        console.error("deletion plan failed", error);
+        summary.textContent = "Could not reach the server to check deletion status.";
+      }
+    }
+
+    function openDeletionConfirm(hasPassword) {
+      document.getElementById("start-deletion-button").hidden = true;
+      const form = document.getElementById("deletion-confirm-form");
+      const passwordInput = document.getElementById("deletion-current-password");
+      const reauthNote = document.getElementById("deletion-reauth-note");
+      document.getElementById("deletion-confirm-handle").value = "";
+      passwordInput.value = "";
+      document.getElementById("deletion-status").textContent = "";
+
+      if (hasPassword) {
+        passwordInput.hidden = false;
+        reauthNote.textContent = "Enter your current password to confirm.";
+      } else {
+        passwordInput.hidden = true;
+        reauthNote.textContent = "This account signed in with Discord and has no password. If your session here is more than 15 minutes old, sign out and back in with Discord first, then retry.";
+      }
+      form.hidden = false;
+    }
+
+    document.getElementById("cancel-deletion-button").addEventListener("click", () => {
+      document.getElementById("deletion-confirm-form").hidden = true;
+      document.getElementById("start-deletion-button").hidden = false;
+    });
+
+    document.getElementById("confirm-deletion-button").addEventListener("click", async () => {
+      const status = document.getElementById("deletion-status");
+      const confirmHandle = document.getElementById("deletion-confirm-handle").value.trim();
+      const currentPassword = document.getElementById("deletion-current-password").value;
+
+      if (!confirmHandle) {
+        status.textContent = "Type your handle to confirm.";
+        return;
+      }
+      status.textContent = "Deleting...";
+      try {
+        const response = await fetch("/api/account/delete", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm_handle: confirmHandle, current_password: currentPassword }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          const code = payload?.error || `HTTP ${response.status}`;
+          const messages = {
+            confirm_handle_mismatch: "That doesn't match your handle exactly.",
+            invalid_credentials: "That password isn't correct.",
+            recent_login_required: "Sign out, log back in with Discord, then retry within 15 minutes.",
+            deletion_blocked: "Deletion is blocked — see the reasons above.",
+          };
+          status.textContent = messages[code] || `Could not delete account (${code}).`;
+          if (code === "deletion_blocked") {
+            loadDeletionPlan(false);
+          }
+          return;
+        }
+        status.textContent = "Account deleted. Signing you out...";
+        setTimeout(() => { window.location.href = "/"; }, 1200);
+      } catch (error) {
+        console.error("account deletion failed", error);
+        status.textContent = "Could not reach the server. Try again.";
+      }
+    });
+
+    document.getElementById("export-account-button").addEventListener("click", async () => {
+      const status = document.getElementById("export-status");
+      status.textContent = "Requesting export...";
+      try {
+        const response = await fetch("/api/account/export", { method: "POST", credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          status.textContent = `Could not start export (${payload?.error || response.status}).`;
+          return;
+        }
+        status.textContent = "Export requested. Checking status...";
+        pollExportStatus();
+      } catch (error) {
+        console.error("export request failed", error);
+        status.textContent = "Could not reach the server.";
+      }
+    });
+
+    async function pollExportStatus(attempt = 0) {
+      const status = document.getElementById("export-status");
+      try {
+        const response = await fetch("/api/account/export/status", { credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          status.textContent = "Could not check export status.";
+          return;
+        }
+        const job = payload.data || {};
+        if (job.status === "ready") {
+          status.innerHTML = "";
+          const link = document.createElement("a");
+          link.href = "/api/account/export/download";
+          link.className = "button";
+          link.textContent = "Download Export";
+          status.appendChild(link);
+          return;
+        }
+        if (job.status === "failed") {
+          status.textContent = "Export failed. Try again.";
+          return;
+        }
+        if (attempt > 20) {
+          status.textContent = "Export is taking longer than expected. Refresh this page in a minute.";
+          return;
+        }
+        status.textContent = "Preparing your export...";
+        setTimeout(() => pollExportStatus(attempt + 1), 1500);
+      } catch (error) {
+        console.error("export status check failed", error);
+        status.textContent = "Could not reach the server.";
+      }
+    }
 
     bootstrapAccount();
   </script>

@@ -1,6 +1,12 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    # Kernel 77 K77-09: pinned to a digest rather than the floating
+    # `16-alpine` tag, so a routine `docker compose pull` cannot silently
+    # swap in a different image. Corresponds to postgres:16-alpine as of
+    # 2026-08-02; re-pin deliberately (docker pull postgres:16-alpine &&
+    # docker inspect postgres:16-alpine --format '{{index .RepoDigests 0}}')
+    # when a newer 16.x patch is wanted.
+    image: postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
     container_name: victory-postgres
     restart: unless-stopped
     environment:
@@ -45,11 +51,26 @@ services:
       DISCORD_SERVER_LINK_ENABLED: ${DISCORD_SERVER_LINK_ENABLED:-}
       DISCORD_GATEWAY_INTENTS: ${DISCORD_GATEWAY_INTENTS:-641}
       DISCORD_GATEWAY_URL: ${DISCORD_GATEWAY_URL:-}
+      # Kernel 77: self-service recovery email and the export staging path.
+      # docker-compose only forwards variables explicitly listed here --
+      # being present in .env alone (used for this file's own ${...}
+      # substitution) does not put them in the container's environment.
+      EXPORTS_ROOT: ${EXPORTS_ROOT:-/opt/victory/exports}
+      RECOVERY_EMAIL_ENABLED: ${RECOVERY_EMAIL_ENABLED:-}
+      RECOVERY_EMAIL_FROM: ${RECOVERY_EMAIL_FROM:-}
+      RECOVERY_EMAIL_FROM_NAME: ${RECOVERY_EMAIL_FROM_NAME:-Victory}
+      RECOVERY_EMAIL_BASE_URL: ${RECOVERY_EMAIL_BASE_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_TLS_MODE: ${SMTP_TLS_MODE:-starttls}
     depends_on:
       - postgres
     volumes:
       - /opt/victory/storage:/opt/victory/storage
       - /opt/victory/backups:/opt/victory/backups
+      - /opt/victory/exports:/opt/victory/exports
     expose:
       - "8081"
     networks:

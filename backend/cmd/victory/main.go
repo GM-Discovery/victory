@@ -32,6 +32,7 @@ import (
 	"victory/backend/internal/cues"
 	"victory/backend/internal/db"
 	"victory/backend/internal/identity"
+	"victory/backend/internal/mailer"
 	"victory/backend/internal/merchant"
 	"victory/backend/internal/messages"
 	"victory/backend/internal/migrate"
@@ -61,6 +62,7 @@ func main() {
 	databaseURL := getenv("DATABASE_URL", "postgres://victory:REDACTED@victory-postgres:5432/victory?sslmode=disable")
 	secureCookie := cookieSecureFromEnv()
 	storageRoot := getenv("STORAGE_ROOT", "/opt/victory/storage")
+	exportsRoot := getenv("EXPORTS_ROOT", "/opt/victory/exports")
 	discordOAuthConfig := discordOAuthConfigFromEnv()
 	discordServerLinkConfig := discordServerLinkConfigFromEnv()
 	discordGatewayConfig := discordGatewayConfigFromEnv()
@@ -130,6 +132,35 @@ func main() {
 
 	go network.RunDiscordGatewayWorker(context.Background(), pool, hub, discordAudioPresenceStore, discordServerLinkConfig, discordGatewayConfig)
 
+	// Kernel 77 K77-05: revoking a session must eventually disconnect any
+	// WebSocket already open under it, not just block new connections.
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			hub.RevalidateSessions(ctx, pool)
+			cancel()
+		}
+	}()
+
+	// Kernel 77 §7.5: expired export archives must be cleaned up even if no
+	// one ever checks their status again after the link goes stale.
+	go func() {
+		ticker := time.NewTicker(30 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			n, err := identity.SweepExpiredExports(ctx, pool)
+			cancel()
+			if err != nil {
+				log.Printf("export sweep failed: %v", err)
+			} else if n > 0 {
+				log.Printf("export sweep removed %d expired archive(s)", n)
+			}
+		}
+	}()
+
 	access.SetThirdPlaceReadinessChecker(func(ctx context.Context, pool *pgxpool.Pool, userID string) (bool, error) {
 		result, err := playerprofile.TrailerFaceReady(ctx, pool, userID)
 		if err != nil {
@@ -152,6 +183,12 @@ func main() {
 	// per-IP token bucket (burst 10, refill 10/min). Ordinary API routes are
 	// deliberately unthrottled.
 	credentialLimiter := ratelimit.New(10, 10)
+	// Kernel 77 K77-06: ordinary API routes were deliberately unthrottled
+	// beyond the Kernel-76 body-size cap. This is a more generous bucket
+	// than credentialLimiter for legitimate higher-frequency in-session
+	// actions (chat, note cards, uploads, command execution) -- bounded
+	// against flooding, not tuned to make live play feel rate-limited.
+	actionLimiter := ratelimit.New(30, 60)
 	mux.HandleFunc("/api/auth/signup", ratelimit.Middleware(credentialLimiter, identity.HandleSignup(pool, secureCookie)))
 	mux.HandleFunc("/api/auth/login", ratelimit.Middleware(credentialLimiter, identity.HandleLogin(pool, secureCookie)))
 	mux.HandleFunc("/api/auth/logout", identity.HandleLogout(pool, secureCookie))
@@ -160,7 +197,7 @@ func main() {
 	mux.HandleFunc("GET /auth/discord/callback", identity.HandleDiscordOAuthCallback(pool, discordOAuthConfig, secureCookie))
 	mux.HandleFunc("GET /api/auth/discord/start", identity.HandleDiscordOAuthStart(pool, discordOAuthConfig))
 	mux.HandleFunc("GET /api/auth/discord/callback", identity.HandleDiscordOAuthCallback(pool, discordOAuthConfig, secureCookie))
-	mux.HandleFunc("/api/auth/password-reset/request", ratelimit.Middleware(credentialLimiter, identity.HandleForgotPassword(pool)))
+	mux.HandleFunc("/api/auth/password-reset/request", ratelimit.Middleware(credentialLimiter, identity.HandleForgotPassword(pool, forgotPasswordConfigFromEnv())))
 	mux.HandleFunc("/api/auth/password-reset/confirm", ratelimit.Middleware(credentialLimiter, identity.HandleResetPassword(pool, secureCookie)))
 	mux.HandleFunc("/api/invites", identity.HandleCreateInvite(pool))
 	mux.HandleFunc("/api/invites/accept", identity.HandleAcceptInvite(pool, secureCookie))
@@ -186,6 +223,14 @@ func main() {
 	mux.HandleFunc("/api/productions", identity.HandleProductionsCollection(pool))
 	mux.HandleFunc("/api/account/me", identity.HandleAccountMe(pool))
 	mux.HandleFunc("/api/account/email", ratelimit.Middleware(credentialLimiter, identity.HandleUpdateAccountEmail(pool)))
+	mux.HandleFunc("/api/account/email/verify", ratelimit.Middleware(credentialLimiter, identity.HandleRequestEmailVerification(pool, forgotPasswordConfigFromEnv())))
+	mux.HandleFunc("/api/account/email/verify/confirm", ratelimit.Middleware(credentialLimiter, identity.HandleConfirmEmailVerification(pool)))
+	mux.HandleFunc("/api/account/deletion-plan", ratelimit.Middleware(credentialLimiter, identity.HandleAccountDeletionPlan(pool)))
+	mux.HandleFunc("/api/account/delete", ratelimit.Middleware(credentialLimiter, identity.HandleAccountDelete(pool, storageRoot)))
+	mux.HandleFunc("/api/account/export", ratelimit.Middleware(credentialLimiter, identity.HandleExportCollection(pool, storageRoot, exportsRoot)))
+	mux.HandleFunc("/api/account/export/status", identity.HandleExportStatus(pool))
+	mux.HandleFunc("/api/account/export/download", identity.HandleExportDownload(pool))
+	mux.HandleFunc("/api/operator/backup-status", identity.HandleBackupStatus(pool))
 	mux.HandleFunc("/api/session/me", identity.HandleMe(pool))
 	mux.HandleFunc("/api/profiles/me", profiles.HandleGetMyProfile(pool))
 	mux.HandleFunc("/api/profiles/public", profiles.HandleGetPublicProfile(pool))
@@ -358,7 +403,7 @@ func main() {
 	mux.HandleFunc("/api/character-journals", characters.HandleCharacterJournals(pool))
 	mux.HandleFunc("GET /api/commands/available", network.HandleCommandsAvailable(pool))
 	mux.HandleFunc("POST /api/commands/preview", network.HandleCommandsPreview(pool))
-	mux.HandleFunc("POST /api/commands/execute", network.HandleCommandsExecute(hub, pool))
+	mux.HandleFunc("POST /api/commands/execute", ratelimit.Middleware(actionLimiter, network.HandleCommandsExecute(hub, pool)))
 	mux.HandleFunc("GET /api/characters/venue-sheet", network.HandleVenueCharacterSheet(pool))
 	mux.HandleFunc("POST /api/character-card-permissions", characters.HandleGrantCharacterPermission(pool))
 	mux.HandleFunc("POST /api/character-card-permissions/revoke", characters.HandleRevokeCharacterPermission(pool))
@@ -370,9 +415,9 @@ func main() {
 	mux.HandleFunc("POST /api/showings/start", network.HandleDirectorConsoleStartShowing(hub, pool))
 	mux.HandleFunc("POST /api/venues/{slug}/chat-policy", network.HandleDirectorConsoleChatPolicy(hub, pool))
 	mux.HandleFunc("GET /api/messages", messages.HandleMessages(pool))
-	mux.HandleFunc("POST /api/messages", messages.HandleMessages(pool))
+	mux.HandleFunc("POST /api/messages", ratelimit.Middleware(actionLimiter, messages.HandleMessages(pool)))
 	mux.HandleFunc("GET /api/messages/{id}", messages.HandleMessageByID(pool))
-	mux.HandleFunc("POST /api/note-cards", messages.HandleNoteCards(pool))
+	mux.HandleFunc("POST /api/note-cards", ratelimit.Middleware(actionLimiter, messages.HandleNoteCards(pool)))
 	// Kernel 74 S8.1: Directors+ read the door-intention note inside
 	// Catharsis, without opening Stage Management or the mailbox.
 	mux.HandleFunc("GET /api/backstage-notes", messages.HandleBackstageNotes(pool))
@@ -706,14 +751,14 @@ func main() {
 		})
 	})
 
-	mux.HandleFunc("/api/workshop/assets", assets.HandleWorkshopUpload(pool, storageRoot))
-	mux.HandleFunc("/api/workshop/assets/token", assets.HandleTokenUploadAsset(pool, storageRoot))
+	mux.HandleFunc("/api/workshop/assets", ratelimit.Middleware(actionLimiter, assets.HandleWorkshopUpload(pool, storageRoot)))
+	mux.HandleFunc("/api/workshop/assets/token", ratelimit.Middleware(actionLimiter, assets.HandleTokenUploadAsset(pool, storageRoot)))
 	mux.HandleFunc("/api/assets/", assets.HandleGetAssetMeta(pool))
 	mux.HandleFunc("/api/warehouse/storage", assets.HandleWarehouseStorage(pool, storageRoot))
 	mux.HandleFunc("/api/warehouse/storage/filesystem", assets.HandleWarehouseFilesystemStorage(pool, storageRoot))
 	mux.HandleFunc("/api/warehouse/storage/settings", assets.HandleWarehouseStorageSettings(pool))
-	mux.HandleFunc("/api/warehouse/assets", assets.HandleWarehouseAssets(pool))
-	mux.HandleFunc("/api/warehouse/assets/", assets.HandleWarehouseAssetByID(pool, storageRoot))
+	mux.HandleFunc("/api/warehouse/assets", ratelimit.Middleware(actionLimiter, assets.HandleWarehouseAssets(pool)))
+	mux.HandleFunc("/api/warehouse/assets/", ratelimit.Middleware(actionLimiter, assets.HandleWarehouseAssetByID(pool, storageRoot)))
 	mux.HandleFunc("GET /api/venues/first-theater/map", venues.HandleVenueMap(hub, pool))
 	mux.HandleFunc("POST /api/venues/first-theater/map", venues.HandleVenueMap(hub, pool))
 	mux.HandleFunc("GET /api/venues/first-theater/grid", venues.HandleVenueGrid(pool))
@@ -995,6 +1040,38 @@ func discordOAuthConfigFromEnv() identity.DiscordOAuthConfig {
 		RedirectURL:  strings.TrimSpace(os.Getenv("DISCORD_REDIRECT_URL")),
 		Scopes:       scopes,
 		Enabled:      enabled,
+	}
+}
+
+// forgotPasswordConfigFromEnv builds Kernel 77's self-service reset config.
+// Ready only becomes true when RECOVERY_EMAIL_ENABLED is truthy AND SMTP is
+// actually configured -- see identity.ForgotPasswordConfig's doc comment for
+// why an incomplete config must not half-open this endpoint.
+func forgotPasswordConfigFromEnv() identity.ForgotPasswordConfig {
+	enabled := parseBoolish(getenv("RECOVERY_EMAIL_ENABLED", ""))
+	smtpCfg := mailer.Config{
+		Enabled:  enabled,
+		From:     strings.TrimSpace(getenv("RECOVERY_EMAIL_FROM", "")),
+		FromName: strings.TrimSpace(getenv("RECOVERY_EMAIL_FROM_NAME", "Victory")),
+		Host:     strings.TrimSpace(getenv("SMTP_HOST", "")),
+		Port:     strings.TrimSpace(getenv("SMTP_PORT", "587")),
+		Username: strings.TrimSpace(getenv("SMTP_USERNAME", "")),
+		Password: strings.TrimSpace(getenv("SMTP_PASSWORD", "")),
+		TLSMode:  strings.TrimSpace(getenv("SMTP_TLS_MODE", "starttls")),
+	}
+	baseURL := strings.TrimRight(strings.TrimSpace(getenv("RECOVERY_EMAIL_BASE_URL", "")), "/")
+
+	ready := enabled && smtpCfg.Host != "" && smtpCfg.From != "" && baseURL != ""
+
+	var recoveryMailer identity.RecoveryMailer = mailer.NoopMailer{}
+	if ready {
+		recoveryMailer = mailer.NewSMTPMailer(smtpCfg)
+	}
+
+	return identity.ForgotPasswordConfig{
+		Ready:   ready,
+		Mailer:  recoveryMailer,
+		BaseURL: baseURL,
 	}
 }
 

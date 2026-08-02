@@ -251,10 +251,12 @@ func TestKernel75TutorialCompletionEndToEnd(t *testing.T) {
 	if _, err := OpenDialogue(ctx, pool, playerAUserID, prep.RaInteractionID); err != nil {
 		t.Fatalf("OpenDialogue: %v", err)
 	}
-	for _, topic := range []string{"why-looking", "crown-bet"} {
-		if _, err := ReadTopic(ctx, pool, playerAUserID, prep.RaInteractionID, topic); err != nil {
-			t.Fatalf("ReadTopic(%s): %v", topic, err)
-		}
+	// why-looking is the sole required_for_completion topic since migration
+	// 078 (Kernel 75) retired crown-bet from the live Ra packet in favor of
+	// the supervisor-handoff ending; crown-bet is no longer active and
+	// cannot be read.
+	if _, err := ReadTopic(ctx, pool, playerAUserID, prep.RaInteractionID, "why-looking"); err != nil {
+		t.Fatalf("ReadTopic(why-looking): %v", err)
 	}
 
 	// --- S3.2: Continue is refused before the gate is open -----------------
