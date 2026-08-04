@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Writer's Room — Editor</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    body {
+      margin: 0;
+      background: #17120d;
+      color: #f3e6cf;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 18px;
+      background: rgba(31, 24, 18, 0.98);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      flex-wrap: wrap;
+    }
+
+    .topbar h1 {
+      font-size: 16px;
+      margin: 0;
+      max-width: 320px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .status-chip {
+      font-size: 10.5px;
+      border-radius: 4px;
+      padding: 2px 7px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .status-draft { background: rgba(150, 130, 60, 0.25); color: #e4cd88; }
+    .status-published { background: rgba(70, 140, 80, 0.25); color: #9ede9f; }
+    .status-archived { background: rgba(120, 120, 120, 0.25); color: #c9c9c9; }
+
+    .rev-label { color: #a89467; font-size: 12.5px; }
+    .save-state { color: #a89467; font-size: 12.5px; min-width: 90px; }
+    .save-state.dirty { color: #e4cd88; }
+    .save-state.saving { color: #9ec9de; }
+
+    .topbar select {
+      background: #211c12;
+      color: #f3e6cf;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 12.5px;
+    }
+
+    .topbar .spacer { flex: 1; }
+
+    button {
+      background: #6b5327;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      padding: 7px 14px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    button:hover { background: #83672f; }
+    button:disabled { opacity: 0.5; cursor: default; }
+    button.secondary { background: rgba(255, 255, 255, 0.08); }
+    button.secondary:hover { background: rgba(255, 255, 255, 0.14); }
+    button.danger { background: #7a3a2e; }
+
+    .conflict-banner {
+      background: rgba(170, 70, 40, 0.25);
+      border-bottom: 1px solid rgba(220, 110, 70, 0.5);
+      color: #f2c4ae;
+      padding: 10px 18px;
+      font-size: 14px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .workspace {
+      display: flex;
+      gap: 0;
+      height: calc(100vh - 54px);
+    }
+
+    .outline-rail {
+      width: 240px;
+      flex-shrink: 0;
+      overflow-y: auto;
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 12px 8px;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+
+    .outline-rail h2 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #a89467;
+      margin: 0 0 8px 8px;
+    }
+
+    .outline-rail a {
+      display: block;
+      color: #cbbd9c;
+      text-decoration: none;
+      padding: 2px 8px;
+      line-height: 1.45;
+      border-radius: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .outline-rail a:hover { background: rgba(255, 255, 255, 0.05); color: #f3e6cf; }
+    .ol-2 { padding-left: 20px; }
+    .ol-3 { padding-left: 34px; font-size: 12.5px; }
+    .ol-4 { padding-left: 46px; font-size: 12px; }
+    .ol-explicit::after { content: " ⚓"; opacity: 0.5; font-size: 10px; }
+
+    .editor-col {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .format-strip {
+      display: flex;
+      gap: 6px;
+      padding: 8px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      align-items: center;
+    }
+
+    .format-strip button {
+      background: rgba(255, 255, 255, 0.07);
+      padding: 5px 11px;
+      font-size: 13px;
+    }
+    .format-strip button:hover { background: rgba(255, 255, 255, 0.14); }
+    .format-strip .wc { margin-left: auto; color: #a89467; font-size: 12.5px; }
+
+    #source-editor {
+      flex: 1;
+      width: 100%;
+      box-sizing: border-box;
+      background: #14100a;
+      color: #ece2c8;
+      border: none;
+      outline: none;
+      resize: none;
+      padding: 18px 22px;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      tab-size: 4;
+    }
+
+    .preview-pane {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 26px;
+      background: rgba(28, 24, 16, 0.96);
+      line-height: 1.6;
+      font-family: Georgia, serif;
+      font-size: 15.5px;
+      border-left: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .preview-pane h1, .preview-pane h2, .preview-pane h3 { color: #f6ecd2; }
+    .preview-pane a { color: #ecd9a8; }
+    .preview-pane code { background: rgba(255,255,255,0.07); padding: 1px 5px; border-radius: 4px; }
+    .preview-pane pre { background: #0f0d08; padding: 12px; border-radius: 8px; overflow-x: auto; }
+    .preview-pane table { border-collapse: collapse; }
+    .preview-pane th, .preview-pane td { border: 1px solid rgba(255,255,255,0.14); padding: 6px 9px; }
+    .preview-pane blockquote { border-left: 3px solid #6b5327; margin-left: 0; padding-left: 14px; color: #cbbd9c; }
+    .preview-pane img { max-width: 100%; }
+
+    .side-drawer {
+      width: 330px;
+      flex-shrink: 0;
+      overflow-y: auto;
+      border-left: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 14px;
+      box-sizing: border-box;
+      font-size: 13.5px;
+    }
+    .side-drawer h2 { font-size: 13px; color: #ecd9a8; margin: 16px 0 8px; }
+    .side-drawer h2:first-child { margin-top: 0; }
+    .side-drawer ul { list-style: none; padding: 0; margin: 0; }
+    .side-drawer li {
+      padding: 7px 9px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 7px;
+      margin-bottom: 6px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .side-drawer .meta { color: #8d8064; font-size: 11.5px; }
+    .side-drawer input[type="text"], .side-drawer select {
+      width: 100%;
+      box-sizing: border-box;
+      background: #211c12;
+      color: #f3e6cf;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 13px;
+      margin-top: 5px;
+    }
+    .side-drawer button { margin-top: 8px; font-size: 12.5px; padding: 6px 11px; }
+    .inline-btn { font-size: 11.5px !important; padding: 3px 8px !important; margin: 0 0 0 6px !important; }
+
+    .hidden { display: none !important; }
+    .status-line { color: #d9c39d; padding: 24px; }
+    .form-note { color: #a89467; font-size: 12px; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>This eWriting is not yours to edit.</p>
+      <a href="/venues/writers-room/" class="back-map-button">← Writer's Room</a>
+    </div>
+  </div>
+
+  <div id="loading-status" class="status-line">Opening the manuscript...</div>
+
+  <div id="editor-chrome" class="hidden">
+    <div class="topbar">
+      <a href="/venues/writers-room/" style="color:#a89467;text-decoration:none;">←</a>
+      <h1 id="pub-title"></h1>
+      <span id="status-chip" class="status-chip"></span>
+      <span id="rev-label" class="rev-label"></span>
+      <span id="save-state" class="save-state">saved</span>
+      <span class="spacer"></span>
+      <select id="visibility-select" title="Visibility">
+        <option value="production">Production only</option>
+        <option value="authenticated">Signed-in readers</option>
+        <option value="public">Public (signed-in for now)</option>
+      </select>
+      <button id="preview-toggle" class="secondary" type="button">Preview</button>
+      <button id="save-button" type="button">Save</button>
+      <button id="publish-button" type="button">Publish</button>
+      <button id="unpublish-button" class="secondary hidden" type="button">Unpublish</button>
+      <a id="reader-link" class="hidden" href="#" style="color:#9ede9f;font-size:13px;text-decoration:none;">View in Library →</a>
+    </div>
+
+    <div id="conflict-banner" class="conflict-banner hidden">
+      <span id="conflict-text"></span>
+      <button id="conflict-keep-mine" type="button">Keep my text (overwrite theirs on next save)</button>
+      <button id="conflict-reload" class="danger" type="button">Discard mine, load theirs</button>
+    </div>
+
+    <div id="restore-banner" class="conflict-banner hidden" style="background:rgba(70,110,150,0.2);border-color:rgba(110,160,220,0.5);color:#c4d8f2;">
+      <span id="restore-text"></span>
+      <button id="restore-accept" type="button">Restore it</button>
+      <button id="restore-dismiss" class="secondary" type="button">Discard snapshot</button>
+    </div>
+
+    <div class="workspace">
+      <nav class="outline-rail">
+        <h2>Outline</h2>
+        <div id="outline-links"></div>
+      </nav>
+
+      <div class="editor-col">
+        <div class="format-strip">
+          <button type="button" data-format="bold" title="Bold (wrap **)"><b>B</b></button>
+          <button type="button" data-format="italic" title="Italic (wrap *)"><i>I</i></button>
+          <button type="button" data-format="h2" title="Section heading">H2</button>
+          <button type="button" data-format="h3" title="Subsection heading">H3</button>
+          <button type="button" data-format="link" title="Insert link">🔗</button>
+          <span class="wc" id="word-count"></span>
+        </div>
+        <textarea id="source-editor" spellcheck="true" placeholder="# Title&#10;&#10;## Section&#10;&#10;Write in Markdown. Ctrl+S saves."></textarea>
+      </div>
+
+      <div id="preview-pane" class="preview-pane hidden"></div>
+
+      <aside class="side-drawer">
+        <h2>Revisions</h2>
+        <ul id="revision-list"></ul>
+
+        <h2>Named editors</h2>
+        <ul id="editor-list"></ul>
+        <input id="grant-handle" type="text" placeholder="user handle" />
+        <select id="grant-kind">
+          <option value="edit">edit</option>
+          <option value="publish">publish</option>
+          <option value="manage_editors">manage editors</option>
+        </select>
+        <button id="grant-add" type="button">Grant</button>
+        <div id="grant-message" class="form-note"></div>
+
+        <h2>Linked objects</h2>
+        <ul id="link-list"></ul>
+        <input id="link-venue" type="text" placeholder="venue slug (e.g. catharsis)" value="catharsis" />
+        <button id="link-load-equipment" class="secondary" type="button">Load equipment</button>
+        <select id="link-equipment" class="hidden"></select>
+        <select id="link-section" class="hidden"></select>
+        <button id="link-add" class="hidden" type="button">Link item → section</button>
+        <div id="link-message" class="form-note"></div>
+      </aside>
+    </div>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script src="/lib/ewrite/outline.js?v=k78-1"></script>
+  <script src="/lib/ewrite/editor-core.js?v=k78-1"></script>
+  <script>
+    const core = window.VictoryEwriteEditorCore;
+    const outlineLib = window.VictoryEwriteOutline;
+    const params = new URLSearchParams(location.search);
+    const pubId = params.get("pub") || "";
+
+    const editorEl = document.getElementById("source-editor");
+    const outlineLinks = document.getElementById("outline-links");
+    const saveStateEl = document.getElementById("save-state");
+    const revLabel = document.getElementById("rev-label");
+    const wordCountEl = document.getElementById("word-count");
+    const conflictBanner = document.getElementById("conflict-banner");
+    const previewPane = document.getElementById("preview-pane");
+
+    let pub = null;
+    let editorState = core.reduceEditorState(null, { type: "loaded", baseRevisionId: "" });
+    let currentRevisionNumber = 0;
+    let sections = [];
+    let autosaveTimer = null;
+    let previewVisible = false;
+
+    function dispatch(event) {
+      editorState = core.reduceEditorState(editorState, event);
+      renderState();
+    }
+
+    function renderState() {
+      saveStateEl.classList.remove("dirty", "saving");
+      if (editorState.status === "dirty") {
+        saveStateEl.textContent = "unsaved changes";
+        saveStateEl.classList.add("dirty");
+      } else if (editorState.status === "saving") {
+        saveStateEl.textContent = "saving...";
+        saveStateEl.classList.add("saving");
+      } else if (editorState.status === "conflict") {
+        saveStateEl.textContent = "conflict";
+        saveStateEl.classList.add("dirty");
+      } else {
+        saveStateEl.textContent = "saved";
+      }
+      conflictBanner.classList.toggle("hidden", editorState.status !== "conflict");
+      revLabel.textContent = currentRevisionNumber ? "rev " + currentRevisionNumber : "no revisions yet";
+    }
+
+    function renderStatusChip() {
+      const chip = document.getElementById("status-chip");
+      chip.className = "status-chip status-" + pub.status;
+      chip.textContent = pub.status;
+      document.getElementById("publish-button").classList.toggle("hidden", pub.status === "published");
+      document.getElementById("unpublish-button").classList.toggle("hidden", pub.status !== "published");
+      const readerLink = document.getElementById("reader-link");
+      readerLink.classList.toggle("hidden", pub.status !== "published");
+      readerLink.href = "/venues/library/read.html?pub=" + encodeURIComponent(pubId);
+    }
+
+    function renderOutline() {
+      const parsed = outlineLib.parseOutline(editorEl.value);
+      outlineLinks.innerHTML = "";
+      for (const h of parsed.headings) {
+        const a = document.createElement("a");
+        a.textContent = h.title;
+        a.href = "#";
+        a.className = "ol-" + Math.min(h.level, 4) + (h.explicit ? " ol-explicit" : "");
+        a.title = "#" + h.anchor + " (line " + h.line + ")";
+        a.addEventListener("click", (e) => {
+          e.preventDefault();
+          jumpToLine(h.line);
+        });
+        outlineLinks.appendChild(a);
+      }
+      wordCountEl.textContent = core.countWords(editorEl.value).toLocaleString() + " words";
+    }
+
+    function jumpToLine(lineNumber) {
+      const lines = editorEl.value.split("\n");
+      let offset = 0;
+      for (let i = 0; i < lineNumber - 1 && i < lines.length; i++) offset += lines[i].length + 1;
+      editorEl.focus();
+      editorEl.setSelectionRange(offset, offset + (lines[lineNumber - 1] || "").length);
+      const lineHeight = 22.4;
+      editorEl.scrollTop = Math.max(0, (lineNumber - 6) * lineHeight);
+    }
+
+    // --- Autosave (crash protection only; server revisions stay deliberate) ---
+    function autosaveNow() {
+      try {
+        localStorage.setItem(core.autosaveKey(pubId, editorState.baseRevisionId), JSON.stringify({
+          source: editorEl.value,
+          at: Date.now(),
+        }));
+      } catch (e) { /* storage full/blocked: autosave is best-effort */ }
+    }
+
+    function clearAutosave(baseId) {
+      try { localStorage.removeItem(core.autosaveKey(pubId, baseId)); } catch (e) { /* ignore */ }
+    }
+
+    function checkRestoreSnapshot() {
+      let snap = null;
+      try {
+        snap = JSON.parse(localStorage.getItem(core.autosaveKey(pubId, editorState.baseRevisionId)) || "null");
+      } catch (e) { snap = null; }
+      if (!snap || !snap.source || snap.source === editorEl.value) return;
+      const banner = document.getElementById("restore-banner");
+      document.getElementById("restore-text").textContent =
+        "An unsaved snapshot from " + new Date(snap.at).toLocaleString() + " exists for this revision (" +
+        core.countWords(snap.source).toLocaleString() + " words vs " +
+        core.countWords(editorEl.value).toLocaleString() + " saved).";
+      banner.classList.remove("hidden");
+      document.getElementById("restore-accept").onclick = () => {
+        editorEl.value = snap.source;
+        banner.classList.add("hidden");
+        dispatch({ type: "edited" });
+        renderOutline();
+      };
+      document.getElementById("restore-dismiss").onclick = () => {
+        clearAutosave(editorState.baseRevisionId);
+        banner.classList.add("hidden");
+      };
+    }
+
+    // --- Save / publish ---
+    async function save() {
+      if (editorState.status === "saving") return;
+      dispatch({ type: "save_started" });
+      try {
+        const res = await fetch("/api/ewrite/publications/" + encodeURIComponent(pubId) + "/source", {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source_markdown: editorEl.value,
+            base_revision_id: editorState.baseRevisionId,
+          }),
+        });
+        const payload = await res.json().catch(() => null);
+        if (res.status === 409 && payload?.data?.conflict) {
+          const c = payload.data.conflict;
+          document.getElementById("conflict-text").textContent =
+            "Someone saved revision " + c.current_revision_number +
+            (c.updated_by_name ? " (" + c.updated_by_name + ")" : "") +
+            " while you were editing. Your text is safe in this editor.";
+          dispatch({ type: "save_conflicted", conflict: c });
+          return;
+        }
+        if (!res.ok || !payload?.ok) {
+          saveStateEl.textContent = "save failed: " + (payload?.data?.error || res.status);
+          dispatch({ type: "edited" });
+          return;
+        }
+        const data = payload.data;
+        const oldBase = editorState.baseRevisionId;
+        currentRevisionNumber = data.revision_number;
+        pub = data.publication || pub;
+        clearAutosave(oldBase);
+        dispatch({ type: "save_succeeded", newRevisionId: data.revision_id });
+        renderStatusChip();
+        loadRevisions();
+        loadLinks(); // refetch sections with their stable row ids
+      } catch (err) {
+        console.error("save failed", err);
+        saveStateEl.textContent = "save failed (network)";
+        dispatch({ type: "edited" });
+      }
+    }
+
+    async function publish(unpublish) {
+      const action = unpublish ? "unpublish" : "publish";
+      const res = await fetch("/api/ewrite/publications/" + encodeURIComponent(pubId) + "/" + action, {
+        method: "POST",
+        credentials: "include",
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload?.ok) {
+        saveStateEl.textContent = action + " failed: " + (payload?.data?.error || res.status);
+        return;
+      }
+      pub = payload.data.publication;
+      renderStatusChip();
+    }
+
+    // --- Preview ---
+    async function togglePreview() {
+      previewVisible = !previewVisible;
+      previewPane.classList.toggle("hidden", !previewVisible);
+      document.getElementById("preview-toggle").textContent = previewVisible ? "Hide preview" : "Preview";
+      if (!previewVisible) return;
+      previewPane.innerHTML = "<em>Rendering…</em>";
+      const res = await fetch("/api/ewrite/preview", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source_markdown: editorEl.value }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload?.ok) {
+        previewPane.textContent = "Preview failed.";
+        return;
+      }
+      // Server-sanitized HTML (goldmark + bluemonday) -- deliberate injection.
+      previewPane.innerHTML = payload.data.html;
+    }
+
+    // --- Revisions ---
+    async function loadRevisions() {
+      const res = await fetch("/api/ewrite/publications/" + encodeURIComponent(pubId) + "/revisions", { credentials: "include" });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload?.ok) return;
+      const list = document.getElementById("revision-list");
+      list.innerHTML = "";
+      for (const rev of payload.data.revisions.slice(0, 12)) {
+        const li = document.createElement("li");
+        const head = document.createElement("div");
+        head.textContent = "rev " + rev.revision_number + (rev.created_by_name ? " — " + rev.created_by_name : "");
+        li.appendChild(head);
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        meta.textContent = new Date(rev.created_at).toLocaleString() + " · " + (rev.byte_size / 1024).toFixed(1) + " KB";
+        li.appendChild(meta);
+        if (rev.revision_number !== currentRevisionNumber) {
+          const btn = document.createElement("button");
+          btn.className = "inline-btn secondary";
+          btn.type = "button";
+          btn.textContent = "Load into editor";
+          btn.title = "Loads this revision's text; saving creates a NEW revision (history is never rewritten)";
+          btn.addEventListener("click", async () => {
+            const r = await fetch("/api/ewrite/revisions/" + encodeURIComponent(rev.id), { credentials: "include" });
+            const p = await r.json().catch(() => null);
+            if (!r.ok || !p?.ok) return;
+            editorEl.value = p.data.revision.source_markdown;
+            dispatch({ type: "edited" });
+            renderOutline();
+          });
+          head.appendChild(btn);
+        }
+        list.appendChild(li);
+      }
+    }
+
+    // --- Named editors ---
+    async function loadEditors() {
+      const res = await fetch("/api/ewrite/publications/" + encodeURIComponent(pubId) + "/editors", { credentials: "include" });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload?.ok) return;
+      const list = document.getElementById("editor-list");
+      list.innerHTML = "";
+      if (!payload.data.editors.length) {
+        const li = document.createElement("li");
+        li.textContent = "No named editors.";
+        li.style.color = "#8d8064";
+        list.appendChild(li);
+      }
+      for (const g of payload.data.editors) {
+        const li = document.createElement("li");
+        li.textContent = g.user_handle + " — " + g.grant_kind;
+        const rm = document.createElement("button");
+        rm.className = "inline-btn danger";
+        rm.type = "button";
+        rm.textContent = "✕";
+        rm.title = "Revoke";
+        rm.addEventListener("click", async () => {
+          await fetch("/api/ewrite/editors/" + encodeURIComponent(g.id), { method: "DELETE", credentials: "include" });
+          loadEditors();
+        });
+        li.appendChild(rm);
+        list.appendChild(li);
+      }
+    }
+
+    async function addEditorGrant() {
+      const handle = document.getElementById("grant-handle").value.trim();
+      const kind = document.getElementById("grant-kind").value;
+      const msg = document.getElementById("grant-message");
+      if (!handle) return;
+      const res = await fetch("/api/ewrite/publications/" + encodeURIComponent(pubId) + "/editors", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_handle: handle, grant_kind: kind }),
+      });
+      const payload = await res.json().catch(() => null);
+      msg.textContent = res.ok && payload?.ok ? "Granted." : "Failed: " + (payload?.data?.error || res.status);
+      document.getElementById("grant-handle").value = "";
+      loadEditors();
+    }
+
+    // --- Linked objects (equipment → rule section) ---
+    function fillSectionSelect() {
+      const sel = document.getElementById("link-section");
+      sel.innerHTML = "";
+      const top = document.createElement("option");
+      top.value = "";
+      top.textContent = "(publication top)";
+      sel.appendChild(top);
+      for (const s of sections) {
+        const opt = document.createElement("option");
+        opt.value = s.id || "";
+        opt.dataset.anchor = s.anchor;
+        opt.textContent = "  ".repeat(Math.max(0, (s.heading_level || 1) - 1)) + s.title;
+        if (!s.id) opt.disabled = true;
+        sel.appendChild(opt);
+      }
+    }
+
+    async function loadLinks() {
+      const res = await fetch("/api/ewrite/publications/" + encodeURIComponent(pubId), { credentials: "include" });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload?.ok) return;
+      sections = payload.data.sections || [];
+      fillSectionSelect();
+      const list = document.getElementById("link-list");
+      list.innerHTML = "";
+      const links = payload.data.object_links || [];
+      if (!links.length) {
+        const li = document.createElement("li");
+        li.textContent = "No Victory objects link here yet.";
+        li.style.color = "#8d8064";
+        list.appendChild(li);
+      }
+      for (const l of links) {
+        const li = document.createElement("li");
+        li.textContent = l.object_type + " → " + (l.section_title ? "§ " + l.section_title : "(top)");
+        const rm = document.createElement("button");
+        rm.className = "inline-btn danger";
+        rm.type = "button";
+        rm.textContent = "✕";
+        rm.addEventListener("click", async () => {
+          await fetch("/api/ewrite/object-links/" + encodeURIComponent(l.id), { method: "DELETE", credentials: "include" });
+          loadLinks();
+        });
+        li.appendChild(rm);
+        list.appendChild(li);
+      }
+    }
+
+    async function loadEquipment() {
+      const venue = document.getElementById("link-venue").value.trim() || "catharsis";
+      const msg = document.getElementById("link-message");
+      const res = await fetch("/api/venues/" + encodeURIComponent(venue) + "/equipment", { credentials: "include" });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload?.ok) {
+        msg.textContent = "Could not load equipment: " + (payload?.data?.error || res.status);
+        return;
+      }
+      const items = payload.data.equipment_items || payload.data.items || [];
+      const sel = document.getElementById("link-equipment");
+      sel.innerHTML = "";
+      for (const item of items) {
+        const opt = document.createElement("option");
+        opt.value = item.id;
+        opt.textContent = item.name;
+        sel.appendChild(opt);
+      }
+      msg.textContent = items.length + " item(s) loaded.";
+      sel.classList.remove("hidden");
+      document.getElementById("link-section").classList.remove("hidden");
+      document.getElementById("link-add").classList.remove("hidden");
+    }
+
+    async function addObjectLink() {
+      const msg = document.getElementById("link-message");
+      const equipmentID = document.getElementById("link-equipment").value;
+      const sectionID = document.getElementById("link-section").value;
+      if (!equipmentID) return;
+      const res = await fetch("/api/ewrite/object-links", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          object_type: "equipment_item",
+          equipment_item_id: equipmentID,
+          publication_id: pubId,
+          section_id: sectionID,
+        }),
+      });
+      const payload = await res.json().catch(() => null);
+      msg.textContent = res.ok && payload?.ok ? "Linked." : "Failed: " + (payload?.data?.error || res.status);
+      loadLinks();
+    }
+
+    // --- Formatting strip ---
+    function applyFormat(kind) {
+      const start = editorEl.selectionStart;
+      const end = editorEl.selectionEnd;
+      let r;
+      if (kind === "bold") r = core.applyWrap(editorEl.value, start, end, "**");
+      else if (kind === "italic") r = core.applyWrap(editorEl.value, start, end, "*");
+      else if (kind === "h2") r = core.applyHeading(editorEl.value, start, 2);
+      else if (kind === "h3") r = core.applyHeading(editorEl.value, start, 3);
+      else if (kind === "link") {
+        const url = prompt("Link target (URL or #section-anchor):", "#");
+        if (url === null) return;
+        r = core.applyLink(editorEl.value, start, end, url);
+      } else return;
+      editorEl.value = r.text;
+      editorEl.focus();
+      editorEl.setSelectionRange(r.selStart, r.selEnd);
+      dispatch({ type: "edited" });
+      renderOutline();
+    }
+
+    // --- Bootstrap ---
+    async function bootstrap() {
+      if (!pubId) {
+        location.href = "/venues/writers-room/";
+        return;
+      }
+      try {
+        const res = await fetch("/api/ewrite/publications/" + encodeURIComponent(pubId), { credentials: "include" });
+        const payload = await res.json().catch(() => null);
+        if (isForbiddenAccessResponse(res, payload) || !res.ok || !payload?.ok) {
+          document.getElementById("loading-status").classList.add("hidden");
+          showForbiddenScreen();
+          return;
+        }
+        const data = payload.data;
+        pub = data.publication;
+        sections = data.sections || [];
+        currentRevisionNumber = data.current_revision_number || 0;
+
+        document.title = "Writer's Room — " + pub.title;
+        document.getElementById("pub-title").textContent = pub.title;
+        document.getElementById("visibility-select").value = pub.visibility;
+        editorEl.value = pub.source_markdown || "";
+        editorState = core.reduceEditorState(null, { type: "loaded", baseRevisionId: pub.current_revision_id || "" });
+        if (!data.can_publish) {
+          document.getElementById("publish-button").disabled = true;
+          document.getElementById("publish-button").title = "You have edit access but not publish authority.";
+        }
+
+        renderStatusChip();
+        renderState();
+        renderOutline();
+        fillSectionSelect();
+        loadRevisions();
+        loadEditors();
+        loadLinks();
+        checkRestoreSnapshot();
+
+        document.getElementById("loading-status").classList.add("hidden");
+        document.getElementById("editor-chrome").classList.remove("hidden");
+      } catch (err) {
+        console.error("editor bootstrap failed", err);
+        showForbiddenScreen();
+      }
+    }
+
+    editorEl.addEventListener("input", () => {
+      dispatch({ type: "edited" });
+      clearTimeout(autosaveTimer);
+      autosaveTimer = setTimeout(() => {
+        autosaveNow();
+        renderOutline();
+      }, 800);
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        save();
+      }
+    });
+
+    document.getElementById("save-button").addEventListener("click", save);
+    document.getElementById("publish-button").addEventListener("click", () => publish(false));
+    document.getElementById("unpublish-button").addEventListener("click", () => publish(true));
+    document.getElementById("preview-toggle").addEventListener("click", togglePreview);
+    document.getElementById("grant-add").addEventListener("click", addEditorGrant);
+    document.getElementById("link-load-equipment").addEventListener("click", loadEquipment);
+    document.getElementById("link-add").addEventListener("click", addObjectLink);
+
+    document.getElementById("conflict-keep-mine").addEventListener("click", () => {
+      dispatch({ type: "conflict_keep_mine" });
+    });
+    document.getElementById("conflict-reload").addEventListener("click", async () => {
+      const res = await fetch("/api/ewrite/publications/" + encodeURIComponent(pubId), { credentials: "include" });
+      const payload = await res.json().catch(() => null);
+      if (res.ok && payload?.ok) {
+        pub = payload.data.publication;
+        currentRevisionNumber = payload.data.current_revision_number || 0;
+        editorEl.value = pub.source_markdown || "";
+        dispatch({ type: "conflict_reload_theirs" });
+        renderStatusChip();
+        renderOutline();
+      }
+    });
+
+    document.getElementById("visibility-select").addEventListener("change", async (e) => {
+      const res = await fetch("/api/ewrite/publications/" + encodeURIComponent(pubId), {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visibility: e.target.value }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (res.ok && payload?.ok) pub = payload.data.publication;
+    });
+
+    document.querySelectorAll(".format-strip button[data-format]").forEach((btn) => {
+      btn.addEventListener("click", () => applyFormat(btn.dataset.format));
+    });
+
+    window.addEventListener("beforeunload", (e) => {
+      if (editorState.status === "dirty" || editorState.status === "conflict") {
+        autosaveNow();
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    });
+
+    bootstrap();
+  </script>
+</body>
+</html>

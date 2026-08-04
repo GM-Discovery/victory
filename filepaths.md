@@ -1,6 +1,6 @@
 # Victory — Repository Map
 
-Current as of **Kernel 74** (2026-07-27). Paths are clickable. Agents should start their referencing here.
+Current as of **Kernel 78** (2026-08-04). Paths are clickable. Agents should start their referencing here.
 
 The previous version of this file was a flat link dump from an editor picker, last accurate around Kernel 4 — it stopped at migration `004` and listed six backend packages out of the thirty-four that exist. This version is organized by what each area *is*, so it can be read as well as clicked.
 
@@ -16,7 +16,7 @@ Go. Entry point [main.go](backend/cmd/victory/main.go) registers every HTTP rout
 
 | Path | What it is |
 |---|---|
-| [access/](backend/internal/access) | Venue visibility, operator checks, session-cookie→user resolution. [kernel16_venue_bootstrap.go](backend/internal/access/kernel16_venue_bootstrap.go) is the **fresh-install venue seed** — a new venue capability flag must be added here *and* in a migration, or fresh installs silently lose it. |
+| [access/](backend/internal/access) | Venue visibility, operator checks, session-cookie→user resolution. [kernel16_venue_bootstrap.go](backend/internal/access/kernel16_venue_bootstrap.go) is the legacy every-boot venue seed; since Kernel 77A **a migration alone is the canonical way to add a venue** (migrations auto-apply before every `Ensure*` bootstrap — see 083/085 for the pattern). |
 | [identity/](backend/internal/identity) | Signup/login/logout, Discord OAuth, invites, permission requests, productions. |
 | [participation/](backend/internal/participation) | Kernel 71's canonical resolver reconciling `location_memberships`, roster rows, and legacy `memberships`. |
 | [tickets/](backend/internal/tickets) | Two-punch Show tickets — the only ordinary path to a Player roster row. |
@@ -61,11 +61,17 @@ Go. Entry point [main.go](backend/cmd/victory/main.go) registers every HTTP rout
 | [dialogue/](backend/internal/dialogue) | Bounded guided-dialogue packets; prerequisite graph validated acyclic on load. |
 | [projection/](backend/internal/projection) | Participant-local stage projection — substitutes *which Scene a viewer resolves*, never writes the shared current Scene. |
 
+### eWrite — Kernel 78
+
+| Path | What it is |
+|---|---|
+| [ewrite/](backend/internal/ewrite) | The writing/publication/reading system: typed collection tree, publications with append-forward revisions and 409 save-conflict protection, stable section anchors + aliases, named editor grants, typed object links, Postgres FTS search, per-publication export. [markdown.go](backend/internal/ewrite/markdown.go)/[markdown_policy.go](backend/internal/ewrite/markdown_policy.go) are the repo's **only** Markdown render+sanitize path (goldmark + bluemonday, server-side only). Design notes in [Construction/eWrite/](Construction/eWrite). |
+
 ### Schema and infrastructure
 
 | Path | What it is |
 |---|---|
-| [migrations/](backend/migrations) | **69 migrations**, `000`–`068`, embedded via [embed.go](backend/migrations/embed.go) and auto-applied at boot with a checksum ledger and pre-apply backup. Never edit a shipped migration; always confirm the next number against both this directory and the live `schema_migrations` table. |
+| [migrations/](backend/migrations) | **86 migrations**, `000`–`085`, embedded via [embed.go](backend/migrations/embed.go) and auto-applied at boot with a checksum ledger and pre-apply backup. Never edit a shipped migration; always confirm the next number against both this directory and the live `schema_migrations` table. |
 | [migrate/](backend/internal/migrate) | The embedded runner. |
 | [dbtest/](backend/internal/dbtest) | Kernel 64's **safety gate**: `ValidateTestDatabaseURL` refuses any database not obviously a test database. Every DB-touching test must call it first. |
 | [assets/](backend/internal/assets), [commands/](backend/internal/commands), [config/](backend/internal/config), [db/](backend/internal/db) | Warehouse assets, command palette, config, pool. |
@@ -92,7 +98,7 @@ Kernel 72 replaced First Theater's and Catharsis's separately-copied runtimes wi
 
 ### Venues — [venues/](frontend/venues)
 
-[catharsis/](frontend/venues/catharsis) is the live Socio stage (thin shell + `venue.js` + onboarding). [show-runs/](frontend/venues/show-runs) holds Stage Management, including [show.html](frontend/venues/show-runs/show.html)'s Scene Setup composer and [scene-preview.html](frontend/venues/show-runs/scene-preview.html) (Preview as Player). Others: [audition-hall/](frontend/venues/audition-hall), [first-theater/](frontend/venues/first-theater), [greenroom/](frontend/venues/greenroom), [third-place/](frontend/venues/third-place), [trailers/](frontend/venues/trailers), [warehouse/](frontend/venues/warehouse), [workshop/](frontend/venues/workshop), [the-cave/](frontend/venues/the-cave), [directors-chair/](frontend/venues/directors-chair), [producers-office/](frontend/venues/producers-office), [victory-theater/](frontend/venues/victory-theater), [grants-cabin/](frontend/venues/grants-cabin), [middle-school-stage/](frontend/venues/middle-school-stage), [construction/](frontend/venues/construction), [construction-site/](frontend/venues/construction-site), [stage-template/](frontend/venues/stage-template), [shared/](frontend/venues/shared).
+[catharsis/](frontend/venues/catharsis) is the live Socio stage (thin shell + `venue.js` + onboarding). [show-runs/](frontend/venues/show-runs) holds Stage Management, including [show.html](frontend/venues/show-runs/show.html)'s Scene Setup composer and [scene-preview.html](frontend/venues/show-runs/scene-preview.html) (Preview as Player). [writers-room/](frontend/venues/writers-room) (eWrite dashboard + [edit.html](frontend/venues/writers-room/edit.html) editor) and [library/](frontend/venues/library) (browse + [read.html](frontend/venues/library/read.html) reader) are Kernel 78's authoring/reading pair, backed by the pure-logic modules in [lib/ewrite/](frontend/lib/ewrite). Others: [audition-hall/](frontend/venues/audition-hall), [first-theater/](frontend/venues/first-theater), [greenroom/](frontend/venues/greenroom), [third-place/](frontend/venues/third-place), [trailers/](frontend/venues/trailers), [warehouse/](frontend/venues/warehouse), [workshop/](frontend/venues/workshop), [the-cave/](frontend/venues/the-cave), [directors-chair/](frontend/venues/directors-chair), [producers-office/](frontend/venues/producers-office), [victory-theater/](frontend/venues/victory-theater), [grants-cabin/](frontend/venues/grants-cabin), [middle-school-stage/](frontend/venues/middle-school-stage), [construction/](frontend/venues/construction), [construction-site/](frontend/venues/construction-site), [stage-template/](frontend/venues/stage-template), [shared/](frontend/venues/shared).
 
 ### Other
 
@@ -106,6 +112,7 @@ Plain `node --test`; no jest/vitest anywhere.
 
 - [stage-runtime/](tests/stage-runtime) — engine unit tests, one per module. **Note:** [dice.test.js](tests/stage-runtime/dice.test.js) carries nine known failures tracked as a named exception in the alpha gate and roadmap; changing that count in *either* direction fails the gate, so a fix must update the script and roadmap together.
 - [contract/](tests/contract) — scene-node contract tests.
+- [ewrite/](tests/ewrite) — eWrite editor/outline pure-logic tests (Kernel 78).
 
 Backend tests live beside their packages; DB-touching ones are conventionally `*_dbtest_test.go` and require `TEST_DATABASE_URL`.
 

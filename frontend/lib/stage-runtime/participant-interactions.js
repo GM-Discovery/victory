@@ -172,12 +172,18 @@
 
     function renderEquipment() {
       const stock = currentContext.packet.stock || [];
+      const ruleLinks = currentContext.rule_links || {};
       const rows = stock.map((item) => {
         const owned = inventoryQuantityFor(item.id);
         const ownedNote = owned > 0 ? ` <em>(you have ${owned})</em>` : "";
+        // Kernel 78: published eWrite rule section for this item, if linked.
+        const rule = ruleLinks[item.id];
+        const ruleNote = rule
+          ? ` <a href="/venues/library/read.html?pub=${encodeURIComponent(rule.publication_id)}${rule.section_anchor ? "#" + encodeURIComponent(rule.section_anchor) : ""}" target="_blank" rel="noopener" style="font-size:12px;opacity:0.85;">View rule${rule.section_title ? ": " + escapeHtml(rule.section_title) : ""} →</a>`
+          : "";
         return `
           <div style="margin-bottom:10px;">
-            <strong>${escapeHtml(item.name)}</strong>${ownedNote}<br/>
+            <strong>${escapeHtml(item.name)}</strong>${ownedNote}${ruleNote}<br/>
             <span style="opacity:0.8;">${escapeHtml(item.short_description)}</span><br/>
             <button type="button" data-action="purchase" data-item="${escapeHtml(item.id)}">Purchase</button>
           </div>

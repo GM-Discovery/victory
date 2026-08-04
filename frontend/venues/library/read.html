@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Library — Reading</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    body {
+      margin: 0;
+      background: #14120d;
+      color: #f3ecd9;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    .layout {
+      display: flex;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 24px;
+      gap: 28px;
+      box-sizing: border-box;
+    }
+
+    .toc-rail {
+      width: 270px;
+      flex-shrink: 0;
+      position: sticky;
+      top: 16px;
+      align-self: flex-start;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      font-family: Arial, sans-serif;
+      font-size: 13.5px;
+      padding-right: 8px;
+    }
+
+    .toc-rail h2 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #a89467;
+      margin: 0 0 10px;
+    }
+
+    .toc-rail a {
+      display: block;
+      color: #cbbd9c;
+      text-decoration: none;
+      padding: 3px 8px;
+      border-left: 2px solid transparent;
+      line-height: 1.4;
+    }
+
+    .toc-rail a:hover {
+      color: #f3ecd9;
+    }
+
+    .toc-rail a.active {
+      color: #ecd9a8;
+      border-left-color: #6b5327;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .toc-l3 { padding-left: 22px; font-size: 12.5px; }
+    .toc-l4 { padding-left: 36px; font-size: 12px; }
+
+    .reader {
+      flex: 1;
+      min-width: 0;
+      background: rgba(28, 24, 16, 0.96);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 34px 44px;
+      box-sizing: border-box;
+    }
+
+    .reader-header {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+    }
+
+    .reader-header h1 {
+      margin: 0 0 6px;
+    }
+
+    .reader-meta {
+      color: #a89467;
+      font-size: 13.5px;
+      font-family: Arial, sans-serif;
+    }
+
+    .reader-actions {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-family: Arial, sans-serif;
+    }
+
+    .reader-actions a,
+    .reader-actions button {
+      font-size: 13px;
+      color: #ecd9a8;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 7px;
+      padding: 6px 12px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .reader-actions a:hover,
+    .reader-actions button:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .anchor-notice {
+      background: rgba(160, 108, 32, 0.18);
+      border: 1px solid rgba(220, 160, 60, 0.4);
+      color: #eccf9a;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+    }
+
+    .content {
+      line-height: 1.65;
+      font-size: 16.5px;
+    }
+
+    .content h1, .content h2, .content h3, .content h4 {
+      color: #f6ecd2;
+      scroll-margin-top: 18px;
+      position: relative;
+    }
+
+    .content h2 { border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 6px; }
+
+    .content a { color: #ecd9a8; }
+
+    .content blockquote {
+      border-left: 3px solid #6b5327;
+      margin-left: 0;
+      padding-left: 16px;
+      color: #cbbd9c;
+    }
+
+    .content code {
+      background: rgba(255, 255, 255, 0.07);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .content pre {
+      background: #0f0d08;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 14px;
+      overflow-x: auto;
+    }
+
+    .content pre code { background: none; padding: 0; }
+
+    .content table {
+      border-collapse: collapse;
+      margin: 14px 0;
+      width: 100%;
+    }
+
+    .content th, .content td {
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 7px 10px;
+      text-align: left;
+    }
+
+    .content th { background: rgba(255, 255, 255, 0.05); }
+
+    .content img { max-width: 100%; border-radius: 8px; }
+
+    .heading-link {
+      position: absolute;
+      margin-left: 8px;
+      color: #6b5327;
+      text-decoration: none;
+      opacity: 0;
+      font-size: 0.8em;
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-family: Georgia, serif;
+    }
+
+    .content h1:hover .heading-link,
+    .content h2:hover .heading-link,
+    .content h3:hover .heading-link,
+    .content h4:hover .heading-link,
+    .content h5:hover .heading-link,
+    .content h6:hover .heading-link {
+      opacity: 1;
+    }
+
+    .prev-next {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 30px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      font-family: Arial, sans-serif;
+      gap: 12px;
+    }
+
+    .prev-next a {
+      color: #ecd9a8;
+      text-decoration: none;
+      font-size: 14.5px;
+    }
+
+    .prev-next a:hover { text-decoration: underline; }
+
+    .hidden { display: none; }
+
+    .status-line { color: #d9c39d; padding: 24px; }
+
+    @media (max-width: 900px) {
+      .layout { flex-direction: column; }
+      .toc-rail { position: static; width: auto; max-height: none; }
+    }
+
+    @media print {
+      body { background: #fff; color: #111; }
+      .toc-rail, .reader-actions, .prev-next, .heading-link, #back-to-map-floating { display: none !important; }
+      .reader { border: none; background: #fff; padding: 0; }
+      .content { font-size: 12pt; line-height: 1.5; }
+      .content h1, .content h2, .content h3, .content h4 { color: #000; break-after: avoid; }
+      .content pre, .content blockquote, .content table { break-inside: avoid; }
+      .content a { color: #000; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>This eWriting is not on the open shelves.</p>
+      <a href="/venues/library/" class="back-map-button">← Back to the Library</a>
+    </div>
+  </div>
+
+  <div id="loading-status" class="status-line">Fetching from the stacks...</div>
+
+  <div id="reader-layout" class="layout hidden">
+    <nav id="toc-rail" class="toc-rail" aria-label="Table of contents">
+      <h2>Contents</h2>
+      <div id="toc-links"></div>
+    </nav>
+
+    <article class="reader">
+      <header class="reader-header">
+        <h1 id="pub-title"></h1>
+        <div id="pub-meta" class="reader-meta"></div>
+        <div class="reader-actions">
+          <a href="/venues/library/">← Library</a>
+          <button id="copy-link" type="button">Copy link</button>
+          <a id="export-link" href="#" download>Export (.zip)</a>
+          <button id="print-button" type="button">Print</button>
+        </div>
+      </header>
+
+      <div id="anchor-notice" class="anchor-notice hidden"></div>
+      <div id="content" class="content"></div>
+
+      <nav class="prev-next">
+        <a id="prev-link" class="hidden" href="#"></a>
+        <span></span>
+        <a id="next-link" class="hidden" href="#"></a>
+      </nav>
+    </article>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/back-to-map.js" data-back-to-map="floating"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const pubId = params.get("pub") || "";
+    const requestedAnchor = decodeURIComponent(location.hash.replace(/^#/, ""));
+
+    const loadingStatus = document.getElementById("loading-status");
+    const layout = document.getElementById("reader-layout");
+    const contentEl = document.getElementById("content");
+    const tocLinks = document.getElementById("toc-links");
+    const anchorNotice = document.getElementById("anchor-notice");
+
+    function readerHref(id, anchor) {
+      return "/venues/library/read.html?pub=" + encodeURIComponent(id) + (anchor ? "#" + encodeURIComponent(anchor) : "");
+    }
+
+    function buildToc(sections) {
+      tocLinks.innerHTML = "";
+      for (const s of sections) {
+        if (s.heading_level > 4) continue;
+        const a = document.createElement("a");
+        a.href = "#" + encodeURIComponent(s.anchor);
+        a.textContent = s.title;
+        a.dataset.anchor = s.anchor;
+        if (s.heading_level === 3) a.className = "toc-l3";
+        if (s.heading_level >= 4) a.className = "toc-l4";
+        a.addEventListener("click", (e) => {
+          e.preventDefault();
+          jumpTo(s.anchor, true);
+        });
+        tocLinks.appendChild(a);
+      }
+    }
+
+    function jumpTo(anchor, updateHash) {
+      const el = document.getElementById(anchor);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (updateHash) history.replaceState(null, "", "#" + encodeURIComponent(anchor));
+    }
+
+    // Hover-¶ copy links on every anchored heading.
+    function decorateHeadings() {
+      const headings = contentEl.querySelectorAll("h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]");
+      for (const h of headings) {
+        const btn = document.createElement("button");
+        btn.className = "heading-link";
+        btn.type = "button";
+        btn.title = "Copy a direct link to this section";
+        btn.textContent = "¶";
+        btn.addEventListener("click", () => {
+          const url = location.origin + readerHref(pubId, h.id);
+          navigator.clipboard?.writeText(url);
+          btn.textContent = "✓";
+          setTimeout(() => { btn.textContent = "¶"; }, 1200);
+        });
+        h.appendChild(btn);
+      }
+    }
+
+    // Scrollspy: highlight the TOC entry for the section in view.
+    function initScrollspy() {
+      const headings = [...contentEl.querySelectorAll("h1[id], h2[id], h3[id], h4[id]")];
+      if (!("IntersectionObserver" in window) || headings.length === 0) return;
+      const byAnchor = new Map([...tocLinks.querySelectorAll("a")].map((a) => [a.dataset.anchor, a]));
+      let currentActive = null;
+      const observer = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const link = byAnchor.get(entry.target.id);
+          if (!link) continue;
+          if (currentActive) currentActive.classList.remove("active");
+          link.classList.add("active");
+          currentActive = link;
+        }
+      }, { rootMargin: "0px 0px -75% 0px" });
+      for (const h of headings) observer.observe(h);
+    }
+
+    async function bootstrapReader() {
+      if (!pubId) {
+        location.href = "/venues/library/";
+        return;
+      }
+      try {
+        let url = "/api/library/publications/" + encodeURIComponent(pubId);
+        if (requestedAnchor) url += "?anchor=" + encodeURIComponent(requestedAnchor);
+        const response = await fetch(url, { credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (isForbiddenAccessResponse(response, payload) || !response.ok || !payload?.ok) {
+          loadingStatus.classList.add("hidden");
+          showForbiddenScreen();
+          return;
+        }
+        const data = payload.data;
+        const pub = data.publication;
+
+        document.title = "Library — " + pub.title;
+        document.getElementById("pub-title").textContent = pub.title;
+        const meta = [];
+        if (pub.word_count) meta.push(pub.word_count.toLocaleString() + " words");
+        if (pub.published_at) meta.push("published " + new Date(pub.published_at).toLocaleDateString());
+        if (pub.summary) meta.push(pub.summary);
+        document.getElementById("pub-meta").textContent = meta.join(" · ");
+        document.getElementById("export-link").href = "/api/library/publications/" + encodeURIComponent(pubId) + "/export";
+
+        // rendered_html is server-side sanitized (goldmark + bluemonday);
+        // this is the one deliberate innerHTML injection in the Library.
+        contentEl.innerHTML = pub.rendered_html || "";
+
+        buildToc(data.sections || []);
+        decorateHeadings();
+        initScrollspy();
+
+        if (data.previous) {
+          const prev = document.getElementById("prev-link");
+          prev.textContent = "← " + data.previous.title;
+          prev.href = readerHref(data.previous.id);
+          prev.classList.remove("hidden");
+        }
+        if (data.next) {
+          const next = document.getElementById("next-link");
+          next.textContent = data.next.title + " →";
+          next.href = readerHref(data.next.id);
+          next.classList.remove("hidden");
+        }
+
+        document.getElementById("copy-link").addEventListener("click", (e) => {
+          const url = location.origin + readerHref(pubId, location.hash.replace(/^#/, ""));
+          navigator.clipboard?.writeText(url);
+          e.target.textContent = "Copied ✓";
+          setTimeout(() => { e.target.textContent = "Copy link"; }, 1200);
+        });
+        document.getElementById("print-button").addEventListener("click", () => window.print());
+
+        loadingStatus.classList.add("hidden");
+        layout.classList.remove("hidden");
+
+        if (requestedAnchor) {
+          if (data.anchor_found) {
+            const target = data.resolved_anchor || requestedAnchor;
+            if (data.resolved_anchor && data.resolved_anchor !== requestedAnchor) {
+              history.replaceState(null, "", "#" + encodeURIComponent(data.resolved_anchor));
+            }
+            requestAnimationFrame(() => jumpTo(target, false));
+          } else {
+            anchorNotice.textContent = "The section “" + requestedAnchor + "” no longer exists in this eWriting — showing the beginning instead.";
+            anchorNotice.classList.remove("hidden");
+          }
+        }
+      } catch (err) {
+        console.error("reader bootstrap failed", err);
+        loadingStatus.classList.add("hidden");
+        showForbiddenScreen();
+      }
+    }
+
+    bootstrapReader();
+  </script>
+</body>
+</html>

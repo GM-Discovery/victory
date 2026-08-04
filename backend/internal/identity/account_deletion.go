@@ -191,6 +191,7 @@ func BuildDeletionPlan(ctx context.Context, pool *pgxpool.Pool, userID string) (
 		"relationships": `SELECT COUNT(*) FROM player_relationships WHERE observer_user_id = $1 OR subject_user_id = $1`,
 		"messages_received": `SELECT COUNT(*) FROM messages WHERE to_user_id = $1`,
 		"uploads":       `SELECT COUNT(*) FROM assets WHERE (owner_user_id = $1 OR uploader_user_id = $1) AND is_deleted = FALSE`,
+		"ewritings":     `SELECT COUNT(*) FROM ewrite_publications WHERE created_by = $1`,
 	}
 	for label, q := range countQueries {
 		var n int
@@ -360,7 +361,35 @@ func executeDeletion(ctx context.Context, pool *pgxpool.Pool, userID, storageRoo
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	anonymized := 0
+
+	// eWrite (Kernel 78), ordered BEFORE the generic reassign slice
+	// because the draft rule needs the pre-reassignment created_by:
+	//   - sole-owned drafts (no other named editor) are private unfinished
+	//     work -> hard-deleted; revisions/sections/aliases/links CASCADE.
+	//   - everything else (published/archived works, drafts with other
+	//     named editors, collections) is shared production material ->
+	//     reassigned to the tombstone; the work survives, authorship is
+	//     anonymized (kernel 78 spec 12.4: "shared published rules are not
+	//     destroyed casually", "no ownerless publication remains").
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM ewrite_publications p
+		WHERE p.created_by = $1
+		  AND p.status = 'draft'
+		  AND NOT EXISTS (
+			SELECT 1 FROM ewrite_editors e
+			WHERE e.publication_id = p.id AND e.user_id <> $1
+		  )
+	`, userID); err != nil {
+		return nil, nil, err
+	}
+
 	reassign := []string{
+		`UPDATE ewrite_publications SET created_by = $2 WHERE created_by = $1`,
+		`UPDATE ewrite_publications SET updated_by = $2 WHERE updated_by = $1`,
+		`UPDATE ewrite_collections SET created_by = $2 WHERE created_by = $1`,
+		`UPDATE ewrite_revisions SET created_by = $2 WHERE created_by = $1`,
+		`UPDATE ewrite_editors SET granted_by = $2 WHERE granted_by = $1`,
+		`UPDATE ewrite_object_links SET created_by = $2 WHERE created_by = $1`,
 		`UPDATE actions SET actor_id = $2 WHERE actor_id = $1`,
 		`UPDATE cue_executions SET triggered_by_user_id = $2 WHERE triggered_by_user_id = $1`,
 		`UPDATE character_inventory_items SET acquired_by_user_id = $2 WHERE acquired_by_user_id = $1`,

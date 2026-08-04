@@ -31,6 +31,7 @@ import (
 	"victory/backend/internal/characters"
 	"victory/backend/internal/cues"
 	"victory/backend/internal/db"
+	"victory/backend/internal/ewrite"
 	"victory/backend/internal/identity"
 	"victory/backend/internal/mailer"
 	"victory/backend/internal/merchant"
@@ -90,6 +91,12 @@ func main() {
 	}
 	if err := access.EnsureKernel16VenueSurface(ctx, pool); err != nil {
 		log.Fatalf("kernel 16 venue bootstrap failed: %v", err)
+	}
+	// Kernel 78: every Victory install ships with the Socio v1.1 core
+	// rulebook already published in the Library -- create-if-absent only,
+	// so a later hand edit (e.g. the known 4d12/5d12 fix) is never reverted.
+	if err := ewrite.EnsureCanonicalSocioManuscript(ctx, pool); err != nil {
+		log.Fatalf("kernel 78 socio manuscript seed failed: %v", err)
 	}
 	// Kernel 73: must run after the venue bootstrap above -- migration 057
 	// seeds the same Courtyard Scene for existing databases, but on a fresh
@@ -422,6 +429,38 @@ func main() {
 	// Catharsis, without opening Stage Management or the mailbox.
 	mux.HandleFunc("GET /api/backstage-notes", messages.HandleBackstageNotes(pool))
 	mux.HandleFunc("/api/index-cards", network.HandleIndexCardSave(hub, pool))
+
+	// Kernel 78: eWrite -- Writer's Room authoring surface. All writes
+	// behind the shared action limiter; every handler re-derives authority
+	// server-side (Crew+ in scope, named grants), never from the client.
+	mux.HandleFunc("GET /api/ewrite/tree", ewrite.HandleTree(pool))
+	mux.HandleFunc("POST /api/ewrite/collections", ratelimit.Middleware(actionLimiter, ewrite.HandleCreateCollection(pool)))
+	mux.HandleFunc("PATCH /api/ewrite/collections/{collection_id}", ratelimit.Middleware(actionLimiter, ewrite.HandleCollectionItem(pool)))
+	mux.HandleFunc("DELETE /api/ewrite/collections/{collection_id}", ratelimit.Middleware(actionLimiter, ewrite.HandleCollectionItem(pool)))
+	mux.HandleFunc("POST /api/ewrite/publications", ratelimit.Middleware(actionLimiter, ewrite.HandleCreatePublication(pool)))
+	mux.HandleFunc("GET /api/ewrite/publications/{publication_id}", ewrite.HandlePublicationItem(pool))
+	mux.HandleFunc("PATCH /api/ewrite/publications/{publication_id}", ratelimit.Middleware(actionLimiter, ewrite.HandlePublicationItem(pool)))
+	mux.HandleFunc("DELETE /api/ewrite/publications/{publication_id}", ratelimit.Middleware(actionLimiter, ewrite.HandlePublicationItem(pool)))
+	mux.HandleFunc("PUT /api/ewrite/publications/{publication_id}/source", ratelimit.Middleware(actionLimiter, ewrite.HandleSaveSource(pool)))
+	mux.HandleFunc("POST /api/ewrite/publications/{publication_id}/publish", ratelimit.Middleware(actionLimiter, ewrite.HandlePublish(pool)))
+	mux.HandleFunc("POST /api/ewrite/publications/{publication_id}/unpublish", ratelimit.Middleware(actionLimiter, ewrite.HandleUnpublish(pool)))
+	mux.HandleFunc("POST /api/ewrite/publications/{publication_id}/import", ratelimit.Middleware(actionLimiter, ewrite.HandleImport(pool)))
+	mux.HandleFunc("GET /api/ewrite/publications/{publication_id}/revisions", ewrite.HandleRevisionList(pool))
+	mux.HandleFunc("GET /api/ewrite/publications/{publication_id}/editors", ewrite.HandleEditors(pool))
+	mux.HandleFunc("POST /api/ewrite/publications/{publication_id}/editors", ratelimit.Middleware(actionLimiter, ewrite.HandleEditors(pool)))
+	mux.HandleFunc("GET /api/ewrite/revisions/{revision_id}", ewrite.HandleRevisionItem(pool))
+	mux.HandleFunc("POST /api/ewrite/preview", ratelimit.Middleware(actionLimiter, ewrite.HandlePreview(pool)))
+	mux.HandleFunc("DELETE /api/ewrite/editors/{grant_id}", ratelimit.Middleware(actionLimiter, ewrite.HandleEditorItem(pool)))
+	mux.HandleFunc("GET /api/ewrite/object-links", ewrite.HandleObjectLinks(pool))
+	mux.HandleFunc("POST /api/ewrite/object-links", ratelimit.Middleware(actionLimiter, ewrite.HandleObjectLinks(pool)))
+	mux.HandleFunc("DELETE /api/ewrite/object-links/{link_id}", ratelimit.Middleware(actionLimiter, ewrite.HandleObjectLinkItem(pool)))
+
+	// Kernel 78: eWrite -- Library reading surface. Published content
+	// only; per-publication visibility enforced in the handlers.
+	mux.HandleFunc("GET /api/library/tree", ewrite.HandleLibraryTree(pool))
+	mux.HandleFunc("GET /api/library/publications/{publication_id}", ewrite.HandleLibraryPublication(pool))
+	mux.HandleFunc("GET /api/library/publications/{publication_id}/export", ewrite.HandleLibraryExport(pool))
+	mux.HandleFunc("GET /api/library/search", ewrite.HandleLibrarySearch(pool))
 
 	mux.HandleFunc("/api/map/visibility", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

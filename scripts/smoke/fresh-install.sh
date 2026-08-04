@@ -9,6 +9,7 @@ Usage:
 Optional env:
   POSTGRES_CONTAINER=victory-postgres
   POSTGRES_USER=victory
+  POSTGRES_PASSWORD=change_this_now   (use the real value from /opt/victory/.env)
   BACKEND_PORT=18081
 EOF
 }
@@ -23,6 +24,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BACKEND_DIR="$ROOT/backend"
 POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-victory-postgres}"
 POSTGRES_USER="${POSTGRES_USER:-victory}"
+# Kernel 76 rotated the real password out of the compose file into .env;
+# accept it from the environment instead of hardcoding the pre-rotation
+# default everywhere below (Kernel 78 repair -- the script silently broke
+# at the first post-rotation run).
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-change_this_now}"
 BACKEND_PORT="${BACKEND_PORT:-18081}"
 DB_NAME="victory_fresh_$(date +%s)_$RANDOM"
 BACKEND_LOG="${TMPDIR:-/tmp}/victory-fresh-install-backend.log"
@@ -157,11 +163,12 @@ FRESH_INSTALL_BIN="${TMPDIR:-/tmp}/victory-fresh-install-backend-bin"
 
 env \
   PORT="$BACKEND_PORT" \
-  DATABASE_URL="postgres://victory:REDACTED@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
+  DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
   MIGRATE_DANGEROUSLY_SKIP_BACKUP=1 \
   STORAGE_ROOT="$ROOT/storage" \
   SESSION_COOKIE_SECURE=false \
   COOKIE_SECURE=false \
+  PASSWORD_SIGNUP_ENABLED=true \
   OPERATOR_HANDLE=fresh_install_operator \
   DISCORD_CLIENT_ID= \
   DISCORD_CLIENT_SECRET= \
@@ -213,7 +220,14 @@ check_status() {
 check_status "/api/account/me" "401"
 check_status "/api/discord/server-link/status" "401"
 check_status "/api/discord/channel-mapping/status" "401"
-check_status "/api/discord/gateway/status" "200"
+# Kernel 76 (K76-M02) closed gateway status to Operator-only; anonymous is
+# 401 by design. The old 200 expectation predated that closure (fixed in
+# Kernel 78 -- this script had been silently stale since the K76 rotation).
+check_status "/api/discord/gateway/status" "401"
+# Kernel 78: eWrite surfaces exist and refuse anonymous callers.
+check_status "/api/ewrite/tree" "401"
+check_status "/api/library/tree" "401"
+check_status "/api/library/search?q=test" "401"
 
 for file in \
   frontend/assets/favicon.png \
@@ -261,7 +275,7 @@ echo "PASS local auth signup issued a session cookie"
 bootstrap_default="$(
   cd "$BACKEND_DIR" && \
   env \
-    DATABASE_URL="postgres://victory:REDACTED@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
+    DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
     go run ./cmd/victory-bootstrap producer --handle "$operator_handle"
 )"
 if [[ "$bootstrap_default" != *"Already existed: false"* ]]; then
@@ -277,7 +291,7 @@ echo "PASS bootstrap producer by handle at neutral default location"
 bootstrap_repeat="$(
   cd "$BACKEND_DIR" && \
   env \
-    DATABASE_URL="postgres://victory:REDACTED@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
+    DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
     go run ./cmd/victory-bootstrap producer --handle "$operator_handle"
 )"
 if [[ "$bootstrap_repeat" != *"Already existed: true"* ]]; then
@@ -289,7 +303,7 @@ echo "PASS bootstrap producer is idempotent"
 bootstrap_legacy="$(
   cd "$BACKEND_DIR" && \
   env \
-    DATABASE_URL="postgres://victory:REDACTED@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
+    DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
     go run ./cmd/victory-bootstrap producer --handle "$operator_handle" --location amurray-family
 )"
 if [[ "$bootstrap_legacy" != *"Location: amurray.family (amurray-family)"* && "$bootstrap_legacy" != *"Location: amurray-family"* ]]; then
@@ -299,7 +313,7 @@ fi
 echo "PASS bootstrap --location works with legacy compatibility location"
 
 if cd "$BACKEND_DIR" && \
-  env DATABASE_URL="postgres://victory:REDACTED@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
+  env DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
   go run ./cmd/victory-bootstrap producer --handle definitely_missing_user >/tmp/victory-fresh-install-bootstrap-error.txt 2>&1; then
   echo "expected missing-user bootstrap to fail" >&2
   exit 1
@@ -612,9 +626,23 @@ if [[ "$leave_again_status" != "200" || "$(cat "$BODY_OUT")" != *'"created":fals
 fi
 echo "PASS repeated Leave Headshot did not create a duplicate"
 
+# Kernel 68 gated the commons list on the VIEWER's own Trailer Face
+# readiness (stage name + a visible Face field). B is deliberately kept
+# face-UNREADY here -- the Kernel 68 map-fog assertions below depend on
+# that -- so B proves the gate refuses, and Face-ready A proves the
+# listing works. (Kernel 78 repair: the original expectation predated the
+# K68 gate and asked the impossible of B.)
 b_commons_list="$(curl -s -H "Cookie: victory_session=$second_session" "http://127.0.0.1:${BACKEND_PORT}/api/third-place/headshots")"
+if [[ "$b_commons_list" != *'"trailer_face_not_ready"'* ]]; then
+  echo "expected Face-unready B to be refused the commons list with trailer_face_not_ready" >&2
+  echo "$b_commons_list" >&2
+  exit 1
+fi
+echo "PASS Face-unready B is refused the commons list (Kernel 68 gate)"
+
+b_commons_list="$(curl -s -H "Cookie: victory_session=$raw_session" "http://127.0.0.1:${BACKEND_PORT}/api/third-place/headshots")"
 if [[ "$b_commons_list" != *"\"headshot_id\":\"$headshot_id\""* ]]; then
-  echo "expected B to see A's Headshot in the commons list" >&2
+  echo "expected Face-ready A to see the Headshot in the commons list" >&2
   echo "$b_commons_list" >&2
   exit 1
 fi

@@ -1732,3 +1732,15 @@ Visual Scene composition/capture (the standing next-recommendation since Kernel 
 
 ### Next recommended kernel
 **Kernel 75 — Tutorial Completion, Aftercare, and Director-Controlled Continuation**, drafted at `Construction/Kernels/kernel-75-tutorial-completion-aftercare-continuation-v0.1.md`. Mostly presentation on top of machinery that already exists: final handoff art and copy, Ra's prose rewrite, tutorial-complete presentation, progression acknowledgement, and the Director's readiness view. **Aftercare has no prior definition anywhere in Victory and needs an operator decision before anything is built.** A second open question the draft raises: authored NPC dialogue is now seed-only for the second time (Kessa in 73, Ra in 74), so every wording change is a migration — worth deciding whether a bounded packet editor is due.
+
+## Kernel 78 — eWrite Foundation (2026-08-04)
+
+**PASS, deployed live, uncommitted.** Migrations `084`–`085` applied to production with a pre-apply backup (ledger at 86). Full detail: `Construction/OperatorLogs/kernel-78-reportback.md`; architecture notes in `Construction/eWrite/`.
+
+- Victory's first rules-native writing/publication/reading system: Writer's Room (Crew+ map tile, `ewrite_author_surface`) and Library (authenticated surface; its half-built seeded slot from Kernel 16 finally has pages).
+- First Markdown pipeline in the repo — goldmark + bluemonday, server-side only, policy built from empty; malicious fixtures tested vector by vector. A recorded spike chose a fence-aware regex pre-pass over goldmark's `{#id}` parser, which mangles the Google-Docs anchor charset (`(`, `?`).
+- Scale proof against the real `Sociov1_1.md`: 357 KB / 43,207 words / 763 headings, 137 explicit anchors preserved verbatim, render ≈136 ms, full save ≈0.9 s.
+- Save conflicts are 409s that never touch the submitted text; revisions append-forward; section rows keep UUIDs across edits with anchor aliases on rename, so links survive title changes and object links degrade instead of dangling.
+- Account export gained `ewrite/` (format_version 2); deletion hard-deletes sole-owned drafts and tombstones shared work.
+- Repaired `scripts/smoke/fresh-install.sh`, silently unrunnable since Kernel 76 (hardcoded pre-rotation password; stale 200-expectations for routes K76 deliberately closed; a Third Place fixture predating K68's Face-readiness gate). The alpha gate now passes end to end again.
+- Deferred by operator decision: the anonymous public read route (`public` visibility currently serves signed-in readers). Grant supplies the Writer's Room map icon (`frontend/assets/writers-room.png` is a placeholder copy of default.png).

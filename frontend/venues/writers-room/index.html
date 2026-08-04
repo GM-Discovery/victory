@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Writer's Room</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    body {
+      margin: 0;
+      background: #17120d;
+      color: #f3e6cf;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .shell {
+      min-height: 100vh;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    .columns {
+      display: flex;
+      gap: 20px;
+      max-width: 1240px;
+      margin: 0 auto;
+      align-items: flex-start;
+    }
+
+    .panel {
+      background: rgba(31, 24, 18, 0.96);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 22px;
+      box-sizing: border-box;
+    }
+
+    .main-col { flex: 1.4; min-width: 0; }
+    .side-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+
+    h1 { margin-top: 0; }
+    h2 { font-size: 16px; margin: 0 0 12px; color: #ecd9a8; }
+
+    .status-line { margin-top: 8px; color: #d9c39d; }
+    .hidden { display: none; }
+
+    .tree { list-style: none; padding-left: 0; }
+    .tree ul {
+      list-style: none;
+      padding-left: 20px;
+      border-left: 1px solid rgba(255, 255, 255, 0.07);
+      margin: 4px 0;
+    }
+    .tree li { margin: 6px 0; }
+
+    .kind-tag {
+      display: inline-block;
+      font-size: 10.5px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #a89467;
+      border: 1px solid rgba(168, 148, 103, 0.4);
+      border-radius: 4px;
+      padding: 1px 6px;
+      margin-right: 7px;
+    }
+
+    .status-chip {
+      display: inline-block;
+      font-size: 10.5px;
+      border-radius: 4px;
+      padding: 1px 7px;
+      margin-left: 7px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .status-draft { background: rgba(150, 130, 60, 0.25); color: #e4cd88; }
+    .status-published { background: rgba(70, 140, 80, 0.25); color: #9ede9f; }
+    .status-archived { background: rgba(120, 120, 120, 0.25); color: #c9c9c9; }
+
+    .pub-link { color: #ecd9a8; text-decoration: none; font-size: 15px; }
+    .pub-link:hover { text-decoration: underline; }
+
+    label { display: block; margin: 10px 0 4px; font-size: 13px; color: #cbbd9c; }
+
+    input[type="text"], select, textarea {
+      width: 100%;
+      box-sizing: border-box;
+      background: #211c12;
+      color: #f3e6cf;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 7px;
+      padding: 8px 10px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    textarea { min-height: 120px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+    button {
+      background: #6b5327;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      padding: 9px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    button:hover { background: #83672f; }
+    button:disabled { opacity: 0.5; cursor: default; }
+
+    .form-error { color: #e89b9b; font-size: 13px; margin-top: 8px; }
+    .form-ok { color: #9ede9f; font-size: 13px; margin-top: 8px; }
+
+    .recent-list { list-style: none; padding: 0; margin: 0; }
+    .recent-list li {
+      padding: 8px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .recent-meta { color: #8d8064; font-size: 12px; margin-top: 2px; }
+
+    .import-report {
+      background: #0f0d08;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 12px;
+      font-size: 13px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+    .import-report ul { margin: 6px 0; padding-left: 18px; }
+    .warn { color: #eccf9a; }
+
+    @media (max-width: 980px) { .columns { flex-direction: column; } }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>The Writer's Room is a Crew workspace.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <div class="columns">
+      <div class="main-col panel">
+        <h1>Writer's Room</h1>
+        <div id="connection-status" class="status-line">Unlocking the door...</div>
+
+        <div id="dashboard" class="hidden">
+          <h2>eWritings</h2>
+          <ul id="authoring-tree" class="tree"></ul>
+          <p id="tree-empty" class="hidden" style="color:#a89467;font-style:italic;">No eWritings yet — create a Ruleset to begin.</p>
+
+          <h2 style="margin-top:24px;">Recent drafts</h2>
+          <ul id="recent-drafts" class="recent-list"></ul>
+        </div>
+      </div>
+
+      <div class="side-col">
+        <div class="panel hidden" id="create-collection-panel">
+          <h2>New collection</h2>
+          <label for="cc-kind">Level</label>
+          <select id="cc-kind">
+            <option value="ruleset">Ruleset (top level)</option>
+            <option value="series">Series (inside a Ruleset)</option>
+            <option value="module">Module (inside a Ruleset or Series)</option>
+          </select>
+          <label for="cc-parent">Parent</label>
+          <select id="cc-parent"></select>
+          <label for="cc-title">Title</label>
+          <input id="cc-title" type="text" placeholder="e.g. Socio: Stories of Us" />
+          <label for="cc-visibility">Default visibility</label>
+          <select id="cc-visibility">
+            <option value="production">Production only</option>
+            <option value="authenticated">Any signed-in reader</option>
+            <option value="public">Public (served to signed-in readers for now)</option>
+          </select>
+          <button id="cc-create" type="button">Create collection</button>
+          <div id="cc-message"></div>
+        </div>
+
+        <div class="panel hidden" id="create-publication-panel">
+          <h2>New eWriting</h2>
+          <label for="cp-collection">Collection</label>
+          <select id="cp-collection"></select>
+          <label for="cp-title">Title</label>
+          <input id="cp-title" type="text" placeholder="e.g. Social Stances" />
+          <label for="cp-visibility">Visibility</label>
+          <select id="cp-visibility">
+            <option value="production">Production only</option>
+            <option value="authenticated">Any signed-in reader</option>
+            <option value="public">Public (served to signed-in readers for now)</option>
+          </select>
+
+          <label for="cp-file">Import a Markdown file (optional)</label>
+          <input id="cp-file" type="file" accept=".md,.markdown,.txt" />
+          <label for="cp-paste">…or paste Markdown (optional)</label>
+          <textarea id="cp-paste" placeholder="# Title&#10;&#10;## Section..."></textarea>
+
+          <button id="cp-create" type="button">Create eWriting</button>
+          <div id="cp-message"></div>
+          <div id="cp-report" class="import-report hidden"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/back-to-map.js"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script>
+    const connectionStatus = document.getElementById("connection-status");
+    const dashboard = document.getElementById("dashboard");
+    let treeData = null;
+
+    function editorHref(pubId) {
+      return "/venues/writers-room/edit.html?pub=" + encodeURIComponent(pubId);
+    }
+
+    function statusChip(status) {
+      const span = document.createElement("span");
+      span.className = "status-chip status-" + status;
+      span.textContent = status;
+      return span;
+    }
+
+    function renderTree() {
+      const treeEl = document.getElementById("authoring-tree");
+      treeEl.innerHTML = "";
+      let pubCount = 0;
+
+      for (const loc of treeData.locations) {
+        const byParent = new Map();
+        for (const c of loc.collections) {
+          const key = c.parent_id || "";
+          if (!byParent.has(key)) byParent.set(key, []);
+          byParent.get(key).push(c);
+        }
+        const pubsByCollection = new Map();
+        for (const p of loc.publications) {
+          pubCount += 1;
+          if (!pubsByCollection.has(p.collection_id)) pubsByCollection.set(p.collection_id, []);
+          pubsByCollection.get(p.collection_id).push(p);
+        }
+
+        function renderCollection(c) {
+          const li = document.createElement("li");
+          const tag = document.createElement("span");
+          tag.className = "kind-tag";
+          tag.textContent = c.kind;
+          li.appendChild(tag);
+          const title = document.createElement("span");
+          title.textContent = c.title;
+          li.appendChild(title);
+
+          const children = document.createElement("ul");
+          for (const pub of pubsByCollection.get(c.id) || []) {
+            const pli = document.createElement("li");
+            const a = document.createElement("a");
+            a.className = "pub-link";
+            a.href = editorHref(pub.id);
+            a.textContent = pub.title;
+            pli.appendChild(a);
+            pli.appendChild(statusChip(pub.status));
+            children.appendChild(pli);
+          }
+          for (const child of byParent.get(c.id) || []) {
+            children.appendChild(renderCollection(child));
+          }
+          if (children.childNodes.length > 0) li.appendChild(children);
+          return li;
+        }
+
+        if (treeData.locations.length > 1) {
+          const locHeader = document.createElement("li");
+          locHeader.style.color = "#a89467";
+          locHeader.textContent = loc.location_name;
+          treeEl.appendChild(locHeader);
+        }
+        for (const root of byParent.get("") || []) {
+          treeEl.appendChild(renderCollection(root));
+        }
+      }
+      document.getElementById("tree-empty").classList.toggle("hidden", pubCount > 0 || collectionsFlat().length > 0);
+    }
+
+    function collectionsFlat() {
+      const out = [];
+      for (const loc of treeData.locations) {
+        for (const c of loc.collections) out.push(c);
+      }
+      return out;
+    }
+
+    function renderRecentDrafts() {
+      const list = document.getElementById("recent-drafts");
+      list.innerHTML = "";
+      const drafts = treeData.recent_drafts || [];
+      if (drafts.length === 0) {
+        const li = document.createElement("li");
+        li.textContent = "No drafts in progress.";
+        li.style.color = "#8d8064";
+        list.appendChild(li);
+        return;
+      }
+      for (const d of drafts) {
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.className = "pub-link";
+        a.href = editorHref(d.id);
+        a.textContent = d.title;
+        li.appendChild(a);
+        const meta = document.createElement("div");
+        meta.className = "recent-meta";
+        meta.textContent = (d.word_count ? d.word_count.toLocaleString() + " words · " : "") +
+          "updated " + new Date(d.updated_at).toLocaleString();
+        li.appendChild(meta);
+        list.appendChild(li);
+      }
+    }
+
+    function fillParentSelectors() {
+      const kindSel = document.getElementById("cc-kind");
+      const parentSel = document.getElementById("cc-parent");
+      const collections = collectionsFlat();
+
+      function refreshParents() {
+        const kind = kindSel.value;
+        parentSel.innerHTML = "";
+        if (kind === "ruleset") {
+          const opt = document.createElement("option");
+          opt.value = "";
+          opt.textContent = "(top level)";
+          parentSel.appendChild(opt);
+          parentSel.disabled = true;
+          return;
+        }
+        parentSel.disabled = false;
+        const allowed = kind === "series" ? ["ruleset"] : ["ruleset", "series"];
+        for (const c of collections.filter((c) => allowed.includes(c.kind))) {
+          const opt = document.createElement("option");
+          opt.value = c.id;
+          opt.textContent = c.kind + ": " + c.title;
+          parentSel.appendChild(opt);
+        }
+        if (!parentSel.childNodes.length) {
+          const opt = document.createElement("option");
+          opt.value = "";
+          opt.textContent = "(create a " + (kind === "series" ? "Ruleset" : "Ruleset or Series") + " first)";
+          parentSel.appendChild(opt);
+        }
+      }
+      kindSel.addEventListener("change", refreshParents);
+      refreshParents();
+
+      const pubCollectionSel = document.getElementById("cp-collection");
+      pubCollectionSel.innerHTML = "";
+      for (const c of collections) {
+        const opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = c.kind + ": " + c.title;
+        pubCollectionSel.appendChild(opt);
+      }
+    }
+
+    function setMessage(id, text, ok) {
+      const el = document.getElementById(id);
+      el.className = ok ? "form-ok" : "form-error";
+      el.textContent = text;
+    }
+
+    async function apiPost(url, body) {
+      const res = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = await res.json().catch(() => null);
+      return { res, payload };
+    }
+
+    async function createCollection() {
+      const kind = document.getElementById("cc-kind").value;
+      const parentSel = document.getElementById("cc-parent");
+      const title = document.getElementById("cc-title").value.trim();
+      if (!title) {
+        setMessage("cc-message", "A title is required.", false);
+        return;
+      }
+      const body = {
+        kind,
+        title,
+        parent_id: parentSel.disabled ? "" : parentSel.value,
+        visibility: document.getElementById("cc-visibility").value,
+      };
+      if (!parentSel.disabled && !body.parent_id) {
+        setMessage("cc-message", "Pick a parent collection first.", false);
+        return;
+      }
+      if (kind === "ruleset") {
+        body.location_id = treeData.locations[0]?.location_id || "";
+      }
+      const { res, payload } = await apiPost("/api/ewrite/collections", body);
+      if (!res.ok || !payload?.ok) {
+        setMessage("cc-message", "Could not create: " + (payload?.data?.error || res.status), false);
+        return;
+      }
+      setMessage("cc-message", "Created “" + title + "”.", true);
+      document.getElementById("cc-title").value = "";
+      await reloadTree();
+    }
+
+    function renderImportReport(report) {
+      const el = document.getElementById("cp-report");
+      el.innerHTML = "";
+      const head = document.createElement("div");
+      head.textContent = "Import recognized: " + report.heading_count + " headings (" +
+        report.section_count + " sections, " + report.subsection_count + " subsections, " +
+        report.spacer_count + " spacers) · " + report.word_count.toLocaleString() + " words · " +
+        report.explicit_anchors + " explicit anchors";
+      el.appendChild(head);
+      if (report.warnings && report.warnings.length) {
+        const wh = document.createElement("div");
+        wh.className = "warn";
+        wh.textContent = "Warnings:";
+        el.appendChild(wh);
+        const ul = document.createElement("ul");
+        for (const w of report.warnings) {
+          const li = document.createElement("li");
+          li.className = "warn";
+          li.textContent = w;
+          ul.appendChild(li);
+        }
+        el.appendChild(ul);
+      }
+      el.classList.remove("hidden");
+    }
+
+    async function createPublication() {
+      const collectionID = document.getElementById("cp-collection").value;
+      const title = document.getElementById("cp-title").value.trim();
+      const fileInput = document.getElementById("cp-file");
+      const pasted = document.getElementById("cp-paste").value;
+      const btn = document.getElementById("cp-create");
+      if (!collectionID) {
+        setMessage("cp-message", "Create a collection first.", false);
+        return;
+      }
+      if (!title) {
+        setMessage("cp-message", "A title is required.", false);
+        return;
+      }
+      btn.disabled = true;
+      try {
+        const { res, payload } = await apiPost("/api/ewrite/publications", {
+          collection_id: collectionID,
+          title,
+          visibility: document.getElementById("cp-visibility").value,
+        });
+        if (!res.ok || !payload?.ok) {
+          setMessage("cp-message", "Could not create: " + (payload?.data?.error || res.status), false);
+          return;
+        }
+        const pub = payload.data.publication;
+
+        let source = pasted;
+        const file = fileInput.files && fileInput.files[0];
+        if (file) source = await file.text();
+
+        if (source && source.trim()) {
+          const form = new FormData();
+          form.append("base_revision_id", "");
+          if (file) {
+            form.append("file", file);
+          } else {
+            form.append("source", source);
+          }
+          const importRes = await fetch("/api/ewrite/publications/" + encodeURIComponent(pub.id) + "/import", {
+            method: "POST",
+            credentials: "include",
+            body: form,
+          });
+          const importPayload = await importRes.json().catch(() => null);
+          if (!importRes.ok || !importPayload?.ok) {
+            setMessage("cp-message", "Created, but import failed: " + (importPayload?.data?.error || importRes.status), false);
+            return;
+          }
+          renderImportReport(importPayload.data.report);
+          setMessage("cp-message", "Created and imported (" + importPayload.data.import_ms + "ms). Open it below or in the editor.", true);
+        } else {
+          setMessage("cp-message", "Created. Open the editor to start writing.", true);
+        }
+        const open = document.createElement("a");
+        open.href = editorHref(pub.id);
+        open.textContent = " Open in editor →";
+        open.className = "pub-link";
+        document.getElementById("cp-message").appendChild(open);
+        await reloadTree();
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function reloadTree() {
+      const response = await fetch("/api/ewrite/tree", { credentials: "include" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) return false;
+      treeData = payload.data;
+      renderTree();
+      renderRecentDrafts();
+      fillParentSelectors();
+      return true;
+    }
+
+    async function bootstrap() {
+      try {
+        const response = await fetch("/api/ewrite/tree", { credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (isForbiddenAccessResponse(response, payload) || !response.ok || !payload?.ok) {
+          showForbiddenScreen();
+          return;
+        }
+        treeData = payload.data;
+        connectionStatus.textContent = "Welcome back. The desk is yours.";
+        renderTree();
+        renderRecentDrafts();
+        fillParentSelectors();
+        dashboard.classList.remove("hidden");
+        document.getElementById("create-collection-panel").classList.remove("hidden");
+        document.getElementById("create-publication-panel").classList.remove("hidden");
+        document.getElementById("cc-create").addEventListener("click", createCollection);
+        document.getElementById("cp-create").addEventListener("click", createPublication);
+      } catch (err) {
+        console.error("writers-room bootstrap failed", err);
+        showForbiddenScreen();
+      }
+    }
+
+    bootstrap();
+  </script>
+</body>
+</html>

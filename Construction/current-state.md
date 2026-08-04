@@ -2,17 +2,17 @@
 
 ## Purpose
 
-This document is the current-state canon for Victory as of **Kernel 74**. Historical kernel specifications and reportbacks describe what was true when they were written; this file wins when an older current-tense statement conflicts with the implemented repository.
+This document is the current-state canon for Victory as of **Kernel 78**. Historical kernel specifications and reportbacks describe what was true when they were written; this file wins when an older current-tense statement conflicts with the implemented repository. (Kernels 75–77A shipped without a corresponding update to this file; their reportbacks in `Construction/OperatorLogs/` are authoritative for that span.)
 
 For detailed vocabulary use `Construction/Dictionary.txt`. For durable implementation traps use `Construction/OperatorLogs/operator-notes.md`. For chronological kernel history use `Construction/OperatorLogs/operator-log.md`.
 
 ## Kernel State
 
-- Current completed kernel: **Kernel 74 — Locked Door Intentions, Ra Guided Dialogue, and Participant-Local Tutorial Handoff**
-- Completion date: **2026-07-27**
-- Status: **PASS, deployed live, uncommitted** — migrations `066`–`068` applied to production with pre-apply backups (ledger at 69), backend rebuilt, `scripts/test/alpha-gate.sh` green, and the operator walked the tutorial in a real browser. Not committed; pending review, matching project practice.
-- Product state: Kernels 53–74 are implemented. Visual Scene composition shipped in Kernel 73A; Scene *capture* remains future work.
-- Next kernel: **Kernel 75 — Tutorial Completion, Aftercare, and Director-Controlled Continuation** (drafted at `Construction/Kernels/kernel-75-tutorial-completion-aftercare-continuation-v0.1.md`; Aftercare needs an operator decision before implementation).
+- Current completed kernel: **Kernel 78 — eWrite Foundation** (Writer's Room authoring venue, Library reading venue, safe Markdown pipeline, revisions/conflicts, stable anchors, FTS search, export, equipment→rule links)
+- Completion date: **2026-08-04**
+- Status: **PASS, deployed live, uncommitted** — migrations `084`–`085` applied to production with a pre-apply backup (ledger at 86), backend rebuilt, `scripts/test/alpha-gate.sh` green end to end (including a fresh-install smoke this kernel had to repair — it had been silently unrunnable since Kernel 76). Anonymous public reading is schema-ready but deliberately deferred; `public` visibility serves authenticated readers only. See `Construction/OperatorLogs/kernel-78-reportback.md`.
+- Between 74 and 78: Kernel 75 (tutorial completion/aftercare, PASS), 76 (security audit + DB rebuild, PASS), 77 (private-client readiness: deletion/export/backups, PASS), 77A (canonical venue seed repair, PASS) — reportbacks are authoritative for those.
+- Product state: Kernels 53–78 are implemented. Victory now has a rules-native writing/publication/reading system; the full Socio v1.1 manuscript is proven through the importer.
 - Kernel numbers are stable historical labels. Always check the operator log before assigning the next number.
 - Previous completed/live kernel: **Kernel 70A — Live Stage Closure and Alpha Path Alignment**, deployed live 2026-07-16, commit `2611840`. That deploy also retroactively applied Kernel 70's own migrations (`043`–`045`), which had never reached the live database despite being committed since `920aeb7` on 2026-07-14.
 

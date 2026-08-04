@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/access"
+	"victory/backend/internal/ewrite"
 	"victory/backend/internal/network"
 )
 
@@ -414,7 +415,18 @@ func HandleCharacterInventory(pool *pgxpool.Pool) http.HandlerFunc {
 			writeError(w, err)
 			return
 		}
-		writeOK(w, map[string]any{"inventory": list})
+		// Kernel 78: attach published rule sections per item so the
+		// inventory page can offer "View rule" deep links.
+		itemIDs := make([]string, 0, len(list))
+		for _, entry := range list {
+			itemIDs = append(itemIDs, entry.EquipmentItemID)
+		}
+		ruleLinks, err := ewrite.RuleLinksForEquipmentItems(ctx, pool, itemIDs)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeOK(w, map[string]any{"inventory": list, "rule_links": ruleLinks})
 	}
 }
 

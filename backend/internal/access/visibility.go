@@ -136,7 +136,25 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 		WITH visible AS (
 			SELECT v.id, v.slug, v.name, v.kind, 1 AS reason_rank, 'authenticated_surface'::text AS visible_because
 			FROM venues v
-			WHERE v.slug IN ('audition-hall', 'trailers')
+			WHERE v.slug IN ('audition-hall', 'trailers', 'library')
+
+			UNION
+
+			-- Writer's Room (Kernel 78): the eWrite authoring venue. Crew+
+			-- only -- producer/director/crew at any active Location
+			-- membership. Cast/Audience never see the tile; they read
+			-- published eWritings in the Library instead. Map visibility
+			-- only: every /api/ewrite/* route re-checks authoring authority
+			-- server-side per request (visibility filtering is never
+			-- invocation authorization -- operator-notes.md).
+			SELECT v.id, v.slug, v.name, v.kind, 3 AS reason_rank, 'ewrite_author_surface'::text AS visible_because
+			FROM venues v
+			JOIN lots l ON l.id = v.lot_id
+			JOIN location_memberships lm ON lm.location_id = l.location_id
+			WHERE v.slug = 'writers-room'
+			  AND lm.user_id = $1
+			  AND lm.active = TRUE
+			  AND lm.role IN ('producer', 'director', 'crew')
 
 			UNION
 

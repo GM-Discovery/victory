@@ -167,6 +167,8 @@ function venueHref(slug) {
   switch (slug) {
     case "library":
       return "/venues/library/";
+    case "writers-room":
+      return "/venues/writers-room/";
     case "first-theater":
       return "/venues/first-theater/";
     case "middle-school-stage":
@@ -260,6 +262,7 @@ function createVenuePin(venue, assetURL, fallbackPositions) {
   const icon = document.createElement("img");
   const venueIcons = {
     library: "/assets/librarycc.png",
+    "writers-room": "/assets/writers-room.png",
     "first-theater": "/assets/firsttheater.png",
     "middle-school-stage": "/assets/default.png",
     "soil-experts": "/assets/mudfarm.png",
@@ -328,6 +331,7 @@ function renderMapMenu() {
     backstage_authority_surface: "Backstage authority",
     show_run_crew_surface: "Show Run crew",
     trailer_face_ready: "Trailer Face ready",
+    ewrite_author_surface: "Writer's Room access",
   };
 
   const groups = new Map();
@@ -529,6 +533,7 @@ const VENUE_ICON_CLEAR_ZONES = [
   { x: 29, y: 57, r: 9 }, // construction
   { x: 70, y: 62, r: 9 }, // first-theater
   { x: 70, y: 87, r: 9 }, // library
+  { x: 29, y: 62, r: 9 }, // writers-room
   { x: 83, y: 77, r: 10 }, // victory-theater
   { x: 4, y: 65, r: 10 }, // soil-experts
 ];
@@ -689,6 +694,7 @@ async function loadVenues() {
 
     const fallbackPositions = {
       library: { x: 70, y: 87 },
+      "writers-room": { x: 29, y: 58 },
       "first-theater": { x: 69, y: 62 },
       "middle-school-stage": { x: 105, y: 50 },
       "the-cave": { x: 22, y: 23 },

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Library</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    body {
+      margin: 0;
+      background: #14120d;
+      color: #f3ecd9;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    .panel {
+      max-width: 1100px;
+      width: 100%;
+      margin: 0 auto;
+      background: rgba(28, 24, 16, 0.96);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    h1 {
+      margin-top: 0;
+    }
+
+    .status-line {
+      margin-top: 8px;
+      color: #d9c39d;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .search-row {
+      display: flex;
+      gap: 8px;
+      margin: 16px 0;
+    }
+
+    .search-row input {
+      flex: 1;
+      padding: 10px 12px;
+      font-size: 15px;
+      background: #211c12;
+      color: #f3ecd9;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      font-family: inherit;
+    }
+
+    .search-row button {
+      padding: 10px 18px;
+      background: #6b5327;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    .search-row button:hover {
+      background: #83672f;
+    }
+
+    .search-results {
+      margin: 0 0 20px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .search-results li {
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      margin-bottom: 10px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .search-results a {
+      color: #ecd9a8;
+      font-size: 17px;
+      text-decoration: none;
+    }
+
+    .search-results a:hover {
+      text-decoration: underline;
+    }
+
+    .snippet {
+      margin-top: 6px;
+      color: #cbbd9c;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .snippet mark {
+      background: #6b5327;
+      color: #fff;
+      padding: 0 2px;
+      border-radius: 3px;
+    }
+
+    .tree {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .tree ul {
+      list-style: none;
+      padding-left: 22px;
+      border-left: 1px solid rgba(255, 255, 255, 0.07);
+      margin: 4px 0;
+    }
+
+    .tree li {
+      margin: 6px 0;
+    }
+
+    .kind-tag {
+      display: inline-block;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #a89467;
+      border: 1px solid rgba(168, 148, 103, 0.4);
+      border-radius: 4px;
+      padding: 1px 6px;
+      margin-right: 8px;
+      vertical-align: middle;
+      font-family: Arial, sans-serif;
+    }
+
+    .collection-title {
+      font-size: 17px;
+      color: #f3ecd9;
+    }
+
+    .pub-link {
+      color: #ecd9a8;
+      text-decoration: none;
+      font-size: 16px;
+    }
+
+    .pub-link:hover {
+      text-decoration: underline;
+    }
+
+    .pub-meta {
+      color: #8d8064;
+      font-size: 12.5px;
+      margin-left: 8px;
+      font-family: Arial, sans-serif;
+    }
+
+    .empty-note {
+      color: #a89467;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <div class="panel">
+      <h1>Library</h1>
+      <div id="connection-status" class="status-line">Opening the Library...</div>
+
+      <div id="library-body" class="hidden">
+        <div class="search-row">
+          <input id="search-input" type="search" placeholder="Search the shelves — rules, scripts, sections..." aria-label="Search the Library" />
+          <button id="search-button" type="button">Search</button>
+        </div>
+        <ul id="search-results" class="search-results hidden"></ul>
+
+        <div id="browse-section">
+          <ul id="library-tree" class="tree"></ul>
+          <p id="empty-note" class="empty-note hidden">Nothing has been published yet. The shelves await their first eWriting.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/back-to-map.js"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script>
+    const connectionStatus = document.getElementById("connection-status");
+    const libraryBody = document.getElementById("library-body");
+    const treeEl = document.getElementById("library-tree");
+    const emptyNote = document.getElementById("empty-note");
+    const searchInput = document.getElementById("search-input");
+    const searchButton = document.getElementById("search-button");
+    const searchResults = document.getElementById("search-results");
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    // ts_headline snippets are plain text plus <mark> markers. Escape
+    // everything, then re-open only the exact <mark> tags the server
+    // emits -- a document that *discusses* "<script>" stays inert text.
+    function snippetHtml(snippet) {
+      return escapeHtml(snippet)
+        .replaceAll("&lt;mark&gt;", "<mark>")
+        .replaceAll("&lt;/mark&gt;", "</mark>");
+    }
+
+    function readerHref(pubId, anchor) {
+      return "/venues/library/read.html?pub=" + encodeURIComponent(pubId) + (anchor ? "#" + anchor : "");
+    }
+
+    function renderTree(tree) {
+      const byParent = new Map();
+      for (const c of tree.collections) {
+        const key = c.parent_id || "";
+        if (!byParent.has(key)) byParent.set(key, []);
+        byParent.get(key).push(c);
+      }
+      const pubsByCollection = new Map();
+      for (const p of tree.publications) {
+        if (!pubsByCollection.has(p.collection_id)) pubsByCollection.set(p.collection_id, []);
+        pubsByCollection.get(p.collection_id).push(p);
+      }
+
+      function renderCollection(c) {
+        const li = document.createElement("li");
+        const tag = document.createElement("span");
+        tag.className = "kind-tag";
+        tag.textContent = c.kind;
+        const title = document.createElement("span");
+        title.className = "collection-title";
+        title.textContent = c.title;
+        li.appendChild(tag);
+        li.appendChild(title);
+
+        const children = document.createElement("ul");
+        for (const pub of pubsByCollection.get(c.id) || []) {
+          const pli = document.createElement("li");
+          const a = document.createElement("a");
+          a.className = "pub-link";
+          a.href = readerHref(pub.id);
+          a.textContent = pub.title;
+          pli.appendChild(a);
+          const meta = document.createElement("span");
+          meta.className = "pub-meta";
+          meta.textContent = (pub.word_count ? pub.word_count.toLocaleString() + " words" : "") +
+            (pub.summary ? " — " + pub.summary : "");
+          pli.appendChild(meta);
+          children.appendChild(pli);
+        }
+        for (const child of byParent.get(c.id) || []) {
+          children.appendChild(renderCollection(child));
+        }
+        if (children.childNodes.length > 0) li.appendChild(children);
+        return li;
+      }
+
+      treeEl.innerHTML = "";
+      const roots = byParent.get("") || [];
+      for (const root of roots) {
+        treeEl.appendChild(renderCollection(root));
+      }
+      emptyNote.classList.toggle("hidden", tree.publications.length > 0);
+    }
+
+    async function runSearch() {
+      const q = searchInput.value.trim();
+      if (!q) {
+        searchResults.classList.add("hidden");
+        return;
+      }
+      const res = await fetch("/api/library/search?q=" + encodeURIComponent(q), { credentials: "include" });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload?.ok) return;
+      searchResults.innerHTML = "";
+      const results = payload.data.results || [];
+      if (results.length === 0) {
+        const li = document.createElement("li");
+        li.textContent = "Nothing found for “" + q + "”.";
+        searchResults.appendChild(li);
+      }
+      for (const r of results) {
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.href = readerHref(r.publication_id);
+        a.textContent = r.title;
+        li.appendChild(a);
+        const snip = document.createElement("div");
+        snip.className = "snippet";
+        snip.innerHTML = snippetHtml(r.snippet);
+        li.appendChild(snip);
+        searchResults.appendChild(li);
+      }
+      searchResults.classList.remove("hidden");
+    }
+
+    searchButton.addEventListener("click", runSearch);
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") runSearch();
+    });
+
+    async function bootstrapLibrary() {
+      try {
+        const response = await fetch("/api/library/tree", { method: "GET", credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (isForbiddenAccessResponse(response, payload)) {
+          showForbiddenScreen();
+          return;
+        }
+        if (!response.ok || !payload?.ok) {
+          showForbiddenScreen();
+          return;
+        }
+        connectionStatus.textContent = "Browse the published eWritings, or search the shelves.";
+        renderTree(payload.data);
+        libraryBody.classList.remove("hidden");
+      } catch (err) {
+        console.error("library bootstrap failed", err);
+        showForbiddenScreen();
+      }
+    }
+
+    bootstrapLibrary();
+  </script>
+</body>
+</html>

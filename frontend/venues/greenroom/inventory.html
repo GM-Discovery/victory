@@ -98,6 +98,7 @@
             return;
           }
           const items = payload.data.inventory || [];
+          const ruleLinks = payload.data.rule_links || {};
           if (items.length === 0) {
             statusLine.textContent = "No items yet.";
             return;
@@ -110,12 +111,18 @@
             const imageHtml = item.image_asset_id
               ? `<img src="/api/assets/${encodeURIComponent(item.image_asset_id)}/content?variant=thumbnail" alt="" />`
               : "";
+            // Kernel 78: published eWrite rule section for this item, if linked.
+            const rule = ruleLinks[entry.equipment_item_id];
+            const ruleHtml = rule
+              ? `<p class="item-meta"><a href="/venues/library/read.html?pub=${encodeURIComponent(rule.publication_id)}${rule.section_anchor ? "#" + encodeURIComponent(rule.section_anchor) : ""}" target="_blank" rel="noopener" style="color:#ecd9a8;">View rule${rule.section_title ? ": " + escapeHtml(rule.section_title) : ""} →</a></p>`
+              : "";
             card.innerHTML = `
               ${imageHtml}
               <div>
                 <p class="item-name">${escapeHtml(item.name || "Unknown item")}</p>
                 <p class="item-desc">${escapeHtml(item.short_description || "")}</p>
                 <p class="item-meta">${escapeHtml(sourceSummary(entry))}</p>
+                ${ruleHtml}
               </div>
               <span class="qty-badge">×${Number(entry.quantity) || 1}</span>
             `;

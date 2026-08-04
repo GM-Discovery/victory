@@ -361,8 +361,9 @@ func buildExportArchive(ctx context.Context, pool *pgxpool.Pool, userID, jobID, 
 	}
 
 	manifest := map[string]any{
-		"generated_at":  time.Now().UTC().Format(time.RFC3339),
-		"format_version": 1,
+		"generated_at": time.Now().UTC().Format(time.RFC3339),
+		// format_version 2: Kernel 78 added the ewrite/ section.
+		"format_version": 2,
 	}
 	counts := map[string]int{}
 
@@ -685,6 +686,79 @@ func buildExportArchive(ctx context.Context, pool *pgxpool.Pool, userID, jobID, 
 	}
 	counts["uploads"] = len(assetList)
 
+	// ewrite/ -- Kernel 78: publications this user created (any status;
+	// drafts are the user's work product), each as source Markdown plus a
+	// metadata manifest and full revision history metadata. Source
+	// Markdown, not rendered HTML, so nothing is trapped in Victory
+	// (kernel 78 spec 12.3, 25.4).
+	ewriteRows, err := pool.Query(ctx, `
+		SELECT p.id::text, p.title, p.slug, p.summary, p.status, p.visibility,
+		       p.source_markdown, p.word_count, p.created_at, p.updated_at,
+		       COALESCE(c.title, '')
+		FROM ewrite_publications p
+		LEFT JOIN ewrite_collections c ON c.id = p.collection_id
+		WHERE p.created_by = $1
+		ORDER BY p.created_at
+	`, userID)
+	if err != nil {
+		return "", 0, err
+	}
+	type ewritePub struct {
+		id, title, slug, summary, status, visibility, source, collection string
+		wordCount                                                        int
+		createdAt, updatedAt                                             time.Time
+	}
+	var ewritePubs []ewritePub
+	for ewriteRows.Next() {
+		var p ewritePub
+		if err := ewriteRows.Scan(&p.id, &p.title, &p.slug, &p.summary, &p.status, &p.visibility,
+			&p.source, &p.wordCount, &p.createdAt, &p.updatedAt, &p.collection); err != nil {
+			ewriteRows.Close()
+			return "", 0, err
+		}
+		ewritePubs = append(ewritePubs, p)
+	}
+	ewriteRows.Close()
+	if err := ewriteRows.Err(); err != nil {
+		return "", 0, err
+	}
+	for _, p := range ewritePubs {
+		dir := "ewrite/" + exportSafeName(p.slug) + "-" + p.id[:8]
+		if err := writeTextFile(dir+"/publication.md", p.source); err != nil {
+			return "", 0, err
+		}
+		var revisions []map[string]any
+		revRows, err := pool.Query(ctx, `
+			SELECT revision_number, length(source_markdown), created_at
+			FROM ewrite_revisions WHERE publication_id = $1 ORDER BY revision_number
+		`, p.id)
+		if err != nil {
+			return "", 0, err
+		}
+		for revRows.Next() {
+			var num, size int
+			var at time.Time
+			if err := revRows.Scan(&num, &size, &at); err != nil {
+				revRows.Close()
+				return "", 0, err
+			}
+			revisions = append(revisions, map[string]any{"revision_number": num, "byte_size": size, "created_at": at})
+		}
+		revRows.Close()
+		if err := revRows.Err(); err != nil {
+			return "", 0, err
+		}
+		if err := writeJSONFile(dir+"/metadata.json", map[string]any{
+			"id": p.id, "title": p.title, "slug": p.slug, "summary": p.summary,
+			"status": p.status, "visibility": p.visibility, "collection": p.collection,
+			"word_count": p.wordCount, "created_at": p.createdAt, "updated_at": p.updatedAt,
+			"revisions": revisions,
+		}); err != nil {
+			return "", 0, err
+		}
+	}
+	counts["ewrite_publications"] = len(ewritePubs)
+
 	manifest["counts"] = counts
 	if err := writeJSONFile("manifest.json", manifest); err != nil {
 		return "", 0, err
@@ -698,7 +772,8 @@ func buildExportArchive(ctx context.Context, pool *pgxpool.Pool, userID, jobID, 
 		"- relationships/ — your private relationship records and notes about other members\n" +
 		"- messages/ — messages you sent or received\n" +
 		"- activity/ — a reference list of Actions you authored in shared Shows\n" +
-		"- uploads/ — files you uploaded or own\n\n" +
+		"- uploads/ — files you uploaded or own\n" +
+		"- ewrite/ — eWritings you created, as source Markdown plus metadata and revision history\n\n" +
 		"## Not included\n\n" +
 		"Password hashes, session tokens, password-reset tokens, OAuth tokens, server secrets, " +
 		"and any other member's private information are never exported.\n"

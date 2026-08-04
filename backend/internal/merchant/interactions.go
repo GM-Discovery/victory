@@ -11,6 +11,7 @@ import (
 
 	"victory/backend/internal/actions"
 	"victory/backend/internal/dice"
+	"victory/backend/internal/ewrite"
 	"victory/backend/internal/scenes"
 	"victory/backend/internal/showruns"
 	"victory/backend/internal/shows"
@@ -401,12 +402,16 @@ func packetSlugFromConfig(config map[string]any) string {
 
 // EquipModeContext is everything the frontend needs to render Equip Mode on
 // open (spec S8.2): the packet (with stock), current inventory for the
-// Character, and the resolved identity to display.
+// Character, and the resolved identity to display. RuleLinks (Kernel 78)
+// maps equipment_item_id -> published eWrite rule section so the shop can
+// offer "View rule" without a second round trip; only published targets
+// resolve, so no draft title can leak into a Player payload.
 type EquipModeContext struct {
-	Interaction     ParticipantInteraction `json:"interaction"`
-	Packet          MerchantPacket         `json:"packet"`
-	CharacterCardID string                 `json:"character_card_id"`
-	Inventory       []InventoryEntry       `json:"inventory"`
+	Interaction     ParticipantInteraction     `json:"interaction"`
+	Packet          MerchantPacket             `json:"packet"`
+	CharacterCardID string                     `json:"character_card_id"`
+	Inventory       []InventoryEntry           `json:"inventory"`
+	RuleLinks       map[string]ewrite.RuleLink `json:"rule_links,omitempty"`
 }
 
 // OpenEquipMode resolves eligibility, then loads everything the Program
@@ -429,11 +434,20 @@ func OpenEquipMode(ctx context.Context, pool *pgxpool.Pool, actorUserID, interac
 	if err != nil {
 		return EquipModeContext{}, err
 	}
+	stockIDs := make([]string, 0, len(packet.Stock))
+	for _, item := range packet.Stock {
+		stockIDs = append(stockIDs, item.ID)
+	}
+	ruleLinks, err := ewrite.RuleLinksForEquipmentItems(ctx, pool, stockIDs)
+	if err != nil {
+		return EquipModeContext{}, err
+	}
 	return EquipModeContext{
 		Interaction:     eligible.Interaction,
 		Packet:          packet,
 		CharacterCardID: eligible.CharacterCardID,
 		Inventory:       inventory,
+		RuleLinks:       ruleLinks,
 	}, nil
 }
 
