@@ -121,6 +121,16 @@ func TestPrepareLockedCourtyardOpeningIsIdempotentAndReachable(t *testing.T) {
 	if !first.StageElementCreated {
 		t.Fatal("expected a new Kessa stage element to be created on first call")
 	}
+	var kessaContentURL, kessaThumbnailURL string
+	if err := pool.QueryRow(ctx, `
+		SELECT COALESCE(data->>'asset_content_url', ''), COALESCE(data->>'asset_thumbnail_url', '')
+		FROM scene_stage_elements WHERE id = $1
+	`, first.StageElementID).Scan(&kessaContentURL, &kessaThumbnailURL); err != nil {
+		t.Fatalf("load Kessa token artwork: %v", err)
+	}
+	if kessaContentURL != kessaTokenAssetURL || kessaThumbnailURL != kessaTokenAssetURL {
+		t.Fatalf("Kessa token artwork = %q/%q, want %q", kessaContentURL, kessaThumbnailURL, kessaTokenAssetURL)
+	}
 	if !first.BindingCreated {
 		t.Fatal("expected a new binding to be created on first call")
 	}

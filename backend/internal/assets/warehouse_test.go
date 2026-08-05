@@ -30,6 +30,13 @@ func TestDefaultWarehouseStorageSettings(t *testing.T) {
 	}
 }
 
+func TestWarehousePhysicalReserveFitsStandardHost(t *testing.T) {
+	const standardHostBytes = int64(40 * 1000 * 1000 * 1000)
+	if WarehousePhysicalReserveBytes >= standardHostBytes/5 {
+		t.Fatalf("physical reserve = %d, want less than 20%% of a standard 40 GB host", WarehousePhysicalReserveBytes)
+	}
+}
+
 // loadWarehouseStorageStats takes a location UUID, not a filesystem path -
 // filesystem usage is loaded separately by loadWarehouseFilesystemStats and
 // the two are never combined inside loadWarehouseStorageStats itself. The

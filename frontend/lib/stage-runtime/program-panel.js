@@ -96,6 +96,39 @@
       }
       .victory-program-panel__close:hover { background: rgba(255, 255, 255, 0.08); }
       .victory-program-panel__body { line-height: 1.5; }
+      .victory-aftercare-fields {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-top: 16px;
+      }
+      .victory-aftercare-field {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 7px;
+        width: 100%;
+      }
+      .victory-aftercare-field__prompt {
+        display: block;
+        font-weight: 600;
+        line-height: 1.35;
+      }
+      .victory-aftercare-field textarea {
+        display: block;
+        box-sizing: border-box;
+        width: 100%;
+        min-height: 88px;
+        resize: vertical;
+        margin: 0;
+        padding: 10px 12px;
+        border: 1px solid rgba(255, 233, 197, 0.3);
+        border-radius: 8px;
+        background: rgba(10, 8, 6, 0.45);
+        color: inherit;
+        font: inherit;
+        line-height: 1.4;
+      }
       .victory-program-panel__error {
         background: rgba(200, 60, 40, 0.18);
         border: 1px solid rgba(255, 120, 100, 0.4);

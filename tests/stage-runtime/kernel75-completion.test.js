@@ -16,6 +16,15 @@ const runtimeSource = fs.readFileSync(RUNTIME_PATH, "utf8");
 const greenroomSource = fs.readFileSync(GREENROOM_PATH, "utf8");
 const chairSource = fs.readFileSync(CHAIR_PATH, "utf8");
 
+const { interactionErrorMessage } = require(PI_PATH);
+
+test("Kessa directs unfinished Players to Character Making", () => {
+  const expected = "You haven't finished making a character. Please select the character maker in the right tray first.";
+  assert.equal(interactionErrorMessage(new Error("not_a_roster_member")), expected);
+  assert.equal(interactionErrorMessage(new Error("no_character_selected")), expected);
+  assert.equal(interactionErrorMessage(new Error("scene_not_current")), "scene_not_current");
+});
+
 // --- Ra's closing beats (S3.1) ---------------------------------------------
 
 test("kernel 75 renders closing beats one at a time", () => {
@@ -23,6 +32,12 @@ test("kernel 75 renders closing beats one at a time", () => {
     "the staged lock reveal must be its own renderer");
   assert.match(participantInteractionsSource, /data-action="next-beat"/,
     "there must be an advance control between beats");
+});
+
+test("aftercare keeps each prompt attached to its answer field", () => {
+  assert.match(participantInteractionsSource, /victory-aftercare-fields/);
+  assert.match(participantInteractionsSource, /victory-aftercare-field__prompt/);
+  assert.match(participantInteractionsSource, /class="victory-aftercare-field"/);
 });
 
 test("kernel 75 falls back to closing_narration when no beats are authored", () => {

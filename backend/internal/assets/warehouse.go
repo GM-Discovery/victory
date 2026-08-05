@@ -35,8 +35,12 @@ const (
 	DefaultTokenMasterMaxDimension    = 1024
 	DefaultTokenStageMaxDimension     = 512
 	DefaultTokenThumbnailMaxDimension = 128
-	WarehousePhysicalReserveBytes     = int64(8 * 1024 * 1024 * 1024)
-	constructionFallbackAssetPath     = "frontend/assets/construction.png"
+	// Keep enough host disk free for the database, logs, and normal operation.
+	// This is deliberately smaller than the per-location warehouse quota: an
+	// 8 GiB reserve made uploads impossible on the standard 40 GB host whenever
+	// ordinary host usage left less than 8 GiB free.
+	WarehousePhysicalReserveBytes = int64(2 * 1024 * 1024 * 1024)
+	constructionFallbackAssetPath = "frontend/assets/construction.png"
 )
 
 func defaultWarehouseStorageSettings(locationID string) WarehouseStorageSettings {
@@ -1043,7 +1047,12 @@ func checkWarehouseUploadCapacity(ctx context.Context, pool *pgxpool.Pool, locat
 	if err != nil {
 		return "filesystem_stats_lookup_failed", err
 	}
-	if filesystemStats.AvailableBytes-additionalBytes < WarehousePhysicalReserveBytes {
+	// Every caller computes the final stored size only after materializing the
+	// upload and its derivatives on this filesystem. AvailableBytes therefore
+	// already reflects additionalBytes; subtracting it again double-counts the
+	// upload. The files are temporary/uncommitted and callers remove them when
+	// this guard rejects the operation.
+	if filesystemStats.AvailableBytes < WarehousePhysicalReserveBytes {
 		return "warehouse_physical_reserve_exceeded", nil
 	}
 

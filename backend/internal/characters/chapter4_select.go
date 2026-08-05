@@ -391,14 +391,27 @@ func CommitChapter4FirstSkill(ctx context.Context, pool *pgxpool.Pool, actorUser
 
 	// Completing the first trained skill is the Catharsis tutorial's
 	// approval moment. Put the newly completed Character into any currently
-	// active Catharsis Show Run so the live stage can project Player controls
+	// live Catharsis Show so the live stage can project Player controls
 	// immediately, without requiring a separate ticket or roster screen.
+	//
+	// Gated on shows.status = 'live' (the child Show's own state), not
+	// show_runs.status = 'active' (the parent Show Run's separately-toggled
+	// production-management field) -- the original version checked the
+	// Show Run's status, which a Director can leave at 'planning' even
+	// while a Session under it is genuinely live/rehearsing (exactly what
+	// happened live: "Opening Socio" sat in show_runs.status='planning'
+	// the whole time its Show was status='live' with an active rehearsal
+	// session), silently matching zero rows and leaving new tutorial
+	// graduates with no roster row at all -- so Kessa's shop (which checks
+	// roster membership, not show_runs.status) always refused them.
 	if _, err := pool.Exec(ctx, `
 		INSERT INTO show_run_roster_members
 			(show_run_id, user_id, role, program_visible, added_by_user_id, character_card_id)
 		SELECT sr.id, $1::uuid, 'player', TRUE, $1::uuid, $2::uuid
 		FROM show_runs sr
-		WHERE sr.status = 'active'
+		WHERE EXISTS (
+			SELECT 1 FROM shows sh WHERE sh.show_run_id = sr.id AND sh.status = 'live'
+		  )
 		  AND EXISTS (
 			SELECT 1
 			FROM lots l

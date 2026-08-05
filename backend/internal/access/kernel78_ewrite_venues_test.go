@@ -3,15 +3,68 @@ package access
 import (
 	"context"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// TestResolveVisibleVenuesLibraryOpenToAnyAuthenticatedUser proves Kernel 78:
-// the Library -- seeded since Kernel 16 but never surfaced by
-// ResolveVisibleVenues for anyone but the Operator -- is now part of the
-// authenticated_surface class alongside Audition Hall and Trailers. Any
-// signed-in account sees it; readership authority for individual eWritings is
-// enforced per publication by the /api/library routes, not by the map tile.
-func TestResolveVisibleVenuesLibraryOpenToAnyAuthenticatedUser(t *testing.T) {
+// insertVisibilityTestCharacterCard creates a minimal character card owned
+// by userID at locationID, for proving the Library's Catharsis-character
+// gate (Kernel 79 operator amendment).
+func insertVisibilityTestCharacterCard(t *testing.T, pool *pgxpool.Pool, ownerUserID, locationID string) string {
+	t.Helper()
+	var id string
+	if err := pool.QueryRow(context.Background(), `
+		INSERT INTO character_cards (owner_user_id, location_id, name)
+		VALUES ($1, $2, 'Visibility Test Character')
+		RETURNING id::text
+	`, ownerUserID, locationID).Scan(&id); err != nil {
+		t.Fatalf("insert character card: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM character_cards WHERE id = $1`, id)
+	})
+	return id
+}
+
+// insertVisibilityTestLocation creates a disposable second location, for
+// proving the Library's Catharsis-character gate is scoped to Catharsis's
+// own location and not "any character anywhere."
+func insertVisibilityTestLocation(t *testing.T, pool *pgxpool.Pool) string {
+	t.Helper()
+	var id string
+	slug := "vis-test-loc-" + visibilityTestSuffix(t)
+	if err := pool.QueryRow(context.Background(), `
+		INSERT INTO locations (slug, name) VALUES ($1, 'Visibility Test Location') RETURNING id::text
+	`, slug).Scan(&id); err != nil {
+		t.Fatalf("insert test location: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM locations WHERE id = $1`, id)
+	})
+	return id
+}
+
+// catharsisLocationID resolves the location that owns the seeded Catharsis
+// venue, the same join ResolveVisibleVenues uses for the Library gate.
+func catharsisLocationID(t *testing.T, pool *pgxpool.Pool) string {
+	t.Helper()
+	var id string
+	if err := pool.QueryRow(context.Background(), `
+		SELECT l.location_id::text FROM venues v JOIN lots l ON l.id = v.lot_id WHERE v.slug = 'catharsis'
+	`).Scan(&id); err != nil {
+		t.Fatalf("load catharsis location: %v", err)
+	}
+	return id
+}
+
+// TestResolveVisibleVenuesLibraryGatedOnCatharsisCharacter proves the
+// Kernel 79 operator amendment: the Library is no longer open to every
+// authenticated account (Kernel 78's original authenticated_surface
+// behavior) -- it only appears once the user has a character card at
+// Catharsis's own location. Readership authority for individual eWritings
+// is still enforced per publication by the /api/library routes, not by
+// this map-tile gate.
+func TestResolveVisibleVenuesLibraryGatedOnCatharsisCharacter(t *testing.T) {
 	pool := openVisibilityTestPool(t)
 	locationID := loadAmurrayFamilyLocationID(t, pool)
 	audience := insertVisibilityTestUser(t, pool, "vis_ewrite_audience")
@@ -22,17 +75,27 @@ func TestResolveVisibleVenuesLibraryOpenToAnyAuthenticatedUser(t *testing.T) {
 		t.Fatalf("ResolveVisibleVenues: %v", err)
 	}
 	slugs := visibleSlugSet(t, venues)
-	if !slugs["library"] {
-		t.Fatal("expected a plain audience-role account to see the Library")
+	if slugs["library"] {
+		t.Fatal("expected an audience-role account with no Catharsis character to NOT see the Library")
 	}
 	if slugs["writers-room"] {
-		t.Fatal("expected a plain audience-role account to NOT see the Writer's Room -- authoring surface must stay Crew+ only")
+		t.Fatal("expected a plain audience-role account to NOT see the Writer's Room -- authoring surface must stay Director+ only")
 	}
 
+	insertVisibilityTestCharacterCard(t, pool, audience, catharsisLocationID(t, pool))
+
+	venues, err = ResolveVisibleVenues(context.Background(), pool, audience)
+	if err != nil {
+		t.Fatalf("ResolveVisibleVenues after character creation: %v", err)
+	}
+	slugs = visibleSlugSet(t, venues)
+	if !slugs["library"] {
+		t.Fatal("expected the Library to become visible once the user has a character at Catharsis's location")
+	}
 	for _, v := range venues {
 		if v.Slug == "library" {
-			if v.VisibleBecause != "authenticated_surface" {
-				t.Fatalf("expected library visible_because=authenticated_surface, got %q", v.VisibleBecause)
+			if v.VisibleBecause != "catharsis_character_surface" {
+				t.Fatalf("expected library visible_because=catharsis_character_surface, got %q", v.VisibleBecause)
 			}
 			if v.Name != "Library" {
 				t.Fatalf("expected display name %q, got %q", "Library", v.Name)
@@ -41,16 +104,37 @@ func TestResolveVisibleVenuesLibraryOpenToAnyAuthenticatedUser(t *testing.T) {
 	}
 }
 
-// TestResolveVisibleVenuesWritersRoomCrewPlusOnly proves the Writer's Room
-// UNION arm role by role: producer/director/crew see the tile
-// (ewrite_author_surface), cast do not. Cast is the sharpest negative --
-// IsPerformerRole(cast) is true, so this catches any future refactor that
-// swaps the explicit role list for the broader performer helper.
-func TestResolveVisibleVenuesWritersRoomCrewPlusOnly(t *testing.T) {
+// TestResolveVisibleVenuesLibraryIgnoresCharacterAtOtherLocation proves the
+// gate is scoped to Catharsis's own location specifically, not "any
+// character anywhere" (that broader rule is what Greenroom already uses).
+func TestResolveVisibleVenuesLibraryIgnoresCharacterAtOtherLocation(t *testing.T) {
+	pool := openVisibilityTestPool(t)
+	locationID := loadAmurrayFamilyLocationID(t, pool)
+	user := insertVisibilityTestUser(t, pool, "vis_ewrite_other_loc")
+	grantVisibilityLocationRole(t, pool, locationID, user, "audience")
+
+	otherLocationID := insertVisibilityTestLocation(t, pool)
+	insertVisibilityTestCharacterCard(t, pool, user, otherLocationID)
+
+	venues, err := ResolveVisibleVenues(context.Background(), pool, user)
+	if err != nil {
+		t.Fatalf("ResolveVisibleVenues: %v", err)
+	}
+	if visibleSlugSet(t, venues)["library"] {
+		t.Fatal("a character card at an unrelated location must not unlock the Library")
+	}
+}
+
+// TestResolveVisibleVenuesWritersRoomDirectorPlusOnly proves the Writer's
+// Room UNION arm role by role: producer/director see the tile
+// (ewrite_author_surface); crew and cast do not. Kernel 79 narrowed this
+// from the original Kernel 78 Crew+ default -- crew is the sharpest
+// negative here since it used to be positive.
+func TestResolveVisibleVenuesWritersRoomDirectorPlusOnly(t *testing.T) {
 	pool := openVisibilityTestPool(t)
 	locationID := loadAmurrayFamilyLocationID(t, pool)
 
-	seen := map[string]bool{"producer": true, "director": true, "crew": true, "cast": false}
+	seen := map[string]bool{"producer": true, "director": true, "crew": false, "cast": false}
 	for role, wantVisible := range seen {
 		user := insertVisibilityTestUser(t, pool, "vis_ewrite_"+role)
 		grantVisibilityLocationRole(t, pool, locationID, user, role)

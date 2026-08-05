@@ -2037,17 +2037,20 @@
       : "Lock it in and Catharsis will stamp both parent rolls into your draft.";
     buildLockButton.textContent = phaseLockLabel();
     buildRerollButton.textContent = state.phase === 1 ? "Reroll first parent" : "Reroll second parent";
+    // The wheel window (renderWheelWindow, shown before this panel opens)
+    // already displays the resolved social class/description -- a second
+    // manual "Reveal" click here was pure redundancy. Auto-reveal
+    // immediately so Lock In / Reroll are ready the moment this panel
+    // appears.
     if (buildRevealButton) {
-      buildRevealButton.hidden = !state.revealPending;
-      buildRevealButton.disabled = !state.revealPending;
+      buildRevealButton.hidden = true;
+      buildRevealButton.disabled = true;
     }
     document.body.classList.add("modal-open");
-    if (state.revealPending && buildRevealButton) {
-      buildRevealButton.focus();
-    }
-    if (state.revealPending && !buildRevealButton) {
+    if (state.revealPending) {
       revealPendingRoll();
     }
+    buildLockButton.focus();
   };
 
   const revealPendingRoll = () => {
@@ -2609,13 +2612,18 @@
         return;
       }
 
-      const shouldShowOnboarding = state.canDraft && state.cards.length === 0;
       const hasSeenIntro = localStorage.getItem(introKey) === "1";
       if (requestedNewCharacter) {
         showSocioPrompt();
         return;
       }
-      if (shouldShowOnboarding || !hasSeenIntro) {
+      // Auto-open only on a genuine first visit (introKey unset). Having
+      // zero cards used to force this every single visit regardless of
+      // introKey -- someone who explores without finishing character
+      // creation would get the full intro on every return trip forever.
+      // The right-tray help button (VictoryCatharsisOnboarding.begin) still
+      // re-opens it on demand at any time.
+      if (!hasSeenIntro) {
         openIntroOverlay();
         return;
       }

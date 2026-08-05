@@ -37,5 +37,21 @@ func EnsureCourtyardScene(ctx context.Context, pool *pgxpool.Pool) error {
 			SELECT 1 FROM scenes s WHERE s.location_id = l.id AND s.slug = 'courtyard'
 		  )
 	`)
+	if err != nil {
+		return err
+	}
+	_, err = pool.Exec(ctx, `
+		INSERT INTO scene_stage_elements (scene_id, kind, label, data, position, sort_order)
+		SELECT s.id, 'map_backdrop', 'Courtyard',
+			'{"content_url":"/assets/courtyard.png","display_mode":"theater","fit":"contain","crop_x":0.5,"crop_y":0.5,"scale":1,"grid_enabled":false}'::jsonb,
+			'{}'::jsonb, 0
+		FROM scenes s
+		JOIN locations l ON l.id = s.location_id AND l.slug = 'amurray-family'
+		WHERE s.slug = 'courtyard'
+		  AND NOT EXISTS (
+			SELECT 1 FROM scene_stage_elements e
+			WHERE e.scene_id = s.id AND e.kind = 'map_backdrop' AND e.show_scene_placement_id IS NULL
+		)
+	`)
 	return err
 }

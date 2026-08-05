@@ -136,17 +136,44 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 		WITH visible AS (
 			SELECT v.id, v.slug, v.name, v.kind, 1 AS reason_rank, 'authenticated_surface'::text AS visible_because
 			FROM venues v
-			WHERE v.slug IN ('audition-hall', 'trailers', 'library')
+			WHERE v.slug IN ('audition-hall', 'trailers')
 
 			UNION
 
-			-- Writer's Room (Kernel 78): the eWrite authoring venue. Crew+
-			-- only -- producer/director/crew at any active Location
-			-- membership. Cast/Audience never see the tile; they read
-			-- published eWritings in the Library instead. Map visibility
-			-- only: every /api/ewrite/* route re-checks authoring authority
-			-- server-side per request (visibility filtering is never
-			-- invocation authorization -- operator-notes.md).
+			-- Library (Kernel 79 operator amendment): gated on having a
+			-- character card at Catharsis's own location, not open to every
+			-- authenticated account -- the Library only becomes relevant
+			-- once a player actually has a character to look rules up for.
+			-- Readership authority for individual eWritings is still
+			-- enforced per publication by /api/library routes regardless of
+			-- this map-tile gate.
+			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'catharsis_character_surface'::text AS visible_because
+			FROM venues v
+			JOIN lots l ON l.id = v.lot_id
+			WHERE v.slug = 'library'
+			  AND EXISTS (
+				SELECT 1
+				FROM character_cards cc
+				JOIN venues cv ON cv.slug = 'catharsis'
+				JOIN lots cl ON cl.id = cv.lot_id
+				WHERE cc.owner_user_id = $1
+				  AND cc.is_deleted = FALSE
+				  AND cc.location_id = cl.location_id
+			  )
+
+			UNION
+
+			-- Writer's Room (Kernel 78; narrowed Kernel 79): the eWrite
+			-- authoring venue. Director+ only -- producer/director at any
+			-- active Location membership. Crew previously saw this tile too
+			-- (Kernel 78 default); the operator narrowed it to Director+
+			-- since authoring official rules content is a Director-level
+			-- responsibility, not general Crew. Cast/Audience never see the
+			-- tile; they read published eWritings in the Library instead.
+			-- Map visibility only: every /api/ewrite/* route re-checks
+			-- authoring authority server-side per request (visibility
+			-- filtering is never invocation authorization --
+			-- operator-notes.md).
 			SELECT v.id, v.slug, v.name, v.kind, 3 AS reason_rank, 'ewrite_author_surface'::text AS visible_because
 			FROM venues v
 			JOIN lots l ON l.id = v.lot_id
@@ -154,7 +181,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 			WHERE v.slug = 'writers-room'
 			  AND lm.user_id = $1
 			  AND lm.active = TRUE
-			  AND lm.role IN ('producer', 'director', 'crew')
+			  AND lm.role IN ('producer', 'director')
 
 			UNION
 

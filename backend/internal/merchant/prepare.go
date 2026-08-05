@@ -16,6 +16,8 @@ import (
 	"victory/backend/internal/tutorial"
 )
 
+const kessaTokenAssetURL = "/assets/Kessa.png"
+
 // PrepareCourtyardOpeningResult is both the outcome of the idempotent
 // "Prepare Locked Courtyard Opening" action and a Kessa reachability
 // diagnostics report (Kernel 73A S8, S9) -- every field that would make
@@ -218,10 +220,14 @@ func PrepareLockedCourtyardOpening(ctx context.Context, pool *pgxpool.Pool, acto
 	if elementID == "" {
 		if result.VenueSceneComposerEnabled {
 			e, err := scenes.CreateSceneStageElement(ctx, pool, actorUserID, sceneID, scenes.CreateStageElementInput{
-				Kind:     scenes.StageElementKindToken,
-				Label:    "Kessa",
-				Data:     map[string]any{"appearance": "merchant_stall"},
-				Position: map[string]any{"x": 0.5, "y": 0.6},
+				Kind:  scenes.StageElementKindToken,
+				Label: "Kessa",
+				Data: map[string]any{
+					"appearance":          "merchant_stall",
+					"asset_content_url":   kessaTokenAssetURL,
+					"asset_thumbnail_url": kessaTokenAssetURL,
+				},
+				Position: map[string]any{"x": 0.5, "y": 0.55},
 			})
 			if err != nil {
 				return PrepareCourtyardOpeningResult{}, err
@@ -233,6 +239,22 @@ func PrepareLockedCourtyardOpening(ctx context.Context, pool *pgxpool.Pool, acto
 		}
 	}
 	result.StageElementID = elementID
+	if elementID != "" {
+		// Kessa is shipped with the application, not owned by a disposable
+		// warehouse upload. Repair older scene rows that predate her packaged
+		// artwork so container rebuilds and warehouse cleanup cannot send her
+		// back through the generic construction fallback.
+		if _, err := pool.Exec(ctx, `
+			UPDATE scene_stage_elements
+			SET data = COALESCE(data, '{}'::jsonb) || jsonb_build_object(
+				'asset_content_url', $2::text,
+				'asset_thumbnail_url', $2::text
+			), updated_at = NOW()
+			WHERE id = $1
+		`, elementID, kessaTokenAssetURL); err != nil {
+			return PrepareCourtyardOpeningResult{}, err
+		}
+	}
 
 	// Step 5: ensure the binding.
 	if elementID != "" && interactionID != "" {
@@ -310,10 +332,10 @@ func prepareKernel74TutorialTail(ctx context.Context, pool *pgxpool.Pool, actorU
 			// S1.3's authored description, deliberately establishing that no
 			// ordinary lock is visible from this side -- the state Ra's
 			// closing narration later reveals a concealed mechanism behind.
-			"description": "The oak door is heavy, reinforced with black iron bands. There is no obvious lock or keyhole on this side.",
-			"prompt":      "What does your Character try?",
+			"description":  "The oak door is heavy, reinforced with black iron bands. There is no obvious lock or keyhole on this side.",
+			"prompt":       "What does your Character try?",
 			"submit_label": "Make the Attempt",
-			"max_length":  defaultFreeformMaxLength,
+			"max_length":   defaultFreeformMaxLength,
 			// Chained by internal_name, resolved server-side -- the Player
 			// never names what comes next.
 			"next_interaction_slug": "ra_gate_dialogue",

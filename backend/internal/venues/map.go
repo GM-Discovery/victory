@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	firstTheaterSlug = "first-theater"
-	catharsisSlug    = "catharsis"
+	firstTheaterSlug       = "first-theater"
+	catharsisSlug          = "catharsis"
+	builtInCourtyardMapURL = "/assets/courtyard.png"
 )
 
 func isSupportedTheaterVenueSlug(slug string) bool {
@@ -145,6 +146,13 @@ func handleVenueMapGet(w http.ResponseWriter, r *http.Request, pool *pgxpool.Poo
 	state, err := loadVenueMapState(ctx, pool, venueSlug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			if venueSlug == catharsisSlug {
+				writeJSON(w, http.StatusOK, map[string]any{
+					"ok":   true,
+					"data": defaultCourtyardMapState(),
+				})
+				return
+			}
 			writeJSON(w, http.StatusOK, map[string]any{
 				"ok":   true,
 				"data": nil,
@@ -162,6 +170,27 @@ func handleVenueMapGet(w http.ResponseWriter, r *http.Request, pool *pgxpool.Poo
 		"ok":   true,
 		"data": state,
 	})
+}
+
+// defaultCourtyardMapState keeps the one packaged map available on a fresh
+// install, where no warehouse asset row exists yet. The frontend asset is
+// versioned with the application, so this cannot disappear during a backend
+// rebuild or a database restore.
+func defaultCourtyardMapState() venueMapState {
+	return venueMapState{
+		Fit:         "contain",
+		CropX:       0.5,
+		CropY:       0.5,
+		Scale:       1,
+		SafeMargin:  24,
+		DisplayMode: "theater",
+		Asset: &venueMapAsset{
+			AssetID:          "builtin-courtyard",
+			OriginalFilename: "courtyard.png",
+			AssetType:        "map",
+			ContentURL:       builtInCourtyardMapURL,
+		},
+	}
 }
 
 func handleVenueMapSave(w http.ResponseWriter, r *http.Request, hub *network.Hub, pool *pgxpool.Pool, venueSlug string) {

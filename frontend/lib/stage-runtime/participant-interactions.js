@@ -20,6 +20,19 @@
   };
   const STANCE_ORDER = ["command", "convince", "insight", "follow", "sympathize"];
   const KESSA_PORTRAIT_FALLBACK = "/assets/Kessa.png";
+  const CHARACTER_MAKER_REQUIRED_MESSAGE = "You haven't finished making a character. Please select the character maker in the right tray first.";
+
+  function interactionErrorMessage(error) {
+    const code = String(error?.message || error || "").trim();
+    // A Player who reaches the stage before Character Making has completed
+    // may have neither a roster row nor a selected Character yet. Those are
+    // distinct server-side authorization states, but they require the same
+    // useful next step in the Player-facing Program panel.
+    if (code === "not_a_roster_member" || code === "no_character_selected") {
+      return CHARACTER_MAKER_REQUIRED_MESSAGE;
+    }
+    return code;
+  }
 
   function newIdempotencyKey() {
     if (typeof globalThis !== "undefined" && globalThis.crypto && globalThis.crypto.randomUUID) {
@@ -605,8 +618,8 @@
       const prompts = state.prompts || [];
       const draft = (state.draft && state.draft.responses) || {};
       const fields = prompts.map((p) => `
-        <label class="victory-field">
-          <span>${escapeHtml(p.label)}</span>
+        <label class="victory-aftercare-field">
+          <span class="victory-aftercare-field__prompt">${escapeHtml(p.label)}</span>
           <textarea data-aftercare-prompt="${escapeHtml(p.key)}"
                     maxlength="${Number(p.max_length) || 2000}"
                     rows="3">${escapeHtml(draft[p.key] || "")}</textarea>
@@ -619,7 +632,7 @@
             Your Director can read this.
           </p>
           <p class="is-dim">Every question is optional. You can save what you have and come back later.</p>
-          ${fields}
+          <div class="victory-aftercare-fields">${fields}</div>
           <div class="victory-program-panel__buttons">
             <button type="button" class="is-primary" data-action="aftercare-save">Save and Close</button>
             <button type="button" data-action="aftercare-skip">Skip</button>
@@ -781,13 +794,14 @@
         });
         renderMain();
       } catch (error) {
-        setStageStatus(error.message || String(error));
-        panel.setError(error.message || String(error));
+        const message = interactionErrorMessage(error);
+        setStageStatus(message);
+        panel.setError(message);
       }
     }
 
     return { openInteraction, openTutorialCompletion };
   }
 
-  return { createParticipantInteractionsController };
+  return { createParticipantInteractionsController, interactionErrorMessage };
 });
