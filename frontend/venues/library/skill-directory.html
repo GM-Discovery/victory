@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Skill Directory</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    body {
+      margin: 0;
+      background: #120e0e;
+      color: #ece1de;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    .panel {
+      max-width: 1100px;
+      width: 100%;
+      margin: 0 auto;
+      background: rgba(26, 18, 18, 0.97);
+      border: 1px solid rgba(200, 140, 140, 0.14);
+      border-radius: 14px;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    h1 {
+      margin-top: 0;
+      color: #f1e4e1;
+    }
+
+    .back-link {
+      display: inline-block;
+      color: #d9a8a6;
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      text-decoration: none;
+      margin-bottom: 8px;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    .status-line {
+      margin-top: 8px;
+      color: #b49793;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin: 18px 0;
+      flex-wrap: wrap;
+    }
+
+    .controls input[type="search"] {
+      flex: 1;
+      min-width: 200px;
+      padding: 10px 12px;
+      font-size: 15px;
+      background: #1a1414;
+      color: #ece1de;
+      border: 1px solid rgba(200, 140, 140, 0.2);
+      border-radius: 8px;
+      font-family: inherit;
+    }
+
+    .controls select {
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #1a1414;
+      color: #ece1de;
+      border: 1px solid rgba(200, 140, 140, 0.2);
+      border-radius: 8px;
+      font-family: Arial, sans-serif;
+    }
+
+    .controls input[type="search"]:focus,
+    .controls select:focus {
+      outline: none;
+      border-color: rgba(201, 130, 130, 0.55);
+    }
+
+    .result-count {
+      font-family: Arial, sans-serif;
+      font-size: 12.5px;
+      color: #8d7572;
+      margin-bottom: 12px;
+    }
+
+    .letter-heading {
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #b98a86;
+      border-bottom: 1px solid rgba(200, 140, 140, 0.14);
+      margin: 22px 0 8px;
+      padding-bottom: 4px;
+    }
+
+    .letter-heading:first-child {
+      margin-top: 0;
+    }
+
+    .entry-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .entry {
+      padding: 10px 12px;
+      border: 1px solid rgba(200, 140, 140, 0.1);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      background: rgba(200, 140, 140, 0.02);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .entry-main {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .entry-name {
+      font-size: 16px;
+      color: #ece1de;
+    }
+
+    .entry-category {
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #8d7572;
+      margin-left: 8px;
+    }
+
+    .entry-summary {
+      color: #b49793;
+      font-size: 13.5px;
+      margin-top: 2px;
+    }
+
+    .entry-link a {
+      color: #d9a8a6;
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .entry-link a:hover {
+      text-decoration: underline;
+    }
+
+    .entry-link .unlinked {
+      color: #6e5a57;
+      font-family: Arial, sans-serif;
+      font-size: 12.5px;
+      font-style: italic;
+    }
+
+    .empty-note {
+      color: #a8908c;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <div class="panel">
+      <a class="back-link" href="/venues/library/index.html">← Back to Library</a>
+      <h1 id="directory-title">Skill Directory</h1>
+      <div id="connection-status" class="status-line">Opening the directory...</div>
+
+      <div id="directory-body" class="hidden">
+        <div class="controls">
+          <input id="search-input" type="search" placeholder="Search skills, aliases..." aria-label="Search the directory" />
+          <select id="category-select" aria-label="Filter by attribute">
+            <option value="">All attributes</option>
+          </select>
+        </div>
+        <div id="result-count" class="result-count"></div>
+        <div id="entry-container"></div>
+        <p id="empty-note" class="empty-note hidden">Nothing matches that search.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/back-to-map.js"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script>
+    const connectionStatus = document.getElementById("connection-status");
+    const directoryBody = document.getElementById("directory-body");
+    const directoryTitle = document.getElementById("directory-title");
+    const searchInput = document.getElementById("search-input");
+    const categorySelect = document.getElementById("category-select");
+    const resultCount = document.getElementById("result-count");
+    const entryContainer = document.getElementById("entry-container");
+    const emptyNote = document.getElementById("empty-note");
+
+    const params = new URLSearchParams(window.location.search);
+    const directoryId = params.get("dir") || "";
+
+    let allEntries = [];
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function readerHref(pubId, anchor) {
+      return "/venues/library/read.html?pub=" + encodeURIComponent(pubId) + (anchor ? "#" + anchor : "");
+    }
+
+    function renderEntries() {
+      const search = searchInput.value.trim().toLowerCase();
+      const category = categorySelect.value;
+
+      let filtered = allEntries.filter((e) => {
+        if (category && e.category !== category) return false;
+        if (!search) return true;
+        const haystack = [e.canonical_name, e.compact_summary, ...(e.aliases || [])].join(" ").toLowerCase();
+        return haystack.includes(search);
+      });
+      filtered.sort((a, b) => a.canonical_name.localeCompare(b.canonical_name));
+
+      entryContainer.innerHTML = "";
+      resultCount.textContent = filtered.length + (filtered.length === 1 ? " skill" : " skills");
+      emptyNote.classList.toggle("hidden", filtered.length > 0);
+
+      let currentLetter = "";
+      const list = document.createElement("ul");
+      list.className = "entry-list";
+      for (const e of filtered) {
+        const letter = (e.canonical_name[0] || "#").toUpperCase();
+        if (letter !== currentLetter) {
+          currentLetter = letter;
+          if (list.childNodes.length > 0) {
+            entryContainer.appendChild(list.cloneNode(true));
+            list.innerHTML = "";
+          }
+          const heading = document.createElement("div");
+          heading.className = "letter-heading";
+          heading.textContent = letter;
+          entryContainer.appendChild(heading);
+        }
+
+        const li = document.createElement("li");
+        li.className = "entry";
+        const main = document.createElement("div");
+        main.className = "entry-main";
+        const name = document.createElement("span");
+        name.className = "entry-name";
+        name.textContent = e.canonical_name;
+        main.appendChild(name);
+        if (e.category) {
+          const cat = document.createElement("span");
+          cat.className = "entry-category";
+          cat.textContent = e.category;
+          main.appendChild(cat);
+        }
+        if (e.compact_summary) {
+          const summary = document.createElement("div");
+          summary.className = "entry-summary";
+          summary.textContent = e.compact_summary;
+          main.appendChild(summary);
+        }
+        li.appendChild(main);
+
+        const linkCell = document.createElement("div");
+        linkCell.className = "entry-link";
+        if (e.link_status === "linked" && e.target_publication_id) {
+          const a = document.createElement("a");
+          a.href = readerHref(e.target_publication_id, e.target_section_anchor);
+          a.textContent = "View rule →";
+          linkCell.appendChild(a);
+        } else {
+          const span = document.createElement("span");
+          span.className = "unlinked";
+          span.textContent = e.link_status === "hidden" ? "rule not available" : "not yet linked";
+          linkCell.appendChild(span);
+        }
+        li.appendChild(linkCell);
+        list.appendChild(li);
+      }
+      if (list.childNodes.length > 0) entryContainer.appendChild(list);
+    }
+
+    function populateCategories() {
+      const categories = Array.from(new Set(allEntries.map((e) => e.category).filter(Boolean))).sort();
+      for (const c of categories) {
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c;
+        categorySelect.appendChild(opt);
+      }
+    }
+
+    async function bootstrapDirectory() {
+      if (!directoryId) {
+        showForbiddenScreen();
+        return;
+      }
+      try {
+        const response = await fetch("/api/ewrite/directories/" + encodeURIComponent(directoryId) + "/entries", { method: "GET", credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (isForbiddenAccessResponse(response, payload)) {
+          showForbiddenScreen();
+          return;
+        }
+        if (!response.ok || !payload?.ok) {
+          showForbiddenScreen();
+          return;
+        }
+        if (payload.data.directory?.title) {
+          directoryTitle.textContent = payload.data.directory.title;
+          document.title = payload.data.directory.title;
+        }
+        allEntries = payload.data.entries || [];
+        populateCategories();
+        connectionStatus.textContent = "Browse, search, or filter by attribute.";
+        directoryBody.classList.remove("hidden");
+        renderEntries();
+      } catch (err) {
+        console.error("skill directory bootstrap failed", err);
+        showForbiddenScreen();
+      }
+    }
+
+    searchInput.addEventListener("input", renderEntries);
+    categorySelect.addEventListener("change", renderEntries);
+
+    bootstrapDirectory();
+  </script>
+</body>
+</html>

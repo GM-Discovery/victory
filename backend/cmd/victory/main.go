@@ -119,6 +119,21 @@ func main() {
 	if err := ewrite.BackfillPublicationAssetRefs(ctx, pool); err != nil {
 		log.Fatalf("kernel 79 publication asset backfill failed: %v", err)
 	}
+	// Kernel 79A: seeds the Skill Directory (100 catalogue skills, each
+	// auto-matched to its exact Core Rulebook section by title). Must run
+	// after EnsureSocioSeriesHierarchy/EnsureCanonicalSocioManuscript above,
+	// which create the ruleset and its sections this reads. The catalogue is
+	// bridged here rather than imported by ewrite directly -- see
+	// ewrite.SkillCatalogueEntry's doc comment for the cycle it avoids.
+	skillCatalogue := make([]ewrite.SkillCatalogueEntry, len(characters.Chapter4Skills))
+	for i, s := range characters.Chapter4Skills {
+		skillCatalogue[i] = ewrite.SkillCatalogueEntry{
+			ID: s.ID, Name: s.Name, AttributeName: s.AttributeName, CardDescription: s.CardDescription,
+		}
+	}
+	if err := ewrite.EnsureSkillDirectory(ctx, pool, skillCatalogue); err != nil {
+		log.Fatalf("kernel 79a skill directory seed failed: %v", err)
+	}
 	// Kernel 73: must run after the venue bootstrap above -- migration 057
 	// seeds the same Courtyard Scene for existing databases, but on a fresh
 	// install migrations run before catharsis exists as a venue row.
@@ -475,6 +490,9 @@ func main() {
 	mux.HandleFunc("GET /api/ewrite/object-links", ewrite.HandleObjectLinks(pool))
 	mux.HandleFunc("POST /api/ewrite/object-links", ratelimit.Middleware(actionLimiter, ewrite.HandleObjectLinks(pool)))
 	mux.HandleFunc("DELETE /api/ewrite/object-links/{link_id}", ratelimit.Middleware(actionLimiter, ewrite.HandleObjectLinkItem(pool)))
+	mux.HandleFunc("GET /api/ewrite/directories", ewrite.HandleDirectories(pool))
+	mux.HandleFunc("GET /api/ewrite/directories/{directory_id}/entries", ewrite.HandleDirectoryEntries(pool))
+	mux.HandleFunc("PUT /api/ewrite/directory-entries/{entry_id}/link", ratelimit.Middleware(actionLimiter, ewrite.HandleDirectoryEntryLink(pool)))
 
 	// Kernel 78: eWrite -- Library reading surface. Published content
 	// only; per-publication visibility enforced in the handlers.

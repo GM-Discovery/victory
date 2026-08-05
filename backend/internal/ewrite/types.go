@@ -91,6 +91,45 @@ type ObjectLink struct {
 	SectionTitle    string `json:"section_title,omitempty"`
 }
 
+// Directory is compact navigational metadata for a dense rules domain --
+// it never copies the canonical rule text (spec 5.1, 5.4). Scoped to a
+// Ruleset collection; DirectoryType is a CHECK enum so future directories
+// (actions, health systems, equipment, ...) add an arm, not a new shape.
+type Directory struct {
+	ID            string    `json:"id"`
+	CollectionID  string    `json:"collection_id"`
+	DirectoryType string    `json:"directory_type"`
+	Title         string    `json:"title"`
+	Slug          string    `json:"slug"`
+	Summary       string    `json:"summary"`
+	EntryCount    int       `json:"entry_count"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// DirectoryEntry is one compact index row pointing at (at most) one exact
+// eWrite section. LinkStatus is computed at read time, never stored:
+//   - "unlinked": no target has been curated yet.
+//   - "hidden": a target exists but the requesting reader cannot read it
+//     (spec 5.3 -- an entry must not leak a hidden target's title).
+//   - "linked": target resolved and readable; Target* fields are filled.
+type DirectoryEntry struct {
+	ID                     string   `json:"id"`
+	DirectoryID            string   `json:"directory_id"`
+	ExternalRef            string   `json:"external_ref"`
+	CanonicalName          string   `json:"canonical_name"`
+	Aliases                []string `json:"aliases,omitempty"`
+	CompactSummary         string   `json:"compact_summary,omitempty"`
+	Category               string   `json:"category,omitempty"`
+	SortKey                int      `json:"sort_key"`
+	LinkStatus             string   `json:"link_status"`
+	TargetPublicationID    string   `json:"target_publication_id,omitempty"`
+	TargetPublicationTitle string   `json:"target_publication_title,omitempty"`
+	TargetSectionID        string   `json:"target_section_id,omitempty"`
+	TargetSectionAnchor    string   `json:"target_section_anchor,omitempty"`
+	TargetSectionTitle     string   `json:"target_section_title,omitempty"`
+}
+
 // ImportReport is returned by import/preview so the author sees exactly
 // what the recognizer did before (or after) committing (kernel spec 7.4).
 type ImportReport struct {

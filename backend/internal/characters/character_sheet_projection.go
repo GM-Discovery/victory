@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"victory/backend/internal/ewrite"
 )
 
 // applyFaceOverrides layers Director value overrides and owner/Director
@@ -106,6 +108,10 @@ type CharacterSheetProjection struct {
 	DetailSections    map[string][]WorkbookPageField `json:"detail_sections"`
 	Attributes        map[string]int                 `json:"attributes"`
 	Skills            []CharacterSkill               `json:"skills"`
+	// SkillRuleLinks is the Skill Directory deep-link metadata for Skills,
+	// keyed by skill_id (Kernel 79A goal 6.1) -- lets the venue right tray
+	// offer "View rule" during actual play, not just the Greenroom.
+	SkillRuleLinks map[string]ewrite.RuleLink `json:"skill_rule_links,omitempty"`
 }
 
 // CharacterProjectionVersion is a durable, comparable server version for the
@@ -176,6 +182,15 @@ func ProjectCharacterSheet(ctx context.Context, pool *pgxpool.Pool, actorUserID,
 		return CharacterSheetProjection{}, err
 	}
 	proj.Skills = skills
+	skillIDs := make([]string, len(skills))
+	for i, s := range skills {
+		skillIDs[i] = s.SkillID
+	}
+	skillRuleLinks, err := ewrite.RuleLinksForCharacterSkills(ctx, pool, skillIDs)
+	if err != nil {
+		return CharacterSheetProjection{}, err
+	}
+	proj.SkillRuleLinks = skillRuleLinks
 
 	version, err := CharacterProjectionVersion(ctx, pool, cardID)
 	if err != nil {

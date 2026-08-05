@@ -28,6 +28,7 @@ import (
 	"context"
 	_ "embed"
 	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -364,4 +365,131 @@ func EnsureNiavaManuscript(ctx context.Context, pool *pgxpool.Pool) error {
 		socioNiavaPublicationTitle, socioNiavaPublicationSlug,
 		"The Niava setting supplement: gazetteer, world dynamics, the plot, NPC reference, and the Nianic language primer.",
 		niavaManuscriptSource)
+}
+
+const (
+	skillDirectorySlug  = "skills"
+	skillDirectoryTitle = "Skill Directory"
+)
+
+// SkillCatalogueEntry is the minimal shape EnsureSkillDirectory needs from
+// characters.Chapter4Skills. Passed in by main.go rather than imported
+// directly -- internal/assets already imports ewrite (Kernel 79's image-
+// visibility fix), and internal/characters would need to import ewrite for
+// RuleLinksForCharacterSkills, so ewrite importing characters here would
+// close an import cycle. cmd/victory imports both packages already, so it
+// is the natural place to bridge the two catalogues.
+type SkillCatalogueEntry struct {
+	ID              string
+	Name            string
+	AttributeName   string
+	CardDescription string
+}
+
+// EnsureSkillDirectory seeds the Skill Directory (kernel spec 5.2) under
+// the Socio ruleset with one entry per catalogue skill, on first boot.
+// Requires EnsureSocioSeriesHierarchy and EnsureCanonicalSocioManuscript to
+// have already run (boot order in main.go); a safe no-op if the ruleset or
+// Core Rulebook aren't seeded yet.
+//
+// Each entry's target section is auto-matched by exact title equality
+// against the Core Rulebook's own catalogue appendix, which renders every
+// skill as a level-4 heading "{Name} ({AttributeName})" (verified directly
+// against the imported manuscript, not assumed) -- so a fresh install gets
+// a genuinely working Skill Directory, not 100 empty rows waiting on
+// manual Crew+ curation.
+//
+// Idempotency is ON CONFLICT DO NOTHING per entry (matching
+// EnsureCanonicalSocioManuscript's create-if-absent-only rule): once an
+// entry exists, later boots never touch its target again, so a Crew+
+// member who re-curates a link in the Skill Directory manager is never
+// silently reverted by a redeploy.
+func EnsureSkillDirectory(ctx context.Context, pool *pgxpool.Pool, catalogue []SkillCatalogueEntry) error {
+	var locationID string
+	err := pool.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = $1`, socioSeedLocationSlug).Scan(&locationID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	var rulesetID string
+	err = pool.QueryRow(ctx, `
+		SELECT id::text FROM ewrite_collections WHERE location_id = $1 AND slug = $2 AND kind = 'ruleset'
+	`, locationID, socioSeedRulesetSlug).Scan(&rulesetID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	var corePubID string
+	err = pool.QueryRow(ctx, `
+		SELECT id::text FROM ewrite_publications WHERE location_id = $1 AND slug = $2
+	`, locationID, socioSeedPublicationSlug).Scan(&corePubID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	sectionByTitle := map[string]string{}
+	rows, err := pool.Query(ctx, `
+		SELECT title, id::text FROM ewrite_sections WHERE publication_id = $1 AND heading_level = 4
+	`, corePubID)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var title, id string
+		if err := rows.Scan(&title, &id); err != nil {
+			rows.Close()
+			return err
+		}
+		sectionByTitle[title] = id
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	rows.Close()
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var directoryID string
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO ewrite_directories (collection_id, directory_type, title, slug, summary)
+		VALUES ($1, 'skill', $2, $3, $4)
+		ON CONFLICT (collection_id, slug) DO UPDATE SET title = EXCLUDED.title
+		RETURNING id::text
+	`, rulesetID, skillDirectoryTitle, skillDirectorySlug,
+		"Every Socio- skill, browsable and searchable, linked to its exact rule.",
+	).Scan(&directoryID); err != nil {
+		return err
+	}
+
+	for i, skill := range catalogue {
+		sectionTitle := fmt.Sprintf("%s (%s)", skill.Name, skill.AttributeName)
+		sectionID := sectionByTitle[sectionTitle]
+		var targetPubArg, targetSectionArg any
+		if sectionID != "" {
+			targetPubArg, targetSectionArg = corePubID, sectionID
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO ewrite_directory_entries
+				(directory_id, external_ref, canonical_name, aliases, compact_summary, category, sort_key, target_publication_id, target_section_id)
+			VALUES ($1, $2, $3, '{}', $4, $5, $6, $7, $8)
+			ON CONFLICT (directory_id, external_ref) DO NOTHING
+		`, directoryID, skill.ID, skill.Name, skill.CardDescription, skill.AttributeName, i, targetPubArg, targetSectionArg); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
 }

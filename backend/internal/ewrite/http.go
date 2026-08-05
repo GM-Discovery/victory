@@ -504,6 +504,90 @@ func HandleEditors(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+// HandleDirectories serves GET /api/ewrite/directories?collection_id=...
+// -- the compact list of directories under a Ruleset (Goal B).
+func HandleDirectories(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		if _, err := requireAuthenticatedUser(ctx, pool, r); err != nil {
+			writeError(w, err)
+			return
+		}
+		collectionID := strings.TrimSpace(r.URL.Query().Get("collection_id"))
+		if collectionID == "" {
+			writeError(w, errors.New("collection_id_required"))
+			return
+		}
+		dirs, err := ListDirectoriesForCollection(ctx, pool, collectionID)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeOK(w, map[string]any{"directories": dirs})
+	}
+}
+
+// HandleDirectoryEntries serves GET
+// /api/ewrite/directories/{directory_id}/entries?search=&category= -- the
+// Skill Directory's browse/search/filter surface, read by both Library and
+// Writer's Room. Entry link resolution is visibility-safe per requester
+// (spec 5.3).
+func HandleDirectoryEntries(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		directoryID := strings.TrimSpace(r.PathValue("directory_id"))
+		dir, _, err := LoadDirectory(ctx, pool, directoryID)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		entries, err := ListDirectoryEntries(ctx, pool, userID, directoryID, r.URL.Query().Get("search"), r.URL.Query().Get("category"))
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeOK(w, map[string]any{"directory": dir, "entries": entries})
+	}
+}
+
+// HandleDirectoryEntryLink serves PUT
+// /api/ewrite/directory-entries/{entry_id}/link -- Crew+ curating one
+// entry's target section (spec 5.3, Crew+ scoped to the directory's own
+// location). An empty publication_id clears the link back to "unlinked".
+func HandleDirectoryEntryLink(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		var body struct {
+			PublicationID string `json:"publication_id"`
+			SectionID     string `json:"section_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeError(w, errors.New("invalid_json"))
+			return
+		}
+		entryID := strings.TrimSpace(r.PathValue("entry_id"))
+		entry, err := SetDirectoryEntryLink(ctx, pool, userID, entryID, body.PublicationID, body.SectionID)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeOK(w, map[string]any{"entry": entry})
+	}
+}
+
 // HandleEditorItem serves DELETE /api/ewrite/editors/{grant_id}.
 func HandleEditorItem(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -2909,6 +2909,7 @@
           const skillHeading = document.createElement("h3");
           skillHeading.textContent = "Trained Skills";
           section.appendChild(skillHeading);
+          const ruleLinks = page.skill_rule_links || {};
           for (const skill of skills) {
             const item = document.createElement("div");
             item.className = "list-item";
@@ -2919,6 +2920,17 @@
             const body = document.createElement("p");
             body.textContent = `Source: ${skill.source || "character"} · Improvements: ${skill.improvement_count ?? 0}`;
             item.append(title, meta, body);
+            const rule = ruleLinks[skill.skill_id];
+            if (rule) {
+              const ruleLink = document.createElement("a");
+              ruleLink.href = "/venues/library/read.html?pub=" + encodeURIComponent(rule.publication_id) + (rule.section_anchor ? "#" + encodeURIComponent(rule.section_anchor) : "");
+              ruleLink.target = "_blank";
+              ruleLink.rel = "noopener";
+              ruleLink.className = "text-button";
+              ruleLink.style.fontSize = "12px";
+              ruleLink.textContent = `View rule: ${rule.section_title || rule.publication_title} →`;
+              item.appendChild(ruleLink);
+            }
             skillList.appendChild(item);
           }
         } else {

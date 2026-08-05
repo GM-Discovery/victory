@@ -18,6 +18,10 @@ import (
 	// make storysofar import characters -- inject the canonical rules
 	// instead, as merchant.storyRules does.
 	"victory/backend/internal/storysofar"
+
+	// ewrite doesn't import characters (no cycle) -- same direction merchant
+	// already uses for equipment rule links (Kernel 79).
+	"victory/backend/internal/ewrite"
 )
 
 type WorkbookPageField struct {
@@ -65,6 +69,10 @@ type CharacterWorkbookPage struct {
 	Entries  []CharacterWorkbookEntry `json:"entries,omitempty"`
 	Journals []CharacterJournalEntry  `json:"journals,omitempty"`
 	Skills   []CharacterSkill         `json:"skills,omitempty"`
+	// SkillRuleLinks is the Skill Directory deep-link metadata for each
+	// skill in Skills, keyed by skill_id (Kernel 79A goal 6.1). Populated
+	// only for the mechanics page.
+	SkillRuleLinks map[string]ewrite.RuleLink `json:"skill_rule_links,omitempty"`
 	// StoryEvents is Kernel 75's generated play history (S6), following the
 	// same one-typed-slice-per-page-kind shape as Entries/Journals/Skills.
 	//
@@ -341,6 +349,14 @@ func LoadCharacterWorkbookView(ctx context.Context, pool *pgxpool.Pool, actorUse
 	if err != nil {
 		return CharacterWorkbookView{}, err
 	}
+	skillIDs := make([]string, len(skills))
+	for i, s := range skills {
+		skillIDs[i] = s.SkillID
+	}
+	skillRuleLinks, err := ewrite.RuleLinksForCharacterSkills(ctx, pool, skillIDs)
+	if err != nil {
+		return CharacterWorkbookView{}, err
+	}
 	// Kernel 75 PRIVACY TRAP, stated plainly because getting it wrong is a
 	// leak rather than a bug:
 	//
@@ -376,6 +392,7 @@ func LoadCharacterWorkbookView(ctx context.Context, pool *pgxpool.Pool, actorUse
 			// skill list, while the venue right tray did. Kernel 59A's shared
 			// projector requires both to agree.
 			pages[i].Skills = skills
+			pages[i].SkillRuleLinks = skillRuleLinks
 		}
 	}
 

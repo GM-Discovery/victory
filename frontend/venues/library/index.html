@@ -245,7 +245,11 @@
       return "/venues/library/read.html?pub=" + encodeURIComponent(pubId) + (anchor ? "#" + anchor : "");
     }
 
-    function renderTree(tree) {
+    function directoryHref(dirId) {
+      return "/venues/library/skill-directory.html?dir=" + encodeURIComponent(dirId);
+    }
+
+    function renderTree(tree, directoriesByCollection) {
       const byParent = new Map();
       for (const c of tree.collections) {
         const key = c.parent_id || "";
@@ -283,6 +287,21 @@
             (pub.summary ? " — " + pub.summary : "");
           pli.appendChild(meta);
           children.appendChild(pli);
+        }
+        for (const dir of directoriesByCollection.get(c.id) || []) {
+          const dli = document.createElement("li");
+          const dTag = document.createElement("span");
+          dTag.className = "kind-tag";
+          dTag.textContent = "directory";
+          const a = document.createElement("a");
+          a.className = "pub-link";
+          a.href = directoryHref(dir.id);
+          a.textContent = dir.title;
+          const meta = document.createElement("span");
+          meta.className = "pub-meta";
+          meta.textContent = dir.entry_count + (dir.entry_count === 1 ? " entry" : " entries");
+          dli.append(dTag, a, meta);
+          children.appendChild(dli);
         }
         for (const child of byParent.get(c.id) || []) {
           children.appendChild(renderCollection(child));
@@ -348,7 +367,20 @@
           return;
         }
         connectionStatus.textContent = "Browse the published eWritings, or search the shelves.";
-        renderTree(payload.data);
+        const directoriesByCollection = new Map();
+        const rulesetIds = (payload.data.collections || []).filter((c) => c.kind === "ruleset").map((c) => c.id);
+        await Promise.all(rulesetIds.map(async (id) => {
+          try {
+            const dres = await fetch("/api/ewrite/directories?collection_id=" + encodeURIComponent(id), { credentials: "include" });
+            const dpayload = await dres.json().catch(() => null);
+            if (dres.ok && dpayload?.ok && (dpayload.data.directories || []).length) {
+              directoriesByCollection.set(id, dpayload.data.directories);
+            }
+          } catch (err) {
+            console.error("directory list fetch failed", err);
+          }
+        }));
+        renderTree(payload.data, directoriesByCollection);
         libraryBody.classList.remove("hidden");
       } catch (err) {
         console.error("library bootstrap failed", err);
