@@ -24,14 +24,20 @@ func TestEnsureCanonicalSocioManuscriptSeedsAndIsIdempotent(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
+	// Queried by ewrite_publications.location_id + slug directly, not by
+	// joining through a collection with the ruleset's slug -- Kernel 79's
+	// EnsureSocioSeriesHierarchy (not called in this test, but always run
+	// immediately after this seed at real boot, see seed_hierarchy_dbtest_
+	// test.go) reparents this publication out from directly-under-the-
+	// ruleset into the Core Rulebook Series, so a join anchored to the
+	// ruleset's slug would stop finding it.
 	var pubID, status, visibility string
 	var wordCount int
 	if err := pool.QueryRow(ctx, `
-		SELECT p.id::text, p.status, p.visibility, p.word_count
-		FROM ewrite_publications p
-		JOIN ewrite_collections c ON c.id = p.collection_id
-		WHERE c.location_id = $1 AND c.slug = $2 AND p.slug = $3
-	`, loc, socioSeedRulesetSlug, socioSeedPublicationSlug).Scan(&pubID, &status, &visibility, &wordCount); err != nil {
+		SELECT id::text, status, visibility, word_count
+		FROM ewrite_publications
+		WHERE location_id = $1 AND slug = $2
+	`, loc, socioSeedPublicationSlug).Scan(&pubID, &status, &visibility, &wordCount); err != nil {
 		t.Fatalf("seeded publication not found: %v", err)
 	}
 	if status != "published" || visibility != "public" {
@@ -79,10 +85,8 @@ func TestEnsureCanonicalSocioManuscriptSeedsAndIsIdempotent(t *testing.T) {
 
 	var count int
 	if err := pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM ewrite_publications p
-		JOIN ewrite_collections c ON c.id = p.collection_id
-		WHERE c.location_id = $1 AND c.slug = $2 AND p.slug = $3
-	`, loc, socioSeedRulesetSlug, socioSeedPublicationSlug).Scan(&count); err != nil {
+		SELECT COUNT(*) FROM ewrite_publications WHERE location_id = $1 AND slug = $2
+	`, loc, socioSeedPublicationSlug).Scan(&count); err != nil {
 		t.Fatalf("count: %v", err)
 	}
 	if count != 1 {

@@ -10,8 +10,8 @@
   <style>
     body {
       margin: 0;
-      background: #14120d;
-      color: #f3ecd9;
+      background: #120e0e;
+      color: #ece1de;
       font-family: Georgia, "Times New Roman", serif;
     }
 
@@ -27,8 +27,8 @@
       max-width: 1100px;
       width: 100%;
       margin: 0 auto;
-      background: rgba(28, 24, 16, 0.96);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(26, 18, 18, 0.97);
+      border: 1px solid rgba(200, 140, 140, 0.14);
       border-radius: 14px;
       padding: 24px;
       box-sizing: border-box;
@@ -36,11 +36,12 @@
 
     h1 {
       margin-top: 0;
+      color: #f1e4e1;
     }
 
     .status-line {
       margin-top: 8px;
-      color: #d9c39d;
+      color: #b49793;
     }
 
     .hidden {
@@ -57,25 +58,31 @@
       flex: 1;
       padding: 10px 12px;
       font-size: 15px;
-      background: #211c12;
-      color: #f3ecd9;
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: #1a1414;
+      color: #ece1de;
+      border: 1px solid rgba(200, 140, 140, 0.2);
       border-radius: 8px;
       font-family: inherit;
     }
 
+    .search-row input:focus {
+      outline: none;
+      border-color: rgba(201, 130, 130, 0.55);
+    }
+
     .search-row button {
       padding: 10px 18px;
-      background: #6b5327;
-      color: #fff;
+      background: #5a3336;
+      color: #f6ece9;
       border: none;
       border-radius: 8px;
       cursor: pointer;
       font-size: 15px;
+      font-family: Arial, sans-serif;
     }
 
     .search-row button:hover {
-      background: #83672f;
+      background: #6e4145;
     }
 
     .search-results {
@@ -86,14 +93,14 @@
 
     .search-results li {
       padding: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(200, 140, 140, 0.12);
       border-radius: 10px;
       margin-bottom: 10px;
-      background: rgba(255, 255, 255, 0.02);
+      background: rgba(200, 140, 140, 0.03);
     }
 
     .search-results a {
-      color: #ecd9a8;
+      color: #d9a8a6;
       font-size: 17px;
       text-decoration: none;
     }
@@ -104,14 +111,14 @@
 
     .snippet {
       margin-top: 6px;
-      color: #cbbd9c;
+      color: #c2ada9;
       font-size: 14px;
       line-height: 1.5;
     }
 
     .snippet mark {
-      background: #6b5327;
-      color: #fff;
+      background: rgba(196, 120, 120, 0.4);
+      color: #fbeeec;
       padding: 0 2px;
       border-radius: 3px;
     }
@@ -124,7 +131,7 @@
     .tree ul {
       list-style: none;
       padding-left: 22px;
-      border-left: 1px solid rgba(255, 255, 255, 0.07);
+      border-left: 1px solid rgba(200, 140, 140, 0.12);
       margin: 4px 0;
     }
 
@@ -137,8 +144,8 @@
       font-size: 11px;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: #a89467;
-      border: 1px solid rgba(168, 148, 103, 0.4);
+      color: #b98a86;
+      border: 1px solid rgba(185, 138, 134, 0.4);
       border-radius: 4px;
       padding: 1px 6px;
       margin-right: 8px;
@@ -148,11 +155,11 @@
 
     .collection-title {
       font-size: 17px;
-      color: #f3ecd9;
+      color: #ece1de;
     }
 
     .pub-link {
-      color: #ecd9a8;
+      color: #d9a8a6;
       text-decoration: none;
       font-size: 16px;
     }
@@ -162,14 +169,14 @@
     }
 
     .pub-meta {
-      color: #8d8064;
+      color: #8d7572;
       font-size: 12.5px;
       margin-left: 8px;
       font-family: Arial, sans-serif;
     }
 
     .empty-note {
-      color: #a89467;
+      color: #a8908c;
       font-style: italic;
     }
   </style>

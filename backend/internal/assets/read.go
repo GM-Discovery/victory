@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"victory/backend/internal/access"
+	"victory/backend/internal/ewrite"
 	"victory/backend/internal/sessions"
 
 	"github.com/jackc/pgx/v5"
@@ -87,7 +88,26 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 				contentType = "application/octet-stream"
 			}
 
-			if strings.EqualFold(strings.TrimSpace(rec.AssetType), "map") {
+			// Kernel 79: every content request must be authorized, not just
+			// map assets. Prior to this, a non-map asset (including every
+			// eWrite-embedded image) served with zero access check.
+			warehouseRec, whErr := loadWarehouseAssetRecord(ctx, pool, assetID, true)
+			if whErr != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{
+					"ok":    false,
+					"error": "asset_access_check_failed",
+				})
+				return
+			}
+			allowed, err := userCanReadAssetConsideringEwrite(ctx, pool, userID, warehouseRec)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{
+					"ok":    false,
+					"error": "asset_access_check_failed",
+				})
+				return
+			}
+			if !allowed && strings.EqualFold(strings.TrimSpace(rec.AssetType), "map") {
 				venueMapVisible, venueErr := assetIsActiveTheaterMap(ctx, pool, assetID)
 				if venueErr != nil {
 					writeJSON(w, http.StatusInternalServerError, map[string]any{
@@ -104,13 +124,14 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 					})
 					return
 				}
-				if !(venueMapVisible && venueAccessible) {
-					writeJSON(w, http.StatusForbidden, map[string]any{
-						"ok":    false,
-						"error": "forbidden",
-					})
-					return
-				}
+				allowed = venueMapVisible && venueAccessible
+			}
+			if !allowed {
+				writeJSON(w, http.StatusForbidden, map[string]any{
+					"ok":    false,
+					"error": "forbidden",
+				})
+				return
 			}
 
 			file, openErr := os.Open(filepath.Clean(contentPath))
@@ -151,7 +172,7 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		allowed, err := userCanReadAsset(ctx, pool, userID, rec.ProducerUserID, rec.UploaderUserID, rec.OwnerUserID, rec.LocationID)
+		allowed, err := userCanReadAssetConsideringEwrite(ctx, pool, userID, rec)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{
 				"ok":    false,
@@ -185,6 +206,10 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
+		// Kernel 79: visibility can change over time (draft->published,
+		// unpublish, an eWrite reference added/removed) -- never let an
+		// intermediary cache a stale access decision.
+		w.Header().Set("Cache-Control", "private, max-age=0, must-revalidate")
 		writeJSON(w, http.StatusOK, map[string]any{
 			"ok": true,
 			"data": map[string]any{
@@ -385,6 +410,64 @@ func serveConstructionFallback(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "public, max-age=60")
 	http.ServeFile(w, r, filepath.Clean(constructionFallbackAssetPath))
+}
+
+// userCanReadAssetConsideringEwrite is the entry point every asset read
+// (content and meta) must go through. Kernel 79: if an asset is referenced
+// by one or more eWrite publications (ewrite_publication_assets), its
+// access is governed by those publications' own visibility via
+// ewrite.CanReadPublication instead of the asset's incidental location
+// membership -- this closes both directions of the Kernel 78 gap: a
+// public/authenticated eWriting's image is readable by any signed-in
+// reader regardless of location membership, and a draft/production-scoped
+// eWriting's image is denied to anyone without editor authority or
+// production membership, even if they hold unrelated membership at the
+// asset's own location. Ownership (producer/uploader/owner) always keeps
+// access, matching userCanReadAsset's existing precedent. Assets not
+// referenced by any eWrite publication are completely unaffected --
+// unchanged legacy behavior.
+func userCanReadAssetConsideringEwrite(ctx context.Context, pool *pgxpool.Pool, userID string, rec warehouseAssetRecord) (bool, error) {
+	if userID == rec.ProducerUserID || userID == rec.UploaderUserID || userID == rec.OwnerUserID {
+		return true, nil
+	}
+
+	pubIDs, err := ewritePublicationsForAsset(ctx, pool, rec.ID)
+	if err != nil {
+		return false, err
+	}
+	if len(pubIDs) > 0 {
+		for _, pubID := range pubIDs {
+			pub, err := ewrite.LoadPublication(ctx, pool, pubID)
+			if err != nil {
+				continue
+			}
+			if ok, err := ewrite.CanReadPublication(ctx, pool, userID, pub); err == nil && ok {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+
+	return userCanReadAsset(ctx, pool, userID, rec.ProducerUserID, rec.UploaderUserID, rec.OwnerUserID, rec.LocationID)
+}
+
+func ewritePublicationsForAsset(ctx context.Context, pool *pgxpool.Pool, assetID string) ([]string, error) {
+	rows, err := pool.Query(ctx, `
+		SELECT publication_id::text FROM ewrite_publication_assets WHERE asset_id = $1
+	`, assetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 func userCanReadAsset(ctx context.Context, pool *pgxpool.Pool, userID, producerUserID, uploaderUserID, ownerUserID, locationID string) (bool, error) {

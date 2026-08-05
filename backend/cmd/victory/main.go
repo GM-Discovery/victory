@@ -98,6 +98,27 @@ func main() {
 	if err := ewrite.EnsureCanonicalSocioManuscript(ctx, pool); err != nil {
 		log.Fatalf("kernel 78 socio manuscript seed failed: %v", err)
 	}
+	// Kernel 79: organizes the ruleset into Core Rulebook / Quickstart /
+	// Niava Series (reparenting the pre-existing Core Rulebook publication
+	// non-destructively) and seeds the two new manuscripts. Must run after
+	// EnsureCanonicalSocioManuscript above, which creates the ruleset and
+	// (on a fresh install) the Core Rulebook publication this reparents.
+	if err := ewrite.EnsureSocioSeriesHierarchy(ctx, pool); err != nil {
+		log.Fatalf("kernel 79 socio series hierarchy failed: %v", err)
+	}
+	if err := ewrite.EnsureQuickstartManuscript(ctx, pool); err != nil {
+		log.Fatalf("kernel 79 quickstart manuscript seed failed: %v", err)
+	}
+	if err := ewrite.EnsureNiavaManuscript(ctx, pool); err != nil {
+		log.Fatalf("kernel 79 niava manuscript seed failed: %v", err)
+	}
+	// Kernel 79: backfills ewrite_publication_assets for any publication
+	// that predates that table (e.g. the live Core Rulebook, seeded under
+	// Kernel 78) -- belt-and-suspenders alongside the direct reconcile
+	// calls in the seed functions above and in every ordinary save.
+	if err := ewrite.BackfillPublicationAssetRefs(ctx, pool); err != nil {
+		log.Fatalf("kernel 79 publication asset backfill failed: %v", err)
+	}
 	// Kernel 73: must run after the venue bootstrap above -- migration 057
 	// seeds the same Courtyard Scene for existing databases, but on a fresh
 	// install migrations run before catharsis exists as a venue row.

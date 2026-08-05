@@ -134,6 +134,10 @@ func SavePublicationSource(ctx context.Context, pool *pgxpool.Pool, userID, publ
 		return nil, nil, err
 	}
 
+	if err := reconcilePublicationAssetRefs(ctx, tx, publicationID, res.ImageRefs); err != nil {
+		return nil, nil, err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, nil, err
 	}

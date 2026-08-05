@@ -10,8 +10,8 @@
   <style>
     body {
       margin: 0;
-      background: #050505;
-      color: #f0e4e4;
+      background: #0d0a05;
+      color: #f0e8d8;
       font-family: Arial, Helvetica, sans-serif;
     }
 
@@ -42,8 +42,8 @@
     }
 
     .panel {
-      background: #0d0808;
-      border: 1px solid rgba(224, 38, 63, 0.28);
+      background: #171208;
+      border: 1px solid rgba(196, 155, 74, 0.25);
       border-radius: 14px;
       padding: 22px;
       box-sizing: border-box;
@@ -56,8 +56,8 @@
     }
 
     .primary-panel {
-      border-color: rgba(224, 38, 63, 0.55);
-      box-shadow: 0 0 32px rgba(200, 20, 40, 0.12);
+      border-color: rgba(196, 155, 74, 0.45);
+      box-shadow: 0 0 32px rgba(180, 140, 60, 0.08);
     }
 
     .sidebar-col {
@@ -72,20 +72,20 @@
     h2 {
       font-size: 16px;
       margin: 0 0 12px;
-      color: #ff5c72;
+      color: #d9b46a;
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
     .primary-panel h2 { font-size: 20px; }
 
-    .status-line { margin-top: 8px; color: #c98a90; }
+    .status-line { margin-top: 8px; color: #b9a077; }
     .hidden { display: none; }
 
     .tree { list-style: none; padding-left: 0; }
     .tree ul {
       list-style: none;
       padding-left: 20px;
-      border-left: 1px solid rgba(224, 38, 63, 0.2);
+      border-left: 1px solid rgba(196, 155, 74, 0.2);
       margin: 4px 0;
     }
     .tree li { margin: 6px 0; }
@@ -95,8 +95,8 @@
       font-size: 10.5px;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: #d97b8a;
-      border: 1px solid rgba(217, 123, 138, 0.4);
+      color: #c9a45c;
+      border: 1px solid rgba(201, 164, 92, 0.4);
       border-radius: 4px;
       padding: 1px 6px;
       margin-right: 7px;
@@ -111,21 +111,21 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
-    .status-draft { background: rgba(180, 60, 40, 0.28); color: #f0a888; }
+    .status-draft { background: rgba(180, 140, 40, 0.28); color: #e8c888; }
     .status-published { background: rgba(60, 140, 90, 0.25); color: #9ede9f; }
     .status-archived { background: rgba(120, 120, 120, 0.25); color: #c9c9c9; }
 
-    .pub-link { color: #ff8fa0; text-decoration: none; font-size: 15px; }
+    .pub-link { color: #d9b46a; text-decoration: none; font-size: 15px; }
     .pub-link:hover { text-decoration: underline; }
 
-    label { display: block; margin: 10px 0 4px; font-size: 13px; color: #cf9ca2; }
+    label { display: block; margin: 10px 0 4px; font-size: 13px; color: #b9a077; }
 
     input[type="text"], select, textarea {
       width: 100%;
       box-sizing: border-box;
-      background: #150c0c;
-      color: #f0e4e4;
-      border: 1px solid rgba(224, 38, 63, 0.3);
+      background: #17110a;
+      color: #f0e8d8;
+      border: 1px solid rgba(196, 155, 74, 0.3);
       border-radius: 7px;
       padding: 8px 10px;
       font-size: 14px;
@@ -133,7 +133,7 @@
     }
     input[type="text"]:focus, select:focus, textarea:focus {
       outline: none;
-      border-color: rgba(255, 92, 114, 0.7);
+      border-color: rgba(212, 168, 82, 0.7);
     }
 
     .primary-panel textarea#cp-paste {
@@ -143,7 +143,7 @@
     textarea { min-height: 120px; font-family: ui-monospace, Menlo, Consolas, monospace; }
 
     button {
-      background: #7a0f22;
+      background: #6b5327;
       color: #fff;
       border: none;
       border-radius: 7px;
@@ -152,32 +152,32 @@
       cursor: pointer;
       margin-top: 12px;
     }
-    button:hover { background: #a3172f; }
+    button:hover { background: #83672f; }
     button:disabled { opacity: 0.5; cursor: default; }
 
     .primary-panel button {
-      background: #c81e3a;
+      background: #96762f;
       font-size: 15px;
       padding: 11px 20px;
     }
-    .primary-panel button:hover { background: #ea2c48; }
+    .primary-panel button:hover { background: #b28d3a; }
 
-    .form-error { color: #ff8080; font-size: 13px; margin-top: 8px; }
+    .form-error { color: #e08a7a; font-size: 13px; margin-top: 8px; }
     .form-ok { color: #9ede9f; font-size: 13px; margin-top: 8px; }
 
     .recent-list { list-style: none; padding: 0; margin: 0; }
     .recent-list li {
       padding: 8px 10px;
-      border: 1px solid rgba(224, 38, 63, 0.18);
+      border: 1px solid rgba(196, 155, 74, 0.18);
       border-radius: 8px;
       margin-bottom: 8px;
-      background: rgba(224, 38, 63, 0.04);
+      background: rgba(196, 155, 74, 0.04);
     }
-    .recent-meta { color: #a3777c; font-size: 12px; margin-top: 2px; }
+    .recent-meta { color: #a89272; font-size: 12px; margin-top: 2px; }
 
     .import-report {
-      background: #0a0505;
-      border: 1px solid rgba(224, 38, 63, 0.25);
+      background: #100c06;
+      border: 1px solid rgba(196, 155, 74, 0.25);
       border-radius: 8px;
       padding: 12px;
       margin-top: 12px;
@@ -186,7 +186,7 @@
       overflow-y: auto;
     }
     .import-report ul { margin: 6px 0; padding-left: 18px; }
-    .warn { color: #f0b088; }
+    .warn { color: #e8c888; }
 
     @media (max-width: 1140px) {
       .layout { flex-direction: column; align-items: stretch; }
@@ -245,7 +245,7 @@
         <div class="panel">
           <h2>Library</h2>
           <ul id="authoring-tree" class="tree"></ul>
-          <p id="tree-empty" class="hidden" style="color:#d97b8a;font-style:italic;">No eWritings yet — create a Ruleset to begin.</p>
+          <p id="tree-empty" class="hidden" style="color:#c9a45c;font-style:italic;">No eWritings yet — create a Ruleset to begin.</p>
 
           <h2 style="margin-top:24px;">Recent drafts</h2>
           <ul id="recent-drafts" class="recent-list"></ul>

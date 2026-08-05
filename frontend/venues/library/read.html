@@ -10,8 +10,8 @@
   <style>
     body {
       margin: 0;
-      background: #14120d;
-      color: #f3ecd9;
+      background: #120e0e;
+      color: #e9dedb;
       font-family: Georgia, "Times New Roman", serif;
     }
 
@@ -41,13 +41,13 @@
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      color: #a89467;
+      color: #a8908c;
       margin: 0 0 10px;
     }
 
     .toc-rail a {
       display: block;
-      color: #cbbd9c;
+      color: #c2ada9;
       text-decoration: none;
       padding: 3px 8px;
       border-left: 2px solid transparent;
@@ -55,13 +55,13 @@
     }
 
     .toc-rail a:hover {
-      color: #f3ecd9;
+      color: #ece1de;
     }
 
     .toc-rail a.active {
-      color: #ecd9a8;
-      border-left-color: #6b5327;
-      background: rgba(255, 255, 255, 0.03);
+      color: #e2b8b6;
+      border-left-color: #8a5a5a;
+      background: rgba(200, 140, 140, 0.06);
     }
 
     .toc-l3 { padding-left: 22px; font-size: 12.5px; }
@@ -70,25 +70,26 @@
     .reader {
       flex: 1;
       min-width: 0;
-      background: rgba(28, 24, 16, 0.96);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(26, 18, 18, 0.97);
+      border: 1px solid rgba(200, 140, 140, 0.14);
       border-radius: 14px;
       padding: 34px 44px;
       box-sizing: border-box;
     }
 
     .reader-header {
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      border-bottom: 1px solid rgba(200, 140, 140, 0.14);
       padding-bottom: 16px;
       margin-bottom: 20px;
     }
 
     .reader-header h1 {
       margin: 0 0 6px;
+      color: #f1e4e1;
     }
 
     .reader-meta {
-      color: #a89467;
+      color: #a8908c;
       font-size: 13.5px;
       font-family: Arial, sans-serif;
     }
@@ -104,9 +105,9 @@
     .reader-actions a,
     .reader-actions button {
       font-size: 13px;
-      color: #ecd9a8;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #d9b9b6;
+      background: rgba(200, 140, 140, 0.06);
+      border: 1px solid rgba(200, 140, 140, 0.2);
       border-radius: 7px;
       padding: 6px 12px;
       cursor: pointer;
@@ -115,13 +116,13 @@
 
     .reader-actions a:hover,
     .reader-actions button:hover {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(200, 140, 140, 0.12);
     }
 
     .anchor-notice {
-      background: rgba(160, 108, 32, 0.18);
-      border: 1px solid rgba(220, 160, 60, 0.4);
-      color: #eccf9a;
+      background: rgba(160, 90, 60, 0.16);
+      border: 1px solid rgba(200, 130, 90, 0.35);
+      color: #e6c2a8;
       border-radius: 8px;
       padding: 10px 14px;
       margin-bottom: 16px;
@@ -130,37 +131,38 @@
     }
 
     .content {
-      line-height: 1.65;
-      font-size: 16.5px;
+      line-height: 1.7;
+      font-size: 17px;
+      max-width: 74ch;
     }
 
     .content h1, .content h2, .content h3, .content h4 {
-      color: #f6ecd2;
+      color: #f1e4e1;
       scroll-margin-top: 18px;
       position: relative;
     }
 
-    .content h2 { border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 6px; }
+    .content h2 { border-bottom: 1px solid rgba(200, 140, 140, 0.14); padding-bottom: 6px; }
 
-    .content a { color: #ecd9a8; }
+    .content a { color: #d9a8a6; }
 
     .content blockquote {
-      border-left: 3px solid #6b5327;
+      border-left: 3px solid #8a5a5a;
       margin-left: 0;
       padding-left: 16px;
-      color: #cbbd9c;
+      color: #c2ada9;
     }
 
     .content code {
-      background: rgba(255, 255, 255, 0.07);
+      background: rgba(200, 140, 140, 0.1);
       padding: 1px 5px;
       border-radius: 4px;
       font-size: 14px;
     }
 
     .content pre {
-      background: #0f0d08;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: #150f0f;
+      border: 1px solid rgba(200, 140, 140, 0.14);
       border-radius: 8px;
       padding: 14px;
       overflow-x: auto;
@@ -175,19 +177,19 @@
     }
 
     .content th, .content td {
-      border: 1px solid rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(200, 140, 140, 0.18);
       padding: 7px 10px;
       text-align: left;
     }
 
-    .content th { background: rgba(255, 255, 255, 0.05); }
+    .content th { background: rgba(200, 140, 140, 0.06); }
 
     .content img { max-width: 100%; border-radius: 8px; }
 
     .heading-link {
       position: absolute;
       margin-left: 8px;
-      color: #6b5327;
+      color: #8a5a5a;
       text-decoration: none;
       opacity: 0;
       font-size: 0.8em;
@@ -211,13 +213,13 @@
       justify-content: space-between;
       margin-top: 30px;
       padding-top: 18px;
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      border-top: 1px solid rgba(200, 140, 140, 0.14);
       font-family: Arial, sans-serif;
       gap: 12px;
     }
 
     .prev-next a {
-      color: #ecd9a8;
+      color: #d9a8a6;
       text-decoration: none;
       font-size: 14.5px;
     }
@@ -226,7 +228,7 @@
 
     .hidden { display: none; }
 
-    .status-line { color: #d9c39d; padding: 24px; }
+    .status-line { color: #b49793; padding: 24px; }
 
     @media (max-width: 900px) {
       .layout { flex-direction: column; }
