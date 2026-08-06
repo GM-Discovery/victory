@@ -362,8 +362,8 @@ func buildExportArchive(ctx context.Context, pool *pgxpool.Pool, userID, jobID, 
 
 	manifest := map[string]any{
 		"generated_at": time.Now().UTC().Format(time.RFC3339),
-		// format_version 2: Kernel 78 added the ewrite/ section.
-		"format_version": 2,
+		// format_version 3: Kernel 80 added the storyboards/ section.
+		"format_version": 3,
 	}
 	counts := map[string]int{}
 
@@ -416,7 +416,7 @@ func buildExportArchive(ctx context.Context, pool *pgxpool.Pool, userID, jobID, 
 	}
 	type charRow struct {
 		id, name, pronouns, tagline, publicDesc, privateNotes, workbookStatus string
-		createdAt                                                            time.Time
+		createdAt                                                             time.Time
 	}
 	var characters []charRow
 	for charRows.Next() {
@@ -758,6 +758,78 @@ func buildExportArchive(ctx context.Context, pool *pgxpool.Pool, userID, jobID, 
 		}
 	}
 	counts["ewrite_publications"] = len(ewritePubs)
+
+	// Kernel 80: owned Storyboards, each with its own access-grant list
+	// (spec 12.1 -- "must include owned Storyboards, access grants").
+	// Boards merely SHARED to this user (not owned) are deliberately
+	// excluded: the spec frames this as "owned Storyboards + grants",
+	// i.e. grants ON boards they own, not boards granted TO them --
+	// those aren't this user's data to export. Raw SQL, not the
+	// storyboards package's Go API: identity cannot import storyboards
+	// (network already imports identity, and storyboards imports
+	// network for its live WS events, so identity -> storyboards would
+	// close an import cycle).
+	boardRows, err := pool.Query(ctx, `
+		SELECT id::text, title, description, archived_at, created_at, updated_at
+		FROM storyboards WHERE owner_user_id = $1 ORDER BY created_at
+	`, userID)
+	if err != nil {
+		return "", 0, err
+	}
+	type ownedBoard struct {
+		id, title, description string
+		archivedAt             *time.Time
+		createdAt, updatedAt   time.Time
+	}
+	var ownedBoards []ownedBoard
+	for boardRows.Next() {
+		var b ownedBoard
+		if err := boardRows.Scan(&b.id, &b.title, &b.description, &b.archivedAt, &b.createdAt, &b.updatedAt); err != nil {
+			boardRows.Close()
+			return "", 0, err
+		}
+		ownedBoards = append(ownedBoards, b)
+	}
+	boardRows.Close()
+	if err := boardRows.Err(); err != nil {
+		return "", 0, err
+	}
+	var storyboardsExport []map[string]any
+	for _, b := range ownedBoards {
+		grantRows, err := pool.Query(ctx, `
+			SELECT g.granted_role::text, COALESCE(u.handle, ''), g.created_at
+			FROM storyboard_grants g
+			LEFT JOIN users u ON u.id = g.user_id
+			WHERE g.storyboard_id = $1
+			ORDER BY g.created_at
+		`, b.id)
+		if err != nil {
+			return "", 0, err
+		}
+		var grants []map[string]any
+		for grantRows.Next() {
+			var role, handle string
+			var grantedAt time.Time
+			if err := grantRows.Scan(&role, &handle, &grantedAt); err != nil {
+				grantRows.Close()
+				return "", 0, err
+			}
+			grants = append(grants, map[string]any{"granted_role": role, "user_handle": handle, "granted_at": grantedAt})
+		}
+		grantRows.Close()
+		if err := grantRows.Err(); err != nil {
+			return "", 0, err
+		}
+		storyboardsExport = append(storyboardsExport, map[string]any{
+			"id": b.id, "title": b.title, "description": b.description,
+			"archived_at": b.archivedAt, "created_at": b.createdAt, "updated_at": b.updatedAt,
+			"grants": grants,
+		})
+	}
+	if err := writeJSONFile("storyboards/owned.json", storyboardsExport); err != nil {
+		return "", 0, err
+	}
+	counts["storyboards"] = len(ownedBoards)
 
 	manifest["counts"] = counts
 	if err := writeJSONFile("manifest.json", manifest); err != nil {

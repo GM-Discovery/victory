@@ -42,25 +42,25 @@ type DeletionBlocker struct {
 // DeletionPlan is the read-only preview shown before a user commits to
 // deletion (Kernel 77 §6.1, §6.2).
 type DeletionPlan struct {
-	Handle              string             `json:"handle"`
-	IsOperator          bool               `json:"is_operator"`
-	HasPassword         bool               `json:"has_password"`
-	Blockers            []DeletionBlocker  `json:"blockers"`
-	CanDelete           bool               `json:"can_delete"`
-	PrivateRecordCounts map[string]int     `json:"private_record_counts"`
-	RequiresPassword    bool               `json:"requires_current_password"`
-	RequiresRecentLogin bool               `json:"requires_recent_login"`
+	Handle              string            `json:"handle"`
+	IsOperator          bool              `json:"is_operator"`
+	HasPassword         bool              `json:"has_password"`
+	Blockers            []DeletionBlocker `json:"blockers"`
+	CanDelete           bool              `json:"can_delete"`
+	PrivateRecordCounts map[string]int    `json:"private_record_counts"`
+	RequiresPassword    bool              `json:"requires_current_password"`
+	RequiresRecentLogin bool              `json:"requires_recent_login"`
 }
 
 // DeletionReceipt is the minimal, non-identifying audit record kept after a
 // successful deletion (Kernel 77 §6.7). It deliberately does not carry the
 // original user id, email, handle, or Discord id.
 type DeletionReceipt struct {
-	ID                     string    `json:"id"`
-	CreatedAt              time.Time `json:"created_at"`
-	DeletedPrivateCount    int       `json:"deleted_private_count"`
-	AnonymizedSharedCount  int       `json:"anonymized_shared_count"`
-	Status                 string    `json:"status"`
+	ID                    string    `json:"id"`
+	CreatedAt             time.Time `json:"created_at"`
+	DeletedPrivateCount   int       `json:"deleted_private_count"`
+	AnonymizedSharedCount int       `json:"anonymized_shared_count"`
+	Status                string    `json:"status"`
 }
 
 // recentLoginWindow bounds how old the current session may be for it to
@@ -182,16 +182,66 @@ func BuildDeletionPlan(ctx context.Context, pool *pgxpool.Pool, userID string) (
 		})
 	}
 
+	// Kernel 80: owned-Storyboard blocker. storyboards.owner_user_id is
+	// ON DELETE RESTRICT (migration 090) precisely so this blocker, not a
+	// cascade, is what clears ownership -- "no ownerless boards can
+	// remain" (spec 12.2). Every owned board blocks, archived included:
+	// the spec's own text says "owned active Storyboards appear in the
+	// deletion plan," but archived boards still hold that same RESTRICT
+	// FK, and Kernel 80 has no ownership-transfer or archived-board
+	// reassignment mechanism -- treating only "active" as blocking would
+	// leave a real path to an unresolvable RESTRICT violation at execute
+	// time. Simpler and safer to block on all owned boards uniformly
+	// (confirmed decision, not a spec gap): the owner must archive or
+	// delete every owned board, or transfer ownership if a future kernel
+	// adds that, before deletion can proceed. Raw SQL, not the
+	// storyboards package's Go API -- identity cannot import storyboards
+	// (network already imports identity, and storyboards imports network
+	// for its live WS events, so identity -> storyboards would close an
+	// import cycle).
+	boardRows, err := pool.Query(ctx, `SELECT id::text, title, archived_at FROM storyboards WHERE owner_user_id = $1`, userID)
+	if err != nil {
+		return nil, err
+	}
+	type ownedBoard struct {
+		id, title  string
+		archivedAt *time.Time
+	}
+	var ownedBoards []ownedBoard
+	for boardRows.Next() {
+		var b ownedBoard
+		if err := boardRows.Scan(&b.id, &b.title, &b.archivedAt); err != nil {
+			boardRows.Close()
+			return nil, err
+		}
+		ownedBoards = append(ownedBoards, b)
+	}
+	boardRows.Close()
+	if err := boardRows.Err(); err != nil {
+		return nil, err
+	}
+	for _, b := range ownedBoards {
+		status := "active"
+		if b.archivedAt != nil {
+			status = "archived"
+		}
+		plan.Blockers = append(plan.Blockers, DeletionBlocker{
+			Reason:     "you own a " + status + " Storyboard: " + b.title,
+			Resolution: "delete this Storyboard (Storyboards > board settings > Delete), or transfer ownership if a future feature adds that, then retry deletion",
+		})
+	}
+
 	// Representative private-record counts for the plan preview -- not
 	// exhaustive across every private table, enough to show the user what
 	// "private data" concretely means for their account.
 	countQueries := map[string]string{
-		"characters":    `SELECT COUNT(*) FROM character_cards WHERE owner_user_id = $1`,
-		"journal_entries": `SELECT COUNT(*) FROM character_journals cj JOIN character_cards cc ON cc.id = cj.character_card_id WHERE cc.owner_user_id = $1`,
-		"relationships": `SELECT COUNT(*) FROM player_relationships WHERE observer_user_id = $1 OR subject_user_id = $1`,
+		"characters":        `SELECT COUNT(*) FROM character_cards WHERE owner_user_id = $1`,
+		"journal_entries":   `SELECT COUNT(*) FROM character_journals cj JOIN character_cards cc ON cc.id = cj.character_card_id WHERE cc.owner_user_id = $1`,
+		"relationships":     `SELECT COUNT(*) FROM player_relationships WHERE observer_user_id = $1 OR subject_user_id = $1`,
 		"messages_received": `SELECT COUNT(*) FROM messages WHERE to_user_id = $1`,
-		"uploads":       `SELECT COUNT(*) FROM assets WHERE (owner_user_id = $1 OR uploader_user_id = $1) AND is_deleted = FALSE`,
-		"ewritings":     `SELECT COUNT(*) FROM ewrite_publications WHERE created_by = $1`,
+		"uploads":           `SELECT COUNT(*) FROM assets WHERE (owner_user_id = $1 OR uploader_user_id = $1) AND is_deleted = FALSE`,
+		"ewritings":         `SELECT COUNT(*) FROM ewrite_publications WHERE created_by = $1`,
+		"storyboards_owned": `SELECT COUNT(*) FROM storyboards WHERE owner_user_id = $1`,
 	}
 	for label, q := range countQueries {
 		var n int
@@ -399,6 +449,18 @@ func executeDeletion(ctx context.Context, pool *pgxpool.Pool, userID, storageRoo
 		`UPDATE show_runs SET created_by_user_id = $2 WHERE created_by_user_id = $1`,
 		`UPDATE showings SET created_by = $2 WHERE created_by = $1`,
 		`UPDATE shows SET created_by_user_id = $2 WHERE created_by_user_id = $1`,
+		// Kernel 80: authored cards remain with anonymized authorship
+		// (spec 12.2's "authored cards remain... where continuity
+		// requires it"), and grantor attribution is reassigned the same
+		// way ewrite_editors.granted_by already is above. storyboard_
+		// grants rows where THIS user is the grantee (recipient, not
+		// grantor) need no code here at all: storyboard_grants.user_id is
+		// ON DELETE CASCADE (migration 090), so the `DELETE FROM users`
+		// below already removes them -- "non-owner deletion removes
+		// their grants without creating ghost grants" is satisfied by
+		// that FK alone.
+		`UPDATE storyboard_cards SET author_user_id = $2 WHERE author_user_id = $1`,
+		`UPDATE storyboard_grants SET granted_by = $2 WHERE granted_by = $1`,
 	}
 	for _, q := range reassign {
 		tag, err := tx.Exec(ctx, q, userID, tombstoneUserID)

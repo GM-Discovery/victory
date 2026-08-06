@@ -91,6 +91,7 @@ type ObjectLink struct {
 	IndexCardElementID string `json:"index_card_element_id,omitempty"`
 	SceneElementID     string `json:"scene_element_id,omitempty"`
 	DialogueTopicID    string `json:"dialogue_topic_id,omitempty"`
+	StoryboardCardID   string `json:"storyboard_card_id,omitempty"`
 	PublicationID      string `json:"publication_id"`
 	SectionID          string `json:"section_id,omitempty"`
 	SectionAnchor      string `json:"section_anchor,omitempty"`

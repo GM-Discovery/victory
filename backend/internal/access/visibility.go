@@ -136,7 +136,7 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 		WITH visible AS (
 			SELECT v.id, v.slug, v.name, v.kind, 1 AS reason_rank, 'authenticated_surface'::text AS visible_because
 			FROM venues v
-			WHERE v.slug IN ('audition-hall', 'trailers')
+			WHERE v.slug IN ('audition-hall', 'trailers', 'storyboards')
 
 			UNION
 

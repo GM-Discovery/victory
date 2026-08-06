@@ -201,6 +201,8 @@ function venueHref(slug) {
       return "/venues/grants-cabin/";
     case "catharsis":
       return "/venues/catharsis/";
+    case "storyboards":
+      return "/venues/storyboards/";
     default:
       return "";
   }
@@ -281,6 +283,7 @@ function createVenuePin(venue, assetURL, fallbackPositions) {
     "directors-chair": "/assets/directorschair.png",
     "grants-cabin": "/assets/grantsoffice.png",
     catharsis: "/assets/catharsis.png",
+    storyboards: "/assets/storyboard.png",
   };
 
   icon.src = assetURL(venue.icon_url || venueIcons[venue.slug] || "/assets/default.png");
@@ -536,6 +539,7 @@ const VENUE_ICON_CLEAR_ZONES = [
   { x: 29, y: 62, r: 9 }, // writers-room
   { x: 83, y: 77, r: 10 }, // victory-theater
   { x: 4, y: 65, r: 10 }, // soil-experts
+  { x: 15, y: 50, r: 9 }, // storyboards
 ];
 
 function isNearVenueIcon(x, y) {
@@ -711,6 +715,7 @@ async function loadVenues() {
       workshop: { x: 75, y: 33 },
       warehouse: { x: 75, y: 27 },
       "soil-experts": { x: 4, y: 65 },
+      storyboards: { x: 81, y: 19 },
       construction: { x: -15, y: 57 },
       "info-booth": { x: 50, y: 93 },
     };

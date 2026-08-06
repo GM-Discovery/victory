@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Storyboard</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    body {
+      margin: 0;
+      background: #0d0a05;
+      color: #f0e8d8;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .shell { min-height: 100vh; padding: 18px; box-sizing: border-box; }
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+      /* venue-account-badge.js floats a fixed top:14/right:14 badge
+         whenever the page has no <header> for it to dock into (this page
+         doesn't use one). Without this, header-actions -- pinned to the
+         far right by justify-content:space-between -- renders directly
+         under that badge and its buttons become unclickable. */
+      padding-right: 235px;
+    }
+    .page-header h1 { margin: 0; font-size: 22px; }
+    .status-line { color: #a89272; font-size: 12px; }
+    .header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .role-badge {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border: 1px solid rgba(196, 155, 74, 0.4);
+      border-radius: 4px;
+      padding: 3px 8px;
+      color: #d9b46a;
+    }
+
+    button {
+      background: #5a481f;
+      color: #f0e8d8;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    button:hover { background: #83672f; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    button.small { padding: 3px 8px; font-size: 11px; }
+    button.danger { background: #6a2f2f; }
+    button.danger:hover { background: #8a3f3f; }
+
+    label { font-size: 12px; color: #cbb98a; }
+    input, textarea, select {
+      background: #0d0a05;
+      color: #f0e8d8;
+      border: 1px solid rgba(196, 155, 74, 0.3);
+      border-radius: 5px;
+      padding: 5px 7px;
+      font-size: 13px;
+    }
+
+    /* --- Grid --- */
+    .board-scroll { overflow: auto; border: 1px solid rgba(196, 155, 74, 0.2); border-radius: 8px; max-height: 76vh; }
+    table.board-grid { border-collapse: separate; border-spacing: 0; min-width: 100%; }
+    table.board-grid th, table.board-grid td { border-right: 1px solid rgba(196, 155, 74, 0.12); border-bottom: 1px solid rgba(196, 155, 74, 0.12); vertical-align: top; }
+    .col-header {
+      position: sticky;
+      top: 0;
+      background: #171208;
+      z-index: 3;
+      padding: 8px;
+      min-width: 200px;
+      font-size: 13px;
+    }
+    .row-label-cell {
+      position: sticky;
+      left: 0;
+      background: #171208;
+      z-index: 2;
+      padding: 8px;
+      min-width: 160px;
+      max-width: 220px;
+      font-size: 13px;
+    }
+    .col-header.corner { left: 0; z-index: 4; min-width: 160px; }
+    .band-row td {
+      background: #221a0c;
+      padding: 6px 10px;
+      font-weight: bold;
+      color: #d9b46a;
+      position: sticky;
+      left: 0;
+    }
+    .cell { padding: 6px; min-width: 200px; }
+    .card {
+      background: rgba(196, 155, 74, 0.08);
+      border: 1px solid rgba(196, 155, 74, 0.25);
+      border-radius: 6px;
+      padding: 6px 8px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .card:hover, .card:focus { border-color: rgba(196, 155, 74, 0.6); outline: none; }
+    .card.locked { border-style: dashed; }
+    .card.hidden-flag { background: rgba(224, 138, 122, 0.08); }
+    .card-title { font-weight: bold; }
+    .card-flags { font-size: 10px; color: #cbb98a; margin-top: 2px; }
+    .add-card-btn { font-size: 11px; }
+
+    /* --- Modal --- */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      display: flex; align-items: center; justify-content: center; z-index: 50;
+    }
+    .modal-backdrop[hidden] { display: none; }
+    .modal {
+      background: #171208; border: 1px solid rgba(196, 155, 74, 0.4);
+      border-radius: 10px; padding: 20px; width: min(520px, 92vw);
+      max-height: 88vh; overflow: auto;
+    }
+    .modal h2 { margin-top: 0; font-size: 16px; color: #d9b46a; }
+    .field { margin-bottom: 10px; }
+    .field label { display: block; margin-bottom: 3px; }
+    .field input, .field textarea, .field select { width: 100%; box-sizing: border-box; }
+    .modal-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .checkbox-field { display: flex; align-items: center; gap: 6px; }
+    .checkbox-field input { width: auto; }
+
+    .grant-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(196,155,74,0.12); font-size: 13px; }
+    .suggestion-chip { display: inline-block; background: rgba(196,155,74,0.1); border: 1px solid rgba(196,155,74,0.3); border-radius: 12px; padding: 2px 10px; font-size: 12px; margin: 2px 4px 2px 0; cursor: pointer; }
+
+    .form-error { color: #e08a7a; font-size: 12px; margin-top: 6px; }
+    .form-ok { color: #9ede9f; font-size: 12px; margin-top: 6px; }
+
+    .toolbar { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>You don't have access to this Storyboard.</p>
+      <a href="/venues/storyboards/" class="back-map-button">← Back to Storyboards</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <div class="page-header">
+      <div>
+        <h1 id="board-title">Loading…</h1>
+        <div class="status-line" id="board-status"></div>
+      </div>
+      <div class="header-actions">
+        <span class="role-badge" id="role-badge"></span>
+        <a href="/venues/storyboards/">← Boards</a>
+        <button id="export-btn" hidden>Export JSON</button>
+        <button id="share-btn" hidden>Sharing</button>
+        <button id="archive-btn" hidden></button>
+      </div>
+    </div>
+
+    <div class="toolbar" id="structure-toolbar" hidden>
+      <button id="add-column-btn" class="small">+ Column</button>
+      <button id="add-band-btn" class="small">+ Band</button>
+      <span id="column-limit-note" class="status-line"></span>
+    </div>
+
+    <div id="board-root">
+      <div class="board-scroll">
+        <table class="board-grid" id="board-grid">
+          <thead><tr id="grid-header-row"></tr></thead>
+          <tbody id="grid-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card editor modal -->
+  <div class="modal-backdrop" id="card-modal" hidden>
+    <div class="modal">
+      <h2 id="card-modal-title">Card</h2>
+      <div class="field"><label>Title</label><input id="card-title-input" /></div>
+      <div class="field"><label>Front</label><textarea id="card-front-input" rows="3"></textarea></div>
+      <div class="field"><label>Back</label><textarea id="card-back-input" rows="3"></textarea></div>
+      <div class="field"><label>Category</label><input id="card-category-input" /></div>
+      <div class="field"><label>Color token</label><input id="card-color-input" placeholder="e.g. amber" /></div>
+      <div class="field" id="card-hidden-field" hidden>
+        <label class="checkbox-field"><input type="checkbox" id="card-hidden-input" /> Hidden from Audience/Cast</label>
+      </div>
+      <div class="field" id="card-lock-field" hidden>
+        <label class="checkbox-field"><input type="checkbox" id="card-lock-input" /> Locked</label>
+      </div>
+      <div class="field" id="card-move-field">
+        <label>Move to</label>
+        <div style="display:flex; gap:6px;">
+          <select id="card-move-row"></select>
+          <select id="card-move-column"></select>
+          <button id="card-move-btn" class="small">Move</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Rule link</label>
+        <div id="card-ewrite-link"></div>
+      </div>
+      <div id="card-modal-message"></div>
+      <div class="modal-actions">
+        <button id="card-save-btn">Save</button>
+        <button id="card-delete-btn" class="danger">Delete</button>
+        <button id="card-close-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sharing modal -->
+  <div class="modal-backdrop" id="share-modal" hidden>
+    <div class="modal">
+      <h2>Sharing</h2>
+      <div id="grant-list"></div>
+      <div class="field">
+        <label>People you know</label>
+        <div id="my-people-suggestions"></div>
+      </div>
+      <div class="field"><label>Handle</label><input id="grant-handle-input" /></div>
+      <div class="field">
+        <label>Role</label>
+        <select id="grant-role-input">
+          <option value="audience">Audience</option>
+          <option value="cast">Cast</option>
+          <option value="crew">Crew</option>
+          <option value="director">Director</option>
+          <option value="producer">Producer</option>
+        </select>
+      </div>
+      <div id="share-modal-message"></div>
+      <div class="modal-actions">
+        <button id="grant-add-btn">Share</button>
+        <button id="share-close-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- back-to-map.js deliberately omitted: header-actions already has its
+       own "Boards" link, and its floating fallback (no <header> tag on
+       this page for it to dock into) would otherwise sit on top of the
+       page title. -->
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script src="/lib/ewrite-rule-link.js"></script>
+  <script src="/venues/storyboards/socket.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const boardId = params.get("id");
+    let snapshot = null;
+    let socketHandle = null;
+
+    if (!boardId) {
+      document.getElementById("board-status").textContent = "No board id given.";
+    }
+
+    function tierAtLeastCrew(tier) {
+      return ["crew", "director", "producer", "owner", "operator"].includes(tier);
+    }
+    function tierAtLeastDirector(tier) {
+      return ["director", "producer", "owner", "operator"].includes(tier);
+    }
+    function tierIsOwner(tier) {
+      return tier === "owner" || tier === "operator";
+    }
+
+    async function apiFetch(url, opts) {
+      const res = await fetch(url, Object.assign({ credentials: "include" }, opts || {}));
+      const payload = await res.json().catch(() => null);
+      return { res, payload };
+    }
+    async function apiPost(url, body, method) {
+      return apiFetch(url, {
+        method: method || "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+      });
+    }
+
+    async function loadSnapshot() {
+      const { res, payload } = await apiFetch("/api/storyboards/" + encodeURIComponent(boardId));
+      if (isForbiddenAccessResponse(res, payload) || !res.ok || !payload?.ok) {
+        showForbiddenScreen();
+        return false;
+      }
+      snapshot = payload.data;
+      render();
+      return true;
+    }
+
+    function cardsByCell() {
+      const map = {};
+      for (const c of snapshot.cards) {
+        const key = c.row_id + "|" + c.column_id;
+        (map[key] = map[key] || []).push(c);
+      }
+      for (const key in map) map[key].sort((a, b) => a.sort_order_in_cell - b.sort_order_in_cell);
+      return map;
+    }
+
+    function rowsByBand() {
+      const map = {};
+      for (const r of snapshot.rows) (map[r.band_id] = map[r.band_id] || []).push(r);
+      for (const key in map) map[key].sort((a, b) => a.sort_order_in_band - b.sort_order_in_band);
+      return map;
+    }
+
+    function render() {
+      const tier = snapshot.viewer_tier;
+      document.getElementById("board-title").textContent = snapshot.board.title;
+      document.getElementById("board-status").textContent =
+        (snapshot.board.description || "") + (snapshot.board.archived_at ? " · Archived" : "");
+      document.getElementById("role-badge").textContent = tier;
+
+      document.getElementById("structure-toolbar").hidden = !tierAtLeastDirector(tier);
+      document.getElementById("export-btn").hidden = !tierAtLeastDirector(tier);
+      document.getElementById("share-btn").hidden = !tierIsOwner(tier);
+      const archiveBtn = document.getElementById("archive-btn");
+      archiveBtn.hidden = !tierIsOwner(tier);
+      archiveBtn.textContent = snapshot.board.archived_at ? "Unarchive" : "Archive";
+      document.getElementById("column-limit-note").textContent =
+        snapshot.columns.length >= 200 ? "200-column limit reached" : snapshot.columns.length + " / 200 columns";
+
+      const headerRow = document.getElementById("grid-header-row");
+      headerRow.innerHTML = "";
+      const corner = document.createElement("th");
+      corner.className = "col-header corner";
+      corner.textContent = "";
+      headerRow.appendChild(corner);
+      for (const col of snapshot.columns) {
+        const th = document.createElement("th");
+        th.className = "col-header";
+        th.textContent = col.title;
+        if (tierAtLeastDirector(tier)) {
+          const renameBtn = document.createElement("button");
+          renameBtn.className = "small";
+          renameBtn.textContent = "✎";
+          renameBtn.style.marginLeft = "6px";
+          renameBtn.addEventListener("click", () => renameColumnFlow(col));
+          th.appendChild(renameBtn);
+          const removeBtn = document.createElement("button");
+          removeBtn.className = "small danger";
+          removeBtn.textContent = "×";
+          removeBtn.style.marginLeft = "4px";
+          removeBtn.title = "Remove column";
+          removeBtn.addEventListener("click", () => removeColumnFlow(col));
+          th.appendChild(removeBtn);
+        }
+        headerRow.appendChild(th);
+      }
+
+      const body = document.getElementById("grid-body");
+      body.innerHTML = "";
+      const byBand = rowsByBand();
+      const byCell = cardsByCell();
+
+      for (const band of snapshot.bands) {
+        const bandTr = document.createElement("tr");
+        bandTr.className = "band-row";
+        const bandTd = document.createElement("td");
+        bandTd.colSpan = snapshot.columns.length + 1;
+        bandTd.textContent = band.label + (band.is_locked ? " 🔒" : "");
+        if (tierAtLeastCrew(tier) && (tierAtLeastDirector(tier) || !band.is_locked)) {
+          const editBtn = document.createElement("button");
+          editBtn.className = "small";
+          editBtn.textContent = "Edit band";
+          editBtn.style.marginLeft = "10px";
+          editBtn.addEventListener("click", () => editBandFlow(band));
+          bandTd.appendChild(editBtn);
+        }
+        if (tierAtLeastDirector(tier)) {
+          const lockBtn = document.createElement("button");
+          lockBtn.className = "small";
+          lockBtn.textContent = band.is_locked ? "Unlock" : "Lock";
+          lockBtn.style.marginLeft = "6px";
+          lockBtn.addEventListener("click", () => toggleBandLockFlow(band));
+          bandTd.appendChild(lockBtn);
+          const removeBandBtn = document.createElement("button");
+          removeBandBtn.className = "small danger";
+          removeBandBtn.textContent = "Remove band";
+          removeBandBtn.style.marginLeft = "6px";
+          removeBandBtn.addEventListener("click", () => removeBandFlow(band));
+          bandTd.appendChild(removeBandBtn);
+        }
+        bandTr.appendChild(bandTd);
+        body.appendChild(bandTr);
+
+        const rows = byBand[band.id] || [];
+        for (const row of rows) {
+          const tr = document.createElement("tr");
+          const labelTd = document.createElement("td");
+          labelTd.className = "row-label-cell";
+          labelTd.textContent = row.label;
+          if (tierAtLeastDirector(tier)) {
+            const editBtn = document.createElement("button");
+            editBtn.className = "small";
+            editBtn.textContent = "✎";
+            editBtn.style.marginLeft = "6px";
+            editBtn.addEventListener("click", () => renameRowFlow(row));
+            labelTd.appendChild(editBtn);
+            const removeRowBtn = document.createElement("button");
+            removeRowBtn.className = "small danger";
+            removeRowBtn.textContent = "×";
+            removeRowBtn.style.marginLeft = "4px";
+            removeRowBtn.title = "Remove row";
+            removeRowBtn.addEventListener("click", () => removeRowFlow(row));
+            labelTd.appendChild(removeRowBtn);
+          }
+          tr.appendChild(labelTd);
+
+          for (const col of snapshot.columns) {
+            const td = document.createElement("td");
+            td.className = "cell";
+            const cards = byCell[row.id + "|" + col.id] || [];
+            for (const card of cards) {
+              const cardEl = document.createElement("div");
+              cardEl.className = "card" + (card.is_locked ? " locked" : "") + (card.hidden_from_audience ? " hidden-flag" : "");
+              cardEl.tabIndex = 0;
+              cardEl.setAttribute("role", "button");
+              const titleEl = document.createElement("div");
+              titleEl.className = "card-title";
+              titleEl.textContent = card.title || "(untitled)";
+              cardEl.appendChild(titleEl);
+              const flags = [];
+              if (card.is_locked) flags.push("locked");
+              if (card.hidden_from_audience) flags.push("hidden");
+              if (card.category) flags.push(card.category);
+              if (flags.length) {
+                const flagsEl = document.createElement("div");
+                flagsEl.className = "card-flags";
+                flagsEl.textContent = flags.join(" · ");
+                cardEl.appendChild(flagsEl);
+              }
+              const openHandler = () => openCardModal(card);
+              cardEl.addEventListener("click", openHandler);
+              cardEl.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openHandler(); }
+              });
+              td.appendChild(cardEl);
+            }
+            if (tierAtLeastCrew(tier)) {
+              const addBtn = document.createElement("button");
+              addBtn.className = "small add-card-btn";
+              addBtn.textContent = "+ card";
+              addBtn.addEventListener("click", () => createCardFlow(row, col));
+              td.appendChild(addBtn);
+            }
+            tr.appendChild(td);
+          }
+          body.appendChild(tr);
+        }
+        if (tierAtLeastDirector(tier)) {
+          const addRowTr = document.createElement("tr");
+          const addRowTd = document.createElement("td");
+          addRowTd.colSpan = snapshot.columns.length + 1;
+          addRowTd.style.padding = "4px 8px";
+          const addRowBtn = document.createElement("button");
+          addRowBtn.className = "small";
+          addRowBtn.textContent = "+ row in " + band.label;
+          addRowBtn.addEventListener("click", () => addRowFlow(band));
+          addRowTd.appendChild(addRowBtn);
+          addRowTr.appendChild(addRowTd);
+          body.appendChild(addRowTr);
+        }
+      }
+    }
+
+    // --- Card modal ---
+    let activeCard = null;
+    function openCardModal(card) {
+      activeCard = card;
+      document.getElementById("card-modal-title").textContent = "Card";
+      document.getElementById("card-title-input").value = card.title || "";
+      document.getElementById("card-front-input").value = card.front_text || "";
+      document.getElementById("card-back-input").value = card.back_text || "";
+      document.getElementById("card-category-input").value = card.category || "";
+      document.getElementById("card-color-input").value = card.color_token || "";
+      document.getElementById("card-modal-message").textContent = "";
+
+      const tier = snapshot.viewer_tier;
+      const hiddenField = document.getElementById("card-hidden-field");
+      hiddenField.hidden = !tierAtLeastDirector(tier);
+      document.getElementById("card-hidden-input").checked = !!card.hidden_from_audience;
+
+      const lockField = document.getElementById("card-lock-field");
+      lockField.hidden = !tierAtLeastDirector(tier);
+      document.getElementById("card-lock-input").checked = !!card.is_locked;
+
+      const rowSel = document.getElementById("card-move-row");
+      const colSel = document.getElementById("card-move-column");
+      rowSel.innerHTML = "";
+      for (const r of snapshot.rows) {
+        const opt = document.createElement("option");
+        opt.value = r.id; opt.textContent = r.label;
+        if (r.id === card.row_id) opt.selected = true;
+        rowSel.appendChild(opt);
+      }
+      colSel.innerHTML = "";
+      for (const c of snapshot.columns) {
+        const opt = document.createElement("option");
+        opt.value = c.id; opt.textContent = c.title;
+        if (c.id === card.column_id) opt.selected = true;
+        colSel.appendChild(opt);
+      }
+
+      const canEdit = tierAtLeastCrew(tier) && (!card.is_locked || tierAtLeastDirector(tier));
+      document.getElementById("card-save-btn").hidden = !canEdit;
+      document.getElementById("card-delete-btn").hidden = !canEdit;
+      document.getElementById("card-move-btn").disabled = !canEdit;
+
+      const linkContainer = document.getElementById("card-ewrite-link");
+      linkContainer.innerHTML = "";
+      if (window.attachEwriteRuleLink) {
+        window.attachEwriteRuleLink(linkContainer, { objectType: "storyboard_card", objectId: card.id });
+      }
+
+      document.getElementById("card-modal").hidden = false;
+    }
+    document.getElementById("card-close-btn").addEventListener("click", () => {
+      document.getElementById("card-modal").hidden = true;
+    });
+
+    document.getElementById("card-save-btn").addEventListener("click", async () => {
+      const tier = snapshot.viewer_tier;
+      const body = {
+        base_version: activeCard.version,
+        title: document.getElementById("card-title-input").value,
+        front_text: document.getElementById("card-front-input").value,
+        back_text: document.getElementById("card-back-input").value,
+        category: document.getElementById("card-category-input").value,
+        color_token: document.getElementById("card-color-input").value,
+      };
+      if (tierAtLeastDirector(tier)) {
+        body.hidden_from_audience = document.getElementById("card-hidden-input").checked;
+      }
+      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/cards/" + activeCard.id, body, "PATCH");
+      if (!res.ok || !payload?.ok) {
+        document.getElementById("card-modal-message").className = "form-error";
+        document.getElementById("card-modal-message").textContent = "Save failed: " + (payload?.data?.error || res.status);
+        return;
+      }
+      if (tierAtLeastDirector(tier)) {
+        const lockWanted = document.getElementById("card-lock-input").checked;
+        if (lockWanted !== !!activeCard.is_locked) {
+          await apiPost("/api/storyboards/" + boardId + "/cards/" + activeCard.id + "/lock", { locked: lockWanted });
+        }
+      }
+      document.getElementById("card-modal").hidden = true;
+      await loadSnapshot();
+    });
+
+    document.getElementById("card-delete-btn").addEventListener("click", async () => {
+      if (!confirm("Delete this card?")) return;
+      const { res, payload } = await apiFetch(
+        "/api/storyboards/" + boardId + "/cards/" + activeCard.id + "?base_version=" + activeCard.version,
+        { method: "DELETE" }
+      );
+      if (!res.ok || !payload?.ok) {
+        document.getElementById("card-modal-message").className = "form-error";
+        document.getElementById("card-modal-message").textContent = "Delete failed: " + (payload?.data?.error || res.status);
+        return;
+      }
+      document.getElementById("card-modal").hidden = true;
+      await loadSnapshot();
+    });
+
+    document.getElementById("card-move-btn").addEventListener("click", async () => {
+      const targetRowId = document.getElementById("card-move-row").value;
+      const targetColumnId = document.getElementById("card-move-column").value;
+      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/cards/" + activeCard.id + "/move", {
+        base_version: activeCard.version, target_row_id: targetRowId, target_column_id: targetColumnId,
+      });
+      if (!res.ok || !payload?.ok) {
+        document.getElementById("card-modal-message").className = "form-error";
+        document.getElementById("card-modal-message").textContent = "Move failed: " + (payload?.data?.error || res.status);
+        return;
+      }
+      document.getElementById("card-modal").hidden = true;
+      await loadSnapshot();
+    });
+
+    async function createCardFlow(row, col) {
+      const title = prompt("Card title?");
+      if (title === null) return;
+      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/cards", {
+        row_id: row.id, column_id: col.id, title,
+      });
+      if (!res.ok || !payload?.ok) {
+        alert("Could not create card: " + (payload?.data?.error || res.status));
+        return;
+      }
+      await loadSnapshot();
+    }
+
+    // --- Structural flows (columns/bands/rows) ---
+    async function renameColumnFlow(col) {
+      const title = prompt("Rename column", col.title);
+      if (title === null) return;
+      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/columns/" + col.id, { title }, "PATCH");
+      if (!res.ok || !payload?.ok) { alert("Rename failed: " + (payload?.data?.error || res.status)); return; }
+      await loadSnapshot();
+    }
+
+    async function editBandFlow(band) {
+      const label = prompt("Band label", band.label);
+      if (label === null) return;
+      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/bands/" + band.id, {
+        label, description: band.description || "",
+      }, "PATCH");
+      if (!res.ok || !payload?.ok) { alert("Edit failed: " + (payload?.data?.error || res.status)); return; }
+      await loadSnapshot();
+    }
+
+    async function renameRowFlow(row) {
+      const label = prompt("Row label", row.label);
+      if (label === null) return;
+      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/rows/" + row.id, {
+        label, description: row.description || "",
+      }, "PATCH");
+      if (!res.ok || !payload?.ok) { alert("Rename failed: " + (payload?.data?.error || res.status)); return; }
+      await loadSnapshot();
+    }
+
+    // Occupied-removal resolution flow (spec 6.2-6.4): a plain DELETE is
+    // tried first; if the server refuses because the target is occupied,
+    // the user is asked to type "delete" (delete contents with it) or the
+    // exact title/label of another sibling to move contents there, or
+    // leave blank to cancel outright -- never a silent cascade.
+    async function removeColumnFlow(col) {
+      let resp = await apiFetch("/api/storyboards/" + boardId + "/columns/" + col.id, { method: "DELETE" });
+      if (resp.res.ok && resp.payload?.ok) { await loadSnapshot(); return; }
+      if (resp.payload?.data?.error !== "column_occupied") {
+        alert("Remove failed: " + (resp.payload?.data?.error || resp.res.status));
+        return;
+      }
+      const choice = prompt(
+        "This column has cards. Type 'delete' to remove them with the column, or the exact title of another column to move the cards there. Leave blank to cancel."
+      );
+      if (!choice) return;
+      let url = "/api/storyboards/" + boardId + "/columns/" + col.id + "?resolution=";
+      if (choice.trim().toLowerCase() === "delete") {
+        url += "delete_cards";
+      } else {
+        const target = snapshot.columns.find((c) => c.title === choice.trim() && c.id !== col.id);
+        if (!target) { alert("No other column with that exact title."); return; }
+        url += "move_cards&target_column_id=" + encodeURIComponent(target.id);
+      }
+      const resp2 = await apiFetch(url, { method: "DELETE" });
+      if (!resp2.res.ok || !resp2.payload?.ok) { alert("Remove failed: " + (resp2.payload?.data?.error || resp2.res.status)); return; }
+      await loadSnapshot();
+    }
+
+    async function removeRowFlow(row) {
+      let resp = await apiFetch("/api/storyboards/" + boardId + "/rows/" + row.id, { method: "DELETE" });
+      if (resp.res.ok && resp.payload?.ok) { await loadSnapshot(); return; }
+      if (resp.payload?.data?.error !== "row_occupied") {
+        alert("Remove failed: " + (resp.payload?.data?.error || resp.res.status));
+        return;
+      }
+      const choice = prompt(
+        "This row has cards. Type 'delete' to remove them with the row, or the exact label of another row to move the cards there. Leave blank to cancel."
+      );
+      if (!choice) return;
+      let url = "/api/storyboards/" + boardId + "/rows/" + row.id + "?resolution=";
+      if (choice.trim().toLowerCase() === "delete") {
+        url += "delete_cards";
+      } else {
+        const target = snapshot.rows.find((r) => r.label === choice.trim() && r.id !== row.id);
+        if (!target) { alert("No other row with that exact label."); return; }
+        url += "move_cards&target_row_id=" + encodeURIComponent(target.id);
+      }
+      const resp2 = await apiFetch(url, { method: "DELETE" });
+      if (!resp2.res.ok || !resp2.payload?.ok) { alert("Remove failed: " + (resp2.payload?.data?.error || resp2.res.status)); return; }
+      await loadSnapshot();
+    }
+
+    async function removeBandFlow(band) {
+      let resp = await apiFetch("/api/storyboards/" + boardId + "/bands/" + band.id, { method: "DELETE" });
+      if (resp.res.ok && resp.payload?.ok) { await loadSnapshot(); return; }
+      if (resp.payload?.data?.error !== "band_occupied") {
+        alert("Remove failed: " + (resp.payload?.data?.error || resp.res.status));
+        return;
+      }
+      const choice = prompt(
+        "This band has rows. Type 'delete' to remove them (and their cards) with the band, or the exact label of another band to move the rows there. Leave blank to cancel."
+      );
+      if (!choice) return;
+      let url = "/api/storyboards/" + boardId + "/bands/" + band.id + "?resolution=";
+      if (choice.trim().toLowerCase() === "delete") {
+        url += "delete_rows";
+      } else {
+        const target = snapshot.bands.find((b) => b.label === choice.trim() && b.id !== band.id);
+        if (!target) { alert("No other band with that exact label."); return; }
+        url += "move_rows&target_band_id=" + encodeURIComponent(target.id);
+      }
+      const resp2 = await apiFetch(url, { method: "DELETE" });
+      if (!resp2.res.ok || !resp2.payload?.ok) { alert("Remove failed: " + (resp2.payload?.data?.error || resp2.res.status)); return; }
+      await loadSnapshot();
+    }
+
+    async function toggleBandLockFlow(band) {
+      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/bands/" + band.id + "/lock", {
+        locked: !band.is_locked,
+      });
+      if (!res.ok || !payload?.ok) { alert("Lock toggle failed: " + (payload?.data?.error || res.status)); return; }
+      await loadSnapshot();
+    }
+
+    async function addRowFlow(band) {
+      const label = prompt("New row label in " + band.label, "New Row");
+      if (label === null) return;
+      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/rows", { band_id: band.id, label });
+      if (!res.ok || !payload?.ok) { alert("Add row failed: " + (payload?.data?.error || res.status)); return; }
+      await loadSnapshot();
+    }
+
+    document.getElementById("add-column-btn").addEventListener("click", async () => {
+      const title = prompt("New column title", "New Column");
+      if (title === null) return;
+      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/columns", { title });
+      if (!res.ok || !payload?.ok) { alert("Add column failed: " + (payload?.data?.error || res.status)); return; }
+      await loadSnapshot();
+    });
+
+    document.getElementById("add-band-btn").addEventListener("click", async () => {
+      const label = prompt("New band label", "New Band");
+      if (label === null) return;
+      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/bands", { label });
+      if (!res.ok || !payload?.ok) { alert("Add band failed: " + (payload?.data?.error || res.status)); return; }
+      await loadSnapshot();
+    });
+
+    document.getElementById("archive-btn").addEventListener("click", async () => {
+      const archived = !snapshot.board.archived_at;
+      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/archive", { archived });
+      if (!res.ok || !payload?.ok) { alert("Failed: " + (payload?.data?.error || res.status)); return; }
+      await loadSnapshot();
+    });
+
+    document.getElementById("export-btn").addEventListener("click", () => {
+      window.location.href = "/api/storyboards/" + boardId + "/export";
+    });
+
+    // --- Sharing modal ---
+    document.getElementById("share-btn").addEventListener("click", openShareModal);
+    document.getElementById("share-close-btn").addEventListener("click", () => {
+      document.getElementById("share-modal").hidden = true;
+    });
+
+    async function openShareModal() {
+      document.getElementById("share-modal-message").textContent = "";
+      document.getElementById("share-modal").hidden = false;
+      await renderGrants();
+      await renderMyPeopleSuggestions();
+    }
+
+    async function renderGrants() {
+      const { res, payload } = await apiFetch("/api/storyboards/" + boardId + "/grants");
+      const listEl = document.getElementById("grant-list");
+      listEl.innerHTML = "";
+      if (!res.ok || !payload?.ok) return;
+      for (const g of payload.data.grants || []) {
+        const row = document.createElement("div");
+        row.className = "grant-row";
+        const label = document.createElement("span");
+        label.textContent = (g.user_handle || g.user_id) + " — " + g.granted_role;
+        row.appendChild(label);
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "small danger";
+        removeBtn.textContent = "Remove";
+        removeBtn.addEventListener("click", async () => {
+          const { res: delRes, payload: delPayload } = await apiFetch(
+            "/api/storyboards/" + boardId + "/grants/" + g.id, { method: "DELETE" }
+          );
+          if (!delRes.ok || !delPayload?.ok) { alert("Remove failed: " + (delPayload?.data?.error || delRes.status)); return; }
+          await renderGrants();
+        });
+        row.appendChild(removeBtn);
+        listEl.appendChild(row);
+      }
+    }
+
+    // My People is a reminder of who you already know, not a picker that
+    // grants anything by itself (spec 1.8: a My People relationship must
+    // never itself grant access -- sharing always requires the deliberate
+    // handle-entry step below). The My People API keys relationships by
+    // subject_profile_id/stage_name (a player-profile persona), not the
+    // Victory account handle storyboard grants are keyed on, so these are
+    // shown as informational names only -- there is no field here to
+    // safely autofill a handle from without risking filling in the wrong
+    // account.
+    async function renderMyPeopleSuggestions() {
+      const container = document.getElementById("my-people-suggestions");
+      container.innerHTML = "";
+      try {
+        const { res, payload } = await apiFetch("/api/player-relationships?state=active");
+        if (!res.ok || !payload?.ok) return;
+        const relationships = payload.data?.relationships || [];
+        if (!relationships.length) return;
+        const note = document.createElement("div");
+        note.className = "status-line";
+        note.textContent = "People you know (enter their Victory handle below to share):";
+        container.appendChild(note);
+        for (const rel of relationships) {
+          const name = rel.subject && rel.subject.stage_name;
+          if (!name) continue;
+          const chip = document.createElement("span");
+          chip.className = "suggestion-chip";
+          chip.style.cursor = "default";
+          chip.textContent = name;
+          container.appendChild(chip);
+        }
+      } catch (err) {
+        // My People is a convenience suggestion source only; a failure here
+        // must not block direct handle-entry sharing.
+      }
+    }
+
+    document.getElementById("grant-add-btn").addEventListener("click", async () => {
+      const handle = document.getElementById("grant-handle-input").value.trim();
+      const role = document.getElementById("grant-role-input").value;
+      if (!handle) {
+        document.getElementById("share-modal-message").className = "form-error";
+        document.getElementById("share-modal-message").textContent = "Enter a handle first.";
+        return;
+      }
+      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/grants", {
+        user_handle: handle, granted_role: role,
+      });
+      if (!res.ok || !payload?.ok) {
+        document.getElementById("share-modal-message").className = "form-error";
+        document.getElementById("share-modal-message").textContent = "Share failed: " + (payload?.data?.error || res.status);
+        return;
+      }
+      document.getElementById("share-modal-message").className = "form-ok";
+      document.getElementById("share-modal-message").textContent = "Shared with " + handle + ".";
+      document.getElementById("grant-handle-input").value = "";
+      await renderGrants();
+    });
+
+    async function bootstrap() {
+      if (!boardId) return;
+      const ok = await loadSnapshot();
+      if (!ok) return;
+      socketHandle = watchStoryboard(boardId, {
+        onSnapshot: (data) => { snapshot = data; render(); },
+        onEvent: () => { loadSnapshot(); },
+        onError: (err) => { console.warn("storyboard ws error", err); },
+      });
+    }
+
+    window.addEventListener("beforeunload", () => {
+      if (socketHandle) socketHandle.close();
+    });
+
+    bootstrap();
+  </script>
+</body>
+</html>

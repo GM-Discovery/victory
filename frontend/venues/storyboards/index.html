@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Storyboards</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    body {
+      margin: 0;
+      background: #0d0a05;
+      color: #f0e8d8;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .shell { min-height: 100vh; padding: 24px; box-sizing: border-box; }
+    .page-header {
+      max-width: 1000px;
+      margin: 0 auto 20px;
+      /* back-to-map.js and venue-account-badge.js both float fixed
+         top-left/top-right (this page has no <header> for them to dock
+         into instead) -- clear their bounding boxes so the title and
+         account badge never overlap. */
+      padding: 0 210px;
+      box-sizing: border-box;
+    }
+    .page-header h1 { margin: 0; color: #f2f2f2; letter-spacing: 0.01em; }
+    .status-line { color: #a89272; font-size: 13px; margin-top: 4px; }
+
+    .layout { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+    .panel {
+      background: #171208;
+      border: 1px solid rgba(196, 155, 74, 0.25);
+      border-radius: 14px;
+      padding: 22px;
+      box-sizing: border-box;
+    }
+    h2 { font-size: 16px; margin: 0 0 12px; color: #d9b46a; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    label { display: block; margin-top: 10px; font-size: 13px; color: #cbb98a; }
+    input, textarea, select {
+      width: 100%;
+      box-sizing: border-box;
+      background: #0d0a05;
+      color: #f0e8d8;
+      border: 1px solid rgba(196, 155, 74, 0.3);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 14px;
+      margin-top: 4px;
+    }
+    button {
+      background: #5a481f;
+      color: #f0e8d8;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    button:hover { background: #83672f; }
+    button:disabled { opacity: 0.5; cursor: default; }
+    .primary { background: #96762f; font-size: 15px; padding: 11px 20px; }
+    .primary:hover { background: #b28d3a; }
+
+    .form-error { color: #e08a7a; font-size: 13px; margin-top: 8px; }
+    .form-ok { color: #9ede9f; font-size: 13px; margin-top: 8px; }
+
+    .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+    .tab-btn {
+      background: transparent;
+      border: 1px solid rgba(196, 155, 74, 0.3);
+      margin-top: 0;
+      color: #cbb98a;
+    }
+    .tab-btn.active { background: #5a481f; color: #f0e8d8; }
+
+    .board-list { list-style: none; margin: 0; padding: 0; }
+    .board-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border: 1px solid rgba(196, 155, 74, 0.18);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      background: rgba(196, 155, 74, 0.04);
+    }
+    .board-list a { color: #f0e8d8; text-decoration: none; font-size: 15px; }
+    .board-list a:hover { text-decoration: underline; }
+    .board-meta { color: #a89272; font-size: 12px; margin-top: 2px; }
+    .empty-state { color: #a89272; font-size: 13px; padding: 8px 0; }
+    .archived-badge {
+      font-size: 11px;
+      color: #cbb98a;
+      border: 1px solid rgba(196, 155, 74, 0.3);
+      border-radius: 4px;
+      padding: 1px 6px;
+    }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>You need to be signed in to open Storyboards.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <div class="page-header">
+      <h1>Storyboards</h1>
+      <div id="connection-status" class="status-line">Unlocking the door...</div>
+    </div>
+
+    <div id="dashboard" class="layout hidden">
+      <div class="panel">
+        <h2>New Board</h2>
+        <label for="cb-title">Title</label>
+        <input id="cb-title" type="text" placeholder="e.g. Season 2 Arc" />
+        <label for="cb-description">Description (optional)</label>
+        <textarea id="cb-description" rows="2"></textarea>
+        <button class="primary" id="cb-create">Create Board</button>
+        <div id="cb-message"></div>
+      </div>
+
+      <div class="panel">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="owned">Owned</button>
+          <button class="tab-btn" data-tab="shared">Shared With Me</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
+          <input type="checkbox" id="show-archived" style="width:auto;margin:0;" />
+          Show archived boards
+        </label>
+        <ul class="board-list" id="board-list"></ul>
+        <div class="empty-state" id="board-list-empty" hidden>No boards here yet.</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/back-to-map.js"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script>
+    const dashboard = document.getElementById("dashboard");
+    const connectionStatus = document.getElementById("connection-status");
+    let boardsData = { owned: [], shared: [] };
+    let activeTab = "owned";
+
+    function setMessage(id, text, ok) {
+      const el = document.getElementById(id);
+      el.className = ok ? "form-ok" : "form-error";
+      el.textContent = text;
+    }
+
+    async function apiPost(url, body) {
+      const res = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = await res.json().catch(() => null);
+      return { res, payload };
+    }
+
+    function renderBoardList() {
+      const listEl = document.getElementById("board-list");
+      const emptyEl = document.getElementById("board-list-empty");
+      const showArchived = document.getElementById("show-archived").checked;
+      listEl.innerHTML = "";
+      const boards = (activeTab === "owned" ? boardsData.owned : boardsData.shared) || [];
+      const visible = boards.filter((b) => showArchived || !b.archived_at);
+      emptyEl.hidden = visible.length > 0;
+      for (const b of visible) {
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.href = "/venues/storyboards/board.html?id=" + encodeURIComponent(b.id);
+        a.textContent = b.title;
+        const metaWrap = document.createElement("div");
+        metaWrap.appendChild(a);
+        const meta = document.createElement("div");
+        meta.className = "board-meta";
+        meta.textContent = (b.description ? b.description + " · " : "") + "updated " + new Date(b.updated_at).toLocaleString();
+        metaWrap.appendChild(meta);
+        li.appendChild(metaWrap);
+        if (b.archived_at) {
+          const badge = document.createElement("span");
+          badge.className = "archived-badge";
+          badge.textContent = "Archived";
+          li.appendChild(badge);
+        }
+        listEl.appendChild(li);
+      }
+    }
+
+    async function reloadBoards() {
+      const res = await fetch("/api/storyboards", { credentials: "include" });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload?.ok) return false;
+      boardsData = payload.data || { owned: [], shared: [] };
+      renderBoardList();
+      return true;
+    }
+
+    async function createBoard() {
+      const title = document.getElementById("cb-title").value.trim();
+      if (!title) {
+        setMessage("cb-message", "A title is required.", false);
+        return;
+      }
+      const description = document.getElementById("cb-description").value;
+      const { res, payload } = await apiPost("/api/storyboards", { title, description });
+      if (!res.ok || !payload?.ok) {
+        setMessage("cb-message", "Could not create: " + (payload?.data?.error || res.status), false);
+        return;
+      }
+      window.location.href = "/venues/storyboards/board.html?id=" + encodeURIComponent(payload.data.board.id);
+    }
+
+    function initTabs() {
+      document.querySelectorAll(".tab-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          activeTab = btn.dataset.tab;
+          renderBoardList();
+        });
+      });
+      document.getElementById("show-archived").addEventListener("change", renderBoardList);
+    }
+
+    async function bootstrap() {
+      try {
+        const response = await fetch("/api/storyboards", { credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (isForbiddenAccessResponse(response, payload) || !response.ok || !payload?.ok) {
+          showForbiddenScreen();
+          return;
+        }
+        boardsData = payload.data || { owned: [], shared: [] };
+        connectionStatus.textContent = boardsData.owned.length + " owned, " + boardsData.shared.length + " shared with you.";
+        renderBoardList();
+        initTabs();
+        dashboard.classList.remove("hidden");
+        document.getElementById("cb-create").addEventListener("click", createBoard);
+      } catch (err) {
+        console.error("storyboards bootstrap failed", err);
+        showForbiddenScreen();
+      }
+    }
+
+    bootstrap();
+  </script>
+</body>
+</html>

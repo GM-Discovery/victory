@@ -193,8 +193,12 @@ func TestAccountExportIncludesEwrite(t *testing.T) {
 	if !strings.Contains(contents[mdName], "distinctive-marker-quillfeather") {
 		t.Fatalf("export markdown must be the source: %q", contents[mdName])
 	}
-	if !strings.Contains(contents["manifest.json"], `"format_version": 2`) {
-		t.Fatalf("expected format_version 2 in manifest: %s", contents["manifest.json"])
+	// format_version bumped to 3 by Kernel 80 (storyboards/ section) --
+	// this test's own concern is the ewrite/ section's presence, not the
+	// exact version number, so it stays in sync as later kernels add more
+	// sections.
+	if !strings.Contains(contents["manifest.json"], `"format_version": 3`) {
+		t.Fatalf("expected format_version 3 in manifest: %s", contents["manifest.json"])
 	}
 	if !strings.Contains(contents["manifest.json"], `"ewrite_publications": 1`) {
 		t.Fatalf("expected ewrite count in manifest: %s", contents["manifest.json"])

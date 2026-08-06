@@ -18,6 +18,7 @@
       case "scene_element": return "scene_element_id";
       case "dialogue_topic": return "dialogue_topic_id";
       case "equipment_item": return "equipment_item_id";
+      case "storyboard_card": return "storyboard_card_id";
       default: return "object_id";
     }
   }

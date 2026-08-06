@@ -23,6 +23,15 @@ type Client struct {
 	// use the exact same mechanism -- both just watch a profile_id (Kernel
 	// 61A §9.1: "the smallest reusable delivery mechanism").
 	WatchingProfileID string
+
+	// WatchingBoardID is set by a client on the lightweight Storyboards
+	// websocket (storyboards.ServeStoryboardWS, Kernel 80) to declare which
+	// board it wants live events for. Same "smallest reusable delivery
+	// mechanism" idiom as WatchingProfileID: one board watched per
+	// connection at a time, a client wanting a different board sends a new
+	// watch_board message to re-point the same connection rather than the
+	// hub tracking a set.
+	WatchingBoardID string
 }
 
 type Hub struct {
@@ -192,4 +201,61 @@ func (h *Hub) BroadcastToSessionUser(sessionID, userID string, msg []byte) {
 
 func (h *Hub) Presence() *PresenceRegistry {
 	return h.presence
+}
+
+// SetClientWatchBoard records which storyboard_id a Storyboards websocket
+// client wants live events for (Kernel 80). Locked the same way
+// SetClientWatchProfile is -- the hub's mutex protects per-client fields
+// that broadcast methods read, not just the clients map.
+func (h *Hub) SetClientWatchBoard(c *Client, boardID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	c.WatchingBoardID = boardID
+}
+
+// BoardWatcherUserIDs returns the distinct user IDs of every client
+// currently watching boardID (a user may have more than one tab open on
+// the same board). storyboards/events.go uses this to resolve each
+// watcher's viewer tier before deciding what, if anything, to send them.
+func (h *Hub) BoardWatcherUserIDs(boardID string) []string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	seen := map[string]bool{}
+	var out []string
+	for c := range h.clients {
+		if c == nil || c.WatchingBoardID == "" || c.WatchingBoardID != boardID || c.UserID == "" {
+			continue
+		}
+		if seen[c.UserID] {
+			continue
+		}
+		seen[c.UserID] = true
+		out = append(out, c.UserID)
+	}
+	return out
+}
+
+// SendToBoardWatcher sends msg only to connections for userID currently
+// watching boardID (multi-tab safe) -- the per-viewer delivery primitive
+// Storyboards live events (Kernel 80) build their hidden-card fan-out on,
+// mirroring BroadcastToSessionUser's shape for (board, user) instead of
+// (session, user). The Hub itself does no role/visibility filtering here
+// either, per this package's standing invariant -- storyboards/events.go is
+// what decides, per watcher, whether msg should exist at all before
+// calling this.
+func (h *Hub) SendToBoardWatcher(boardID, userID string, msg []byte) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for c := range h.clients {
+		if c == nil || c.WatchingBoardID != boardID || c.UserID != userID {
+			continue
+		}
+		select {
+		case c.Send <- msg:
+		default:
+			log.Printf("dropping slow websocket client")
+		}
+	}
 }

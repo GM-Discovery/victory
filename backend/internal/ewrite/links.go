@@ -14,6 +14,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"victory/backend/internal/access"
 )
 
 // RuleLink is the read-side projection attached to object payloads
@@ -40,7 +42,7 @@ func ListObjectLinksForPublication(ctx context.Context, pool queryer, publicatio
 		SELECT ol.id::text, ol.object_type,
 		       COALESCE(ol.equipment_item_id::text, ''), COALESCE(ol.cue_id::text, ''),
 		       COALESCE(ol.index_card_element_id::text, ''), COALESCE(ol.scene_element_id::text, ''),
-		       COALESCE(ol.dialogue_topic_id::text, ''),
+		       COALESCE(ol.dialogue_topic_id::text, ''), COALESCE(ol.storyboard_card_id::text, ''),
 		       ol.publication_id::text,
 		       COALESCE(ol.section_id::text, ''), COALESCE(s.anchor, ''), COALESCE(s.title, '')
 		FROM ewrite_object_links ol
@@ -55,7 +57,7 @@ func ListObjectLinksForPublication(ctx context.Context, pool queryer, publicatio
 	out := []ObjectLink{}
 	for rows.Next() {
 		var l ObjectLink
-		if err := rows.Scan(&l.ID, &l.ObjectType, &l.EquipmentItemID, &l.CueID, &l.IndexCardElementID, &l.SceneElementID, &l.DialogueTopicID,
+		if err := rows.Scan(&l.ID, &l.ObjectType, &l.EquipmentItemID, &l.CueID, &l.IndexCardElementID, &l.SceneElementID, &l.DialogueTopicID, &l.StoryboardCardID,
 			&l.PublicationID, &l.SectionID, &l.SectionAnchor, &l.SectionTitle); err != nil {
 			return nil, err
 		}
@@ -553,6 +555,146 @@ func RuleLinksForDialogueTopics(ctx context.Context, pool queryer, topicIDs []st
 	return out, rows.Err()
 }
 
+// storyboardCardEditorAllowed reimplements just enough of
+// storyboards/authority.go's owner-or-grant tier resolution (Operator,
+// board owner, or a producer/director/crew grant) to gate this one
+// operation -- it cannot call into that package directly: storyboards
+// imports network for its live WS events, and network already
+// (transitively, via actions -> characters) imports ewrite, so
+// ewrite -> storyboards would close an import cycle. Keep this in sync
+// with storyboards.CanEditCards/resolveViewerTier if that tier logic ever
+// changes; nothing else about Kernel 80's authority model is duplicated,
+// only this one cross-package check.
+func storyboardCardEditorAllowed(ctx context.Context, pool *pgxpool.Pool, userID, cardID string) (allowed bool, boardID string, err error) {
+	err = pool.QueryRow(ctx, `SELECT storyboard_id::text FROM storyboard_cards WHERE id = $1`, cardID).Scan(&boardID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, "", errors.New("storyboard_card_not_found")
+	}
+	if err != nil {
+		return false, "", err
+	}
+
+	if ok, opErr := access.IsOperatorUser(ctx, pool, userID); opErr != nil {
+		return false, boardID, opErr
+	} else if ok {
+		return true, boardID, nil
+	}
+
+	var ownerID string
+	if err := pool.QueryRow(ctx, `SELECT owner_user_id::text FROM storyboards WHERE id = $1`, boardID).Scan(&ownerID); err != nil {
+		return false, boardID, err
+	}
+	if ownerID == userID {
+		return true, boardID, nil
+	}
+
+	var role string
+	err = pool.QueryRow(ctx, `SELECT granted_role::text FROM storyboard_grants WHERE storyboard_id = $1 AND user_id = $2`, boardID, userID).Scan(&role)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, boardID, nil
+	}
+	if err != nil {
+		return false, boardID, err
+	}
+	switch role {
+	case "producer", "director", "crew":
+		return true, boardID, nil
+	default:
+		return false, boardID, nil
+	}
+}
+
+// SetStoryboardCardRuleLink links a Kernel 80 Storyboard card to an eWrite
+// target. Authority is CanEditPublication on the target (same as every
+// other Set*RuleLink) plus storyboardCardEditorAllowed (Crew+ on the
+// card's board) -- unlike the location-scoped object types above,
+// Storyboard cards have no location_id at all, so CanAuthorInScope does
+// not apply here.
+func SetStoryboardCardRuleLink(ctx context.Context, pool *pgxpool.Pool, userID, cardID, publicationID, sectionID string) (*ObjectLink, error) {
+	p, err := LoadPublication(ctx, pool, strings.TrimSpace(publicationID))
+	if err != nil {
+		return nil, err
+	}
+	if ok, err := CanEditPublication(ctx, pool, userID, p); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, errors.New("not_authorized")
+	}
+
+	cardID = strings.TrimSpace(cardID)
+	allowed, _, err := storyboardCardEditorAllowed(ctx, pool, userID, cardID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, errors.New("not_authorized")
+	}
+
+	sectionID = strings.TrimSpace(sectionID)
+	if sectionID != "" {
+		var sectionPub string
+		err := pool.QueryRow(ctx, `SELECT publication_id::text FROM ewrite_sections WHERE id = $1`, sectionID).Scan(&sectionPub)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.New("section_not_found")
+		}
+		if err != nil {
+			return nil, err
+		}
+		if sectionPub != p.ID {
+			return nil, errors.New("section_publication_mismatch")
+		}
+	}
+
+	var l ObjectLink
+	err = pool.QueryRow(ctx, `
+		INSERT INTO ewrite_object_links (object_type, storyboard_card_id, publication_id, section_id, created_by)
+		VALUES ('storyboard_card', $1, $2, NULLIF($3, '')::uuid, $4)
+		ON CONFLICT (storyboard_card_id) WHERE object_type = 'storyboard_card' DO UPDATE
+			SET publication_id = EXCLUDED.publication_id,
+			    section_id = EXCLUDED.section_id,
+			    updated_at = NOW()
+		RETURNING id::text, COALESCE(section_id::text, '')
+	`, cardID, p.ID, sectionID, userID).Scan(&l.ID, &l.SectionID)
+	if err != nil {
+		return nil, err
+	}
+	l.ObjectType = "storyboard_card"
+	l.StoryboardCardID = cardID
+	l.PublicationID = p.ID
+	return &l, nil
+}
+
+// RuleLinksForStoryboardCards resolves rule links for a set of storyboard
+// card IDs in one query. Only PUBLISHED targets resolve, same rule as
+// every other RuleLinksFor* reader (spec 6.3: a draft must never leak its
+// title into a payload the card's viewers can read).
+func RuleLinksForStoryboardCards(ctx context.Context, pool queryer, cardIDs []string) (map[string]RuleLink, error) {
+	out := map[string]RuleLink{}
+	if len(cardIDs) == 0 {
+		return out, nil
+	}
+	rows, err := pool.Query(ctx, `
+		SELECT ol.id::text, ol.storyboard_card_id::text, p.id::text, p.title, COALESCE(s.anchor, ''), COALESCE(s.title, '')
+		FROM ewrite_object_links ol
+		JOIN ewrite_publications p ON p.id = ol.publication_id
+		LEFT JOIN ewrite_sections s ON s.id = ol.section_id
+		WHERE ol.object_type = 'storyboard_card' AND ol.storyboard_card_id = ANY($1) AND p.status = 'published'
+	`, cardIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cardID string
+		var l RuleLink
+		if err := rows.Scan(&l.ID, &cardID, &l.PublicationID, &l.PublicationTitle, &l.SectionAnchor, &l.SectionTitle); err != nil {
+			return nil, err
+		}
+		out[cardID] = l
+	}
+	return out, rows.Err()
+}
+
 // RemoveObjectLink deletes a binding by id; edit authority on the target
 // publication is the gate.
 func RemoveObjectLink(ctx context.Context, pool *pgxpool.Pool, userID, linkID string) error {
@@ -598,6 +740,7 @@ func HandleObjectLinks(pool *pgxpool.Pool) http.HandlerFunc {
 				IndexCardElementID string `json:"index_card_element_id"`
 				SceneElementID     string `json:"scene_element_id"`
 				DialogueTopicID    string `json:"dialogue_topic_id"`
+				StoryboardCardID   string `json:"storyboard_card_id"`
 				PublicationID      string `json:"publication_id"`
 				SectionID          string `json:"section_id"`
 			}
@@ -618,6 +761,8 @@ func HandleObjectLinks(pool *pgxpool.Pool) http.HandlerFunc {
 				l, setErr = SetSceneElementRuleLink(ctx, pool, userID, body.SceneElementID, body.PublicationID, body.SectionID)
 			case "dialogue_topic":
 				l, setErr = SetDialogueTopicRuleLink(ctx, pool, userID, body.DialogueTopicID, body.PublicationID, body.SectionID)
+			case "storyboard_card":
+				l, setErr = SetStoryboardCardRuleLink(ctx, pool, userID, body.StoryboardCardID, body.PublicationID, body.SectionID)
 			default:
 				writeError(w, errors.New("unsupported_object_type"))
 				return
@@ -647,6 +792,8 @@ func HandleObjectLinks(pool *pgxpool.Pool) http.HandlerFunc {
 				links, linkErr = RuleLinksForSceneElements(ctx, pool, []string{objectID})
 			case "dialogue_topic":
 				links, linkErr = RuleLinksForDialogueTopics(ctx, pool, []string{objectID})
+			case "storyboard_card":
+				links, linkErr = RuleLinksForStoryboardCards(ctx, pool, []string{objectID})
 			default:
 				writeError(w, errors.New("unsupported_object_type"))
 				return

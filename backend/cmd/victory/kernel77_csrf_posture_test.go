@@ -147,4 +147,5 @@ var bareRouteAllowlist = []string{
 	"/ws/catharsis",
 	"/ws/first-theater",
 	"/ws/player-profile",
+	"/ws/storyboards",
 }

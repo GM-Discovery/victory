@@ -48,6 +48,7 @@ import (
 	"victory/backend/internal/showruns"
 	"victory/backend/internal/shows"
 	"victory/backend/internal/showtime"
+	"victory/backend/internal/storyboards"
 	"victory/backend/internal/thirdplace"
 	"victory/backend/internal/tickets"
 	"victory/backend/internal/venues"
@@ -493,6 +494,40 @@ func main() {
 	mux.HandleFunc("GET /api/ewrite/directories", ewrite.HandleDirectories(pool))
 	mux.HandleFunc("GET /api/ewrite/directories/{directory_id}/entries", ewrite.HandleDirectoryEntries(pool))
 	mux.HandleFunc("PUT /api/ewrite/directory-entries/{entry_id}/link", ratelimit.Middleware(actionLimiter, ewrite.HandleDirectoryEntryLink(pool)))
+
+	// Kernel 80: Storyboards Core.
+	mux.HandleFunc("GET /api/storyboards", storyboards.HandleBoards(pool))
+	mux.HandleFunc("POST /api/storyboards", ratelimit.Middleware(actionLimiter, storyboards.HandleBoards(pool)))
+	mux.HandleFunc("GET /api/storyboards/{board_id}", storyboards.HandleBoardItem(pool, hub))
+	mux.HandleFunc("PATCH /api/storyboards/{board_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleBoardItem(pool, hub)))
+	mux.HandleFunc("DELETE /api/storyboards/{board_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleBoardItem(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/archive", ratelimit.Middleware(actionLimiter, storyboards.HandleBoardArchive(pool, hub)))
+	mux.HandleFunc("GET /api/storyboards/{board_id}/export", storyboards.HandleBoardExport(pool))
+	mux.HandleFunc("GET /api/storyboards/{board_id}/grants", storyboards.HandleGrants(pool, hub))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/grants", ratelimit.Middleware(actionLimiter, storyboards.HandleGrants(pool, hub)))
+	mux.HandleFunc("DELETE /api/storyboards/{board_id}/grants/{grant_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleGrantItem(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/columns", ratelimit.Middleware(actionLimiter, storyboards.HandleColumns(pool, hub)))
+	mux.HandleFunc("PATCH /api/storyboards/{board_id}/columns/{column_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleColumnItem(pool, hub)))
+	mux.HandleFunc("DELETE /api/storyboards/{board_id}/columns/{column_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleColumnItem(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/columns/reorder", ratelimit.Middleware(actionLimiter, storyboards.HandleColumnsReorder(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/bands", ratelimit.Middleware(actionLimiter, storyboards.HandleBands(pool, hub)))
+	mux.HandleFunc("PATCH /api/storyboards/{board_id}/bands/{band_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleBandItem(pool, hub)))
+	mux.HandleFunc("DELETE /api/storyboards/{board_id}/bands/{band_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleBandItem(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/bands/{band_id}/lock", ratelimit.Middleware(actionLimiter, storyboards.HandleBandLock(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/bands/{band_id}/collapse", ratelimit.Middleware(actionLimiter, storyboards.HandleBandCollapse(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/bands/reorder", ratelimit.Middleware(actionLimiter, storyboards.HandleBandsReorder(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/bands/{band_id}/rows/reorder", ratelimit.Middleware(actionLimiter, storyboards.HandleBandRowsReorder(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/rows", ratelimit.Middleware(actionLimiter, storyboards.HandleRows(pool, hub)))
+	mux.HandleFunc("PATCH /api/storyboards/{board_id}/rows/{row_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleRowItem(pool, hub)))
+	mux.HandleFunc("DELETE /api/storyboards/{board_id}/rows/{row_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleRowItem(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/rows/{row_id}/move", ratelimit.Middleware(actionLimiter, storyboards.HandleRowMove(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/cards", ratelimit.Middleware(actionLimiter, storyboards.HandleCards(pool, hub)))
+	mux.HandleFunc("PATCH /api/storyboards/{board_id}/cards/{card_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleCardItem(pool, hub)))
+	mux.HandleFunc("DELETE /api/storyboards/{board_id}/cards/{card_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleCardItem(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/cards/{card_id}/move", ratelimit.Middleware(actionLimiter, storyboards.HandleCardMove(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/cards/{card_id}/lock", ratelimit.Middleware(actionLimiter, storyboards.HandleCardLock(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/cells/reorder", ratelimit.Middleware(actionLimiter, storyboards.HandleCellReorder(pool, hub)))
+	mux.HandleFunc("/ws/storyboards", storyboards.ServeStoryboardWS(hub, pool))
 
 	// Kernel 78: eWrite -- Library reading surface. Published content
 	// only; per-publication visibility enforced in the handlers.
