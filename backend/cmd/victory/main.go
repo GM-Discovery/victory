@@ -497,6 +497,8 @@ func main() {
 	// Kernel 78: eWrite -- Library reading surface. Published content
 	// only; per-publication visibility enforced in the handlers.
 	mux.HandleFunc("GET /api/library/tree", ewrite.HandleLibraryTree(pool))
+	mux.HandleFunc("GET /api/library/collections/{collection_id}", ewrite.HandleLibraryCollection(pool))
+	mux.HandleFunc("GET /api/library/collections/{collection_id}/export", ewrite.HandleLibraryCollectionExport(pool))
 	mux.HandleFunc("GET /api/library/publications/{publication_id}", ewrite.HandleLibraryPublication(pool))
 	mux.HandleFunc("GET /api/library/publications/{publication_id}/export", ewrite.HandleLibraryExport(pool))
 	mux.HandleFunc("GET /api/library/search", ewrite.HandleLibrarySearch(pool))

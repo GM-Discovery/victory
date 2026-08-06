@@ -189,6 +189,7 @@
   <script src="/lib/forbidden.js"></script>
   <script src="/lib/back-to-map.js"></script>
   <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script src="/lib/ewrite-rule-link.js"></script>
   <script>
     function showIdFromQuery() {
       return new URLSearchParams(window.location.search).get("id") || "";
@@ -321,6 +322,12 @@
         goButton.disabled = !cue.enabled;
         goButton.addEventListener("click", () => pressGo(cue.id, goButton));
         row.appendChild(goButton);
+
+        const ruleLink = document.createElement("div");
+        ruleLink.style.cssText = "flex-basis:100%;margin-top:4px;";
+        row.appendChild(ruleLink);
+        attachEwriteRuleLink(ruleLink, { objectType: "cue", objectId: cue.id });
+
         return row;
       }
 
@@ -656,7 +663,11 @@
               save.disabled = false;
             }
           });
-          wrap.append(label.field, response.field, save);
+          const ruleLink = document.createElement("div");
+          ruleLink.style.cssText = "margin-bottom:10px;";
+          attachEwriteRuleLink(ruleLink, { objectType: "dialogue_topic", objectId: topic.id });
+
+          wrap.append(label.field, response.field, save, ruleLink);
         }
       }
 
@@ -1282,6 +1293,11 @@
           await loadComposition(detail, surface, list);
         });
         row.appendChild(deleteButton);
+
+        const ruleLink = document.createElement("div");
+        ruleLink.style.cssText = "flex-basis:100%;margin-top:4px;";
+        row.appendChild(ruleLink);
+        attachEwriteRuleLink(ruleLink, { objectType: "scene_element", objectId: el.id });
 
         return row;
       }

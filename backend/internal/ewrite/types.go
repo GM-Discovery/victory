@@ -81,14 +81,20 @@ type EditorGrant struct {
 }
 
 // ObjectLink binds an existing Victory object to an exact rule section.
+// Exactly one of the *ID fields is set, matching ObjectType (kernel Goal C,
+// spec 8.4 -- one reusable link shape for every linkable object).
 type ObjectLink struct {
-	ID              string `json:"id"`
-	ObjectType      string `json:"object_type"`
-	EquipmentItemID string `json:"equipment_item_id,omitempty"`
-	PublicationID   string `json:"publication_id"`
-	SectionID       string `json:"section_id,omitempty"`
-	SectionAnchor   string `json:"section_anchor,omitempty"`
-	SectionTitle    string `json:"section_title,omitempty"`
+	ID                 string `json:"id"`
+	ObjectType         string `json:"object_type"`
+	EquipmentItemID    string `json:"equipment_item_id,omitempty"`
+	CueID              string `json:"cue_id,omitempty"`
+	IndexCardElementID string `json:"index_card_element_id,omitempty"`
+	SceneElementID     string `json:"scene_element_id,omitempty"`
+	DialogueTopicID    string `json:"dialogue_topic_id,omitempty"`
+	PublicationID      string `json:"publication_id"`
+	SectionID          string `json:"section_id,omitempty"`
+	SectionAnchor      string `json:"section_anchor,omitempty"`
+	SectionTitle       string `json:"section_title,omitempty"`
 }
 
 // Directory is compact navigational metadata for a dense rules domain --

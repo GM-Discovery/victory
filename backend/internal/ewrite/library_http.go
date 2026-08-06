@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/access"
@@ -182,9 +183,39 @@ func HandleLibraryPublication(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		ancestorRows, err := pool.Query(ctx, `
+			WITH RECURSIVE chain AS (
+				SELECT id, parent_id, kind, title, 0 AS depth FROM ewrite_collections WHERE id = $1
+				UNION ALL
+				SELECT c.id, c.parent_id, c.kind, c.title, chain.depth + 1
+				FROM ewrite_collections c JOIN chain ON chain.parent_id = c.id
+			)
+			SELECT id::text, kind, title FROM chain ORDER BY depth DESC
+		`, p.CollectionID)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		ancestors := []CollectionAncestor{}
+		for ancestorRows.Next() {
+			var a CollectionAncestor
+			if err := ancestorRows.Scan(&a.ID, &a.Kind, &a.Title); err != nil {
+				ancestorRows.Close()
+				writeError(w, err)
+				return
+			}
+			ancestors = append(ancestors, a)
+		}
+		ancestorRows.Close()
+		if err := ancestorRows.Err(); err != nil {
+			writeError(w, err)
+			return
+		}
+
 		payload := map[string]any{
 			"publication": readerProjection(p),
 			"sections":    sections,
+			"ancestors":   ancestors,
 		}
 
 		if anchor := strings.TrimSpace(r.URL.Query().Get("anchor")); anchor != "" {
@@ -242,6 +273,141 @@ func HandleLibraryPublication(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		writeOK(w, payload)
+	}
+}
+
+// CollectionAncestor is one breadcrumb step, root-first.
+type CollectionAncestor struct {
+	ID    string `json:"id"`
+	Kind  string `json:"kind"`
+	Title string `json:"title"`
+}
+
+// HandleLibraryCollection serves GET /api/library/collections/{collection_id}
+// -- the Ruleset/Series/Module landing page (spec 9.1-9.3): breadcrumb,
+// direct child collections, readable publications, and directories,
+// generic across all three collection kinds since the shape is identical.
+func HandleLibraryCollection(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		id := strings.TrimSpace(r.PathValue("collection_id"))
+
+		var c Collection
+		if err := pool.QueryRow(ctx, `
+			SELECT id::text, location_id::text, COALESCE(parent_id::text, ''), kind, title, slug, summary, sort_order, visibility, created_at, updated_at
+			FROM ewrite_collections WHERE id = $1
+		`, id).Scan(&c.ID, &c.LocationID, &c.ParentID, &c.Kind, &c.Title, &c.Slug, &c.Summary, &c.SortOrder, &c.Visibility, &c.CreatedAt, &c.UpdatedAt); errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, errors.New("collection_not_found"))
+			return
+		} else if err != nil {
+			writeError(w, err)
+			return
+		}
+
+		ancestorRows, err := pool.Query(ctx, `
+			WITH RECURSIVE chain AS (
+				SELECT id, parent_id, kind, title, 0 AS depth FROM ewrite_collections WHERE id = $1
+				UNION ALL
+				SELECT p.id, p.parent_id, p.kind, p.title, chain.depth + 1
+				FROM ewrite_collections p JOIN chain ON chain.parent_id = p.id
+			)
+			SELECT id::text, kind, title FROM chain WHERE id <> $1 ORDER BY depth DESC
+		`, id)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		ancestors := []CollectionAncestor{}
+		for ancestorRows.Next() {
+			var a CollectionAncestor
+			if err := ancestorRows.Scan(&a.ID, &a.Kind, &a.Title); err != nil {
+				ancestorRows.Close()
+				writeError(w, err)
+				return
+			}
+			ancestors = append(ancestors, a)
+		}
+		ancestorRows.Close()
+		if err := ancestorRows.Err(); err != nil {
+			writeError(w, err)
+			return
+		}
+
+		children := []Collection{}
+		childRows, err := pool.Query(ctx, `
+			SELECT id::text, location_id::text, COALESCE(parent_id::text, ''), kind, title, slug, summary, sort_order, visibility, created_at, updated_at
+			FROM ewrite_collections WHERE parent_id = $1 ORDER BY sort_order, title
+		`, id)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		for childRows.Next() {
+			var cc Collection
+			if err := childRows.Scan(&cc.ID, &cc.LocationID, &cc.ParentID, &cc.Kind, &cc.Title, &cc.Slug, &cc.Summary, &cc.SortOrder, &cc.Visibility, &cc.CreatedAt, &cc.UpdatedAt); err != nil {
+				childRows.Close()
+				writeError(w, err)
+				return
+			}
+			children = append(children, cc)
+		}
+		childRows.Close()
+		if err := childRows.Err(); err != nil {
+			writeError(w, err)
+			return
+		}
+
+		operator, err := isOperatorFlag(ctx, pool, userID)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		pubs := []Publication{}
+		pubRows, err := pool.Query(ctx, `
+			SELECT p.id::text, p.collection_id::text, p.location_id::text, p.title, p.slug, p.summary,
+			       p.word_count, p.status, p.visibility, p.published_at, p.created_at, p.updated_at
+			FROM ewrite_publications p
+			WHERE p.collection_id = $3 AND `+visiblePublicationsClause+`
+			ORDER BY p.sort_order, p.published_at`, userID, operator, id)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		for pubRows.Next() {
+			var p Publication
+			if err := pubRows.Scan(&p.ID, &p.CollectionID, &p.LocationID, &p.Title, &p.Slug, &p.Summary,
+				&p.WordCount, &p.Status, &p.Visibility, &p.PublishedAt, &p.CreatedAt, &p.UpdatedAt); err != nil {
+				pubRows.Close()
+				writeError(w, err)
+				return
+			}
+			pubs = append(pubs, p)
+		}
+		pubRows.Close()
+		if err := pubRows.Err(); err != nil {
+			writeError(w, err)
+			return
+		}
+
+		directories, err := ListDirectoriesForCollection(ctx, pool, id)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+
+		writeOK(w, map[string]any{
+			"collection":   c,
+			"ancestors":    ancestors,
+			"children":     children,
+			"publications": pubs,
+			"directories":  directories,
+		})
 	}
 }
 

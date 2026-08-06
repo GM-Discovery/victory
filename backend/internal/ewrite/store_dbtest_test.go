@@ -409,7 +409,7 @@ func TestReadVisibilityAndSearch(t *testing.T) {
 	check("", authPub.ID, false, "anonymous denied (public deferral)")
 
 	// Search respects the same predicate; drafts are structurally excluded.
-	memberResults, err := SearchPublications(ctx, pool, member, false, "zebrawood", 10)
+	memberResults, err := SearchPublications(ctx, pool, member, false, "zebrawood", "", 10)
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -419,14 +419,14 @@ func TestReadVisibilityAndSearch(t *testing.T) {
 	if !strings.Contains(memberResults[0].Snippet, "<mark>") {
 		t.Fatalf("expected highlighted snippet, got %q", memberResults[0].Snippet)
 	}
-	outsiderResults, err := SearchPublications(ctx, pool, outsider, false, "zebrawood", 10)
+	outsiderResults, err := SearchPublications(ctx, pool, outsider, false, "zebrawood", "", 10)
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
 	if len(outsiderResults) != 0 {
 		t.Fatalf("outsider must not find production pub: %+v", outsiderResults)
 	}
-	draftResults, err := SearchPublications(ctx, pool, member, false, "cinderglass", 10)
+	draftResults, err := SearchPublications(ctx, pool, member, false, "cinderglass", "", 10)
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}

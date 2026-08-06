@@ -267,8 +267,11 @@
         const tag = document.createElement("span");
         tag.className = "kind-tag";
         tag.textContent = c.kind;
-        const title = document.createElement("span");
+        const title = document.createElement("a");
         title.className = "collection-title";
+        title.href = "/venues/library/collection.html?id=" + encodeURIComponent(c.id);
+        title.style.textDecoration = "none";
+        title.style.color = "inherit";
         title.textContent = c.title;
         li.appendChild(tag);
         li.appendChild(title);
@@ -329,7 +332,8 @@
       if (!res.ok || !payload?.ok) return;
       searchResults.innerHTML = "";
       const results = payload.data.results || [];
-      if (results.length === 0) {
+      const dirResults = payload.data.directory_results || [];
+      if (results.length === 0 && dirResults.length === 0) {
         const li = document.createElement("li");
         li.textContent = "Nothing found for “" + q + "”.";
         searchResults.appendChild(li);
@@ -344,6 +348,22 @@
         snip.className = "snippet";
         snip.innerHTML = snippetHtml(r.snippet);
         li.appendChild(snip);
+        searchResults.appendChild(li);
+      }
+      for (const d of dirResults) {
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        if (d.link_status === "linked" && d.target_publication_id) {
+          a.href = readerHref(d.target_publication_id, d.target_section_anchor);
+        } else {
+          a.href = "/venues/library/skill-directory.html?dir=" + encodeURIComponent(d.directory_id);
+        }
+        a.textContent = d.canonical_name;
+        li.appendChild(a);
+        const meta = document.createElement("div");
+        meta.className = "snippet";
+        meta.textContent = d.directory_title + (d.category ? " · " + d.category : "");
+        li.appendChild(meta);
         searchResults.appendChild(li);
       }
       searchResults.classList.remove("hidden");

@@ -1634,6 +1634,7 @@
           <textarea id="index-card-front" placeholder="Front text"></textarea>
           <textarea id="index-card-back" placeholder="Back text"></textarea>
           <div id="index-card-status" class="index-card-status"></div>
+          <div id="index-card-rule-link" hidden></div>
         </div>
         <div class="index-card-surface-group">
           <div id="index-card-workshop-section" class="index-card-section">
@@ -1828,6 +1829,7 @@
 <script src="/lib/victory-mic-chat.js?v=kernel40-1"></script>
 <script src="/lib/victory-command-palette.js?v=kernel59-1"></script>
 <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+<script src="/lib/ewrite-rule-link.js"></script>
 <script>
   window.VictoryDiscordAudio?.mount({
     venueSlug: "the-cave",
@@ -1908,6 +1910,7 @@
   const indexCardSave = document.getElementById("index-card-save");
   const indexCardNew = document.getElementById("index-card-new");
   const indexCardStatus = document.getElementById("index-card-status");
+  const indexCardRuleLink = document.getElementById("index-card-rule-link");
   const indexCardCount = document.getElementById("index-card-count");
   const selectionLayer = document.getElementById("selection-layer");
   const connectionStatus = document.getElementById("connection-status");
@@ -3506,6 +3509,7 @@
     if (indexCardColor) indexCardColor.value = "#d9c7a6";
     if (indexCardSave) indexCardSave.textContent = "Save Card";
     setIndexCardStatus("Ready for a new card.");
+    if (indexCardRuleLink) { indexCardRuleLink.hidden = true; indexCardRuleLink.innerHTML = ""; }
     updateSelectionUI();
     refreshIndexCardPanels();
     updateDebugPanel();
@@ -3536,6 +3540,10 @@
     if (indexCardColor) indexCardColor.value = indexCardColorFromData(card);
     if (indexCardSave) indexCardSave.textContent = "Update Card";
     setIndexCardStatus("Editing selected card.");
+    if (indexCardRuleLink && card.element_id && window.attachEwriteRuleLink) {
+      indexCardRuleLink.hidden = false;
+      attachEwriteRuleLink(indexCardRuleLink, { objectType: "index_card", objectId: card.element_id });
+    }
     updateSelectionUI();
     refreshIndexCardPanels();
   }

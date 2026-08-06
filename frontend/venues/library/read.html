@@ -88,6 +88,22 @@
       color: #f1e4e1;
     }
 
+    .breadcrumb {
+      font-family: Arial, sans-serif;
+      font-size: 12.5px;
+      color: #a8908c;
+      margin-bottom: 10px;
+    }
+
+    .breadcrumb a {
+      color: #d9a8a6;
+      text-decoration: none;
+    }
+
+    .breadcrumb a:hover {
+      text-decoration: underline;
+    }
+
     .reader-meta {
       color: #a8908c;
       font-size: 13.5px;
@@ -266,6 +282,7 @@
 
     <article class="reader">
       <header class="reader-header">
+        <nav id="breadcrumb" class="breadcrumb"></nav>
         <h1 id="pub-title"></h1>
         <div id="pub-meta" class="reader-meta"></div>
         <div class="reader-actions">
@@ -387,6 +404,19 @@
         const pub = data.publication;
 
         document.title = "Library — " + pub.title;
+        const breadcrumbEl = document.getElementById("breadcrumb");
+        breadcrumbEl.innerHTML = "";
+        const home = document.createElement("a");
+        home.href = "/venues/library/index.html";
+        home.textContent = "Library";
+        breadcrumbEl.appendChild(home);
+        for (const a of data.ancestors || []) {
+          breadcrumbEl.append(" / ");
+          const link = document.createElement("a");
+          link.href = "/venues/library/collection.html?id=" + encodeURIComponent(a.id);
+          link.textContent = a.title;
+          breadcrumbEl.appendChild(link);
+        }
         document.getElementById("pub-title").textContent = pub.title;
         const meta = [];
         if (pub.word_count) meta.push(pub.word_count.toLocaleString() + " words");

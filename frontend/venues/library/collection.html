@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon.png" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Library</title>
+  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
+  <style>
+    body {
+      margin: 0;
+      background: #120e0e;
+      color: #ece1de;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    .panel {
+      max-width: 1100px;
+      width: 100%;
+      margin: 0 auto;
+      background: rgba(26, 18, 18, 0.97);
+      border: 1px solid rgba(200, 140, 140, 0.14);
+      border-radius: 14px;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    .breadcrumb {
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      color: #a8908c;
+      margin-bottom: 10px;
+    }
+
+    .breadcrumb a {
+      color: #d9a8a6;
+      text-decoration: none;
+    }
+
+    .breadcrumb a:hover {
+      text-decoration: underline;
+    }
+
+    .kind-tag {
+      display: inline-block;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #b98a86;
+      border: 1px solid rgba(185, 138, 134, 0.4);
+      border-radius: 4px;
+      padding: 1px 6px;
+      margin-bottom: 8px;
+      font-family: Arial, sans-serif;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      color: #f1e4e1;
+    }
+
+    .summary {
+      color: #b49793;
+      margin-bottom: 18px;
+    }
+
+    .export-link {
+      display: inline-block;
+      color: #d9a8a6;
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      text-decoration: none;
+      margin-bottom: 14px;
+    }
+
+    .export-link:hover {
+      text-decoration: underline;
+    }
+
+    .search-row {
+      display: flex;
+      gap: 8px;
+      margin: 16px 0;
+    }
+
+    .search-row input {
+      flex: 1;
+      padding: 10px 12px;
+      font-size: 15px;
+      background: #1a1414;
+      color: #ece1de;
+      border: 1px solid rgba(200, 140, 140, 0.2);
+      border-radius: 8px;
+      font-family: inherit;
+    }
+
+    .search-row button {
+      padding: 10px 18px;
+      background: #5a3336;
+      color: #f6ece9;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+      font-family: Arial, sans-serif;
+    }
+
+    .search-row button:hover {
+      background: #6e4145;
+    }
+
+    .search-results,
+    .card-list,
+    .pub-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 22px;
+    }
+
+    .search-results li,
+    .card-list li,
+    .pub-list li {
+      padding: 12px;
+      border: 1px solid rgba(200, 140, 140, 0.12);
+      border-radius: 10px;
+      margin-bottom: 10px;
+      background: rgba(200, 140, 140, 0.03);
+    }
+
+    .card-list a,
+    .pub-list a,
+    .search-results a {
+      color: #d9a8a6;
+      font-size: 16.5px;
+      text-decoration: none;
+    }
+
+    .card-list a:hover,
+    .pub-list a:hover,
+    .search-results a:hover {
+      text-decoration: underline;
+    }
+
+    .meta {
+      color: #8d7572;
+      font-size: 12.5px;
+      margin-left: 8px;
+      font-family: Arial, sans-serif;
+    }
+
+    .snippet {
+      margin-top: 6px;
+      color: #c2ada9;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .snippet mark {
+      background: rgba(196, 120, 120, 0.4);
+      color: #fbeeec;
+      padding: 0 2px;
+      border-radius: 3px;
+    }
+
+    h2.section-heading {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #b98a86;
+      border-bottom: 1px solid rgba(200, 140, 140, 0.14);
+      padding-bottom: 6px;
+      margin: 24px 0 12px;
+      font-family: Arial, sans-serif;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .empty-note {
+      color: #a8908c;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div id="forbidden-screen" class="forbidden-screen" hidden>
+    <div class="forbidden-card">
+      <img src="/assets/redirect.png" alt="Security redirect" />
+      <h1>Error: Forbidden Access Entry</h1>
+      <p>Security redirects you to the pathway.</p>
+      <a href="/" class="back-map-button">← Back to Map</a>
+    </div>
+  </div>
+
+  <div class="shell">
+    <div class="panel">
+      <div id="connection-status" class="empty-note">Opening...</div>
+
+      <div id="body" class="hidden">
+        <nav id="breadcrumb" class="breadcrumb"></nav>
+        <span id="kind-tag" class="kind-tag"></span>
+        <h1 id="title"></h1>
+        <p id="summary" class="summary hidden"></p>
+        <a id="export-link" class="export-link" href="#" download>Export this section (.zip) →</a>
+
+        <div class="search-row">
+          <input id="search-input" type="search" placeholder="Search within this section..." aria-label="Search within this section" />
+          <button id="search-button" type="button">Search</button>
+        </div>
+        <ul id="search-results" class="search-results hidden"></ul>
+
+        <div id="browse-section">
+          <div id="directories-block" class="hidden">
+            <h2 class="section-heading">Directories</h2>
+            <ul id="directories-list" class="card-list"></ul>
+          </div>
+
+          <div id="children-block" class="hidden">
+            <h2 class="section-heading">Contents</h2>
+            <ul id="children-list" class="card-list"></ul>
+          </div>
+
+          <div id="publications-block" class="hidden">
+            <h2 class="section-heading">Publications</h2>
+            <ul id="publications-list" class="pub-list"></ul>
+          </div>
+
+          <p id="empty-note" class="empty-note hidden">Nothing published here yet.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/lib/forbidden.js"></script>
+  <script src="/lib/back-to-map.js"></script>
+  <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script>
+    const connectionStatus = document.getElementById("connection-status");
+    const bodyEl = document.getElementById("body");
+    const breadcrumbEl = document.getElementById("breadcrumb");
+    const kindTag = document.getElementById("kind-tag");
+    const titleEl = document.getElementById("title");
+    const summaryEl = document.getElementById("summary");
+    const searchInput = document.getElementById("search-input");
+    const searchButton = document.getElementById("search-button");
+    const searchResults = document.getElementById("search-results");
+    const directoriesBlock = document.getElementById("directories-block");
+    const directoriesList = document.getElementById("directories-list");
+    const childrenBlock = document.getElementById("children-block");
+    const childrenList = document.getElementById("children-list");
+    const publicationsBlock = document.getElementById("publications-block");
+    const publicationsList = document.getElementById("publications-list");
+    const emptyNote = document.getElementById("empty-note");
+
+    const params = new URLSearchParams(window.location.search);
+    const collectionId = params.get("id") || "";
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function snippetHtml(snippet) {
+      return escapeHtml(snippet)
+        .replaceAll("&lt;mark&gt;", "<mark>")
+        .replaceAll("&lt;/mark&gt;", "</mark>");
+    }
+
+    function collectionHref(id) {
+      return "/venues/library/collection.html?id=" + encodeURIComponent(id);
+    }
+
+    function readerHref(pubId, anchor) {
+      return "/venues/library/read.html?pub=" + encodeURIComponent(pubId) + (anchor ? "#" + anchor : "");
+    }
+
+    function directoryHref(dirId) {
+      return "/venues/library/skill-directory.html?dir=" + encodeURIComponent(dirId);
+    }
+
+    function renderBreadcrumb(ancestors) {
+      breadcrumbEl.innerHTML = "";
+      const home = document.createElement("a");
+      home.href = "/venues/library/index.html";
+      home.textContent = "Library";
+      breadcrumbEl.appendChild(home);
+      for (const a of ancestors) {
+        breadcrumbEl.append(" / ");
+        const link = document.createElement("a");
+        link.href = collectionHref(a.id);
+        link.textContent = a.title;
+        breadcrumbEl.appendChild(link);
+      }
+    }
+
+    async function runSearch() {
+      const q = searchInput.value.trim();
+      if (!q) {
+        searchResults.classList.add("hidden");
+        return;
+      }
+      const res = await fetch("/api/library/search?q=" + encodeURIComponent(q) + "&collection_id=" + encodeURIComponent(collectionId), { credentials: "include" });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload?.ok) return;
+      searchResults.innerHTML = "";
+      const results = payload.data.results || [];
+      const dirResults = payload.data.directory_results || [];
+      if (results.length === 0 && dirResults.length === 0) {
+        const li = document.createElement("li");
+        li.textContent = "Nothing found for “" + q + "” in this section.";
+        searchResults.appendChild(li);
+      }
+      for (const r of results) {
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.href = readerHref(r.publication_id);
+        a.textContent = r.title;
+        li.appendChild(a);
+        const snip = document.createElement("div");
+        snip.className = "snippet";
+        snip.innerHTML = snippetHtml(r.snippet);
+        li.appendChild(snip);
+        searchResults.appendChild(li);
+      }
+      for (const d of dirResults) {
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        if (d.link_status === "linked" && d.target_publication_id) {
+          a.href = readerHref(d.target_publication_id, d.target_section_anchor);
+        } else {
+          a.href = directoryHref(d.directory_id);
+        }
+        a.textContent = d.canonical_name;
+        li.appendChild(a);
+        const meta = document.createElement("span");
+        meta.className = "meta";
+        meta.textContent = d.directory_title + (d.category ? " · " + d.category : "");
+        li.appendChild(meta);
+        searchResults.appendChild(li);
+      }
+      searchResults.classList.remove("hidden");
+    }
+
+    searchButton.addEventListener("click", runSearch);
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") runSearch();
+    });
+
+    async function bootstrap() {
+      if (!collectionId) {
+        showForbiddenScreen();
+        return;
+      }
+      try {
+        const response = await fetch("/api/library/collections/" + encodeURIComponent(collectionId), { credentials: "include" });
+        const payload = await response.json().catch(() => null);
+        if (isForbiddenAccessResponse(response, payload)) {
+          showForbiddenScreen();
+          return;
+        }
+        if (!response.ok || !payload?.ok) {
+          showForbiddenScreen();
+          return;
+        }
+        const data = payload.data;
+        document.title = "Library — " + data.collection.title;
+        renderBreadcrumb(data.ancestors || []);
+        kindTag.textContent = data.collection.kind;
+        titleEl.textContent = data.collection.title;
+        document.getElementById("export-link").href = "/api/library/collections/" + encodeURIComponent(collectionId) + "/export";
+        if (data.collection.summary) {
+          summaryEl.textContent = data.collection.summary;
+          summaryEl.classList.remove("hidden");
+        }
+
+        const directories = data.directories || [];
+        if (directories.length) {
+          for (const dir of directories) {
+            const li = document.createElement("li");
+            const a = document.createElement("a");
+            a.href = directoryHref(dir.id);
+            a.textContent = dir.title;
+            li.appendChild(a);
+            const meta = document.createElement("span");
+            meta.className = "meta";
+            meta.textContent = dir.entry_count + (dir.entry_count === 1 ? " entry" : " entries");
+            li.appendChild(meta);
+            directoriesList.appendChild(li);
+          }
+          directoriesBlock.classList.remove("hidden");
+        }
+
+        const children = data.children || [];
+        if (children.length) {
+          for (const c of children) {
+            const li = document.createElement("li");
+            const tag = document.createElement("span");
+            tag.className = "kind-tag";
+            tag.style.marginRight = "8px";
+            tag.textContent = c.kind;
+            const a = document.createElement("a");
+            a.href = collectionHref(c.id);
+            a.textContent = c.title;
+            li.append(tag, a);
+            childrenList.appendChild(li);
+          }
+          childrenBlock.classList.remove("hidden");
+        }
+
+        const pubs = data.publications || [];
+        if (pubs.length) {
+          for (const pub of pubs) {
+            const li = document.createElement("li");
+            const a = document.createElement("a");
+            a.href = readerHref(pub.id);
+            a.textContent = pub.title;
+            li.appendChild(a);
+            const meta = document.createElement("span");
+            meta.className = "meta";
+            meta.textContent = (pub.word_count ? pub.word_count.toLocaleString() + " words" : "") +
+              (pub.summary ? " — " + pub.summary : "");
+            li.appendChild(meta);
+            publicationsList.appendChild(li);
+          }
+          publicationsBlock.classList.remove("hidden");
+        }
+
+        if (!directories.length && !children.length && !pubs.length) {
+          emptyNote.classList.remove("hidden");
+        }
+
+        connectionStatus.classList.add("hidden");
+        bodyEl.classList.remove("hidden");
+      } catch (err) {
+        console.error("collection bootstrap failed", err);
+        showForbiddenScreen();
+      }
+    }
+
+    bootstrap();
+  </script>
+</body>
+</html>
