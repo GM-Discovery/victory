@@ -22,14 +22,16 @@ const ExportFormat = "victory-storyboard"
 const ExportFormatVersion = 1
 
 type ExportBoard struct {
-	ID          string     `json:"id"`
-	Title       string     `json:"title"`
-	Description string     `json:"description"`
-	OwnerUserID string     `json:"owner_user_id"`
-	OwnerHandle string     `json:"owner_handle,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	ArchivedAt  *time.Time `json:"archived_at,omitempty"`
+	ID              string     `json:"id"`
+	Title           string     `json:"title"`
+	Description     string     `json:"description"`
+	OwnerUserID     string     `json:"owner_user_id"`
+	OwnerHandle     string     `json:"owner_handle,omitempty"`
+	Mode            string     `json:"mode"`
+	TemplateVersion *int       `json:"template_version,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	ArchivedAt      *time.Time `json:"archived_at,omitempty"`
 }
 
 type ExportGrant struct {
@@ -54,16 +56,17 @@ type ExportCard struct {
 }
 
 type ExportDocument struct {
-	Format           string             `json:"format"`
-	FormatVersion    int                `json:"format_version"`
-	ExportedAt       time.Time          `json:"exported_at"`
-	Board            ExportBoard        `json:"board"`
-	VisibilityGrants []ExportGrant      `json:"visibility_grants"`
-	Columns          []StoryboardColumn `json:"columns"`
-	Bands            []StoryboardBand   `json:"bands"`
-	Rows             []StoryboardRow    `json:"rows"`
-	Cards            []ExportCard       `json:"cards"`
-	IntegritySHA256  string             `json:"integrity_sha256"`
+	Format           string                    `json:"format"`
+	FormatVersion    int                       `json:"format_version"`
+	ExportedAt       time.Time                 `json:"exported_at"`
+	Board            ExportBoard               `json:"board"`
+	VisibilityGrants []ExportGrant             `json:"visibility_grants"`
+	Columns          []StoryboardColumn        `json:"columns"`
+	Bands            []StoryboardBand          `json:"bands"`
+	Rows             []StoryboardRow           `json:"rows"`
+	Cards            []ExportCard              `json:"cards"`
+	ReferenceFields  []ReferenceFieldWithItems `json:"reference_fields"`
+	IntegritySHA256  string                    `json:"integrity_sha256"`
 }
 
 // BuildBoardExport requires CanExportBoard (owner or Director+, spec
@@ -123,6 +126,7 @@ func BuildBoardExport(ctx context.Context, pool *pgxpool.Pool, userID, boardID s
 		Board: ExportBoard{
 			ID: board.ID, Title: board.Title, Description: board.Description,
 			OwnerUserID: board.OwnerUserID, OwnerHandle: board.OwnerHandle,
+			Mode: board.Mode, TemplateVersion: board.TemplateVersion,
 			CreatedAt: board.CreatedAt, UpdatedAt: board.UpdatedAt, ArchivedAt: board.ArchivedAt,
 		},
 		VisibilityGrants: grants,
@@ -130,6 +134,7 @@ func BuildBoardExport(ctx context.Context, pool *pgxpool.Pool, userID, boardID s
 		Bands:            snap.Bands,
 		Rows:             snap.Rows,
 		Cards:            cards,
+		ReferenceFields:  snap.ReferenceFields,
 	}
 
 	canonical, err := json.Marshal(doc)

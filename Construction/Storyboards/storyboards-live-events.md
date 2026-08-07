@@ -91,6 +91,18 @@ buffered backlog, matching `ws.go`'s existing venue-connect contract.
 `TestWSSnapshotOnWatchAndReconnect` proves a fresh connection watching
 the same board after a close gets a new snapshot, not stale state.
 
+## Kernel 81 addition: `storyboard/card_swapped`
+
+`EventCardSwapped` broadcasts twice per swap (once per card, each still
+per-viewer-filtered through `broadcastCardEvent`'s existing
+hidden-from-audience gate) rather than introducing a combined
+two-card-payload event type. `board.html` treats it exactly like every
+other `storyboard/*` event — a signal to re-fetch the full snapshot, not
+something it patches incrementally — so no new client-side event-handling
+code was needed. Card image attach/replace/remove reuses the existing
+`storyboard/card_updated` event unchanged (an image reference is just
+another card field, from the event model's point of view).
+
 ## Recorded scope boundary: no live-kick on revocation
 
 Grant revocation stops the next mutation attempt (HTTP 403) and the next

@@ -68,6 +68,18 @@ proves a friend with a relationship but no explicit grant has zero board
 access. The frontend's sharing panel shows My People names as
 informational suggestions only (see `storyboards-ui-contract.md`).
 
+## Kernel 81 addition: card image attach/replace/remove
+
+`SetCardImage` requires `canMutateCard` — the same Crew+-unless-locked
+gate as every other card-content field (title, front/back text, color).
+Attaching an image is not a structural capability; Crew do not need
+Director+ to pin, replace, or remove one. `SwapCards` requires
+`canMutateCard` on *both* cards involved, with the same locked-band
+override Director+/owner already had for a single `MoveCard`. See
+`storyboards-card-image-contract.md` for the asset-read-authorization fix
+this kernel also required (a Storyboard grant, not location membership,
+is what should gate viewing a card's pinned image).
+
 ## Revocation
 
 `RemoveGrant` deletes the `storyboard_grants` row immediately;

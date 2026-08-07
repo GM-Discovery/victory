@@ -18,18 +18,20 @@ import (
 const MaxColumns = 200
 
 var (
-	ErrColumnLimitExceeded = errors.New("column_limit_exceeded")
-	ErrColumnNotFound      = errors.New("column_not_found")
-	ErrColumnOccupied      = errors.New("column_occupied")
-	ErrInvalidResolution   = errors.New("invalid_resolution")
+	ErrColumnLimitExceeded     = errors.New("column_limit_exceeded")
+	ErrColumnNotFound          = errors.New("column_not_found")
+	ErrColumnOccupied          = errors.New("column_occupied")
+	ErrInvalidResolution       = errors.New("invalid_resolution")
+	ErrBoundaryColumnProtected = errors.New("boundary_column_protected")
+	ErrBoundaryColumnDisplaced = errors.New("boundary_column_displaced")
 )
 
 func loadColumn(ctx context.Context, pool *pgxpool.Pool, boardID, columnID string) (*StoryboardColumn, error) {
 	var c StoryboardColumn
 	err := pool.QueryRow(ctx, `
-		SELECT id::text, storyboard_id::text, title, sort_order, created_at, updated_at
+		SELECT id::text, storyboard_id::text, title, COALESCE(slug, ''), column_role, sort_order, created_at, updated_at
 		FROM storyboard_columns WHERE id = $1 AND storyboard_id = $2
-	`, columnID, boardID).Scan(&c.ID, &c.StoryboardID, &c.Title, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt)
+	`, columnID, boardID).Scan(&c.ID, &c.StoryboardID, &c.Title, &c.Slug, &c.ColumnRole, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrColumnNotFound
 	}
@@ -42,7 +44,7 @@ func loadColumn(ctx context.Context, pool *pgxpool.Pool, boardID, columnID strin
 // ListColumns returns a board's columns in display order.
 func ListColumns(ctx context.Context, pool *pgxpool.Pool, boardID string) ([]StoryboardColumn, error) {
 	rows, err := pool.Query(ctx, `
-		SELECT id::text, storyboard_id::text, title, sort_order, created_at, updated_at
+		SELECT id::text, storyboard_id::text, title, COALESCE(slug, ''), column_role, sort_order, created_at, updated_at
 		FROM storyboard_columns WHERE storyboard_id = $1 ORDER BY sort_order
 	`, boardID)
 	if err != nil {
@@ -52,7 +54,7 @@ func ListColumns(ctx context.Context, pool *pgxpool.Pool, boardID string) ([]Sto
 	out := []StoryboardColumn{}
 	for rows.Next() {
 		var c StoryboardColumn
-		if err := rows.Scan(&c.ID, &c.StoryboardID, &c.Title, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.StoryboardID, &c.Title, &c.Slug, &c.ColumnRole, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
@@ -61,6 +63,8 @@ func ListColumns(ctx context.Context, pool *pgxpool.Pool, boardID string) ([]Sto
 }
 
 // AddColumn appends a new column, rejecting the 201st with a clear error.
+// slug is allocated once here (Kernel 81A) via allocateUniqueSlug and
+// never touched again -- RenameColumn below only ever updates title.
 func AddColumn(ctx context.Context, pool *pgxpool.Pool, userID, boardID, title string) (*StoryboardColumn, error) {
 	board, err := LoadBoard(ctx, pool, boardID)
 	if err != nil {
@@ -80,12 +84,16 @@ func AddColumn(ctx context.Context, pool *pgxpool.Pool, userID, boardID, title s
 		return nil, ErrColumnLimitExceeded
 	}
 
-	var id string
-	if err := pool.QueryRow(ctx, `
-		INSERT INTO storyboard_columns (storyboard_id, title, sort_order)
-		VALUES ($1, $2, $3)
-		RETURNING id::text
-	`, boardID, title, count).Scan(&id); err != nil {
+	id, err := allocateUniqueSlug(ctx, pool, columnSlugExistsSQL, boardID, title, func(ctx context.Context, slug string) (string, error) {
+		var newID string
+		err := pool.QueryRow(ctx, `
+			INSERT INTO storyboard_columns (storyboard_id, title, slug, sort_order)
+			VALUES ($1, $2, $3, $4)
+			RETURNING id::text
+		`, boardID, title, slug, count).Scan(&newID)
+		return newID, err
+	})
+	if err != nil {
 		return nil, err
 	}
 	return loadColumn(ctx, pool, boardID, id)
@@ -136,8 +144,10 @@ func ReorderColumns(ctx context.Context, pool *pgxpool.Pool, userID, boardID str
 		return err
 	}
 	existingSet := map[string]bool{}
+	roleByID := map[string]string{}
 	for _, c := range existing {
 		existingSet[c.ID] = true
+		roleByID[c.ID] = c.ColumnRole
 	}
 	if len(orderedColumnIDs) != len(existing) {
 		return ErrInvalidResolution
@@ -148,6 +158,26 @@ func ReorderColumns(ctx context.Context, pool *pgxpool.Pool, userID, boardID str
 			return ErrInvalidResolution
 		}
 		seen[id] = true
+	}
+
+	// Boundary protection (Kernel 82 spec 2.3): a 'beginning' column must
+	// stay at index 0 and an 'ending' column must stay at the last index,
+	// regardless of what order the rest of the board is in. This is a
+	// server-side check, not just a UI omission -- hiding a control is
+	// never itself a security boundary in this codebase. A no-op for
+	// every Blank-mode board, since no column there ever carries either
+	// role.
+	for i, id := range orderedColumnIDs {
+		switch roleByID[id] {
+		case ColumnRoleBeginning:
+			if i != 0 {
+				return ErrBoundaryColumnDisplaced
+			}
+		case ColumnRoleEnding:
+			if i != len(orderedColumnIDs)-1 {
+				return ErrBoundaryColumnDisplaced
+			}
+		}
 	}
 
 	tx, err := pool.Begin(ctx)
@@ -186,8 +216,17 @@ func RemoveColumn(ctx context.Context, pool *pgxpool.Pool, userID, boardID, colu
 	} else if !ok {
 		return ErrNotAuthorized
 	}
-	if _, err := loadColumn(ctx, pool, boardID, columnID); err != nil {
+	col, err := loadColumn(ctx, pool, boardID, columnID)
+	if err != nil {
 		return err
+	}
+	// Boundary protection (Kernel 82 spec 2.2/2.3): Beginning/Ending are
+	// protected structural roles. Deleting one would be the ultimate form
+	// of "displaced outside the timeline" the spec's own FAIL criteria
+	// names -- rejected outright, with no resolution flow, unlike an
+	// ordinary occupied-column removal.
+	if col.ColumnRole == ColumnRoleBeginning || col.ColumnRole == ColumnRoleEnding {
+		return ErrBoundaryColumnProtected
 	}
 
 	var cardCount int

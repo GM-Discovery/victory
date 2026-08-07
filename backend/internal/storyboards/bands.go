@@ -23,9 +23,9 @@ var (
 func loadBand(ctx context.Context, pool *pgxpool.Pool, boardID, bandID string) (*StoryboardBand, error) {
 	var b StoryboardBand
 	err := pool.QueryRow(ctx, `
-		SELECT id::text, storyboard_id::text, label, description, sort_order, is_collapsed, is_locked, created_at, updated_at
+		SELECT id::text, storyboard_id::text, label, COALESCE(slug, ''), description, sort_order, is_collapsed, is_locked, created_at, updated_at
 		FROM storyboard_bands WHERE id = $1 AND storyboard_id = $2
-	`, bandID, boardID).Scan(&b.ID, &b.StoryboardID, &b.Label, &b.Description, &b.SortOrder, &b.IsCollapsed, &b.IsLocked, &b.CreatedAt, &b.UpdatedAt)
+	`, bandID, boardID).Scan(&b.ID, &b.StoryboardID, &b.Label, &b.Slug, &b.Description, &b.SortOrder, &b.IsCollapsed, &b.IsLocked, &b.CreatedAt, &b.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrBandNotFound
 	}
@@ -38,7 +38,7 @@ func loadBand(ctx context.Context, pool *pgxpool.Pool, boardID, bandID string) (
 // ListBands returns a board's bands in display order.
 func ListBands(ctx context.Context, pool *pgxpool.Pool, boardID string) ([]StoryboardBand, error) {
 	rows, err := pool.Query(ctx, `
-		SELECT id::text, storyboard_id::text, label, description, sort_order, is_collapsed, is_locked, created_at, updated_at
+		SELECT id::text, storyboard_id::text, label, COALESCE(slug, ''), description, sort_order, is_collapsed, is_locked, created_at, updated_at
 		FROM storyboard_bands WHERE storyboard_id = $1 ORDER BY sort_order
 	`, boardID)
 	if err != nil {
@@ -48,7 +48,7 @@ func ListBands(ctx context.Context, pool *pgxpool.Pool, boardID string) ([]Story
 	out := []StoryboardBand{}
 	for rows.Next() {
 		var b StoryboardBand
-		if err := rows.Scan(&b.ID, &b.StoryboardID, &b.Label, &b.Description, &b.SortOrder, &b.IsCollapsed, &b.IsLocked, &b.CreatedAt, &b.UpdatedAt); err != nil {
+		if err := rows.Scan(&b.ID, &b.StoryboardID, &b.Label, &b.Slug, &b.Description, &b.SortOrder, &b.IsCollapsed, &b.IsLocked, &b.CreatedAt, &b.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, b)
@@ -56,7 +56,9 @@ func ListBands(ctx context.Context, pool *pgxpool.Pool, boardID string) ([]Story
 	return out, rows.Err()
 }
 
-// AddBand requires CanEditStructure.
+// AddBand requires CanEditStructure. slug is allocated once here (Kernel
+// 81A) via allocateUniqueSlug and never touched again -- UpdateBandLabel
+// below only ever updates label/description.
 func AddBand(ctx context.Context, pool *pgxpool.Pool, userID, boardID, label string) (*StoryboardBand, error) {
 	board, err := LoadBoard(ctx, pool, boardID)
 	if err != nil {
@@ -71,12 +73,16 @@ func AddBand(ctx context.Context, pool *pgxpool.Pool, userID, boardID, label str
 	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM storyboard_bands WHERE storyboard_id = $1`, boardID).Scan(&count); err != nil {
 		return nil, err
 	}
-	var id string
-	if err := pool.QueryRow(ctx, `
-		INSERT INTO storyboard_bands (storyboard_id, label, sort_order)
-		VALUES ($1, $2, $3)
-		RETURNING id::text
-	`, boardID, label, count).Scan(&id); err != nil {
+	id, err := allocateUniqueSlug(ctx, pool, bandSlugExistsSQL, boardID, label, func(ctx context.Context, slug string) (string, error) {
+		var newID string
+		err := pool.QueryRow(ctx, `
+			INSERT INTO storyboard_bands (storyboard_id, label, slug, sort_order)
+			VALUES ($1, $2, $3, $4)
+			RETURNING id::text
+		`, boardID, label, slug, count).Scan(&newID)
+		return newID, err
+	})
+	if err != nil {
 		return nil, err
 	}
 	return loadBand(ctx, pool, boardID, id)

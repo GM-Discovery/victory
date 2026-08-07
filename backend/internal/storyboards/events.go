@@ -40,10 +40,17 @@ const (
 	EventCardAdded            = "storyboard/card_added"
 	EventCardUpdated          = "storyboard/card_updated"
 	EventCardMoved            = "storyboard/card_moved"
+	EventCardSwapped          = "storyboard/card_swapped"
 	EventCardsReordered       = "storyboard/cards_reordered"
 	EventCardRemoved          = "storyboard/card_removed"
 	EventCardLockChanged      = "storyboard/card_lock_changed"
 	EventBoardArchived        = "storyboard/archived"
+	// EventReferencePanelChanged (Kernel 82) covers every Reference Panel
+	// mutation (field add/rename/reorder/type-change/remove, item add/
+	// edit/reorder/remove) with one event type -- panel content is never
+	// hidden-from-audience (spec 3.4 gates editing by role, not viewing),
+	// so there is no per-viewer shaping to do, unlike card events.
+	EventReferencePanelChanged = "storyboard/reference_panel_changed"
 )
 
 // emitBoardEvent resolves every current watcher of boardID, calls build

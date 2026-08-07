@@ -448,7 +448,65 @@ func userCanReadAssetConsideringEwrite(ctx context.Context, pool *pgxpool.Pool, 
 		return false, nil
 	}
 
+	// Kernel 81: a card-image asset's real authority is the Storyboard it's
+	// pinned to, not incidental location membership at whatever fallback
+	// storage location the upload was scoped to (see
+	// storyboards/card_image.go's resolveCardImageStorageScope) -- a
+	// Storyboard grant holder with no location relationship to the board
+	// owner would otherwise be 403'd loading a card image they're fully
+	// authorized to see on the board itself. Found via real Playwright
+	// testing with a throwaway crew account that had no location
+	// memberships at all. This is a raw-SQL inline check, not an import of
+	// the storyboards package, because storyboards already imports assets
+	// (for the upload helper) -- assets importing storyboards back would
+	// close a direct two-package cycle.
+	if allowed, err := storyboardCardImageViewerAllowed(ctx, pool, userID, rec.ID); err != nil {
+		return false, err
+	} else if allowed {
+		return true, nil
+	}
+
 	return userCanReadAsset(ctx, pool, userID, rec.ProducerUserID, rec.UploaderUserID, rec.OwnerUserID, rec.LocationID)
+}
+
+// storyboardCardImageViewerAllowed mirrors storyboards/authority.go's
+// CanViewBoard ("any tier with a resolved grant or ownership") without
+// importing that package. Returns false, nil (not an error) whenever
+// assetID isn't a storyboard card's pinned image at all, so every other
+// asset type falls through to the normal location-membership check
+// unchanged.
+func storyboardCardImageViewerAllowed(ctx context.Context, pool *pgxpool.Pool, userID, assetID string) (bool, error) {
+	var boardID, ownerUserID string
+	err := pool.QueryRow(ctx, `
+		SELECT sb.id::text, sb.owner_user_id::text
+		FROM storyboard_cards sc
+		JOIN storyboards sb ON sb.id = sc.storyboard_id
+		WHERE sc.image_asset_id = $1
+		LIMIT 1
+	`, assetID).Scan(&boardID, &ownerUserID)
+	if err == pgx.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if userID == ownerUserID {
+		return true, nil
+	}
+	if ok, err := access.IsOperatorUser(ctx, pool, userID); err == nil && ok {
+		return true, nil
+	}
+	var grantedRole string
+	err = pool.QueryRow(ctx, `
+		SELECT granted_role FROM storyboard_grants WHERE storyboard_id = $1 AND user_id = $2
+	`, boardID, userID).Scan(&grantedRole)
+	if err == pgx.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func ewritePublicationsForAsset(ctx context.Context, pool *pgxpool.Pool, assetID string) ([]string, error) {

@@ -1,8 +1,23 @@
-# Storyboards Domain Model (Kernel 80)
+# Storyboards Domain Model (Kernel 80, extended by Kernel 81)
 
 Implementation: `backend/internal/storyboards/`. Schema:
 `backend/migrations/090_kernel80_storyboards_core.sql` +
-`091_kernel80_ewrite_object_link_storyboard_card.sql`.
+`091_kernel80_ewrite_object_link_storyboard_card.sql` +
+`092_kernel81_storyboard_card_image.sql`.
+
+## Kernel 81 additions (bounded — see the kernel spec's backend change budget)
+
+- `storyboard_cards.image_asset_id UUID`, **no foreign key** — see
+  `storyboards-card-image-contract.md` for the full reasoning (a real FK
+  would be silently broken by either of two existing asset-lifecycle
+  paths, defeating the gravestone requirement). Set/cleared via
+  `cards.go`'s `SetCardImage`, same `canMutateCard` (Crew+-unless-locked)
+  authority as every other card-content field.
+- `cards.go`'s `SwapCards` — a new atomic function (one transaction,
+  version-checked on both cards) exchanging two cards' cell placement in
+  one step, backing the frontend's occupied-cell "Swap" resolution. See
+  `storyboards-drag-and-drop.md`.
+- Everything else in this document is unchanged from Kernel 80.
 
 ## Hierarchy
 

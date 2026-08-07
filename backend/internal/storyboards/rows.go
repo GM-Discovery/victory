@@ -21,9 +21,9 @@ var (
 func loadRow(ctx context.Context, pool *pgxpool.Pool, boardID, rowID string) (*StoryboardRow, error) {
 	var r StoryboardRow
 	err := pool.QueryRow(ctx, `
-		SELECT id::text, storyboard_id::text, band_id::text, label, description, sort_order_in_band, created_at, updated_at
+		SELECT id::text, storyboard_id::text, band_id::text, label, COALESCE(slug, ''), description, sort_order_in_band, created_at, updated_at
 		FROM storyboard_rows WHERE id = $1 AND storyboard_id = $2
-	`, rowID, boardID).Scan(&r.ID, &r.StoryboardID, &r.BandID, &r.Label, &r.Description, &r.SortOrderInBand, &r.CreatedAt, &r.UpdatedAt)
+	`, rowID, boardID).Scan(&r.ID, &r.StoryboardID, &r.BandID, &r.Label, &r.Slug, &r.Description, &r.SortOrderInBand, &r.CreatedAt, &r.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrRowNotFound
 	}
@@ -37,7 +37,7 @@ func loadRow(ctx context.Context, pool *pgxpool.Pool, boardID, rowID string) (*S
 // sort_order_in_band) display order.
 func ListRows(ctx context.Context, pool *pgxpool.Pool, boardID string) ([]StoryboardRow, error) {
 	rows, err := pool.Query(ctx, `
-		SELECT r.id::text, r.storyboard_id::text, r.band_id::text, r.label, r.description, r.sort_order_in_band, r.created_at, r.updated_at
+		SELECT r.id::text, r.storyboard_id::text, r.band_id::text, r.label, COALESCE(r.slug, ''), r.description, r.sort_order_in_band, r.created_at, r.updated_at
 		FROM storyboard_rows r
 		JOIN storyboard_bands b ON b.id = r.band_id
 		WHERE r.storyboard_id = $1
@@ -50,7 +50,7 @@ func ListRows(ctx context.Context, pool *pgxpool.Pool, boardID string) ([]Storyb
 	out := []StoryboardRow{}
 	for rows.Next() {
 		var r StoryboardRow
-		if err := rows.Scan(&r.ID, &r.StoryboardID, &r.BandID, &r.Label, &r.Description, &r.SortOrderInBand, &r.CreatedAt, &r.UpdatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.StoryboardID, &r.BandID, &r.Label, &r.Slug, &r.Description, &r.SortOrderInBand, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -59,6 +59,8 @@ func ListRows(ctx context.Context, pool *pgxpool.Pool, boardID string) ([]Storyb
 }
 
 // AddRow appends a new row to the given band. Requires CanEditStructure.
+// slug is allocated once here (Kernel 81A), scoped to the *band* (not the
+// whole board, per spec) via allocateUniqueSlug, and never touched again.
 func AddRow(ctx context.Context, pool *pgxpool.Pool, userID, boardID, bandID, label string) (*StoryboardRow, error) {
 	board, err := LoadBoard(ctx, pool, boardID)
 	if err != nil {
@@ -76,12 +78,16 @@ func AddRow(ctx context.Context, pool *pgxpool.Pool, userID, boardID, bandID, la
 	if err := pool.QueryRow(ctx, `SELECT COALESCE(MAX(sort_order_in_band) + 1, 0) FROM storyboard_rows WHERE band_id = $1`, bandID).Scan(&nextOrder); err != nil {
 		return nil, err
 	}
-	var id string
-	if err := pool.QueryRow(ctx, `
-		INSERT INTO storyboard_rows (storyboard_id, band_id, label, sort_order_in_band)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id::text
-	`, boardID, bandID, label, nextOrder).Scan(&id); err != nil {
+	id, err := allocateUniqueSlug(ctx, pool, rowSlugExistsSQL, bandID, label, func(ctx context.Context, slug string) (string, error) {
+		var newID string
+		err := pool.QueryRow(ctx, `
+			INSERT INTO storyboard_rows (storyboard_id, band_id, label, slug, sort_order_in_band)
+			VALUES ($1, $2, $3, $4, $5)
+			RETURNING id::text
+		`, boardID, bandID, label, slug, nextOrder).Scan(&newID)
+		return newID, err
+	})
+	if err != nil {
 		return nil, err
 	}
 	return loadRow(ctx, pool, boardID, id)

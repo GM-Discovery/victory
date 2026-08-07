@@ -28,16 +28,17 @@ var (
 func loadCardRow(ctx context.Context, pool *pgxpool.Pool, boardID, cardID string) (*StoryboardCard, error) {
 	var c StoryboardCard
 	var authorID *string
+	var imageAssetID *string
 	err := pool.QueryRow(ctx, `
 		SELECT c.id::text, c.storyboard_id::text, c.row_id::text, c.column_id::text, c.sort_order_in_cell,
-		       c.title, c.front_text, c.back_text, c.category, c.color_token,
+		       c.title, c.front_text, c.back_text, c.category, c.color_token, c.image_asset_id::text,
 		       c.hidden_from_audience, c.is_locked, c.author_user_id::text, COALESCE(u.handle, ''),
 		       c.version, c.created_at, c.updated_at
 		FROM storyboard_cards c
 		LEFT JOIN users u ON u.id = c.author_user_id
 		WHERE c.id = $1 AND c.storyboard_id = $2
 	`, cardID, boardID).Scan(&c.ID, &c.StoryboardID, &c.RowID, &c.ColumnID, &c.SortOrderInCell,
-		&c.Title, &c.FrontText, &c.BackText, &c.Category, &c.ColorToken,
+		&c.Title, &c.FrontText, &c.BackText, &c.Category, &c.ColorToken, &imageAssetID,
 		&c.HiddenFromAudience, &c.IsLocked, &authorID, &c.AuthorHandle,
 		&c.Version, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -48,6 +49,9 @@ func loadCardRow(ctx context.Context, pool *pgxpool.Pool, boardID, cardID string
 	}
 	if authorID != nil {
 		c.AuthorUserID = *authorID
+	}
+	if imageAssetID != nil {
+		c.ImageAssetID = *imageAssetID
 	}
 	return &c, nil
 }
@@ -63,7 +67,7 @@ func LoadCard(ctx context.Context, pool *pgxpool.Pool, boardID, cardID string) (
 func ListCardsForBoard(ctx context.Context, pool *pgxpool.Pool, boardID string) ([]StoryboardCard, error) {
 	rows, err := pool.Query(ctx, `
 		SELECT c.id::text, c.storyboard_id::text, c.row_id::text, c.column_id::text, c.sort_order_in_cell,
-		       c.title, c.front_text, c.back_text, c.category, c.color_token,
+		       c.title, c.front_text, c.back_text, c.category, c.color_token, c.image_asset_id::text,
 		       c.hidden_from_audience, c.is_locked, c.author_user_id::text, COALESCE(u.handle, ''),
 		       c.version, c.created_at, c.updated_at
 		FROM storyboard_cards c
@@ -79,14 +83,18 @@ func ListCardsForBoard(ctx context.Context, pool *pgxpool.Pool, boardID string) 
 	for rows.Next() {
 		var c StoryboardCard
 		var authorID *string
+		var imageAssetID *string
 		if err := rows.Scan(&c.ID, &c.StoryboardID, &c.RowID, &c.ColumnID, &c.SortOrderInCell,
-			&c.Title, &c.FrontText, &c.BackText, &c.Category, &c.ColorToken,
+			&c.Title, &c.FrontText, &c.BackText, &c.Category, &c.ColorToken, &imageAssetID,
 			&c.HiddenFromAudience, &c.IsLocked, &authorID, &c.AuthorHandle,
 			&c.Version, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if authorID != nil {
 			c.AuthorUserID = *authorID
+		}
+		if imageAssetID != nil {
+			c.ImageAssetID = *imageAssetID
 		}
 		out = append(out, c)
 	}
@@ -421,4 +429,148 @@ func SetCardLock(ctx context.Context, pool *pgxpool.Pool, userID, boardID, cardI
 		return nil, ErrCardNotFound
 	}
 	return loadCardRow(ctx, pool, boardID, cardID)
+}
+
+// SetCardImage attaches, replaces, or (imageAssetID == "") clears a card's
+// pinned image reference (Kernel 81 spec 2.6/9.1). Authority is
+// canMutateCard, the same Crew+-unless-locked gate as title/front/back/
+// color edits -- attaching an image is a card-content edit, not a
+// structural one (spec 11 lists "attach image" under Crew). The column has
+// no foreign key (see migration 092's comment) so this never fails due to
+// the referenced asset's lifecycle; gravestone detection happens entirely
+// by looking the id up through GET /api/assets/{id} at render time.
+func SetCardImage(ctx context.Context, pool *pgxpool.Pool, userID, boardID, cardID, imageAssetID string) (*StoryboardCard, error) {
+	board, err := LoadBoard(ctx, pool, boardID)
+	if err != nil {
+		return nil, err
+	}
+	card, err := loadCardRow(ctx, pool, boardID, cardID)
+	if err != nil {
+		return nil, err
+	}
+	if ok, err := canMutateCard(ctx, pool, userID, board, card); err != nil {
+		return nil, err
+	} else if !ok {
+		if card.IsLocked {
+			return nil, ErrCardLocked
+		}
+		return nil, ErrNotAuthorized
+	}
+	var arg any
+	if imageAssetID != "" {
+		arg = imageAssetID
+	}
+	tag, err := pool.Exec(ctx, `
+		UPDATE storyboard_cards SET image_asset_id = $3, version = version + 1, updated_at = NOW()
+		WHERE id = $1 AND storyboard_id = $2
+	`, cardID, boardID, arg)
+	if err != nil {
+		return nil, err
+	}
+	if tag.RowsAffected() == 0 {
+		return nil, ErrCardNotFound
+	}
+	return loadCardRow(ctx, pool, boardID, cardID)
+}
+
+// SwapCards atomically exchanges two cards' (row, column) placement in a
+// single transaction (spec 7.4's Swap resolution for a drag onto an
+// occupied cell). Two sequential MoveCard calls could leave both cards
+// briefly sharing one cell -- not data loss (the backend already tolerates
+// multiple cards per cell), but a visibly wrong transient state for any
+// third watcher whose snapshot lands mid-sequence; this closes that gap.
+// Optimistic concurrency and lock/band-lock checks apply to both cards
+// independently, exactly as MoveCard would require in each direction.
+func SwapCards(ctx context.Context, pool *pgxpool.Pool, userID, boardID string, cardAID string, baseVersionA int, cardBID string, baseVersionB int) (*StoryboardCard, *StoryboardCard, error) {
+	if cardAID == cardBID {
+		return nil, nil, ErrInvalidResolution
+	}
+	board, err := LoadBoard(ctx, pool, boardID)
+	if err != nil {
+		return nil, nil, err
+	}
+	cardA, err := loadCardRow(ctx, pool, boardID, cardAID)
+	if err != nil {
+		return nil, nil, err
+	}
+	cardB, err := loadCardRow(ctx, pool, boardID, cardBID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if ok, err := canMutateCard(ctx, pool, userID, board, cardA); err != nil {
+		return nil, nil, err
+	} else if !ok {
+		if cardA.IsLocked {
+			return nil, nil, ErrCardLocked
+		}
+		return nil, nil, ErrNotAuthorized
+	}
+	if ok, err := canMutateCard(ctx, pool, userID, board, cardB); err != nil {
+		return nil, nil, err
+	} else if !ok {
+		if cardB.IsLocked {
+			return nil, nil, ErrCardLocked
+		}
+		return nil, nil, ErrNotAuthorized
+	}
+
+	// A is moving into B's row's band and vice versa -- both directions
+	// need the same locked-band override MoveCard requires.
+	targetBandForALocked, err := isBandLockedForRow(ctx, pool, cardB.RowID)
+	if err != nil {
+		return nil, nil, err
+	}
+	targetBandForBLocked, err := isBandLockedForRow(ctx, pool, cardA.RowID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if targetBandForALocked || targetBandForBLocked {
+		if canStructure, err := CanEditStructure(ctx, pool, userID, board); err != nil {
+			return nil, nil, err
+		} else if !canStructure {
+			return nil, nil, ErrBandLocked
+		}
+	}
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tagA, err := tx.Exec(ctx, `
+		UPDATE storyboard_cards
+		SET row_id = $3, column_id = $4, sort_order_in_cell = $5, version = version + 1, updated_at = NOW()
+		WHERE id = $1 AND storyboard_id = $6 AND version = $2
+	`, cardAID, baseVersionA, cardB.RowID, cardB.ColumnID, cardB.SortOrderInCell, boardID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if tagA.RowsAffected() == 0 {
+		return nil, nil, ErrCardVersionConflict
+	}
+	tagB, err := tx.Exec(ctx, `
+		UPDATE storyboard_cards
+		SET row_id = $3, column_id = $4, sort_order_in_cell = $5, version = version + 1, updated_at = NOW()
+		WHERE id = $1 AND storyboard_id = $6 AND version = $2
+	`, cardBID, baseVersionB, cardA.RowID, cardA.ColumnID, cardA.SortOrderInCell, boardID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if tagB.RowsAffected() == 0 {
+		return nil, nil, ErrCardVersionConflict
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, nil, err
+	}
+
+	newA, err := loadCardRow(ctx, pool, boardID, cardAID)
+	if err != nil {
+		return nil, nil, err
+	}
+	newB, err := loadCardRow(ctx, pool, boardID, cardBID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return newA, newB, nil
 }

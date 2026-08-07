@@ -18,12 +18,12 @@ func loadBoardRow(ctx context.Context, tx pgxQuerier, boardID string) (*Storyboa
 	var b Storyboard
 	err := tx.QueryRow(ctx, `
 		SELECT s.id::text, s.owner_user_id::text, COALESCE(u.handle, ''), s.title, s.description,
-		       s.archived_at, s.created_at, s.updated_at
+		       s.mode, s.template_version, s.archived_at, s.created_at, s.updated_at
 		FROM storyboards s
 		LEFT JOIN users u ON u.id = s.owner_user_id
 		WHERE s.id = $1
 	`, boardID).Scan(&b.ID, &b.OwnerUserID, &b.OwnerHandle, &b.Title, &b.Description,
-		&b.ArchivedAt, &b.CreatedAt, &b.UpdatedAt)
+		&b.Mode, &b.TemplateVersion, &b.ArchivedAt, &b.CreatedAt, &b.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrBoardNotFound
 	}
@@ -81,29 +81,49 @@ func CreateBoard(ctx context.Context, pool *pgxpool.Pool, ownerUserID, title, de
 		return nil, err
 	}
 
+	// slug allocation (Kernel 81A) reuses the same allocateUniqueSlug used
+	// by AddColumn/AddBand/AddRow, scoped to this transaction via the
+	// queryRower interface -- a brand-new board's own default rows can
+	// only ever collide with each other (duplicate entries in the caller's
+	// own columnTitles/rowLabels), never with another transaction, since
+	// boardID does not exist for any other caller to reference yet.
 	for i, colTitle := range columnTitles {
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO storyboard_columns (storyboard_id, title, sort_order)
-			VALUES ($1, $2, $3)
-		`, boardID, colTitle, i); err != nil {
+		if _, err := allocateUniqueSlug(ctx, tx, columnSlugExistsSQL, boardID, colTitle, func(ctx context.Context, slug string) (string, error) {
+			var newID string
+			err := tx.QueryRow(ctx, `
+				INSERT INTO storyboard_columns (storyboard_id, title, slug, sort_order)
+				VALUES ($1, $2, $3, $4)
+				RETURNING id::text
+			`, boardID, colTitle, slug, i).Scan(&newID)
+			return newID, err
+		}); err != nil {
 			return nil, err
 		}
 	}
 
 	var bandID string
-	if err := tx.QueryRow(ctx, `
-		INSERT INTO storyboard_bands (storyboard_id, label, sort_order)
-		VALUES ($1, $2, 0)
-		RETURNING id::text
-	`, boardID, bandLabel).Scan(&bandID); err != nil {
+	if bandID, err = allocateUniqueSlug(ctx, tx, bandSlugExistsSQL, boardID, bandLabel, func(ctx context.Context, slug string) (string, error) {
+		var newID string
+		err := tx.QueryRow(ctx, `
+			INSERT INTO storyboard_bands (storyboard_id, label, slug, sort_order)
+			VALUES ($1, $2, $3, 0)
+			RETURNING id::text
+		`, boardID, bandLabel, slug).Scan(&newID)
+		return newID, err
+	}); err != nil {
 		return nil, err
 	}
 
 	for i, rowLabel := range rowLabels {
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO storyboard_rows (storyboard_id, band_id, label, sort_order_in_band)
-			VALUES ($1, $2, $3, $4)
-		`, boardID, bandID, rowLabel, i); err != nil {
+		if _, err := allocateUniqueSlug(ctx, tx, rowSlugExistsSQL, bandID, rowLabel, func(ctx context.Context, slug string) (string, error) {
+			var newID string
+			err := tx.QueryRow(ctx, `
+				INSERT INTO storyboard_rows (storyboard_id, band_id, label, slug, sort_order_in_band)
+				VALUES ($1, $2, $3, $4, $5)
+				RETURNING id::text
+			`, boardID, bandID, rowLabel, slug, i).Scan(&newID)
+			return newID, err
+		}); err != nil {
 			return nil, err
 		}
 	}
@@ -123,7 +143,7 @@ func CreateBoard(ctx context.Context, pool *pgxpool.Pool, ownerUserID, title, de
 func ListOwnedBoards(ctx context.Context, pool *pgxpool.Pool, userID string) ([]Storyboard, error) {
 	rows, err := pool.Query(ctx, `
 		SELECT s.id::text, s.owner_user_id::text, COALESCE(u.handle, ''), s.title, s.description,
-		       s.archived_at, s.created_at, s.updated_at
+		       s.mode, s.template_version, s.archived_at, s.created_at, s.updated_at
 		FROM storyboards s
 		LEFT JOIN users u ON u.id = s.owner_user_id
 		WHERE s.owner_user_id = $1
@@ -137,7 +157,7 @@ func ListOwnedBoards(ctx context.Context, pool *pgxpool.Pool, userID string) ([]
 	for rows.Next() {
 		var b Storyboard
 		if err := rows.Scan(&b.ID, &b.OwnerUserID, &b.OwnerHandle, &b.Title, &b.Description,
-			&b.ArchivedAt, &b.CreatedAt, &b.UpdatedAt); err != nil {
+			&b.Mode, &b.TemplateVersion, &b.ArchivedAt, &b.CreatedAt, &b.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, b)
@@ -150,7 +170,7 @@ func ListOwnedBoards(ctx context.Context, pool *pgxpool.Pool, userID string) ([]
 func ListSharedBoards(ctx context.Context, pool *pgxpool.Pool, userID string) ([]Storyboard, error) {
 	rows, err := pool.Query(ctx, `
 		SELECT s.id::text, s.owner_user_id::text, COALESCE(u.handle, ''), s.title, s.description,
-		       s.archived_at, s.created_at, s.updated_at
+		       s.mode, s.template_version, s.archived_at, s.created_at, s.updated_at
 		FROM storyboards s
 		LEFT JOIN users u ON u.id = s.owner_user_id
 		JOIN storyboard_grants g ON g.storyboard_id = s.id
@@ -165,7 +185,7 @@ func ListSharedBoards(ctx context.Context, pool *pgxpool.Pool, userID string) ([
 	for rows.Next() {
 		var b Storyboard
 		if err := rows.Scan(&b.ID, &b.OwnerUserID, &b.OwnerHandle, &b.Title, &b.Description,
-			&b.ArchivedAt, &b.CreatedAt, &b.UpdatedAt); err != nil {
+			&b.Mode, &b.TemplateVersion, &b.ArchivedAt, &b.CreatedAt, &b.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, b)

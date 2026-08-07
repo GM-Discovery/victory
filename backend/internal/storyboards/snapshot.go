@@ -16,15 +16,28 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// ReferenceFieldWithItems bundles a Reference Panel field with its
+// list/paired_list entries (empty for short_text/long_text fields) --
+// the shape the board snapshot and export both serialize, so a client
+// never needs a second request to render the panel.
+type ReferenceFieldWithItems struct {
+	ReferenceField
+	Items []ReferenceItem `json:"items"`
+}
+
 // BoardSnapshot is the full authoritative state of one board, already
-// filtered for one specific viewer.
+// filtered for one specific viewer. Reference Panel content (Kernel 82)
+// is never hidden-from-audience -- spec 3.4 gates *editing* by role, not
+// *viewing*, so ReferenceFields is loaded the same way for every tier
+// that can see the board at all.
 type BoardSnapshot struct {
-	Board      Storyboard         `json:"board"`
-	ViewerTier string             `json:"viewer_tier"`
-	Columns    []StoryboardColumn `json:"columns"`
-	Bands      []StoryboardBand   `json:"bands"`
-	Rows       []StoryboardRow    `json:"rows"`
-	Cards      []StoryboardCard   `json:"cards"`
+	Board           Storyboard                `json:"board"`
+	ViewerTier      string                    `json:"viewer_tier"`
+	Columns         []StoryboardColumn        `json:"columns"`
+	Bands           []StoryboardBand          `json:"bands"`
+	Rows            []StoryboardRow           `json:"rows"`
+	Cards           []StoryboardCard          `json:"cards"`
+	ReferenceFields []ReferenceFieldWithItems `json:"reference_fields"`
 }
 
 // ProjectBoardSnapshot requires the viewer to have some tier of access
@@ -73,12 +86,34 @@ func projectBoardSnapshotForTier(ctx context.Context, pool *pgxpool.Pool, tier s
 		cards = visible
 	}
 
+	referenceFields, err := ListReferenceFields(ctx, pool, board.ID)
+	if err != nil {
+		return nil, err
+	}
+	fieldIDs := make([]string, len(referenceFields))
+	for i, f := range referenceFields {
+		fieldIDs[i] = f.ID
+	}
+	itemsByField, err := ListReferenceItemsForFields(ctx, pool, fieldIDs)
+	if err != nil {
+		return nil, err
+	}
+	referenceFieldsWithItems := make([]ReferenceFieldWithItems, len(referenceFields))
+	for i, f := range referenceFields {
+		items := itemsByField[f.ID]
+		if items == nil {
+			items = []ReferenceItem{}
+		}
+		referenceFieldsWithItems[i] = ReferenceFieldWithItems{ReferenceField: f, Items: items}
+	}
+
 	return &BoardSnapshot{
-		Board:      *board,
-		ViewerTier: tier,
-		Columns:    columns,
-		Bands:      bands,
-		Rows:       rows,
-		Cards:      cards,
+		Board:           *board,
+		ViewerTier:      tier,
+		Columns:         columns,
+		Bands:           bands,
+		Rows:            rows,
+		Cards:           cards,
+		ReferenceFields: referenceFieldsWithItems,
 	}, nil
 }

@@ -159,6 +159,9 @@ func main() {
 	if err := playerprofile.EnsureKernel61PlayerWorkbookSurface(ctx, pool); err != nil {
 		log.Fatalf("kernel 61 player workbook bootstrap failed: %v", err)
 	}
+	if err := storyboards.EnsureKernel81AStoryboardSlugsSurface(ctx, pool); err != nil {
+		log.Fatalf("kernel 81a storyboard slug backfill failed: %v", err)
+	}
 	if _, err := playerrelationships.LoadCatalogue(); err != nil {
 		log.Fatalf("kernel 62 relationship catalogue invalid: %v", err)
 	}
@@ -526,7 +529,20 @@ func main() {
 	mux.HandleFunc("DELETE /api/storyboards/{board_id}/cards/{card_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleCardItem(pool, hub)))
 	mux.HandleFunc("POST /api/storyboards/{board_id}/cards/{card_id}/move", ratelimit.Middleware(actionLimiter, storyboards.HandleCardMove(pool, hub)))
 	mux.HandleFunc("POST /api/storyboards/{board_id}/cards/{card_id}/lock", ratelimit.Middleware(actionLimiter, storyboards.HandleCardLock(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/cards/swap", ratelimit.Middleware(actionLimiter, storyboards.HandleCardSwap(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/cards/{card_id}/image", ratelimit.Middleware(actionLimiter, storyboards.HandleCardImage(pool, hub, storageRoot)))
+	mux.HandleFunc("DELETE /api/storyboards/{board_id}/cards/{card_id}/image", ratelimit.Middleware(actionLimiter, storyboards.HandleCardImage(pool, hub, storageRoot)))
 	mux.HandleFunc("POST /api/storyboards/{board_id}/cells/reorder", ratelimit.Middleware(actionLimiter, storyboards.HandleCellReorder(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/reference-fields", ratelimit.Middleware(actionLimiter, storyboards.HandleReferenceFields(pool, hub)))
+	mux.HandleFunc("PATCH /api/storyboards/{board_id}/reference-fields/{field_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleReferenceFieldItem(pool, hub)))
+	mux.HandleFunc("DELETE /api/storyboards/{board_id}/reference-fields/{field_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleReferenceFieldItem(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/reference-fields/reorder", ratelimit.Middleware(actionLimiter, storyboards.HandleReferenceFieldsReorder(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/reference-fields/{field_id}/type", ratelimit.Middleware(actionLimiter, storyboards.HandleReferenceFieldType(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/reference-fields/{field_id}/content", ratelimit.Middleware(actionLimiter, storyboards.HandleReferenceFieldContent(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/reference-fields/{field_id}/items", ratelimit.Middleware(actionLimiter, storyboards.HandleReferenceItems(pool, hub)))
+	mux.HandleFunc("PATCH /api/storyboards/{board_id}/reference-fields/{field_id}/items/{item_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleReferenceItemItem(pool, hub)))
+	mux.HandleFunc("DELETE /api/storyboards/{board_id}/reference-fields/{field_id}/items/{item_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleReferenceItemItem(pool, hub)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/reference-fields/{field_id}/items/reorder", ratelimit.Middleware(actionLimiter, storyboards.HandleReferenceItemsReorder(pool, hub)))
 	mux.HandleFunc("/ws/storyboards", storyboards.ServeStoryboardWS(hub, pool))
 
 	// Kernel 78: eWrite -- Library reading surface. Published content

@@ -8,11 +8,22 @@
   <title>Storyboard</title>
   <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
   <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080607;
+      --panel: rgba(17, 13, 14, 0.92);
+      --panel-strong: rgba(11, 8, 9, 0.97);
+      --line: rgba(255, 255, 255, 0.1);
+      --accent: #d84b4f;
+      --accent-strong: #ffd1d3;
+      --muted: #c6b7b8;
+      --accent-soft: rgba(216, 75, 79, 0.16);
+    }
     body {
       margin: 0;
-      background: #0d0a05;
-      color: #f0e8d8;
-      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: #f7eef0;
+      font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     }
     .shell { min-height: 100vh; padding: 18px; box-sizing: border-box; }
     .page-header {
@@ -22,112 +33,225 @@
       gap: 12px;
       margin-bottom: 14px;
       flex-wrap: wrap;
-      /* venue-account-badge.js floats a fixed top:14/right:14 badge
-         whenever the page has no <header> for it to dock into (this page
-         doesn't use one). Without this, header-actions -- pinned to the
-         far right by justify-content:space-between -- renders directly
-         under that badge and its buttons become unclickable. */
+      /* venue-account-badge.js floats a fixed top:14/right:14 badge whenever
+         the page has no <header> for it to dock into (this page doesn't use
+         one) -- without this, header-actions would render underneath it. */
       padding-right: 235px;
     }
-    .page-header h1 { margin: 0; font-size: 22px; }
-    .status-line { color: #a89272; font-size: 12px; }
+    .page-header h1 { margin: 0; font-size: 21px; }
+    .status-line { color: var(--muted); font-size: 12px; }
     .header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .role-badge {
-      font-size: 11px;
+      font-size: 10.5px;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
-      border: 1px solid rgba(196, 155, 74, 0.4);
+      letter-spacing: 0.06em;
+      border: 1px solid rgba(216, 75, 79, 0.4);
       border-radius: 4px;
       padding: 3px 8px;
-      color: #d9b46a;
+      color: var(--accent-strong);
     }
 
-    button {
-      background: #5a481f;
-      color: #f0e8d8;
-      border: none;
-      border-radius: 6px;
-      padding: 6px 12px;
-      font-size: 13px;
+    button, .chip-btn {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--accent-strong);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 13px;
+      font-size: 12.5px;
       cursor: pointer;
+      font: inherit;
+      transition: background 120ms ease, border-color 120ms ease;
     }
-    button:hover { background: #83672f; }
+    button:hover, .chip-btn:hover { background: rgba(255, 255, 255, 0.09); border-color: rgba(216, 75, 79, 0.35); }
     button:disabled { opacity: 0.4; cursor: default; }
-    button.small { padding: 3px 8px; font-size: 11px; }
-    button.danger { background: #6a2f2f; }
-    button.danger:hover { background: #8a3f3f; }
+    button.small { padding: 3px 9px; font-size: 11px; border-radius: 6px; }
+    button.danger { color: #ffd7d8; background: rgba(216, 75, 79, 0.1); border-color: rgba(216, 75, 79, 0.4); }
+    button.danger:hover { background: rgba(216, 75, 79, 0.22); }
+    button.icon-btn { padding: 3px 7px; font-size: 11px; border-radius: 6px; line-height: 1; }
 
-    label { font-size: 12px; color: #cbb98a; }
+    label { font-size: 12px; color: var(--muted); }
     input, textarea, select {
-      background: #0d0a05;
-      color: #f0e8d8;
-      border: 1px solid rgba(196, 155, 74, 0.3);
-      border-radius: 5px;
-      padding: 5px 7px;
-      font-size: 13px;
-    }
-
-    /* --- Grid --- */
-    .board-scroll { overflow: auto; border: 1px solid rgba(196, 155, 74, 0.2); border-radius: 8px; max-height: 76vh; }
-    table.board-grid { border-collapse: separate; border-spacing: 0; min-width: 100%; }
-    table.board-grid th, table.board-grid td { border-right: 1px solid rgba(196, 155, 74, 0.12); border-bottom: 1px solid rgba(196, 155, 74, 0.12); vertical-align: top; }
-    .col-header {
-      position: sticky;
-      top: 0;
-      background: #171208;
-      z-index: 3;
-      padding: 8px;
-      min-width: 200px;
-      font-size: 13px;
-    }
-    .row-label-cell {
-      position: sticky;
-      left: 0;
-      background: #171208;
-      z-index: 2;
-      padding: 8px;
-      min-width: 160px;
-      max-width: 220px;
-      font-size: 13px;
-    }
-    .col-header.corner { left: 0; z-index: 4; min-width: 160px; }
-    .band-row td {
-      background: #221a0c;
-      padding: 6px 10px;
-      font-weight: bold;
-      color: #d9b46a;
-      position: sticky;
-      left: 0;
-    }
-    .cell { padding: 6px; min-width: 200px; }
-    .card {
-      background: rgba(196, 155, 74, 0.08);
-      border: 1px solid rgba(196, 155, 74, 0.25);
+      background: #0d0a0b;
+      color: #f7eef0;
+      border: 1px solid var(--line);
       border-radius: 6px;
       padding: 6px 8px;
-      margin-bottom: 6px;
-      cursor: pointer;
       font-size: 13px;
+      font-family: inherit;
     }
-    .card:hover, .card:focus { border-color: rgba(196, 155, 74, 0.6); outline: none; }
-    .card.locked { border-style: dashed; }
-    .card.hidden-flag { background: rgba(224, 138, 122, 0.08); }
-    .card-title { font-weight: bold; }
-    .card-flags { font-size: 10px; color: #cbb98a; margin-top: 2px; }
-    .add-card-btn { font-size: 11px; }
+    input:focus, textarea:focus, select:focus { outline: 1px solid var(--accent); }
 
-    /* --- Modal --- */
+    .toolbar { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
+
+    /* ---------- CSS Grid board ---------- */
+    .board-scroll {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      max-height: 76vh;
+      background: var(--panel);
+      position: relative;
+    }
+    .board-grid {
+      display: grid;
+      grid-template-columns: 132px repeat(var(--col-count, 1), 172px);
+      grid-auto-rows: min-content;
+      width: max-content;
+      min-width: 100%;
+    }
+    .corner-cell {
+      grid-row: 1; grid-column: 1;
+      position: sticky; top: 0; left: 0; z-index: 6;
+      background: var(--panel-strong);
+      border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    }
+    .col-header {
+      grid-row: 1;
+      position: sticky; top: 0; z-index: 4;
+      background: var(--panel-strong);
+      border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      padding: 8px 8px;
+      font-size: 12px;
+      display: flex; align-items: center; justify-content: space-between; gap: 4px;
+      min-width: 0;
+    }
+    .col-header-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .col-header-boundary { background: var(--accent-soft); }
+    .col-header-boundary .reference-field-type-tag {
+      display: block; color: var(--accent-strong); font-weight: 700; margin: 0 0 2px;
+    }
+    .col-menu-wrap { position: relative; flex: 0 0 auto; }
+    .col-menu-btn { padding: 2px 6px; font-size: 12px; border-radius: 5px; }
+    .col-menu-panel {
+      position: absolute; top: 100%; right: 0; margin-top: 4px; z-index: 10;
+      background: var(--panel-strong); border: 1px solid var(--line); border-radius: 8px;
+      padding: 4px; display: flex; flex-direction: column; gap: 2px; min-width: 140px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+    }
+    .col-menu-panel button { text-align: left; border-radius: 5px; }
+    .col-menu-panel[hidden] { display: none; }
+
+    .band-bar {
+      grid-column: 1 / -1;
+      background: rgba(216, 75, 79, 0.09);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      min-height: 32px;
+      display: flex;
+      align-items: stretch;
+    }
+    .band-bar-inner {
+      position: sticky; left: 0;
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 10px; white-space: nowrap; font-size: 12.5px; font-weight: 700; color: var(--accent-strong);
+    }
+    .band-collapse-btn { font-size: 11px; padding: 2px 7px; }
+
+    .row-label {
+      position: sticky; left: 0; z-index: 2;
+      background: var(--panel-strong);
+      border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      padding: 6px 8px; font-size: 11.5px;
+      display: flex; align-items: center; justify-content: space-between; gap: 3px;
+      min-width: 0;
+    }
+    .row-label-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .cell {
+      border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      padding: 9px; min-height: 118px;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+    }
+    .cell.is-drop-target { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+    .cell.is-drop-occupied { background: rgba(216, 75, 79, 0.24); box-shadow: inset 0 0 0 2px var(--accent-strong); }
+    .cell.is-pick-target { cursor: pointer; box-shadow: inset 0 0 0 2px rgba(255, 209, 211, 0.55); }
+    .cell-empty-add {
+      width: 100%; min-height: 88px; border-radius: 12px; border: 1px dashed var(--line);
+      display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--muted);
+      cursor: pointer; background: transparent;
+    }
+    .cell-empty-add:hover { border-color: rgba(216, 75, 79, 0.4); color: var(--accent-strong); }
+
+    /* ---------- Cave-inspired compact card ---------- */
+    .sb-card {
+      position: relative;
+      width: 100%;
+      max-width: 152px;
+      min-height: 96px;
+      max-height: 176px;
+      overflow: hidden;
+      box-sizing: border-box;
+      border-radius: 13px;
+      padding: 9px 10px 27px;
+      color: #241a12;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      box-shadow: 0 9px 20px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      cursor: grab;
+      touch-action: none;
+      -webkit-user-select: none; user-select: none;
+    }
+    .sb-card:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+    .sb-card.is-dragging { opacity: 0.32; }
+    .sb-card.is-locked { border-style: dashed; border-color: rgba(0, 0, 0, 0.4); }
+    .sb-card.sb-color-default { background: #d9c7a6; }
+    .sb-card.sb-color-amber   { background: #e8c27a; }
+    .sb-card.sb-color-rose    { background: #e3b4bd; }
+    .sb-card.sb-color-crimson { background: #dba0a6; }
+    .sb-card.sb-color-violet  { background: #c8b7dd; }
+    .sb-card.sb-color-teal    { background: #a9d1c9; }
+    .sb-card.sb-color-moss    { background: #b9cf9d; }
+    .sb-card.sb-color-slate   { background: #b7c1c9; }
+    .sb-card.sb-color-gold    { background: #ecd48f; }
+
+    .sb-card-badges { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; z-index: 2; }
+    .sb-card-badge {
+      font-size: 8.5px; padding: 2px 5px; border-radius: 999px;
+      background: rgba(20, 12, 10, 0.68); color: #fff; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .sb-card-thumb-wrap { width: 100%; height: 44px; border-radius: 8px; overflow: hidden; margin-bottom: 6px; background: rgba(0,0,0,0.12); }
+    .sb-card-thumb-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; }
+    .sb-card-thumb-wrap.is-gravestone {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; color: rgba(0,0,0,0.55); text-align: center; padding: 0 4px;
+    }
+    .sb-card-title { font-weight: 700; font-size: 12.5px; line-height: 1.25; }
+    .sb-card-front-text {
+      font-size: 11px; line-height: 1.32; margin-top: 3px; opacity: 0.82;
+      overflow: hidden; text-overflow: ellipsis;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    }
+    .sb-card-back { display: none; font-size: 11px; line-height: 1.35; }
+    .sb-card.is-flipped .sb-card-front { display: none; }
+    .sb-card.is-flipped .sb-card-back { display: block; }
+    .sb-card-flip-btn {
+      position: absolute; right: 6px; bottom: 6px; width: 22px; height: 22px;
+      border-radius: 999px; border: 0; background: rgba(0, 0, 0, 0.2); color: rgba(0, 0, 0, 0.78);
+      cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; padding: 0;
+    }
+    .sb-card-move-btn {
+      position: absolute; left: 6px; bottom: 6px; border-radius: 999px; border: 0;
+      background: rgba(0, 0, 0, 0.14); color: rgba(0, 0, 0, 0.72); font-size: 9.5px; padding: 3px 7px; cursor: pointer;
+    }
+
+    .drag-ghost {
+      position: fixed; z-index: 200; pointer-events: none; opacity: 0.92;
+      transform: translate(-50%, -50%) rotate(-2deg);
+      width: 152px;
+    }
+
+    /* ---------- Modals ---------- */
     .modal-backdrop {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-      display: flex; align-items: center; justify-content: center; z-index: 50;
+      position: fixed; inset: 0; background: rgba(0,0,0,0.62);
+      display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; box-sizing: border-box;
     }
     .modal-backdrop[hidden] { display: none; }
     .modal {
-      background: #171208; border: 1px solid rgba(196, 155, 74, 0.4);
-      border-radius: 10px; padding: 20px; width: min(520px, 92vw);
+      background: var(--panel-strong); border: 1px solid var(--line);
+      border-radius: 14px; padding: 20px; width: min(520px, 92vw);
       max-height: 88vh; overflow: auto;
     }
-    .modal h2 { margin-top: 0; font-size: 16px; color: #d9b46a; }
+    .modal h2 { margin-top: 0; font-size: 16px; color: var(--accent-strong); }
     .field { margin-bottom: 10px; }
     .field label { display: block; margin-bottom: 3px; }
     .field input, .field textarea, .field select { width: 100%; box-sizing: border-box; }
@@ -135,13 +259,68 @@
     .checkbox-field { display: flex; align-items: center; gap: 6px; }
     .checkbox-field input { width: auto; }
 
-    .grant-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(196,155,74,0.12); font-size: 13px; }
-    .suggestion-chip { display: inline-block; background: rgba(196,155,74,0.1); border: 1px solid rgba(196,155,74,0.3); border-radius: 12px; padding: 2px 10px; font-size: 12px; margin: 2px 4px 2px 0; cursor: pointer; }
+    .image-field-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .image-field-thumb { width: 84px; height: 60px; border-radius: 8px; overflow: hidden; background: rgba(255,255,255,0.05); border: 1px solid var(--line); flex: 0 0 auto; display:flex; align-items:center; justify-content:center; }
+    .image-field-thumb img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
+    .image-field-thumb .gravestone-label { font-size: 9px; color: var(--muted); text-align: center; padding: 0 4px; }
 
-    .form-error { color: #e08a7a; font-size: 12px; margin-top: 6px; }
+    .lightbox-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.86); z-index: 100;
+      display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box;
+    }
+    .lightbox-backdrop[hidden] { display: none; }
+    .lightbox-backdrop img { max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+    .lightbox-close {
+      position: absolute; top: 18px; right: 22px; width: 36px; height: 36px; border-radius: 999px;
+      background: rgba(255,255,255,0.1); color: #fff; font-size: 16px; border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .grant-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+    .suggestion-chip { display: inline-block; background: var(--accent-soft); border: 1px solid rgba(216,75,79,0.3); border-radius: 12px; padding: 2px 10px; font-size: 12px; margin: 2px 4px 2px 0; }
+
+    .form-error { color: #ff9a9d; font-size: 12px; margin-top: 6px; }
     .form-ok { color: #9ede9f; font-size: 12px; margin-top: 6px; }
+    .pick-banner {
+      position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 60;
+      background: var(--panel-strong); border: 1px solid var(--accent); border-radius: 999px;
+      padding: 8px 16px; font-size: 12.5px; display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+    .pick-banner[hidden] { display: none; }
 
-    .toolbar { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
+    /* ---------- Reference Panel (Kernel 82) ---------- */
+    #board-root { display: flex; gap: 14px; align-items: flex-start; }
+    .board-scroll { flex: 1 1 auto; min-width: 0; }
+    .reference-panel {
+      width: 300px; flex: 0 0 auto; box-sizing: border-box;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+      padding: 12px; max-height: 76vh; overflow-y: auto;
+    }
+    .reference-panel-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px; font-weight: 700; color: var(--accent-strong); font-size: 13px;
+    }
+    .reference-field { border-bottom: 1px solid var(--line); padding: 10px 0; }
+    .reference-field:last-child { border-bottom: none; }
+    .reference-field-label-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; margin-bottom: 6px; }
+    .reference-field-label { font-weight: 700; font-size: 12.5px; }
+    .reference-field-type-tag { font-size: 9.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-left: 6px; }
+    .reference-field-controls { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+    .reference-field textarea { width: 100%; box-sizing: border-box; min-height: 60px; max-height: 220px; resize: vertical; font-family: inherit; }
+    .reference-field input[type="text"] { width: 100%; box-sizing: border-box; }
+    .reference-list-items { display: flex; flex-direction: column; gap: 4px; }
+    .reference-list-item { display: flex; gap: 4px; align-items: center; }
+    .reference-list-item input { flex: 1; min-width: 0; }
+    .reference-add-item-row { display: flex; gap: 4px; margin-top: 6px; }
+    .reference-add-item-row input { flex: 1; min-width: 0; }
+    .reference-paired { display: flex; gap: 10px; }
+    .reference-paired > div { flex: 1; min-width: 0; }
+    .reference-paired-sublabel { font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 700; }
+    #reference-panel-collapsed-toggle {
+      flex: 0 0 auto; align-self: flex-start; writing-mode: vertical-rl;
+      padding: 10px 4px; border-radius: 8px;
+    }
+    [hidden] { display: none !important; }
   </style>
 </head>
 <body>
@@ -170,17 +349,54 @@
     </div>
 
     <div class="toolbar" id="structure-toolbar" hidden>
-      <button id="add-column-btn" class="small">+ Column</button>
+      <button id="add-column-btn" class="small">+ Column (end)</button>
       <button id="add-band-btn" class="small">+ Band</button>
       <span id="column-limit-note" class="status-line"></span>
     </div>
 
     <div id="board-root">
-      <div class="board-scroll">
-        <table class="board-grid" id="board-grid">
-          <thead><tr id="grid-header-row"></tr></thead>
-          <tbody id="grid-body"></tbody>
-        </table>
+      <div class="board-scroll" id="board-scroll">
+        <div class="board-grid" id="board-grid"></div>
+      </div>
+      <button id="reference-panel-collapsed-toggle" class="small" hidden>Reference Panel »</button>
+      <div class="reference-panel" id="reference-panel" hidden>
+        <div class="reference-panel-header">
+          <span>Reference Panel</span>
+          <div style="display:flex; gap:4px;">
+            <button id="reference-add-field-btn" class="icon-btn" hidden title="Add field">+ Field</button>
+            <button id="reference-panel-collapse-btn" class="icon-btn" title="Collapse">«</button>
+          </div>
+        </div>
+        <div id="reference-panel-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reference field editor modal (add / rename) -->
+  <div class="modal-backdrop" id="reference-field-modal" hidden>
+    <div class="modal" style="width:min(420px,92vw);">
+      <h2 id="reference-field-modal-title">Field</h2>
+      <div class="field"><label>Label</label><input id="reference-field-label-input" /></div>
+      <div class="field" id="reference-field-type-field">
+        <label>Type</label>
+        <select id="reference-field-type-input">
+          <option value="short_text">Short text</option>
+          <option value="long_text">Long text</option>
+          <option value="list">List</option>
+          <option value="paired_list">Paired list</option>
+        </select>
+      </div>
+      <div class="field" id="reference-field-sublabels-field" hidden>
+        <label>Sublabels</label>
+        <div style="display:flex; gap:6px;">
+          <input id="reference-field-sublabel-a-input" placeholder="e.g. Include" />
+          <input id="reference-field-sublabel-b-input" placeholder="e.g. Exclude" />
+        </div>
+      </div>
+      <div id="reference-field-modal-message"></div>
+      <div class="modal-actions">
+        <button id="reference-field-save-btn">Save</button>
+        <button id="reference-field-close-btn">Close</button>
       </div>
     </div>
   </div>
@@ -193,7 +409,22 @@
       <div class="field"><label>Front</label><textarea id="card-front-input" rows="3"></textarea></div>
       <div class="field"><label>Back</label><textarea id="card-back-input" rows="3"></textarea></div>
       <div class="field"><label>Category</label><input id="card-category-input" /></div>
-      <div class="field"><label>Color token</label><input id="card-color-input" placeholder="e.g. amber" /></div>
+      <div class="field">
+        <label>Color</label>
+        <select id="card-color-input"></select>
+      </div>
+      <div class="field">
+        <label>Image</label>
+        <div class="image-field-row">
+          <div class="image-field-thumb" id="card-image-thumb-wrap">
+            <span class="gravestone-label" id="card-image-empty-label">No image</span>
+          </div>
+          <input type="file" id="card-image-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+          <button type="button" id="card-image-choose-btn" class="small">Choose…</button>
+          <button type="button" id="card-image-remove-btn" class="small danger" hidden>Remove</button>
+        </div>
+        <div id="card-image-status" class="status-line"></div>
+      </div>
       <div class="field" id="card-hidden-field" hidden>
         <label class="checkbox-field"><input type="checkbox" id="card-hidden-input" /> Hidden from Audience/Cast</label>
       </div>
@@ -201,8 +432,8 @@
         <label class="checkbox-field"><input type="checkbox" id="card-lock-input" /> Locked</label>
       </div>
       <div class="field" id="card-move-field">
-        <label>Move to</label>
-        <div style="display:flex; gap:6px;">
+        <label>Move to (keyboard-accessible fallback)</label>
+        <div style="display:flex; gap:6px; flex-wrap: wrap;">
           <select id="card-move-row"></select>
           <select id="card-move-column"></select>
           <button id="card-move-btn" class="small">Move</button>
@@ -219,6 +450,31 @@
         <button id="card-close-btn">Close</button>
       </div>
     </div>
+  </div>
+
+  <!-- Occupied-cell resolution modal (spec 7.4) -->
+  <div class="modal-backdrop" id="occupied-modal" hidden>
+    <div class="modal" style="width:min(400px,92vw);">
+      <h2>Cell occupied</h2>
+      <p id="occupied-modal-text" class="status-line"></p>
+      <div class="modal-actions">
+        <button id="occupied-swap-btn">Swap</button>
+        <button id="occupied-move-existing-btn">Move existing…</button>
+        <button id="occupied-cancel-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- "Move existing card" empty-cell picker banner -->
+  <div class="pick-banner" id="pick-banner" hidden>
+    <span id="pick-banner-text">Click an empty cell for the existing card…</span>
+    <button id="pick-banner-cancel" class="small">Cancel (Esc)</button>
+  </div>
+
+  <!-- Lightbox -->
+  <div class="lightbox-backdrop" id="lightbox" hidden>
+    <button class="lightbox-close" id="lightbox-close" aria-label="Close">✕</button>
+    <img id="lightbox-img" alt="Full-size card image" />
   </div>
 
   <!-- Sharing modal -->
@@ -256,25 +512,20 @@
   <script src="/lib/forbidden.js"></script>
   <script src="/lib/venue-account-badge.js?v=nav-1"></script>
   <script src="/lib/ewrite-rule-link.js"></script>
+  <script src="/venues/storyboards/grid-model.js"></script>
   <script src="/venues/storyboards/socket.js"></script>
   <script>
+    const G = window.VictoryStoryboardGrid;
     const params = new URLSearchParams(window.location.search);
     const boardId = params.get("id");
+    const apiBase = "/api/storyboards/" + encodeURIComponent(boardId || "");
     let snapshot = null;
     let socketHandle = null;
+    let affordances = G.roleAffordances("");
+    const assetMetaCache = new Map(); // assetId -> payload.data | null (404)
 
     if (!boardId) {
       document.getElementById("board-status").textContent = "No board id given.";
-    }
-
-    function tierAtLeastCrew(tier) {
-      return ["crew", "director", "producer", "owner", "operator"].includes(tier);
-    }
-    function tierAtLeastDirector(tier) {
-      return ["director", "producer", "owner", "operator"].includes(tier);
-    }
-    function tierIsOwner(tier) {
-      return tier === "owner" || tier === "operator";
     }
 
     async function apiFetch(url, opts) {
@@ -289,34 +540,23 @@
         body: JSON.stringify(body || {}),
       });
     }
+    function errorMessage(payload, res) {
+      return (payload && payload.data && payload.data.error) || (res && res.status) || "unknown error";
+    }
 
     async function loadSnapshot() {
-      const { res, payload } = await apiFetch("/api/storyboards/" + encodeURIComponent(boardId));
-      if (isForbiddenAccessResponse(res, payload) || !res.ok || !payload?.ok) {
+      const { res, payload } = await apiFetch(apiBase);
+      if (isForbiddenAccessResponse(res, payload) || !res.ok || !payload || !payload.ok) {
         showForbiddenScreen();
         return false;
       }
       snapshot = payload.data;
+      affordances = G.roleAffordances(snapshot.viewer_tier);
       render();
       return true;
     }
 
-    function cardsByCell() {
-      const map = {};
-      for (const c of snapshot.cards) {
-        const key = c.row_id + "|" + c.column_id;
-        (map[key] = map[key] || []).push(c);
-      }
-      for (const key in map) map[key].sort((a, b) => a.sort_order_in_cell - b.sort_order_in_cell);
-      return map;
-    }
-
-    function rowsByBand() {
-      const map = {};
-      for (const r of snapshot.rows) (map[r.band_id] = map[r.band_id] || []).push(r);
-      for (const key in map) map[key].sort((a, b) => a.sort_order_in_band - b.sort_order_in_band);
-      return map;
-    }
+    // ---------- Rendering ----------
 
     function render() {
       const tier = snapshot.viewer_tier;
@@ -325,161 +565,593 @@
         (snapshot.board.description || "") + (snapshot.board.archived_at ? " · Archived" : "");
       document.getElementById("role-badge").textContent = tier;
 
-      document.getElementById("structure-toolbar").hidden = !tierAtLeastDirector(tier);
-      document.getElementById("export-btn").hidden = !tierAtLeastDirector(tier);
-      document.getElementById("share-btn").hidden = !tierIsOwner(tier);
+      document.getElementById("structure-toolbar").hidden = !affordances.canEditStructure;
+      document.getElementById("export-btn").hidden = !affordances.canExport;
+      document.getElementById("share-btn").hidden = !affordances.canManageSharing;
       const archiveBtn = document.getElementById("archive-btn");
-      archiveBtn.hidden = !tierIsOwner(tier);
+      archiveBtn.hidden = !affordances.canArchive;
       archiveBtn.textContent = snapshot.board.archived_at ? "Unarchive" : "Archive";
       document.getElementById("column-limit-note").textContent =
         snapshot.columns.length >= 200 ? "200-column limit reached" : snapshot.columns.length + " / 200 columns";
 
-      const headerRow = document.getElementById("grid-header-row");
-      headerRow.innerHTML = "";
-      const corner = document.createElement("th");
-      corner.className = "col-header corner";
-      corner.textContent = "";
-      headerRow.appendChild(corner);
+      renderGrid();
+      renderReferencePanel();
+    }
+
+    function closeAllColumnMenus() {
+      document.querySelectorAll(".col-menu-panel").forEach((p) => (p.hidden = true));
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById("board-grid");
+      grid.style.setProperty("--col-count", String(snapshot.columns.length || 1));
+      grid.innerHTML = "";
+
+      const layout = G.computeGridLayout(snapshot);
+      const byCell = G.cardsByCell(snapshot.cards);
+
+      // Corner
+      const corner = document.createElement("div");
+      corner.className = "corner-cell";
+      grid.appendChild(corner);
+
+      // Column headers
       for (const col of snapshot.columns) {
-        const th = document.createElement("th");
-        th.className = "col-header";
-        th.textContent = col.title;
-        if (tierAtLeastDirector(tier)) {
-          const renameBtn = document.createElement("button");
-          renameBtn.className = "small";
-          renameBtn.textContent = "✎";
-          renameBtn.style.marginLeft = "6px";
-          renameBtn.addEventListener("click", () => renameColumnFlow(col));
-          th.appendChild(renameBtn);
-          const removeBtn = document.createElement("button");
-          removeBtn.className = "small danger";
-          removeBtn.textContent = "×";
-          removeBtn.style.marginLeft = "4px";
-          removeBtn.title = "Remove column";
-          removeBtn.addEventListener("click", () => removeColumnFlow(col));
-          th.appendChild(removeBtn);
+        const header = document.createElement("div");
+        header.className = "col-header";
+        header.style.gridColumn = String(layout.columnLine[col.id]);
+        const titleWrap = document.createElement("div");
+        titleWrap.style.minWidth = "0";
+        if (col.column_role === "beginning" || col.column_role === "ending") {
+          header.classList.add("col-header-boundary");
+          const badge = document.createElement("span");
+          badge.className = "reference-field-type-tag";
+          badge.textContent = col.column_role === "beginning" ? "Beginning" : "Ending";
+          titleWrap.appendChild(badge);
         }
-        headerRow.appendChild(th);
+        const titleEl = document.createElement("span");
+        titleEl.className = "col-header-title";
+        titleEl.textContent = col.title;
+        titleEl.title = col.title;
+        titleWrap.appendChild(titleEl);
+        header.appendChild(titleWrap);
+        if (affordances.canInsertColumns) {
+          header.appendChild(buildColumnMenu(col));
+        }
+        grid.appendChild(header);
       }
 
-      const body = document.getElementById("grid-body");
-      body.innerHTML = "";
-      const byBand = rowsByBand();
-      const byCell = cardsByCell();
-
-      for (const band of snapshot.bands) {
-        const bandTr = document.createElement("tr");
-        bandTr.className = "band-row";
-        const bandTd = document.createElement("td");
-        bandTd.colSpan = snapshot.columns.length + 1;
-        bandTd.textContent = band.label + (band.is_locked ? " 🔒" : "");
-        if (tierAtLeastCrew(tier) && (tierAtLeastDirector(tier) || !band.is_locked)) {
+      // Bands + rows
+      for (const band of layout.bandOrder) {
+        const bandObj = snapshot.bands.find((b) => b.id === band);
+        const bar = document.createElement("div");
+        bar.className = "band-bar";
+        bar.style.gridRow = String(layout.bandHeaderLine[band]);
+        const inner = document.createElement("div");
+        inner.className = "band-bar-inner";
+        const collapseBtn = document.createElement("button");
+        collapseBtn.className = "band-collapse-btn small";
+        collapseBtn.textContent = bandObj.is_collapsed ? "▸" : "▾";
+        collapseBtn.title = bandObj.is_collapsed ? "Expand band" : "Collapse band";
+        collapseBtn.addEventListener("click", () => toggleBandCollapse(bandObj));
+        inner.appendChild(collapseBtn);
+        const label = document.createElement("span");
+        label.textContent = bandObj.label + (bandObj.is_locked ? " 🔒" : "");
+        inner.appendChild(label);
+        if (affordances.canEditCards && (affordances.canEditStructure || !bandObj.is_locked)) {
           const editBtn = document.createElement("button");
           editBtn.className = "small";
-          editBtn.textContent = "Edit band";
-          editBtn.style.marginLeft = "10px";
-          editBtn.addEventListener("click", () => editBandFlow(band));
-          bandTd.appendChild(editBtn);
+          editBtn.textContent = "Edit";
+          editBtn.addEventListener("click", () => editBandFlow(bandObj));
+          inner.appendChild(editBtn);
         }
-        if (tierAtLeastDirector(tier)) {
+        if (affordances.canEditStructure) {
           const lockBtn = document.createElement("button");
           lockBtn.className = "small";
-          lockBtn.textContent = band.is_locked ? "Unlock" : "Lock";
-          lockBtn.style.marginLeft = "6px";
-          lockBtn.addEventListener("click", () => toggleBandLockFlow(band));
-          bandTd.appendChild(lockBtn);
-          const removeBandBtn = document.createElement("button");
-          removeBandBtn.className = "small danger";
-          removeBandBtn.textContent = "Remove band";
-          removeBandBtn.style.marginLeft = "6px";
-          removeBandBtn.addEventListener("click", () => removeBandFlow(band));
-          bandTd.appendChild(removeBandBtn);
+          lockBtn.textContent = bandObj.is_locked ? "Unlock" : "Lock";
+          lockBtn.addEventListener("click", () => toggleBandLockFlow(bandObj));
+          inner.appendChild(lockBtn);
+          const removeBtn = document.createElement("button");
+          removeBtn.className = "small danger";
+          removeBtn.textContent = "Remove";
+          removeBtn.addEventListener("click", () => removeBandFlow(bandObj));
+          inner.appendChild(removeBtn);
         }
-        bandTr.appendChild(bandTd);
-        body.appendChild(bandTr);
+        bar.appendChild(inner);
+        grid.appendChild(bar);
 
-        const rows = byBand[band.id] || [];
-        for (const row of rows) {
-          const tr = document.createElement("tr");
-          const labelTd = document.createElement("td");
-          labelTd.className = "row-label-cell";
-          labelTd.textContent = row.label;
-          if (tierAtLeastDirector(tier)) {
+        if (bandObj.is_collapsed) continue;
+
+        const rowIds = layout.bandRowIds[band];
+        for (const rowId of rowIds) {
+          const row = snapshot.rows.find((r) => r.id === rowId);
+          const rowLine = layout.rowLine[rowId];
+
+          const labelCell = document.createElement("div");
+          labelCell.className = "row-label";
+          labelCell.style.gridRow = String(rowLine);
+          labelCell.style.gridColumn = "1";
+          const labelTitle = document.createElement("span");
+          labelTitle.className = "row-label-title";
+          labelTitle.textContent = row.label;
+          labelTitle.title = row.label;
+          labelCell.appendChild(labelTitle);
+          if (affordances.canEditStructure) {
             const editBtn = document.createElement("button");
-            editBtn.className = "small";
+            editBtn.className = "icon-btn";
             editBtn.textContent = "✎";
-            editBtn.style.marginLeft = "6px";
             editBtn.addEventListener("click", () => renameRowFlow(row));
-            labelTd.appendChild(editBtn);
-            const removeRowBtn = document.createElement("button");
-            removeRowBtn.className = "small danger";
-            removeRowBtn.textContent = "×";
-            removeRowBtn.style.marginLeft = "4px";
-            removeRowBtn.title = "Remove row";
-            removeRowBtn.addEventListener("click", () => removeRowFlow(row));
-            labelTd.appendChild(removeRowBtn);
+            labelCell.appendChild(editBtn);
+            const removeBtn = document.createElement("button");
+            removeBtn.className = "icon-btn danger";
+            removeBtn.textContent = "×";
+            removeBtn.title = "Remove row";
+            removeBtn.addEventListener("click", () => removeRowFlow(row));
+            labelCell.appendChild(removeBtn);
           }
-          tr.appendChild(labelTd);
+          grid.appendChild(labelCell);
 
           for (const col of snapshot.columns) {
-            const td = document.createElement("td");
-            td.className = "cell";
-            const cards = byCell[row.id + "|" + col.id] || [];
-            for (const card of cards) {
-              const cardEl = document.createElement("div");
-              cardEl.className = "card" + (card.is_locked ? " locked" : "") + (card.hidden_from_audience ? " hidden-flag" : "");
-              cardEl.tabIndex = 0;
-              cardEl.setAttribute("role", "button");
-              const titleEl = document.createElement("div");
-              titleEl.className = "card-title";
-              titleEl.textContent = card.title || "(untitled)";
-              cardEl.appendChild(titleEl);
-              const flags = [];
-              if (card.is_locked) flags.push("locked");
-              if (card.hidden_from_audience) flags.push("hidden");
-              if (card.category) flags.push(card.category);
-              if (flags.length) {
-                const flagsEl = document.createElement("div");
-                flagsEl.className = "card-flags";
-                flagsEl.textContent = flags.join(" · ");
-                cardEl.appendChild(flagsEl);
-              }
-              const openHandler = () => openCardModal(card);
-              cardEl.addEventListener("click", openHandler);
-              cardEl.addEventListener("keydown", (e) => {
-                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openHandler(); }
-              });
-              td.appendChild(cardEl);
-            }
-            if (tierAtLeastCrew(tier)) {
+            const cellCards = byCell[row.id + "|" + col.id] || [];
+            const visibleCard = G.visibleCardForCell(cellCards);
+            const cellEl = document.createElement("div");
+            cellEl.className = "cell";
+            cellEl.style.gridRow = String(rowLine);
+            cellEl.style.gridColumn = String(layout.columnLine[col.id]);
+            cellEl.dataset.rowId = row.id;
+            cellEl.dataset.columnId = col.id;
+
+            if (visibleCard) {
+              cellEl.appendChild(buildCardEl(visibleCard));
+            } else if (affordances.canEditCards) {
               const addBtn = document.createElement("button");
-              addBtn.className = "small add-card-btn";
+              addBtn.className = "cell-empty-add";
+              addBtn.type = "button";
               addBtn.textContent = "+ card";
               addBtn.addEventListener("click", () => createCardFlow(row, col));
-              td.appendChild(addBtn);
+              cellEl.appendChild(addBtn);
             }
-            tr.appendChild(td);
+            grid.appendChild(cellEl);
           }
-          body.appendChild(tr);
         }
-        if (tierAtLeastDirector(tier)) {
-          const addRowTr = document.createElement("tr");
-          const addRowTd = document.createElement("td");
-          addRowTd.colSpan = snapshot.columns.length + 1;
-          addRowTd.style.padding = "4px 8px";
+
+        if (affordances.canEditStructure) {
+          const addRowCell = document.createElement("div");
+          addRowCell.style.gridRow = String(layout.addRowLine[band]);
+          addRowCell.style.gridColumn = "1 / -1";
+          addRowCell.style.padding = "4px 10px";
           const addRowBtn = document.createElement("button");
           addRowBtn.className = "small";
-          addRowBtn.textContent = "+ row in " + band.label;
-          addRowBtn.addEventListener("click", () => addRowFlow(band));
-          addRowTd.appendChild(addRowBtn);
-          addRowTr.appendChild(addRowTd);
-          body.appendChild(addRowTr);
+          addRowBtn.textContent = "+ row in " + bandObj.label;
+          addRowBtn.addEventListener("click", () => addRowFlow(bandObj));
+          addRowCell.appendChild(addRowBtn);
+          grid.appendChild(addRowCell);
         }
       }
     }
 
-    // --- Card modal ---
+    function buildColumnMenu(col) {
+      const wrap = document.createElement("div");
+      wrap.className = "col-menu-wrap";
+      const btn = document.createElement("button");
+      btn.className = "col-menu-btn small";
+      btn.textContent = "⋮";
+      btn.title = "Column options";
+      const panel = document.createElement("div");
+      panel.className = "col-menu-panel";
+      panel.hidden = true;
+
+      function item(text, handler) {
+        const b = document.createElement("button");
+        b.className = "small";
+        b.textContent = text;
+        b.addEventListener("click", () => { panel.hidden = true; handler(); });
+        panel.appendChild(b);
+      }
+      // Boundary columns (Kernel 82 spec 2.4): Beginning only expands
+      // rightward, Ending only expands leftward, and neither is ever
+      // removable -- server-enforced already (ErrBoundaryColumnDisplaced/
+      // ErrBoundaryColumnProtected), this just keeps the menu from
+      // offering an action that can only fail.
+      if (col.column_role !== "beginning") item("Insert left", () => insertColumnFlow(col, "left"));
+      if (col.column_role !== "ending") item("Insert right", () => insertColumnFlow(col, "right"));
+      item("Rename", () => renameColumnFlow(col));
+      if (col.column_role === "ordinary") item("Remove", () => removeColumnFlow(col));
+
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const wasHidden = panel.hidden;
+        closeAllColumnMenus();
+        panel.hidden = !wasHidden;
+      });
+      wrap.appendChild(btn);
+      wrap.appendChild(panel);
+      return wrap;
+    }
+    document.addEventListener("click", closeAllColumnMenus);
+
+    // ---------- Card rendering ----------
+
+    function canDragCard(card) {
+      if (!affordances.canDragCards) return false;
+      if (!card.is_locked) return true;
+      return affordances.canEditStructure; // locked cards: only Director+/owner may move (matches canMutateCard)
+    }
+
+    function buildCardEl(card) {
+      const el = document.createElement("div");
+      el.className = "sb-card " + G.colorTokenClass(card.color_token) + (card.is_locked ? " is-locked" : "");
+      el.tabIndex = 0;
+      el.setAttribute("role", "button");
+      el.dataset.cardId = card.id;
+
+      const badges = document.createElement("div");
+      badges.className = "sb-card-badges";
+      if (card.is_locked) badges.appendChild(makeBadge("locked"));
+      if (card.hidden_from_audience) badges.appendChild(makeBadge("hidden"));
+      el.appendChild(badges);
+
+      const front = document.createElement("div");
+      front.className = "sb-card-front";
+
+      if (card.image_asset_id) {
+        front.appendChild(buildCardThumb(card));
+      }
+      const titleEl = document.createElement("div");
+      titleEl.className = "sb-card-title";
+      titleEl.textContent = card.title || "(untitled)";
+      front.appendChild(titleEl);
+      if (card.front_text) {
+        const frontText = document.createElement("div");
+        frontText.className = "sb-card-front-text";
+        frontText.textContent = card.front_text;
+        front.appendChild(frontText);
+      }
+      el.appendChild(front);
+
+      const back = document.createElement("div");
+      back.className = "sb-card-back";
+      back.textContent = card.back_text || "(no back text)";
+      el.appendChild(back);
+
+      const flipBtn = document.createElement("button");
+      flipBtn.className = "sb-card-flip-btn";
+      flipBtn.type = "button";
+      flipBtn.textContent = "⟲";
+      flipBtn.title = "Flip card";
+      flipBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        el.classList.toggle("is-flipped");
+      });
+      el.appendChild(flipBtn);
+
+      if (canDragCard(card)) {
+        const moveBtn = document.createElement("button");
+        moveBtn.className = "sb-card-move-btn";
+        moveBtn.type = "button";
+        moveBtn.textContent = "⠿";
+        moveBtn.title = "Drag to move, or open card to use the Move fallback";
+        moveBtn.addEventListener("click", (e) => { e.stopPropagation(); openCardModal(card); });
+        el.appendChild(moveBtn);
+        attachCardDragHandlers(el, card);
+      }
+
+      const openHandler = (e) => {
+        if (e && e.target && e.target.closest(".sb-card-flip-btn, .sb-card-move-btn, .sb-card-thumb-wrap img")) return;
+        openCardModal(card);
+      };
+      el.addEventListener("click", (e) => {
+        if (el._suppressClick) { el._suppressClick = false; return; }
+        openHandler(e);
+      });
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openCardModal(card); }
+      });
+
+      return el;
+    }
+
+    function makeBadge(text) {
+      const b = document.createElement("span");
+      b.className = "sb-card-badge";
+      b.textContent = text;
+      return b;
+    }
+
+    function buildCardThumb(card) {
+      const wrap = document.createElement("div");
+      wrap.className = "sb-card-thumb-wrap";
+      const img = document.createElement("img");
+      img.src = "/api/assets/" + encodeURIComponent(card.image_asset_id) + "/content?variant=thumbnail";
+      img.alt = "Card image for " + (card.title || "untitled card");
+      img.loading = "lazy";
+      img.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openLightbox(card.image_asset_id);
+      });
+      wrap.appendChild(img);
+
+      loadAssetMeta(card.image_asset_id).then((meta) => {
+        if (G.isImageGravestone(true, meta)) {
+          wrap.classList.add("is-gravestone");
+          wrap.innerHTML = "";
+          const label = document.createElement("span");
+          label.textContent = "Image unavailable";
+          wrap.appendChild(label);
+        }
+      });
+      return wrap;
+    }
+
+    async function loadAssetMeta(assetId) {
+      if (assetMetaCache.has(assetId)) return assetMetaCache.get(assetId);
+      try {
+        const { res, payload } = await apiFetch("/api/assets/" + encodeURIComponent(assetId));
+        const meta = res.ok && payload && payload.ok ? payload.data : null;
+        assetMetaCache.set(assetId, meta);
+        return meta;
+      } catch (err) {
+        assetMetaCache.set(assetId, null);
+        return null;
+      }
+    }
+
+    function openLightbox(assetId) {
+      document.getElementById("lightbox-img").src = "/api/assets/" + encodeURIComponent(assetId) + "/content?variant=original";
+      document.getElementById("lightbox").hidden = false;
+    }
+    function closeLightbox() {
+      document.getElementById("lightbox").hidden = true;
+      document.getElementById("lightbox-img").src = "";
+    }
+    document.getElementById("lightbox-close").addEventListener("click", closeLightbox);
+    document.getElementById("lightbox").addEventListener("click", (e) => {
+      if (e.target.id === "lightbox") closeLightbox();
+    });
+
+    // ---------- Drag and drop (Pointer Events; spec 7) ----------
+
+    let dragState = null;
+    let currentDropTarget = null;
+
+    function attachCardDragHandlers(cardEl, card) {
+      cardEl.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0 && e.pointerType === "mouse") return;
+        dragState = {
+          cardId: card.id, card: card,
+          originRowId: card.row_id, originColumnId: card.column_id,
+          startX: e.clientX, startY: e.clientY,
+          pointerId: e.pointerId, dragging: false, originEl: cardEl,
+        };
+      });
+      cardEl.addEventListener("pointermove", (e) => {
+        if (!dragState || dragState.cardId !== card.id) return;
+        const dx = e.clientX - dragState.startX;
+        const dy = e.clientY - dragState.startY;
+        if (!dragState.dragging) {
+          if (Math.hypot(dx, dy) < 6) return;
+          dragState.dragging = true;
+          try { cardEl.setPointerCapture(dragState.pointerId); } catch (err) { /* ignore */ }
+          startGhost(cardEl, e);
+          cardEl.classList.add("is-dragging");
+        }
+        updateGhost(e);
+        autoScrollNearEdges(e);
+      });
+      cardEl.addEventListener("pointerup", (e) => {
+        if (!dragState || dragState.cardId !== card.id) return;
+        const wasDragging = dragState.dragging;
+        if (wasDragging) {
+          cardEl._suppressClick = true;
+          finishDrag(e);
+          cardEl.classList.remove("is-dragging");
+        }
+        try { cardEl.releasePointerCapture(dragState.pointerId); } catch (err) { /* ignore */ }
+        dragState = null;
+      });
+      cardEl.addEventListener("pointercancel", () => {
+        cancelGhost();
+        if (dragState) dragState.originEl.classList.remove("is-dragging");
+        dragState = null;
+      });
+    }
+
+    let ghostEl = null;
+    function startGhost(cardEl, e) {
+      ghostEl = cardEl.cloneNode(true);
+      ghostEl.classList.add("drag-ghost");
+      ghostEl.classList.remove("is-dragging");
+      ghostEl.style.left = e.clientX + "px";
+      ghostEl.style.top = e.clientY + "px";
+      document.body.appendChild(ghostEl);
+    }
+    function updateGhost(e) {
+      if (!ghostEl) return;
+      ghostEl.style.left = e.clientX + "px";
+      ghostEl.style.top = e.clientY + "px";
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const cell = el ? el.closest(".cell") : null;
+      if (cell !== currentDropTarget) {
+        if (currentDropTarget) currentDropTarget.classList.remove("is-drop-target", "is-drop-occupied");
+        currentDropTarget = cell;
+        if (cell) {
+          const occupied = !!G.visibleCardForCell(
+            G.cardsByCell(snapshot.cards)[cell.dataset.rowId + "|" + cell.dataset.columnId]
+          );
+          cell.classList.add(occupied ? "is-drop-occupied" : "is-drop-target");
+        }
+      }
+    }
+    function cancelGhost() {
+      if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+      if (currentDropTarget) { currentDropTarget.classList.remove("is-drop-target", "is-drop-occupied"); currentDropTarget = null; }
+    }
+    function autoScrollNearEdges(e) {
+      const scroller = document.getElementById("board-scroll");
+      const rect = scroller.getBoundingClientRect();
+      const margin = 36;
+      if (e.clientX - rect.left < margin) scroller.scrollLeft -= 14;
+      else if (rect.right - e.clientX < margin) scroller.scrollLeft += 14;
+      if (e.clientY - rect.top < margin) scroller.scrollTop -= 14;
+      else if (rect.bottom - e.clientY < margin) scroller.scrollTop += 14;
+    }
+
+    async function finishDrag(e) {
+      const target = currentDropTarget;
+      cancelGhost();
+      if (!target) return;
+      const targetRowId = target.dataset.rowId;
+      const targetColumnId = target.dataset.columnId;
+      const card = dragState.card;
+      const cellCards = G.cardsByCell(snapshot.cards)[targetRowId + "|" + targetColumnId];
+      const existing = G.visibleCardForCell(cellCards);
+      const kind = G.dropResolutionKind(existing, card.id);
+      if (kind === "noop") return;
+      if (kind === "move") {
+        const { res, payload } = await apiPost(apiBase + "/cards/" + card.id + "/move", {
+          base_version: card.version, target_row_id: targetRowId, target_column_id: targetColumnId,
+        });
+        if (!res.ok || !payload || !payload.ok) {
+          alert("Could not move card: " + errorMessage(payload, res));
+          await loadSnapshot();
+          return;
+        }
+        await loadSnapshot();
+        return;
+      }
+      // occupied
+      openOccupiedResolution(card, existing, targetRowId, targetColumnId);
+    }
+
+    // ---------- Occupied-cell resolution (spec 7.4) ----------
+
+    let occupiedCtx = null;
+    function openOccupiedResolution(draggedCard, existingCard, targetRowId, targetColumnId) {
+      occupiedCtx = { draggedCard, existingCard, targetRowId, targetColumnId };
+      document.getElementById("occupied-modal-text").textContent =
+        'This cell already has "' + (existingCard.title || "untitled") + '". What would you like to do?';
+      document.getElementById("occupied-modal").hidden = false;
+    }
+    document.getElementById("occupied-cancel-btn").addEventListener("click", () => {
+      document.getElementById("occupied-modal").hidden = true;
+      occupiedCtx = null;
+      loadSnapshot();
+    });
+    document.getElementById("occupied-swap-btn").addEventListener("click", async () => {
+      const ctx = occupiedCtx;
+      document.getElementById("occupied-modal").hidden = true;
+      occupiedCtx = null;
+      const { res, payload } = await apiPost(apiBase + "/cards/swap", {
+        card_a_id: ctx.draggedCard.id, base_version_a: ctx.draggedCard.version,
+        card_b_id: ctx.existingCard.id, base_version_b: ctx.existingCard.version,
+      });
+      if (!res.ok || !payload || !payload.ok) {
+        alert("Could not swap cards: " + errorMessage(payload, res));
+      }
+      await loadSnapshot();
+    });
+    document.getElementById("occupied-move-existing-btn").addEventListener("click", () => {
+      const ctx = occupiedCtx;
+      document.getElementById("occupied-modal").hidden = true;
+      occupiedCtx = null;
+      startPickEmptyCell(ctx);
+    });
+
+    let pickCtx = null;
+    function startPickEmptyCell(ctx) {
+      pickCtx = ctx;
+      document.getElementById("pick-banner").hidden = false;
+      document.querySelectorAll(".cell").forEach((cellEl) => {
+        const key = cellEl.dataset.rowId + "|" + cellEl.dataset.columnId;
+        const occupied = !!G.visibleCardForCell(G.cardsByCell(snapshot.cards)[key]);
+        if (!occupied) {
+          cellEl.classList.add("is-pick-target");
+          cellEl.addEventListener("click", onPickCellClick);
+        }
+      });
+    }
+    function stopPickEmptyCell() {
+      document.getElementById("pick-banner").hidden = true;
+      document.querySelectorAll(".cell.is-pick-target").forEach((cellEl) => {
+        cellEl.classList.remove("is-pick-target");
+        cellEl.removeEventListener("click", onPickCellClick);
+      });
+      pickCtx = null;
+    }
+    async function onPickCellClick(e) {
+      const cellEl = e.currentTarget;
+      const ctx = pickCtx;
+      stopPickEmptyCell();
+      if (!ctx) return;
+      const moveExisting = await apiPost(apiBase + "/cards/" + ctx.existingCard.id + "/move", {
+        base_version: ctx.existingCard.version, target_row_id: cellEl.dataset.rowId, target_column_id: cellEl.dataset.columnId,
+      });
+      if (!moveExisting.res.ok || !moveExisting.payload || !moveExisting.payload.ok) {
+        alert("Could not relocate existing card: " + errorMessage(moveExisting.payload, moveExisting.res));
+        await loadSnapshot();
+        return;
+      }
+      const moveIncoming = await apiPost(apiBase + "/cards/" + ctx.draggedCard.id + "/move", {
+        base_version: ctx.draggedCard.version, target_row_id: ctx.targetRowId, target_column_id: ctx.targetColumnId,
+      });
+      if (!moveIncoming.res.ok || !moveIncoming.payload || !moveIncoming.payload.ok) {
+        alert("Could not place the dragged card: " + errorMessage(moveIncoming.payload, moveIncoming.res));
+      }
+      await loadSnapshot();
+    }
+    document.getElementById("pick-banner-cancel").addEventListener("click", () => { stopPickEmptyCell(); loadSnapshot(); });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        if (pickCtx) { stopPickEmptyCell(); loadSnapshot(); }
+        if (!document.getElementById("lightbox").hidden) closeLightbox();
+      }
+    });
+
+    // ---------- Card modal ----------
     let activeCard = null;
+
+    function populateColorSelect(selected) {
+      const sel = document.getElementById("card-color-input");
+      sel.innerHTML = "";
+      for (const name of G.colorTokenNames()) {
+        const opt = document.createElement("option");
+        opt.value = name === "default" ? "" : name;
+        opt.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+        sel.appendChild(opt);
+      }
+      sel.value = selected || "";
+    }
+
+    function renderCardImageField(card) {
+      const wrap = document.getElementById("card-image-thumb-wrap");
+      const removeBtn = document.getElementById("card-image-remove-btn");
+      wrap.innerHTML = "";
+      document.getElementById("card-image-status").textContent = "";
+      if (!card.image_asset_id) {
+        const label = document.createElement("span");
+        label.className = "gravestone-label";
+        label.textContent = "No image";
+        wrap.appendChild(label);
+        removeBtn.hidden = true;
+        return;
+      }
+      removeBtn.hidden = false;
+      const img = document.createElement("img");
+      img.src = "/api/assets/" + encodeURIComponent(card.image_asset_id) + "/content?variant=thumbnail";
+      img.alt = "Card image";
+      img.addEventListener("click", () => openLightbox(card.image_asset_id));
+      wrap.appendChild(img);
+      loadAssetMeta(card.image_asset_id).then((meta) => {
+        if (G.isImageGravestone(true, meta)) {
+          wrap.innerHTML = "";
+          const label = document.createElement("span");
+          label.className = "gravestone-label";
+          label.textContent = "Image unavailable (removed)";
+          wrap.appendChild(label);
+        }
+      });
+    }
+
     function openCardModal(card) {
       activeCard = card;
       document.getElementById("card-modal-title").textContent = "Card";
@@ -487,16 +1159,15 @@
       document.getElementById("card-front-input").value = card.front_text || "";
       document.getElementById("card-back-input").value = card.back_text || "";
       document.getElementById("card-category-input").value = card.category || "";
-      document.getElementById("card-color-input").value = card.color_token || "";
+      populateColorSelect(card.color_token);
+      renderCardImageField(card);
       document.getElementById("card-modal-message").textContent = "";
 
       const tier = snapshot.viewer_tier;
-      const hiddenField = document.getElementById("card-hidden-field");
-      hiddenField.hidden = !tierAtLeastDirector(tier);
+      document.getElementById("card-hidden-field").hidden = !affordances.canEditStructure;
       document.getElementById("card-hidden-input").checked = !!card.hidden_from_audience;
 
-      const lockField = document.getElementById("card-lock-field");
-      lockField.hidden = !tierAtLeastDirector(tier);
+      document.getElementById("card-lock-field").hidden = !affordances.canEditStructure;
       document.getElementById("card-lock-input").checked = !!card.is_locked;
 
       const rowSel = document.getElementById("card-move-row");
@@ -516,10 +1187,13 @@
         colSel.appendChild(opt);
       }
 
-      const canEdit = tierAtLeastCrew(tier) && (!card.is_locked || tierAtLeastDirector(tier));
+      const canEdit = affordances.canEditCards && (!card.is_locked || affordances.canEditStructure);
       document.getElementById("card-save-btn").hidden = !canEdit;
       document.getElementById("card-delete-btn").hidden = !canEdit;
       document.getElementById("card-move-btn").disabled = !canEdit;
+      document.getElementById("card-image-choose-btn").hidden = !canEdit;
+      document.getElementById("card-image-choose-btn").disabled = !canEdit;
+      if (!canEdit) document.getElementById("card-image-remove-btn").hidden = true;
 
       const linkContainer = document.getElementById("card-ewrite-link");
       linkContainer.innerHTML = "";
@@ -533,8 +1207,47 @@
       document.getElementById("card-modal").hidden = true;
     });
 
+    document.getElementById("card-image-choose-btn").addEventListener("click", () => {
+      document.getElementById("card-image-file").click();
+    });
+    document.getElementById("card-image-file").addEventListener("change", async (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = "";
+      if (!file || !activeCard) return;
+      const statusEl = document.getElementById("card-image-status");
+      statusEl.textContent = "Uploading…";
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(apiBase + "/cards/" + activeCard.id + "/image", {
+        method: "POST", credentials: "include", body: formData,
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload || !payload.ok) {
+        statusEl.className = "form-error";
+        statusEl.textContent = "Upload failed: " + errorMessage(payload, res);
+        return;
+      }
+      activeCard = payload.data.card;
+      assetMetaCache.delete(activeCard.image_asset_id);
+      renderCardImageField(activeCard); // clears card-image-status -- set the success message after, not before
+      statusEl.className = "form-ok";
+      statusEl.textContent = "Image attached.";
+      await loadSnapshot();
+    });
+    document.getElementById("card-image-remove-btn").addEventListener("click", async () => {
+      if (!activeCard) return;
+      const { res, payload } = await apiFetch(apiBase + "/cards/" + activeCard.id + "/image", { method: "DELETE" });
+      if (!res.ok || !payload || !payload.ok) {
+        document.getElementById("card-image-status").className = "form-error";
+        document.getElementById("card-image-status").textContent = "Remove failed: " + errorMessage(payload, res);
+        return;
+      }
+      activeCard = payload.data.card;
+      renderCardImageField(activeCard);
+      await loadSnapshot();
+    });
+
     document.getElementById("card-save-btn").addEventListener("click", async () => {
-      const tier = snapshot.viewer_tier;
       const body = {
         base_version: activeCard.version,
         title: document.getElementById("card-title-input").value,
@@ -543,19 +1256,19 @@
         category: document.getElementById("card-category-input").value,
         color_token: document.getElementById("card-color-input").value,
       };
-      if (tierAtLeastDirector(tier)) {
+      if (affordances.canEditStructure) {
         body.hidden_from_audience = document.getElementById("card-hidden-input").checked;
       }
-      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/cards/" + activeCard.id, body, "PATCH");
-      if (!res.ok || !payload?.ok) {
+      const { res, payload } = await apiPost(apiBase + "/cards/" + activeCard.id, body, "PATCH");
+      if (!res.ok || !payload || !payload.ok) {
         document.getElementById("card-modal-message").className = "form-error";
-        document.getElementById("card-modal-message").textContent = "Save failed: " + (payload?.data?.error || res.status);
+        document.getElementById("card-modal-message").textContent = "Save failed: " + errorMessage(payload, res);
         return;
       }
-      if (tierAtLeastDirector(tier)) {
+      if (affordances.canEditStructure) {
         const lockWanted = document.getElementById("card-lock-input").checked;
         if (lockWanted !== !!activeCard.is_locked) {
-          await apiPost("/api/storyboards/" + boardId + "/cards/" + activeCard.id + "/lock", { locked: lockWanted });
+          await apiPost(apiBase + "/cards/" + activeCard.id + "/lock", { locked: lockWanted });
         }
       }
       document.getElementById("card-modal").hidden = true;
@@ -565,12 +1278,12 @@
     document.getElementById("card-delete-btn").addEventListener("click", async () => {
       if (!confirm("Delete this card?")) return;
       const { res, payload } = await apiFetch(
-        "/api/storyboards/" + boardId + "/cards/" + activeCard.id + "?base_version=" + activeCard.version,
+        apiBase + "/cards/" + activeCard.id + "?base_version=" + activeCard.version,
         { method: "DELETE" }
       );
-      if (!res.ok || !payload?.ok) {
+      if (!res.ok || !payload || !payload.ok) {
         document.getElementById("card-modal-message").className = "form-error";
-        document.getElementById("card-modal-message").textContent = "Delete failed: " + (payload?.data?.error || res.status);
+        document.getElementById("card-modal-message").textContent = "Delete failed: " + errorMessage(payload, res);
         return;
       }
       document.getElementById("card-modal").hidden = true;
@@ -580,12 +1293,21 @@
     document.getElementById("card-move-btn").addEventListener("click", async () => {
       const targetRowId = document.getElementById("card-move-row").value;
       const targetColumnId = document.getElementById("card-move-column").value;
-      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/cards/" + activeCard.id + "/move", {
+      const cellCards = G.cardsByCell(snapshot.cards)[targetRowId + "|" + targetColumnId];
+      const existing = G.visibleCardForCell(cellCards);
+      const kind = G.dropResolutionKind(existing, activeCard.id);
+      if (kind === "noop") { document.getElementById("card-modal").hidden = true; return; }
+      if (kind === "occupied") {
+        document.getElementById("card-modal").hidden = true;
+        openOccupiedResolution(activeCard, existing, targetRowId, targetColumnId);
+        return;
+      }
+      const { res, payload } = await apiPost(apiBase + "/cards/" + activeCard.id + "/move", {
         base_version: activeCard.version, target_row_id: targetRowId, target_column_id: targetColumnId,
       });
-      if (!res.ok || !payload?.ok) {
+      if (!res.ok || !payload || !payload.ok) {
         document.getElementById("card-modal-message").className = "form-error";
-        document.getElementById("card-modal-message").textContent = "Move failed: " + (payload?.data?.error || res.status);
+        document.getElementById("card-modal-message").textContent = "Move failed: " + errorMessage(payload, res);
         return;
       }
       document.getElementById("card-modal").hidden = true;
@@ -595,62 +1317,89 @@
     async function createCardFlow(row, col) {
       const title = prompt("Card title?");
       if (title === null) return;
-      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/cards", {
-        row_id: row.id, column_id: col.id, title,
-      });
-      if (!res.ok || !payload?.ok) {
-        alert("Could not create card: " + (payload?.data?.error || res.status));
+      const { res, payload } = await apiPost(apiBase + "/cards", { row_id: row.id, column_id: col.id, title: title });
+      if (!res.ok || !payload || !payload.ok) {
+        alert("Could not create card: " + errorMessage(payload, res));
         return;
       }
       await loadSnapshot();
     }
 
-    // --- Structural flows (columns/bands/rows) ---
+    // ---------- Structural flows ----------
     async function renameColumnFlow(col) {
       const title = prompt("Rename column", col.title);
       if (title === null) return;
-      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/columns/" + col.id, { title }, "PATCH");
-      if (!res.ok || !payload?.ok) { alert("Rename failed: " + (payload?.data?.error || res.status)); return; }
+      const { res, payload } = await apiPost(apiBase + "/columns/" + col.id, { title: title }, "PATCH");
+      if (!res.ok || !payload || !payload.ok) { alert("Rename failed: " + errorMessage(payload, res)); return; }
+      await loadSnapshot();
+    }
+
+    // Insert-left/right (spec 2.8/8): AddColumn always appends at the end,
+    // so this is append-then-reorder against the *current* full column set.
+    // ReorderColumns validates the ordered id list is exactly the board's
+    // existing columns (no adds/drops/dupes) inside one transaction, so a
+    // concurrent structural change from another editor fails this call
+    // cleanly (invalid_resolution) rather than corrupting order -- the user
+    // just retries against a reloaded board.
+    async function insertColumnFlow(referenceCol, side) {
+      const title = prompt("New column title", "New Column");
+      if (title === null) return;
+      const created = await apiPost(apiBase + "/columns", { title: title });
+      if (!created.res.ok || !created.payload || !created.payload.ok) {
+        alert("Could not create column: " + errorMessage(created.payload, created.res));
+        return;
+      }
+      const newId = created.payload.data.column.id;
+      const ids = snapshot.columns.map((c) => c.id);
+      const refIndex = ids.indexOf(referenceCol.id);
+      const insertAt = side === "left" ? refIndex : refIndex + 1;
+      ids.splice(insertAt, 0, newId);
+      const reordered = await apiPost(apiBase + "/columns/reorder", { ordered_column_ids: ids });
+      if (!reordered.res.ok || !reordered.payload || !reordered.payload.ok) {
+        alert("Column was created but could not be positioned (board changed concurrently) -- it was added at the end instead: " + errorMessage(reordered.payload, reordered.res));
+      }
       await loadSnapshot();
     }
 
     async function editBandFlow(band) {
       const label = prompt("Band label", band.label);
       if (label === null) return;
-      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/bands/" + band.id, {
-        label, description: band.description || "",
-      }, "PATCH");
-      if (!res.ok || !payload?.ok) { alert("Edit failed: " + (payload?.data?.error || res.status)); return; }
+      const { res, payload } = await apiPost(apiBase + "/bands/" + band.id, { label: label, description: band.description || "" }, "PATCH");
+      if (!res.ok || !payload || !payload.ok) { alert("Edit failed: " + errorMessage(payload, res)); return; }
+      await loadSnapshot();
+    }
+
+    async function toggleBandCollapse(band) {
+      const { res, payload } = await apiPost(apiBase + "/bands/" + band.id + "/collapse", { collapsed: !band.is_collapsed });
+      if (!res.ok || !payload || !payload.ok) { alert("Collapse toggle failed: " + errorMessage(payload, res)); return; }
       await loadSnapshot();
     }
 
     async function renameRowFlow(row) {
       const label = prompt("Row label", row.label);
       if (label === null) return;
-      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/rows/" + row.id, {
-        label, description: row.description || "",
-      }, "PATCH");
-      if (!res.ok || !payload?.ok) { alert("Rename failed: " + (payload?.data?.error || res.status)); return; }
+      const { res, payload } = await apiPost(apiBase + "/rows/" + row.id, { label: label, description: row.description || "" }, "PATCH");
+      if (!res.ok || !payload || !payload.ok) { alert("Rename failed: " + errorMessage(payload, res)); return; }
       await loadSnapshot();
     }
 
-    // Occupied-removal resolution flow (spec 6.2-6.4): a plain DELETE is
-    // tried first; if the server refuses because the target is occupied,
-    // the user is asked to type "delete" (delete contents with it) or the
-    // exact title/label of another sibling to move contents there, or
-    // leave blank to cancel outright -- never a silent cascade.
+    // Occupied-removal resolution flow (Kernel 80 spec 6.2-6.4, unchanged):
+    // a plain DELETE is tried first; if the server refuses because the
+    // target is occupied, the user is asked to type "delete" or the exact
+    // title/label of a sibling to move contents there, or leave blank to
+    // cancel -- never a silent cascade.
     async function removeColumnFlow(col) {
-      let resp = await apiFetch("/api/storyboards/" + boardId + "/columns/" + col.id, { method: "DELETE" });
-      if (resp.res.ok && resp.payload?.ok) { await loadSnapshot(); return; }
-      if (resp.payload?.data?.error !== "column_occupied") {
-        alert("Remove failed: " + (resp.payload?.data?.error || resp.res.status));
+      let resp = await apiFetch(apiBase + "/columns/" + col.id, { method: "DELETE" });
+      if (resp.res.ok && resp.payload && resp.payload.ok) { await loadSnapshot(); return; }
+      if (!resp.payload || resp.payload.data.error !== "column_occupied") {
+        alert("Remove failed: " + errorMessage(resp.payload, resp.res));
         return;
       }
       const choice = prompt(
         "This column has cards. Type 'delete' to remove them with the column, or the exact title of another column to move the cards there. Leave blank to cancel."
       );
       if (!choice) return;
-      let url = "/api/storyboards/" + boardId + "/columns/" + col.id + "?resolution=";
+      let url = apiBase + "/columns/" + col.id + "?resolution=";
       if (choice.trim().toLowerCase() === "delete") {
         url += "delete_cards";
       } else {
@@ -659,22 +1408,22 @@
         url += "move_cards&target_column_id=" + encodeURIComponent(target.id);
       }
       const resp2 = await apiFetch(url, { method: "DELETE" });
-      if (!resp2.res.ok || !resp2.payload?.ok) { alert("Remove failed: " + (resp2.payload?.data?.error || resp2.res.status)); return; }
+      if (!resp2.res.ok || !resp2.payload || !resp2.payload.ok) { alert("Remove failed: " + errorMessage(resp2.payload, resp2.res)); return; }
       await loadSnapshot();
     }
 
     async function removeRowFlow(row) {
-      let resp = await apiFetch("/api/storyboards/" + boardId + "/rows/" + row.id, { method: "DELETE" });
-      if (resp.res.ok && resp.payload?.ok) { await loadSnapshot(); return; }
-      if (resp.payload?.data?.error !== "row_occupied") {
-        alert("Remove failed: " + (resp.payload?.data?.error || resp.res.status));
+      let resp = await apiFetch(apiBase + "/rows/" + row.id, { method: "DELETE" });
+      if (resp.res.ok && resp.payload && resp.payload.ok) { await loadSnapshot(); return; }
+      if (!resp.payload || resp.payload.data.error !== "row_occupied") {
+        alert("Remove failed: " + errorMessage(resp.payload, resp.res));
         return;
       }
       const choice = prompt(
         "This row has cards. Type 'delete' to remove them with the row, or the exact label of another row to move the cards there. Leave blank to cancel."
       );
       if (!choice) return;
-      let url = "/api/storyboards/" + boardId + "/rows/" + row.id + "?resolution=";
+      let url = apiBase + "/rows/" + row.id + "?resolution=";
       if (choice.trim().toLowerCase() === "delete") {
         url += "delete_cards";
       } else {
@@ -683,22 +1432,22 @@
         url += "move_cards&target_row_id=" + encodeURIComponent(target.id);
       }
       const resp2 = await apiFetch(url, { method: "DELETE" });
-      if (!resp2.res.ok || !resp2.payload?.ok) { alert("Remove failed: " + (resp2.payload?.data?.error || resp2.res.status)); return; }
+      if (!resp2.res.ok || !resp2.payload || !resp2.payload.ok) { alert("Remove failed: " + errorMessage(resp2.payload, resp2.res)); return; }
       await loadSnapshot();
     }
 
     async function removeBandFlow(band) {
-      let resp = await apiFetch("/api/storyboards/" + boardId + "/bands/" + band.id, { method: "DELETE" });
-      if (resp.res.ok && resp.payload?.ok) { await loadSnapshot(); return; }
-      if (resp.payload?.data?.error !== "band_occupied") {
-        alert("Remove failed: " + (resp.payload?.data?.error || resp.res.status));
+      let resp = await apiFetch(apiBase + "/bands/" + band.id, { method: "DELETE" });
+      if (resp.res.ok && resp.payload && resp.payload.ok) { await loadSnapshot(); return; }
+      if (!resp.payload || resp.payload.data.error !== "band_occupied") {
+        alert("Remove failed: " + errorMessage(resp.payload, resp.res));
         return;
       }
       const choice = prompt(
         "This band has rows. Type 'delete' to remove them (and their cards) with the band, or the exact label of another band to move the rows there. Leave blank to cancel."
       );
       if (!choice) return;
-      let url = "/api/storyboards/" + boardId + "/bands/" + band.id + "?resolution=";
+      let url = apiBase + "/bands/" + band.id + "?resolution=";
       if (choice.trim().toLowerCase() === "delete") {
         url += "delete_rows";
       } else {
@@ -707,54 +1456,52 @@
         url += "move_rows&target_band_id=" + encodeURIComponent(target.id);
       }
       const resp2 = await apiFetch(url, { method: "DELETE" });
-      if (!resp2.res.ok || !resp2.payload?.ok) { alert("Remove failed: " + (resp2.payload?.data?.error || resp2.res.status)); return; }
+      if (!resp2.res.ok || !resp2.payload || !resp2.payload.ok) { alert("Remove failed: " + errorMessage(resp2.payload, resp2.res)); return; }
       await loadSnapshot();
     }
 
     async function toggleBandLockFlow(band) {
-      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/bands/" + band.id + "/lock", {
-        locked: !band.is_locked,
-      });
-      if (!res.ok || !payload?.ok) { alert("Lock toggle failed: " + (payload?.data?.error || res.status)); return; }
+      const { res, payload } = await apiPost(apiBase + "/bands/" + band.id + "/lock", { locked: !band.is_locked });
+      if (!res.ok || !payload || !payload.ok) { alert("Lock toggle failed: " + errorMessage(payload, res)); return; }
       await loadSnapshot();
     }
 
     async function addRowFlow(band) {
       const label = prompt("New row label in " + band.label, "New Row");
       if (label === null) return;
-      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/rows", { band_id: band.id, label });
-      if (!res.ok || !payload?.ok) { alert("Add row failed: " + (payload?.data?.error || res.status)); return; }
+      const { res, payload } = await apiPost(apiBase + "/rows", { band_id: band.id, label: label });
+      if (!res.ok || !payload || !payload.ok) { alert("Add row failed: " + errorMessage(payload, res)); return; }
       await loadSnapshot();
     }
 
     document.getElementById("add-column-btn").addEventListener("click", async () => {
       const title = prompt("New column title", "New Column");
       if (title === null) return;
-      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/columns", { title });
-      if (!res.ok || !payload?.ok) { alert("Add column failed: " + (payload?.data?.error || res.status)); return; }
+      const { res, payload } = await apiPost(apiBase + "/columns", { title: title });
+      if (!res.ok || !payload || !payload.ok) { alert("Add column failed: " + errorMessage(payload, res)); return; }
       await loadSnapshot();
     });
 
     document.getElementById("add-band-btn").addEventListener("click", async () => {
       const label = prompt("New band label", "New Band");
       if (label === null) return;
-      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/bands", { label });
-      if (!res.ok || !payload?.ok) { alert("Add band failed: " + (payload?.data?.error || res.status)); return; }
+      const { res, payload } = await apiPost(apiBase + "/bands", { label: label });
+      if (!res.ok || !payload || !payload.ok) { alert("Add band failed: " + errorMessage(payload, res)); return; }
       await loadSnapshot();
     });
 
     document.getElementById("archive-btn").addEventListener("click", async () => {
       const archived = !snapshot.board.archived_at;
-      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/archive", { archived });
-      if (!res.ok || !payload?.ok) { alert("Failed: " + (payload?.data?.error || res.status)); return; }
+      const { res, payload } = await apiPost(apiBase + "/archive", { archived: archived });
+      if (!res.ok || !payload || !payload.ok) { alert("Failed: " + errorMessage(payload, res)); return; }
       await loadSnapshot();
     });
 
     document.getElementById("export-btn").addEventListener("click", () => {
-      window.location.href = "/api/storyboards/" + boardId + "/export";
+      window.location.href = apiBase + "/export";
     });
 
-    // --- Sharing modal ---
+    // ---------- Sharing modal ----------
     document.getElementById("share-btn").addEventListener("click", openShareModal);
     document.getElementById("share-close-btn").addEventListener("click", () => {
       document.getElementById("share-modal").hidden = true;
@@ -768,10 +1515,10 @@
     }
 
     async function renderGrants() {
-      const { res, payload } = await apiFetch("/api/storyboards/" + boardId + "/grants");
+      const { res, payload } = await apiFetch(apiBase + "/grants");
       const listEl = document.getElementById("grant-list");
       listEl.innerHTML = "";
-      if (!res.ok || !payload?.ok) return;
+      if (!res.ok || !payload || !payload.ok) return;
       for (const g of payload.data.grants || []) {
         const row = document.createElement("div");
         row.className = "grant-row";
@@ -782,10 +1529,8 @@
         removeBtn.className = "small danger";
         removeBtn.textContent = "Remove";
         removeBtn.addEventListener("click", async () => {
-          const { res: delRes, payload: delPayload } = await apiFetch(
-            "/api/storyboards/" + boardId + "/grants/" + g.id, { method: "DELETE" }
-          );
-          if (!delRes.ok || !delPayload?.ok) { alert("Remove failed: " + (delPayload?.data?.error || delRes.status)); return; }
+          const { res: delRes, payload: delPayload } = await apiFetch(apiBase + "/grants/" + g.id, { method: "DELETE" });
+          if (!delRes.ok || !delPayload || !delPayload.ok) { alert("Remove failed: " + errorMessage(delPayload, delRes)); return; }
           await renderGrants();
         });
         row.appendChild(removeBtn);
@@ -794,21 +1539,15 @@
     }
 
     // My People is a reminder of who you already know, not a picker that
-    // grants anything by itself (spec 1.8: a My People relationship must
-    // never itself grant access -- sharing always requires the deliberate
-    // handle-entry step below). The My People API keys relationships by
-    // subject_profile_id/stage_name (a player-profile persona), not the
-    // Victory account handle storyboard grants are keyed on, so these are
-    // shown as informational names only -- there is no field here to
-    // safely autofill a handle from without risking filling in the wrong
-    // account.
+    // grants anything by itself (Kernel 80 spec 1.8) -- see board.html's
+    // prior revision for the full rationale; unchanged in Kernel 81.
     async function renderMyPeopleSuggestions() {
       const container = document.getElementById("my-people-suggestions");
       container.innerHTML = "";
       try {
         const { res, payload } = await apiFetch("/api/player-relationships?state=active");
-        if (!res.ok || !payload?.ok) return;
-        const relationships = payload.data?.relationships || [];
+        if (!res.ok || !payload || !payload.ok) return;
+        const relationships = (payload.data && payload.data.relationships) || [];
         if (!relationships.length) return;
         const note = document.createElement("div");
         note.className = "status-line";
@@ -819,13 +1558,11 @@
           if (!name) continue;
           const chip = document.createElement("span");
           chip.className = "suggestion-chip";
-          chip.style.cursor = "default";
           chip.textContent = name;
           container.appendChild(chip);
         }
       } catch (err) {
-        // My People is a convenience suggestion source only; a failure here
-        // must not block direct handle-entry sharing.
+        // My People is a convenience suggestion source only.
       }
     }
 
@@ -837,12 +1574,10 @@
         document.getElementById("share-modal-message").textContent = "Enter a handle first.";
         return;
       }
-      const { res, payload } = await apiPost("/api/storyboards/" + boardId + "/grants", {
-        user_handle: handle, granted_role: role,
-      });
-      if (!res.ok || !payload?.ok) {
+      const { res, payload } = await apiPost(apiBase + "/grants", { user_handle: handle, granted_role: role });
+      if (!res.ok || !payload || !payload.ok) {
         document.getElementById("share-modal-message").className = "form-error";
-        document.getElementById("share-modal-message").textContent = "Share failed: " + (payload?.data?.error || res.status);
+        document.getElementById("share-modal-message").textContent = "Share failed: " + errorMessage(payload, res);
         return;
       }
       document.getElementById("share-modal-message").className = "form-ok";
@@ -851,12 +1586,342 @@
       await renderGrants();
     });
 
+    // ---------- Reference Panel (Kernel 82) ----------
+
+    const REFERENCE_PANEL_COLLAPSE_KEY_PREFIX = "sb-refpanel-collapsed-";
+    function referencePanelCollapsed() {
+      return localStorage.getItem(REFERENCE_PANEL_COLLAPSE_KEY_PREFIX + boardId) === "1";
+    }
+    function setReferencePanelCollapsed(collapsed) {
+      localStorage.setItem(REFERENCE_PANEL_COLLAPSE_KEY_PREFIX + boardId, collapsed ? "1" : "0");
+    }
+
+    function smallBtn(text, handler, danger) {
+      const b = document.createElement("button");
+      b.className = "icon-btn" + (danger ? " danger" : "");
+      b.type = "button";
+      b.textContent = text;
+      b.addEventListener("click", handler);
+      return b;
+    }
+
+    function fieldTypeDisplayName(t) {
+      return { short_text: "Text", long_text: "Text", list: "List", paired_list: "Paired List" }[t] || t;
+    }
+
+    function renderReferencePanel() {
+      const fields = snapshot.reference_fields || [];
+      const panelEl = document.getElementById("reference-panel");
+      const collapsedToggle = document.getElementById("reference-panel-collapsed-toggle");
+      const addBtn = document.getElementById("reference-add-field-btn");
+
+      if (fields.length === 0 && !affordances.canEditStructure) {
+        panelEl.hidden = true;
+        collapsedToggle.hidden = true;
+        return;
+      }
+      addBtn.hidden = !affordances.canEditStructure;
+
+      const collapsed = referencePanelCollapsed();
+      panelEl.hidden = collapsed;
+      collapsedToggle.hidden = !collapsed;
+
+      const body = document.getElementById("reference-panel-body");
+      body.innerHTML = "";
+      for (const field of fields) {
+        body.appendChild(buildReferenceFieldEl(field));
+      }
+    }
+    document.getElementById("reference-panel-collapse-btn").addEventListener("click", () => {
+      setReferencePanelCollapsed(true);
+      renderReferencePanel();
+    });
+    document.getElementById("reference-panel-collapsed-toggle").addEventListener("click", () => {
+      setReferencePanelCollapsed(false);
+      renderReferencePanel();
+    });
+
+    function buildReferenceFieldEl(field) {
+      const wrap = document.createElement("div");
+      wrap.className = "reference-field";
+
+      const labelRow = document.createElement("div");
+      labelRow.className = "reference-field-label-row";
+      const labelEl = document.createElement("div");
+      const labelText = document.createElement("span");
+      labelText.className = "reference-field-label";
+      labelText.textContent = field.label;
+      labelEl.appendChild(labelText);
+      const typeTag = document.createElement("span");
+      typeTag.className = "reference-field-type-tag";
+      typeTag.textContent = fieldTypeDisplayName(field.field_type);
+      labelEl.appendChild(typeTag);
+      labelRow.appendChild(labelEl);
+
+      const controls = document.createElement("div");
+      controls.className = "reference-field-controls";
+      if (affordances.canEditStructure) {
+        controls.appendChild(smallBtn("✎", () => renameReferenceFieldFlow(field)));
+        controls.appendChild(smallBtn("Type", () => changeReferenceFieldTypeFlow(field)));
+        controls.appendChild(smallBtn("×", () => removeReferenceFieldFlow(field), true));
+      }
+      labelRow.appendChild(controls);
+      wrap.appendChild(labelRow);
+
+      if (field.field_type === "short_text") {
+        wrap.appendChild(buildTextFieldInput(field, false));
+      } else if (field.field_type === "long_text") {
+        wrap.appendChild(buildTextFieldInput(field, true));
+      } else if (field.field_type === "list") {
+        wrap.appendChild(buildListEditor(field, "single", (field.items || []).filter((it) => it.side === "single")));
+      } else if (field.field_type === "paired_list") {
+        const pairedWrap = document.createElement("div");
+        pairedWrap.className = "reference-paired";
+        const colA = document.createElement("div");
+        const subA = document.createElement("div");
+        subA.className = "reference-paired-sublabel";
+        subA.textContent = field.sublabel_a || "A";
+        colA.appendChild(subA);
+        colA.appendChild(buildListEditor(field, "a", (field.items || []).filter((it) => it.side === "a")));
+        const colB = document.createElement("div");
+        const subB = document.createElement("div");
+        subB.className = "reference-paired-sublabel";
+        subB.textContent = field.sublabel_b || "B";
+        colB.appendChild(subB);
+        colB.appendChild(buildListEditor(field, "b", (field.items || []).filter((it) => it.side === "b")));
+        pairedWrap.appendChild(colA);
+        pairedWrap.appendChild(colB);
+        wrap.appendChild(pairedWrap);
+      }
+      return wrap;
+    }
+
+    function buildTextFieldInput(field, multiline) {
+      const wrap = document.createElement("div");
+      const el = document.createElement(multiline ? "textarea" : "input");
+      if (!multiline) el.type = "text";
+      el.value = field.text_content || "";
+      el.disabled = !affordances.canEditCards;
+      el.addEventListener("blur", async () => {
+        if (el.value === (field.text_content || "")) return;
+        const { res, payload } = await apiPost(apiBase + "/reference-fields/" + field.id + "/content", { text: el.value });
+        if (!res.ok || !payload || !payload.ok) {
+          alert("Could not save: " + errorMessage(payload, res));
+          el.value = field.text_content || "";
+          return;
+        }
+        field.text_content = el.value;
+      });
+      wrap.appendChild(el);
+      return wrap;
+    }
+
+    function buildListEditor(field, side, items) {
+      const sorted = items.slice().sort((a, b) => a.sort_order - b.sort_order);
+      const wrap = document.createElement("div");
+      const itemsEl = document.createElement("div");
+      itemsEl.className = "reference-list-items";
+      sorted.forEach((item, idx) => {
+        const row = document.createElement("div");
+        row.className = "reference-list-item";
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = item.content;
+        input.disabled = !affordances.canEditCards;
+        input.addEventListener("blur", async () => {
+          if (input.value === item.content) return;
+          const { res, payload } = await apiFetch(apiBase + "/reference-fields/" + field.id + "/items/" + item.id, {
+            method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: input.value }),
+          });
+          if (!res.ok || !payload || !payload.ok) {
+            alert("Could not save item: " + errorMessage(payload, res));
+            input.value = item.content;
+            return;
+          }
+          item.content = input.value;
+        });
+        row.appendChild(input);
+        if (affordances.canEditCards) {
+          if (idx > 0) row.appendChild(smallBtn("↑", () => moveReferenceItem(field, side, sorted, idx, -1)));
+          if (idx < sorted.length - 1) row.appendChild(smallBtn("↓", () => moveReferenceItem(field, side, sorted, idx, 1)));
+          row.appendChild(smallBtn("×", () => removeReferenceItemFlow(field, item), true));
+        }
+        itemsEl.appendChild(row);
+      });
+      wrap.appendChild(itemsEl);
+
+      if (affordances.canEditCards) {
+        const addRow = document.createElement("div");
+        addRow.className = "reference-add-item-row";
+        const addInput = document.createElement("input");
+        addInput.type = "text";
+        addInput.placeholder = "Add item…";
+        const addItemBtn = document.createElement("button");
+        addItemBtn.type = "button";
+        addItemBtn.className = "small";
+        addItemBtn.textContent = "Add";
+        addItemBtn.addEventListener("click", async () => {
+          const value = addInput.value.trim();
+          if (!value) return;
+          const { res, payload } = await apiPost(apiBase + "/reference-fields/" + field.id + "/items", { side, content: value });
+          if (!res.ok || !payload || !payload.ok) { alert("Could not add item: " + errorMessage(payload, res)); return; }
+          addInput.value = "";
+          await loadSnapshot();
+        });
+        addRow.appendChild(addInput);
+        addRow.appendChild(addItemBtn);
+        wrap.appendChild(addRow);
+      }
+      return wrap;
+    }
+
+    async function moveReferenceItem(field, side, sortedItems, idx, delta) {
+      const newOrder = sortedItems.map((it) => it.id);
+      const targetIdx = idx + delta;
+      const tmp = newOrder[idx];
+      newOrder[idx] = newOrder[targetIdx];
+      newOrder[targetIdx] = tmp;
+      const { res, payload } = await apiPost(apiBase + "/reference-fields/" + field.id + "/items/reorder", { side, ordered_item_ids: newOrder });
+      if (!res.ok || !payload || !payload.ok) { alert("Could not reorder: " + errorMessage(payload, res)); return; }
+      await loadSnapshot();
+    }
+
+    async function removeReferenceItemFlow(field, item) {
+      if (!confirm("Remove this item?")) return;
+      const { res, payload } = await apiFetch(apiBase + "/reference-fields/" + field.id + "/items/" + item.id, { method: "DELETE" });
+      if (!res.ok || !payload || !payload.ok) { alert("Could not remove: " + errorMessage(payload, res)); return; }
+      await loadSnapshot();
+    }
+
+    let referenceFieldModalMode = "add";
+    let referenceFieldModalTarget = null;
+
+    function openReferenceFieldModal(mode, field) {
+      referenceFieldModalMode = mode;
+      referenceFieldModalTarget = field || null;
+      document.getElementById("reference-field-modal-title").textContent = mode === "add" ? "Add Field" : "Edit Field";
+      document.getElementById("reference-field-label-input").value = field ? field.label : "";
+      document.getElementById("reference-field-type-field").hidden = mode !== "add";
+      const currentType = field ? field.field_type : "short_text";
+      document.getElementById("reference-field-type-input").value = currentType;
+      document.getElementById("reference-field-sublabels-field").hidden = currentType !== "paired_list";
+      document.getElementById("reference-field-sublabel-a-input").value = field ? (field.sublabel_a || "") : "";
+      document.getElementById("reference-field-sublabel-b-input").value = field ? (field.sublabel_b || "") : "";
+      document.getElementById("reference-field-modal-message").textContent = "";
+      document.getElementById("reference-field-modal").hidden = false;
+    }
+    document.getElementById("reference-field-type-input").addEventListener("change", (e) => {
+      document.getElementById("reference-field-sublabels-field").hidden = e.target.value !== "paired_list";
+    });
+    document.getElementById("reference-field-close-btn").addEventListener("click", () => {
+      document.getElementById("reference-field-modal").hidden = true;
+    });
+    document.getElementById("reference-add-field-btn").addEventListener("click", () => openReferenceFieldModal("add", null));
+
+    function renameReferenceFieldFlow(field) { openReferenceFieldModal("rename", field); }
+
+    document.getElementById("reference-field-save-btn").addEventListener("click", async () => {
+      const label = document.getElementById("reference-field-label-input").value.trim();
+      if (!label) {
+        document.getElementById("reference-field-modal-message").className = "form-error";
+        document.getElementById("reference-field-modal-message").textContent = "A label is required.";
+        return;
+      }
+      const sublabelA = document.getElementById("reference-field-sublabel-a-input").value;
+      const sublabelB = document.getElementById("reference-field-sublabel-b-input").value;
+      let res, payload;
+      if (referenceFieldModalMode === "add") {
+        const fieldType = document.getElementById("reference-field-type-input").value;
+        ({ res, payload } = await apiPost(apiBase + "/reference-fields", { label, field_type: fieldType, sublabel_a: sublabelA, sublabel_b: sublabelB }));
+      } else {
+        ({ res, payload } = await apiFetch(apiBase + "/reference-fields/" + referenceFieldModalTarget.id, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ label, sublabel_a: sublabelA, sublabel_b: sublabelB }),
+        }));
+      }
+      if (!res.ok || !payload || !payload.ok) {
+        document.getElementById("reference-field-modal-message").className = "form-error";
+        document.getElementById("reference-field-modal-message").textContent = "Save failed: " + errorMessage(payload, res);
+        return;
+      }
+      document.getElementById("reference-field-modal").hidden = true;
+      await loadSnapshot();
+    });
+
+    async function changeReferenceFieldTypeFlow(field) {
+      const options = ["short_text", "long_text", "list", "paired_list"];
+      const choice = prompt(
+        'New type for "' + field.label + '" (short_text, long_text, list, paired_list). The field must be empty to change type.',
+        field.field_type
+      );
+      if (choice === null) return;
+      if (!options.includes(choice.trim())) { alert("Not a valid type."); return; }
+      const { res, payload } = await apiPost(apiBase + "/reference-fields/" + field.id + "/type", { field_type: choice.trim() });
+      if (!res.ok || !payload || !payload.ok) { alert("Could not change type: " + errorMessage(payload, res)); return; }
+      await loadSnapshot();
+    }
+
+    async function removeReferenceFieldFlow(field) {
+      if (!confirm('Remove field "' + field.label + '"?')) return;
+      let resp = await apiFetch(apiBase + "/reference-fields/" + field.id, { method: "DELETE" });
+      if (resp.res.ok && resp.payload && resp.payload.ok) { await loadSnapshot(); return; }
+      if (!resp.payload || resp.payload.data.error !== "reference_field_delete_requires_confirm") {
+        alert("Remove failed: " + errorMessage(resp.payload, resp.res));
+        return;
+      }
+      if (!confirm('"' + field.label + '" has content. Delete it anyway?')) return;
+      const resp2 = await apiFetch(apiBase + "/reference-fields/" + field.id + "?confirm=true", { method: "DELETE" });
+      if (!resp2.res.ok || !resp2.payload || !resp2.payload.ok) { alert("Remove failed: " + errorMessage(resp2.payload, resp2.res)); return; }
+      await loadSnapshot();
+    }
+
+    // ---------- Middle-mouse panning (Kernel 82 spec 6) ----------
+    // Left drag is already owned by card drag-and-drop (Kernel 81);
+    // middle-button drag pans the viewport instead, without sending any
+    // mutation and without disturbing normal wheel/scrollbar/keyboard
+    // scrolling. No zoom/minimap -- pure scroll-position panning.
+    (function initMiddleMousePan() {
+      const scroller = document.getElementById("board-scroll");
+      let panning = false;
+      let startX = 0, startY = 0, startScrollLeft = 0, startScrollTop = 0;
+
+      scroller.addEventListener("pointerdown", (e) => {
+        if (e.button !== 1) return;
+        panning = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        startScrollLeft = scroller.scrollLeft;
+        startScrollTop = scroller.scrollTop;
+        try { scroller.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+        scroller.style.cursor = "grabbing";
+        e.preventDefault();
+      });
+      scroller.addEventListener("pointermove", (e) => {
+        if (!panning) return;
+        scroller.scrollLeft = startScrollLeft - (e.clientX - startX);
+        scroller.scrollTop = startScrollTop - (e.clientY - startY);
+        e.preventDefault();
+      });
+      function endPan(e) {
+        if (!panning) return;
+        panning = false;
+        scroller.style.cursor = "";
+        try { scroller.releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      }
+      scroller.addEventListener("pointerup", endPan);
+      scroller.addEventListener("pointercancel", endPan);
+      // Suppress the OS/browser's own middle-click autoscroll affordance
+      // and (on Linux) middle-click paste, so only our pan behavior fires.
+      scroller.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });
+      scroller.addEventListener("auxclick", (e) => { if (e.button === 1) e.preventDefault(); });
+    })();
+
     async function bootstrap() {
       if (!boardId) return;
       const ok = await loadSnapshot();
       if (!ok) return;
       socketHandle = watchStoryboard(boardId, {
-        onSnapshot: (data) => { snapshot = data; render(); },
+        onSnapshot: (data) => { snapshot = data; affordances = G.roleAffordances(snapshot.viewer_tier); render(); },
         onEvent: () => { loadSnapshot(); },
         onError: (err) => { console.warn("storyboard ws error", err); },
       });

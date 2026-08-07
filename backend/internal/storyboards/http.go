@@ -14,6 +14,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/access"
+	"victory/backend/internal/assets"
 	"victory/backend/internal/network"
 )
 
@@ -106,6 +108,7 @@ func HandleBoards(pool *pgxpool.Pool) http.HandlerFunc {
 			var body struct {
 				Title        string   `json:"title"`
 				Description  string   `json:"description"`
+				Mode         string   `json:"mode"`
 				ColumnTitles []string `json:"column_titles"`
 				BandLabel    string   `json:"band_label"`
 				RowLabels    []string `json:"row_labels"`
@@ -114,7 +117,19 @@ func HandleBoards(pool *pgxpool.Pool) http.HandlerFunc {
 				writeError(w, errors.New("invalid_json"))
 				return
 			}
-			board, err := CreateBoard(ctx, pool, userID, body.Title, body.Description, body.ColumnTitles, body.BandLabel, body.RowLabels)
+			// Kernel 82: mode selects which built-in template to
+			// instantiate from. Empty/"blank" is unchanged Kernel 80
+			// behavior; "timeline" is the only other built-in mode.
+			var board *Storyboard
+			var err error
+			switch strings.ToLower(strings.TrimSpace(body.Mode)) {
+			case "", ModeBlank:
+				board, err = CreateBoard(ctx, pool, userID, body.Title, body.Description, body.ColumnTitles, body.BandLabel, body.RowLabels)
+			case ModeTimeline:
+				board, err = CreateTimelineBoard(ctx, pool, userID, body.Title, body.Description)
+			default:
+				err = errors.New("mode_invalid")
+			}
 			if err != nil {
 				writeError(w, err)
 				return
@@ -873,5 +888,118 @@ func HandleCellReorder(pool *pgxpool.Pool, hub *network.Hub) http.HandlerFunc {
 		}
 		broadcastCellReorder(ctx, pool, hub, boardID, body.RowID, body.ColumnID, body.OrderedCardIDs)
 		writeOK(w, map[string]any{"reordered": true})
+	}
+}
+
+// HandleCardSwap serves POST /api/storyboards/{board_id}/cards/swap with
+// body {"card_a_id","base_version_a","card_b_id","base_version_b"} -- the
+// Swap resolution for a drag dropped onto an occupied cell (spec 7.4).
+func HandleCardSwap(pool *pgxpool.Pool, hub *network.Hub) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context10(r)
+		defer cancel()
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		boardID := strings.TrimSpace(r.PathValue("board_id"))
+		var body struct {
+			CardAID      string `json:"card_a_id"`
+			BaseVersionA int    `json:"base_version_a"`
+			CardBID      string `json:"card_b_id"`
+			BaseVersionB int    `json:"base_version_b"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeError(w, errors.New("invalid_json"))
+			return
+		}
+		cardA, cardB, err := SwapCards(ctx, pool, userID, boardID, body.CardAID, body.BaseVersionA, body.CardBID, body.BaseVersionB)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		broadcastCardEvent(ctx, pool, hub, boardID, EventCardSwapped, cardA)
+		broadcastCardEvent(ctx, pool, hub, boardID, EventCardSwapped, cardB)
+		writeOK(w, map[string]any{"card_a": cardA, "card_b": cardB})
+	}
+}
+
+// HandleCardImage serves POST (multipart "file" field -> attach/replace)
+// and DELETE (clear) at /api/storyboards/{board_id}/cards/{card_id}/image
+// (spec 2.6/9). Authority is canMutateCard's Crew+-unless-locked gate,
+// enforced inside SetCardImage -- attaching an image is a card-content
+// edit like title or color, not a structural change.
+func HandleCardImage(pool *pgxpool.Pool, hub *network.Hub, storageRoot string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		boardID := strings.TrimSpace(r.PathValue("board_id"))
+		cardID := strings.TrimSpace(r.PathValue("card_id"))
+
+		switch r.Method {
+		case http.MethodDelete:
+			card, err := SetCardImage(ctx, pool, userID, boardID, cardID, "")
+			if err != nil {
+				writeError(w, err)
+				return
+			}
+			broadcastCardEvent(ctx, pool, hub, boardID, EventCardUpdated, card)
+			writeOK(w, map[string]any{"card": card})
+			return
+		case http.MethodPost:
+			board, err := LoadBoard(ctx, pool, boardID)
+			if err != nil {
+				writeError(w, err)
+				return
+			}
+			producerUserID, locationID, scopeErr := resolveCardImageStorageScope(ctx, pool, board.OwnerUserID)
+			if scopeErr != nil {
+				writeError(w, errors.New("card_image_storage_scope_unavailable"))
+				return
+			}
+
+			r.Body = http.MaxBytesReader(w, r.Body, assets.MaxUploadBytes)
+			if err := r.ParseMultipartForm(assets.MaxUploadBytes); err != nil {
+				writeError(w, errors.New("invalid_or_oversize_multipart"))
+				return
+			}
+			file, header, err := r.FormFile("file")
+			if err != nil {
+				writeError(w, errors.New("file_required"))
+				return
+			}
+			defer file.Close()
+			data, err := io.ReadAll(io.LimitReader(file, assets.MaxUploadBytes+1))
+			if err != nil {
+				writeError(w, errors.New("file_read_failed"))
+				return
+			}
+
+			created, err := assets.CreateReferencedImageAsset(
+				ctx, pool, storageRoot,
+				userID, producerUserID, locationID, "storyboard_card",
+				header.Filename, header.Header.Get("Content-Type"), data, assets.MaxUploadBytes,
+			)
+			if err != nil {
+				writeError(w, err)
+				return
+			}
+			card, err := SetCardImage(ctx, pool, userID, boardID, cardID, created.AssetID)
+			if err != nil {
+				writeError(w, err)
+				return
+			}
+			broadcastCardEvent(ctx, pool, hub, boardID, EventCardUpdated, card)
+			writeOK(w, map[string]any{"card": card})
+			return
+		default:
+			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false})
+		}
 	}
 }

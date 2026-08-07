@@ -8,11 +8,22 @@
   <title>Storyboards</title>
   <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
   <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080607;
+      --panel: rgba(17, 13, 14, 0.9);
+      --panel-strong: rgba(11, 8, 9, 0.96);
+      --line: rgba(255, 255, 255, 0.1);
+      --accent: #d84b4f;
+      --accent-strong: #ffd1d3;
+      --muted: #c6b7b8;
+      --accent-soft: rgba(216, 75, 79, 0.16);
+    }
     body {
       margin: 0;
-      background: #0d0a05;
-      color: #f0e8d8;
-      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: #f7eef0;
+      font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     }
     .shell { min-height: 100vh; padding: 24px; box-sizing: border-box; }
     .page-header {
@@ -25,58 +36,58 @@
       padding: 0 210px;
       box-sizing: border-box;
     }
-    .page-header h1 { margin: 0; color: #f2f2f2; letter-spacing: 0.01em; }
-    .status-line { color: #a89272; font-size: 13px; margin-top: 4px; }
+    .page-header h1 { margin: 0; color: #f7eef0; letter-spacing: 0.01em; }
+    .status-line { color: var(--muted); font-size: 13px; margin-top: 4px; }
 
     .layout { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
 
     .panel {
-      background: #171208;
-      border: 1px solid rgba(196, 155, 74, 0.25);
+      background: var(--panel);
+      border: 1px solid var(--line);
       border-radius: 14px;
       padding: 22px;
       box-sizing: border-box;
     }
-    h2 { font-size: 16px; margin: 0 0 12px; color: #d9b46a; text-transform: uppercase; letter-spacing: 0.05em; }
+    h2 { font-size: 16px; margin: 0 0 12px; color: var(--accent-strong); text-transform: uppercase; letter-spacing: 0.05em; }
 
-    label { display: block; margin-top: 10px; font-size: 13px; color: #cbb98a; }
+    label { display: block; margin-top: 10px; font-size: 13px; color: var(--muted); }
     input, textarea, select {
       width: 100%;
       box-sizing: border-box;
-      background: #0d0a05;
-      color: #f0e8d8;
-      border: 1px solid rgba(196, 155, 74, 0.3);
+      background: #0d0a0b;
+      color: #f7eef0;
+      border: 1px solid var(--line);
       border-radius: 6px;
       padding: 8px 10px;
       font-size: 14px;
       margin-top: 4px;
     }
     button {
-      background: #5a481f;
-      color: #f0e8d8;
-      border: none;
-      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--accent-strong);
+      border: 1px solid var(--line);
+      border-radius: 999px;
       padding: 9px 16px;
       font-size: 14px;
       cursor: pointer;
       margin-top: 12px;
     }
-    button:hover { background: #83672f; }
+    button:hover { background: rgba(255, 255, 255, 0.09); border-color: rgba(216, 75, 79, 0.35); }
     button:disabled { opacity: 0.5; cursor: default; }
-    .primary { background: #96762f; font-size: 15px; padding: 11px 20px; }
-    .primary:hover { background: #b28d3a; }
+    .primary { background: var(--accent); color: #fff; font-size: 15px; padding: 11px 20px; border-color: var(--accent); }
+    .primary:hover { background: #c43e42; }
 
-    .form-error { color: #e08a7a; font-size: 13px; margin-top: 8px; }
+    .form-error { color: #ff9a9d; font-size: 13px; margin-top: 8px; }
     .form-ok { color: #9ede9f; font-size: 13px; margin-top: 8px; }
 
     .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
     .tab-btn {
       background: transparent;
-      border: 1px solid rgba(196, 155, 74, 0.3);
+      border: 1px solid var(--line);
       margin-top: 0;
-      color: #cbb98a;
+      color: var(--muted);
     }
-    .tab-btn.active { background: #5a481f; color: #f0e8d8; }
+    .tab-btn.active { background: var(--accent-soft); color: var(--accent-strong); border-color: rgba(216, 75, 79, 0.4); }
 
     .board-list { list-style: none; margin: 0; padding: 0; }
     .board-list li {
@@ -85,19 +96,19 @@
       align-items: center;
       gap: 12px;
       padding: 10px 12px;
-      border: 1px solid rgba(196, 155, 74, 0.18);
+      border: 1px solid var(--line);
       border-radius: 8px;
       margin-bottom: 8px;
-      background: rgba(196, 155, 74, 0.04);
+      background: rgba(255, 255, 255, 0.03);
     }
-    .board-list a { color: #f0e8d8; text-decoration: none; font-size: 15px; }
+    .board-list a { color: #f7eef0; text-decoration: none; font-size: 15px; }
     .board-list a:hover { text-decoration: underline; }
-    .board-meta { color: #a89272; font-size: 12px; margin-top: 2px; }
-    .empty-state { color: #a89272; font-size: 13px; padding: 8px 0; }
+    .board-meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .empty-state { color: var(--muted); font-size: 13px; padding: 8px 0; }
     .archived-badge {
       font-size: 11px;
-      color: #cbb98a;
-      border: 1px solid rgba(196, 155, 74, 0.3);
+      color: var(--muted);
+      border: 1px solid var(--line);
       border-radius: 4px;
       padding: 1px 6px;
     }
@@ -122,6 +133,12 @@
     <div id="dashboard" class="layout hidden">
       <div class="panel">
         <h2>New Board</h2>
+        <label>Type</label>
+        <div class="tabs" id="cb-mode-tabs">
+          <button type="button" class="tab-btn active" data-mode="blank">Blank</button>
+          <button type="button" class="tab-btn" data-mode="timeline">Timeline</button>
+        </div>
+        <div id="cb-mode-hint" class="status-line" style="margin-bottom:10px;">An empty grid you structure yourself.</div>
         <label for="cb-title">Title</label>
         <input id="cb-title" type="text" placeholder="e.g. Season 2 Arc" />
         <label for="cb-description">Description (optional)</label>
@@ -210,6 +227,8 @@
       return true;
     }
 
+    let selectedMode = "blank";
+
     async function createBoard() {
       const title = document.getElementById("cb-title").value.trim();
       if (!title) {
@@ -217,7 +236,7 @@
         return;
       }
       const description = document.getElementById("cb-description").value;
-      const { res, payload } = await apiPost("/api/storyboards", { title, description });
+      const { res, payload } = await apiPost("/api/storyboards", { title, description, mode: selectedMode });
       if (!res.ok || !payload?.ok) {
         setMessage("cb-message", "Could not create: " + (payload?.data?.error || res.status), false);
         return;
@@ -237,6 +256,21 @@
       document.getElementById("show-archived").addEventListener("change", renderBoardList);
     }
 
+    function initModeTabs() {
+      const hints = {
+        blank: "An empty grid you structure yourself.",
+        timeline: "Starts with Beginning / middle / Ending columns, a Reference Panel, and one default band and row.",
+      };
+      document.querySelectorAll("#cb-mode-tabs .tab-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll("#cb-mode-tabs .tab-btn").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          selectedMode = btn.dataset.mode;
+          document.getElementById("cb-mode-hint").textContent = hints[selectedMode] || "";
+        });
+      });
+    }
+
     async function bootstrap() {
       try {
         const response = await fetch("/api/storyboards", { credentials: "include" });
@@ -249,6 +283,7 @@
         connectionStatus.textContent = boardsData.owned.length + " owned, " + boardsData.shared.length + " shared with you.";
         renderBoardList();
         initTabs();
+        initModeTabs();
         dashboard.classList.remove("hidden");
         document.getElementById("cb-create").addEventListener("click", createBoard);
       } catch (err) {
