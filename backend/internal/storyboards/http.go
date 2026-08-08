@@ -25,6 +25,7 @@ import (
 	"victory/backend/internal/access"
 	"victory/backend/internal/assets"
 	"victory/backend/internal/network"
+	"victory/backend/internal/venuecoordination"
 )
 
 type response struct {
@@ -143,7 +144,7 @@ func HandleBoards(pool *pgxpool.Pool) http.HandlerFunc {
 
 // HandleBoardItem serves GET (full filtered snapshot), PATCH (metadata),
 // and DELETE at /api/storyboards/{board_id}.
-func HandleBoardItem(pool *pgxpool.Pool, hub *network.Hub) http.HandlerFunc {
+func HandleBoardItem(pool *pgxpool.Pool, hub *network.Hub, reg *venuecoordination.Registry) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context10(r)
 		defer cancel()
@@ -165,6 +166,7 @@ func HandleBoardItem(pool *pgxpool.Pool, hub *network.Hub) http.HandlerFunc {
 				writeError(w, err)
 				return
 			}
+			attachLiveCoordination(ctx, pool, hub, reg, board, snap)
 			writeOK(w, snap)
 		case http.MethodPatch:
 			var body struct {

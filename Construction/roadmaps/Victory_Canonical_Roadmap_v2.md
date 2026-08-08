@@ -236,7 +236,7 @@ Silence is not a skip decision.
 
 ## 5. Actual implementation baseline
 
-This baseline reconciles the reported repository state through Kernel 75. The next audit must verify it against the live repository.
+This baseline reconciles the reported repository state through **Kernel 84** (Canonical Reconciliation & Runtime Cleanup, 2026-08-08). §5.1–§5.6 reconcile through Kernel 75, unchanged since v2.0; §5.7 is new. Full per-kernel evidence (titles, dates, reportback paths, capability summaries, and self-flagged open findings) for Kernels 76–83 lives in `Construction/OperatorLogs/kernel-history-reconciliation-through-83.md` — this section summarizes capability bands only. The next audit must verify this baseline against the live repository.
 
 ### 5.1 Foundation through Kernel 52
 
@@ -345,6 +345,18 @@ Catharsis is no longer the main branch, but side repairs remain valid:
 
 These should be handled as bounded side repairs or absorbed by later generic kernels. They must not retake the main roadmap indefinitely.
 
+### 5.7 Kernels 76–84 — Hosted-readiness, eWrite/Documents, Storyboards, Venue Coordination, reconciliation
+
+This band replaced the entire old six-kernel committed horizon (§14) with real, evidence-backed work under different titles. Grouped by capability, not by number — see `kernel-history-reconciliation-through-83.md` for the exact per-kernel ledger this summary was built from.
+
+**76–77A — Hosted readiness, security, private-client readiness.** PASS/PASS/PASS. Closed the password-reset log leak and gated public signup behind `PASSWORD_SIGNUP_ENABLED` (now closed in production — Discord is the only account-creation path); WS auth-before-handshake, rate limiting, session-revocation sweep; `victory-recover` break-glass tool. Account deletion (tombstone model), self-service export, and encrypted off-host backup with a *measured* restore (RTO≈69s) are all real and proven — not aspirational. Self-service recovery email is code-complete and tested but delivery is blocked on a pending Brevo account-approval gate (re-checked Kernel 79A and again during Kernel 84's own reconciliation pass; still blocked as of 2026-08-08 — see `Security-notes.md` §3). Repaired the canonical Audition Hall venue seed gap (77A).
+
+**78–79 (all passes) — eWrite Foundation / Victory Documents, realized.** PASS across every pass. This *is* what the old roadmap called "Victory Documents" (§V9) — built and shipped under the product name "eWrite." Real capability, not a foundation stub: Markdown pipeline (goldmark+bluemonday) and Postgres FTS search; typed collection hierarchy (Ruleset→Series→Module→Publication→Section); append-forward revisions with 409 save-conflict handling; stable section anchors; named editor grants; a generic reusable "directory" abstraction (proven via a 100-entry Skill Directory); object links from Cues, index cards, Scene elements, and dialogue Topics into rule sections; hierarchical zip export with per-file checksums; ruleset-wide landing pages, breadcrumbs, and scoped search. Proven at real scale against the actual Socio v1.1 manuscript (357KB / 43,207 words / 763 headings), not a toy fixture. Anonymous public reading remains a deliberate, operator-approved scope cut (schema-ready, not exposed) — see V9 below.
+
+**80–83 — Storyboards and Venue Coordination.** PASS across all four. This is what the old roadmap's P2 called "semantic banded board foundation" and the intended foundation for a Microscope-style anthology proof (A1) — built as a generic, reusable, non-Microscope-specific capability on purpose (see A1 below). Ownership/sharing/role-capability matrix, columns/bands/rows/cards with per-viewer hidden-card WS filtering; CSS Grid presentation with drag-and-drop and a full keyboard/modal fallback; a built-in immutable Timeline template with server-enforced Beginning/Ending boundary protection and a configurable Reference Panel; structured JSON export. Kernel 83 added a second, independent generic platform primitive on top of it — live per-venue-session Group Leader/Current Turn coordination (`backend/internal/venuecoordination`), explicitly *not* a game-rule/turn-order system (see the new V11 below) — with Storyboards as its first, but not only intended, consumer.
+
+**84 — Canonical Reconciliation & Runtime Cleanup.** This kernel. Repaired the WS context-lifetime bug Kernel 83 flagged (`storyboards/ws.go` was reusing a 5-second handshake-scoped context for a connection's entire life); fixed a genuine test-isolation bug in the long-flagged `TestEnsureCanonicalSocioManuscriptSeedsAndIsIdempotent` flake (a hardcoded absolute revision-number assertion, not database drift as previously assumed); found and documented (not fixed — see the skip/defer ledger) a real Timeline boundary-invariant gap in `AddColumn`; brought this roadmap, `current-state.md`, and the accessibility/security operator docs current through Kernel 83. Full ledger: `Construction/OperatorLogs/kernel-84-reportback.md`.
+
 ---
 
 ## 6. Track map
@@ -412,7 +424,13 @@ Operational Integrity is cross-cutting. It is not deferred until the product is 
 - Show Scene Placements;
 - Show-owned current Scene and variables;
 - Cues and guided Scene transitions;
-- Catharsis Scene composition through the shared stage runtime.
+- Catharsis Scene composition through the shared stage runtime;
+- **semantic banded card boards (Kernels 80–82, PASS)** — bands stacked vertically, titled rows/bands, a finite horizontal sequence of columns, lockable bands, custom column labels, cards with front/back content and images, and structured JSON export preserving order/hierarchy/placement. Live per-viewer hidden-card filtering. A built-in immutable Timeline template (three columns, server-enforced Beginning/Ending boundary protection, a configurable four-field Reference Panel) ships alongside plain Blank boards. This *is* the generic capability the old plan (§13 P2) described — proven, not still-required. See `Construction/Storyboards/` for the full design contracts.
+
+### Explicitly not built (see skip/defer ledger for why)
+
+- **nested/beneath cards and merged cells/regions** — the original P2 wish-list item. Kernel 80's spec asked for it; Grant's own post-deploy review (Kernel 80 reportback) confirmed a flat one-card-per-cell model matches how he actually wants to use it, and a "multi-card-per-cell" model was not carried into Kernel 81's presentation rework. Not a gap to fill later by default — see skip/defer ledger.
+- **user-created Storyboard templates** (save-a-board-as-a-reusable-template, beyond the two built-in Blank/Timeline templates) — never requested, never speced.
 
 ### Required next systems
 
@@ -423,33 +441,9 @@ Operational Integrity is cross-cutting. It is not deferred until the product is 
 - capture or revise a reusable Scene without duplicating runtime truth;
 - preview role-specific projection.
 
-#### Semantic banded card boards
-
-A storyboard or timeline may contain:
-
-- a finite horizontal sequence;
-- multiple bands stacked vertically;
-- titled rows or bands;
-- one Scene or custom unit per band;
-- cards beneath or nested inside other cards;
-- lockable bands;
-- merged cells or regions;
-- custom labels such as Beat;
-- manual rather than algorithmic story structure;
-- structured export preserving order, hierarchy, front/back content, and placement.
-
-This is the generic capability later proven by the Microscope-style package.
-
 #### Richer index cards
 
-Index cards remain bounded Elements. They should gain:
-
-- links to Documents and anchored sections;
-- links to other cards and game objects;
-- image references or attachments;
-- thumbnail display;
-- click-to-full-size preview;
-- structured front/back export.
+Index cards remain bounded Elements. **Established (Kernel 79 Goal C&E):** links to eWrite Documents/anchored sections. **Established (Kernels 80–81):** image references/attachments, thumbnail display, click-to-full-size preview (lightbox), structured front/back content and export. **Still open:** links to other cards and game objects (beyond the eWrite object-link types Kernel 79 already covers — Cues, Storyboard cards, Scene elements, dialogue Topics).
 
 They should not become unrestricted miniature word processors.
 
@@ -511,12 +505,13 @@ The Cartograph-style package will prove the shared drawing and stamp layer.
 - Showtime and guided entry;
 - Story So Far and Aftercare handoff.
 
+**Also established (Kernel 77):** reliable backup/restore, with a measured restore proof (RTO≈69s, RPO ≤15min DB / ≤24h assets) — this was "Open" as of v2.0 and is real now, not just built.
+
 ### Open
 
 - stranger-facing onboarding;
 - stronger data isolation verification;
 - capacity and performance measurement;
-- reliable backup/restore;
 - client-controlled Production or Lot boundaries;
 - clearer show scheduling and status where needed;
 - admin tools that do not grant infrastructure authority.
@@ -586,23 +581,27 @@ Current product language:
 
 Other integrations may display different labels while using the same underlying organization.
 
-### Required capabilities
+Shipped under the product name **eWrite** (Kernels 78–79, all passes PASS). "Victory Documents" in this roadmap and "eWrite" in the repository are the same system — the repository name is authoritative going forward.
 
-- long-form Documents;
-- short standalone articles;
-- Markdown paste/import;
-- safe Markdown rendering;
-- headings with stable identifiers;
-- links within one Document;
-- links to another Document;
-- links directly to anchored sections;
-- links from Character sheets, cards, equipment, Cues, lessons, and other objects;
-- cover-to-cover reading;
-- direct opening of one short rule;
-- images and linked media;
-- drafts and publication;
-- search and navigation;
-- export without trapping content in Victory.
+### Established
+
+- long-form Documents (Publications) and short standalone articles, same model;
+- Markdown paste/import with safe rendering (goldmark + bluemonday — the repository's only Markdown pipeline);
+- headings with stable, alias-preserving identifiers;
+- links within one Document, to another Document, and directly to anchored sections;
+- links from Cues, index cards, Storyboard cards, and dialogue Topics (Character-sheet skill links also shipped — Kernel 79A);
+- cover-to-cover reading and direct opening of one short rule;
+- images and linked media, with publication-visibility-aware access control (a real gap closed in Kernel 79 Phase 1 — embedded images previously never checked the referencing publication's own visibility);
+- drafts and publication, with append-forward revisions and 409 save-conflict protection;
+- Ruleset-scoped search and navigation, collection landing pages, breadcrumbs;
+- a reusable generic "directory" abstraction (proven via a 100-entry Skill Directory, 98 auto-linked to real manuscript sections);
+- hierarchical (Module/Series/Ruleset) zip export with per-file checksums;
+- proven at real scale against the actual Socio v1.1 core rulebook (357KB/43,207 words/763 headings), not a toy fixture.
+
+### Open
+
+- links from Character equipment/values/attributes/health systems (only skills are wired — no data model exists yet for the rest);
+- anonymous public reading (schema-ready — `public` visibility exists — but deliberately deferred; currently serves authenticated readers only, an operator decision not a gap).
 
 ### Collaboration boundary
 
@@ -638,6 +637,24 @@ It is not a student information system.
 - live teaching and asynchronous work.
 
 Education should reuse Victory primitives but remain a distinct domain. A classroom Venue must not become a junk drawer for every school function.
+
+## V11. Live venue coordination
+
+Added Kernel 84, reconciling Kernel 83's work into this track (spec instruction: record it here, "not a game-rule track" — it does not belong to Track S/Socio even though Socio will likely be its next real consumer).
+
+### Established
+
+- a generic, venue-agnostic, in-memory coordination primitive (`backend/internal/venuecoordination`) for two ephemeral live-session signals: **Group Leader** and **Current Turn**;
+- no persistence across sessions by design — ephemeral live-session state only, cleared on session end and on backend restart;
+- neither state is a Victory role, permission grant, or turn-order system — holding either never changes read/write/structural authority (Kernel 83's own required negative-authority tests prove this directly);
+- explicit handoff only — no participant order, no automatic rotation, no software-inferred "next" participant;
+- Storyboards wired as the first consumer (its whole family — Blank and Timeline both), including a Presence Tray (right-click authority-gated actions, server-reverified independent of what the UI shows) that did not exist in Storyboards before Kernel 83.
+
+### Open
+
+- a second real consumer beyond Storyboards (the generic package is unproven against a second venue's different authority model — see the open decision below);
+- any keyboard-reachable entry point for the Presence Tray's context menu (currently right-click only, a named accessibility gap — see `Construction/Storyboards/storyboards-accessibility.md`);
+- whether The Cave's existing (different-shaped) session/presence concept should eventually adopt this same coordination primitive, or remain separate.
 
 ---
 
@@ -766,25 +783,31 @@ When exact game text cannot be used, build an original package proving the same 
 
 ## A1. Microscope-style package
 
-**Order:** First.
+**Order:** First. **Status reconciled Kernel 84 — the generic capability shipped; the actual licensed package did not, deliberately.**
 
-### Generic Victory capability
+### Generic Victory capability — proven (Kernels 80–83, PASS)
 
-Semantic banded card boards and structured export.
+- semantic Storyboards (columns/bands/rows/cards, ownership/sharing, role-capability matrix);
+- a built-in Timeline mode (server-enforced Beginning/Ending boundary columns, configurable Reference Panel);
+- structured JSON export preserving order, hierarchy, and placement;
+- long ruleset-scale navigation (eWrite, Kernels 78–79);
+- live Group Leader (turn/authority flow's leadership half — Kernel 83);
+- live, explicit Current Turn (turn/authority flow's turn half — Kernel 83, handoff-only, no automatic rotation).
 
-### Package scope
+This is everything A1's original "Generic Victory capability" line asked for. No further platform-primitive work is believed necessary before a Microscope-style package could be built.
 
-- timeline/bands;
-- cards and nesting;
-- periods/events/scenes or legally permitted equivalent terminology;
-- turn and authority flow;
-- links, images, and card detail;
-- export preserving semantic order and layout;
-- complete playable package.
+### Actual Microscope package — not built, intentionally
+
+- exact licensed terminology (Periods/Events/Scenes or a legally distinct equivalent);
+- permission or license to use Microscope's specific trade dress/procedures;
+- complete game-specific setup and turn procedures (Legacies, Palette, bang/question mechanics, etc.);
+- exact trade dress.
+
+Kernel 82 explicitly grepped its own code/docs/UI copy for Microscope-specific terms (Lens/Focus/Period/Event/Scene) and confirmed none are present — Storyboards/Timeline is generic on purpose, not a disguised Microscope implementation. **Decision recorded:** remain generic until permission/licensing is separately established; do not build the actual licensed package speculatively.
 
 ### Estimate
 
-Likely 1–3 kernels after the underlying board foundation is ready.
+Unknown until the licensing/permission open decision (§15) resolves — the generic foundation is no longer the blocker.
 
 ## A2. Cartograph-style package
 
@@ -884,16 +907,21 @@ A Linux private-server package should remain possible from the same Docker deplo
 
 ## C4. Backup, restore, export, and handoff
 
-Required before serious client dependence:
+### Established (Kernel 77, PASS)
 
-- reproducible install;
-- database backup;
+- reproducible install (`scripts/smoke/fresh-install.sh`, repaired this era after being silently broken since Kernel 76);
+- database backup (pre-migrate automatic dump, plus encrypted off-host backup);
 - asset backup;
-- restore proof;
-- versioned migrations;
-- export of Documents, Characters, Scenes, and relevant package data;
-- operator handoff documentation;
-- recovery from a clean environment.
+- **restore proof — measured, not assumed** (RTO≈69s, RPO ≤15min DB / ≤24h assets, rehearsed in an isolated environment);
+- versioned migrations (embedded, checksummed ledger, auto-applied at boot — Kernel 72's design, unchanged);
+- self-service account data export (JSON+Markdown+files archive);
+- account deletion (tombstone-reassignment model, not a hard delete that breaks shared history).
+
+### Open
+
+- live-over-live restore specifically (§8 of the restore runbook) was documented but not separately drilled — only the isolated-environment path was rehearsed;
+- operator handoff documentation for a *second* human beyond Grant (current docs assume the operator is also the developer);
+- export scope for Storyboards/Timeline and eWrite content specifically has not been added to the same self-service export path Kernel 77 built for account data (Storyboards has its own per-board JSON export; eWrite has its own per-publication/hierarchical export; neither is bundled into the *account*-level export yet).
 
 ## C5. Branding and private configuration
 
@@ -981,20 +1009,25 @@ Do not create another roadmap.
 
 ## O4. Authority and security
 
-- server-authoritative identity and role;
-- no client-selected privilege;
-- route and WebSocket authorization;
+### Established
+
+- server-authoritative identity and role; no client-selected privilege (every Kernel 76–84 authority check re-derives the caller's tier server-side — a standing convention, not a one-time fix);
+- route and WebSocket authorization, including auth-before-handshake (Kernel 77 K77-08) and periodic session-revocation sweeps for already-open sockets (Kernel 77);
 - Location/Production/Show/Character isolation;
-- rate limiting;
-- audit events;
-- safe cookies and CSRF posture;
-- secret management;
-- upload validation;
-- safe Markdown and HTML rendering;
-- privacy-safe logs;
-- deletion/export policy;
-- dependency review;
-- database and storage isolation.
+- rate limiting (credential endpoints since Kernel 72/76; WS connection/message limiters);
+- safe cookies and CSRF posture (`SameSite=Lax`, regression-tested);
+- secret management (rotated DB password into `.env`, Kernel 76);
+- upload validation (size/type caps);
+- safe Markdown and HTML rendering (goldmark + bluemonday, the repository's one sanitize path, proven at real manuscript scale);
+- privacy-safe logs (the password-reset token-in-logs leak Kernel 76 closed was the concrete negative example);
+- deletion/export policy (Kernel 77, see C4);
+- database and storage isolation (dedicated test-database safety gate, Kernel 64, still enforced).
+
+### Open
+
+- dependency and license review (last done as part of the Kernel 76 audit inventory; no recurring process);
+- self-service recovery email delivery (code-complete, blocked on Brevo account approval — see §5.7);
+- a second, non-Storyboards consumer to prove `venuecoordination`'s authority model genuinely generalizes (see V11).
 
 ## O5. Browser and multi-user smoke
 
@@ -1027,209 +1060,61 @@ Required later:
 
 # 12. Immediate committed horizon
 
-The following three kernels are committed in purpose. Numbers must be verified against the repository before issue.
+**Reconciled Kernel 84 (2026-08-08).** The three kernels this section originally committed (a hosted-readiness audit, hosted-user stabilization/security repair, and a Victory Documents foundation) are all **complete** — shipped as Kernels 76, 77/77A, and 78/79 respectively, under different titles and with real scope divergence from what this section originally specified. See §5.7 for the capability-band summary and `Construction/OperatorLogs/kernel-history-reconciliation-through-83.md` for the full per-kernel evidence ledger. Their original detailed specs are preserved verbatim in `Construction/Kernels/` (e.g. `Kernel 77 — Proposed Hosted-User Stabilization Scope.md`, marked superseded in favor of the canonical `Kernel 77 — Private-Client Readiness.md`) — not duplicated here, to avoid this file itself becoming the next thing that goes stale.
 
-## Kernel 76 — Canonical State, Security, and Hosted-Readiness Audit
+The following two kernels are now committed in purpose. Numbers must be verified against the repository before issue — per §4.3, always check the operator log for the true next number.
 
-**Primary tracks:** O, V  
-**Secondary tracks:** C, S  
-**Type:** Audit with bounded critical repair
+## Kernel 85 — Socio Sustained Play
 
-### Goal
-
-Determine, from current repository and deployment evidence, whether Victory can responsibly accept strangers and their data.
-
-### Required audit areas
-
-- real repository/kernel inventory;
-- route inventory;
-- anonymous and public exposure;
-- authentication and session cookies;
-- password reset and invite handling;
-- authorization across Locations, Productions, Shows, Sessions, Scenes, Characters, profiles, relationships, messages, and assets;
-- WebSocket authentication and subscription isolation;
-- trusted game-event authorship;
-- CSRF posture;
-- brute-force and rate limiting;
-- secrets and environment variables;
-- database network exposure;
-- logs containing tokens, credentials, private data, or sensitive payloads;
-- uploads, file types, image decoding, storage paths, and size limits;
-- Markdown/HTML sanitization requirements before Documents;
-- backup confidentiality and restore viability;
-- account deletion and data export expectations;
-- dependency and license inventory;
-- denial-of-service limits;
-- stale security documentation;
-- stale or misleading operator documentation.
-
-### Allowed implementation
-
-The kernel may repair a clearly bounded critical defect when:
-
-- the cause is understood;
-- the repair is low-risk;
-- evidence can be completed;
-- it does not consume the audit.
-
-Larger repairs go into the Kernel 77 ledger.
-
-### Required deliverables
-
-- current architecture and exposure map;
-- severity-ranked finding ledger;
-- explicit “safe for what kind of user” classification;
-- bounded repairs and evidence;
-- updated security notes;
-- explicit skipped/deferred findings;
-- recommended Kernel 77 scope;
-- confirmation or correction of future kernel numbering.
-
-### Non-goals
-
-- compliance certification;
-- generalized SaaS;
-- Victory Documents;
-- unrelated redesign;
-- endless theoretical hardening.
-
-## Kernel 77 — Hosted-User Stabilization and Critical Security Repair
-
-**Primary tracks:** O, V, C  
-**Scope source:** Kernel 76 findings
+**Primary tracks:** S  
+**Secondary tracks:** V (reuses Documents/eWrite, Storyboards if useful, and the live coordination primitive)
 
 ### Goal
 
-Repair the most important blockers to stranger-facing hosted use and establish a sustainable maintenance floor.
+Move Socio beyond tutorial/onboarding (Catharsis: The Golden Journey, Kernels 71–75) into repeatable, connected, sustained play — the "P4. Socio learn-to-play continuation" item from the old provisional horizon, now promoted to committed.
 
-### Likely work, subject to audit
+### Direction, not full spec
 
-- rate limiting;
-- audit logging;
-- route and WebSocket isolation repairs;
-- trusted-event repair;
-- secret cleanup;
-- cookie/CSRF corrections;
-- upload hardening;
-- privacy-safe logging;
-- backup and restore proof;
-- account deletion/export minimum;
-- operator health visibility;
-- browser and multi-user regression suite;
-- stale documentation repair.
+Per Kernel 84 spec §10.8, this kernel is intentionally not fully specified here. Likely territory, subject to its own kernel-maker audit against current Catharsis/character/rules-integration state: stances, actions and reactions, values, skill resolution, health systems, sustained-play loop, Director assistance tools. Should reuse eWrite (rules reference/linking) and the live coordination primitive (V11) where a real fit exists rather than inventing parallel mechanisms.
 
-### Scope rule
+## Kernel 86 — Cartograph-Style Drawing Foundation
 
-Kernel 77 must be bounded. Findings that are important but too large become named follow-up work, not silent omissions.
-
-### Required outcome
-
-A documented readiness classification such as:
-
-- suitable for Grant only;
-- suitable for family/friends;
-- suitable for invited strangers with limited data;
-- suitable for paid hosted Productions;
-- not yet suitable for broader public signup.
-
-The classification must be evidence-based.
-
-## Kernel 78 — Victory Documents Foundation
-
-**Primary tracks:** V9  
-**Secondary tracks:** S, A, O
+**Primary tracks:** V5, A2  
+**Secondary tracks:** V3
 
 ### Goal
 
-Create the safe, linkable document foundation needed for rules, scripts, short articles, education, cards, and integrations.
+Build the next meaningfully different reusable creative/game primitive — shared map/drawing authoring — suitable for an original or permission-safe Cartograph-style proof. The "P6. Shared drawing and Cartograph-style package" item from the old provisional horizon, now promoted to committed.
 
-### Build
+### Direction, not full spec
 
-- Series, Ruleset, Module, Document, and anchored-section model;
-- draft/published state;
-- owner and named-editor authority as appropriate;
-- Markdown paste/import;
-- safe parsing and rendering;
-- stable heading/section identifiers;
-- internal links;
-- cross-Document links;
-- direct anchored links;
-- long-form reading view;
-- short-article view;
-- image/media references;
-- search/navigation minimum;
-- export to Markdown or another open representation;
-- links from at least one existing Victory object;
-- Socio rules content as the first real consumer.
+Per Kernel 84 spec §10.8, this kernel is intentionally not fully specified here. Likely territory: shared vector drawing, coastline/path tools, stamps, terrain palettes, layers, undo, export (matching A2's existing "Generic Victory capability" description). Open decision #7 (exact architecture of vector drawing storage) should be resolved as part of this kernel's own early investigation, not assumed here.
 
-### Do not pull in
+### Third committed slot
 
-- Google-Docs-grade simultaneous editing;
-- full educational Courses;
-- semantic storyboard boards;
-- arbitrary executable HTML;
-- universal package marketplace;
-- large-scale content entry by the kernel maker.
-
-### Required proof
-
-- paste a nontrivial Markdown rules document;
-- publish it;
-- follow an internal heading link;
-- follow a link to a short separate rule;
-- link from an existing Victory object into the correct anchored rule;
-- verify unauthorized draft access is denied;
-- export the content without losing its basic structure;
-- prove unsafe HTML/script content does not execute.
+Per Kernel 84 spec §1.5/§10.8: no third slot is committed. Repository evidence does not make a specific third kernel's dependency clear yet — Kernel 84's own audit found real, bounded cleanup items (see the cleanup ledger) but none large enough to justify displacing Socio/Cartograph as the next two, and none of Track C/A's remaining items (concierge delivery, A3 solo oracle, personal distribution) have a clear forcing dependency yet either. This slot is explicitly decision-gated/provisional rather than filled to satisfy the roadmap's own three-kernel format — see §4.1's own three-kernel horizon rule and §15's open decisions for what would need to resolve first.
 
 ---
 
-# 13. Provisional horizon after Kernel 78
+# 13. Provisional horizon after Kernel 84
 
-This order is provisional.
+This order is provisional. **Reconciled Kernel 84:** P4 and P6 are promoted to the committed horizon (§12, as Kernels 85 and 86); P1, P2, and P3 are updated below to reflect real shipped status rather than left as stale future-tense requirements.
 
-## P1. Document linking and content integration
+## P1. Document linking and content integration — largely established
 
-- connect Characters, equipment, index cards, Cues, and Scenes to Documents;
-- thumbnail and full-image support;
-- better navigation and rules lookup;
-- concise help surfaces;
-- source attribution and package metadata.
+Connecting Characters/equipment/index cards/Cues/Scenes to Documents shipped as eWrite's object-link system (Kernel 79 Goal C&E: Cues, index cards, Storyboard cards, dialogue Topics; Kernel 79A: Character skill links). Thumbnail/full-image support, navigation, and search all shipped (V9). **Still open:** links from Character equipment/values/attributes/health systems specifically (no data model yet); concise in-context help surfaces; source attribution/package metadata for imported content.
 
-## P2. Semantic banded board foundation
+## P2. Semantic banded board foundation — established
 
-- horizontal finite timelines;
-- stacked bands;
-- titles;
-- nested cards;
-- merged regions;
-- locks;
-- custom labels;
-- structured export.
+Shipped as Storyboards (Kernels 80–82): horizontal finite sequences, stacked bands, titles, locks, custom column labels, structured export. **Deliberately not built** (see skip/defer ledger): nested/beneath cards, merged regions — Grant's own review confirmed a flat model matches actual use, this is not a gap to fill by default.
 
-## P3. Microscope-style package
+## P3. Microscope-style package — generic capability established, actual package still gated
 
-Use the semantic board to deliver the first complete anthology proof, subject to licensing or permission.
-
-## P4. Socio learn-to-play continuation
-
-Use Documents, links, and existing Catharsis systems to teach the broader Socio rules:
-
-- stances;
-- actions and reactions;
-- values;
-- skill resolution;
-- health systems;
-- sustained play;
-- Director assistance.
+See A1. The semantic board (P2) is real and sufficient; the actual licensed package remains gated on the unresolved legal/permission open decision (§15#6), not on further platform work.
 
 ## P5. Scene composition and capture
 
 Build the general visual Scene-authoring surface if the board or Socio work has not already forced it earlier.
-
-## P6. Shared drawing and Cartograph-style package
-
-Add vector drawing, stamps, layers, undo, and export; package a complete map-making game.
 
 ## P7. Oracle registry and original solo package
 
@@ -1292,6 +1177,14 @@ This ledger must be updated whenever a planned item is not built.
 | Separate Victory instance per five players | **Not assumed** | Measure real capacity before deciding tenancy/deployment model |
 | Unlimited support inside annual license | **Rejected** | Community discussion may exist; private labor remains separately scoped |
 | Tauri desktop package | **Later only if useful** | Docker-based personal distribution comes first |
+| Nested/beneath cards and merged cells/regions in Storyboards | **Replaced** | Kernel 80 speced it; Grant's own post-deploy review confirmed a flat one-card-per-cell model matches actual use. Not carried into Kernel 81's rework — see V3 |
+| Actual licensed Microscope terminology/mechanics in Storyboards/Timeline | **Deferred, intentionally** | Generic capability shipped (Kernels 80–83); the specific package remains gated on the unresolved licensing/permission open decision (§15) — see A1 |
+| Tone/light-dark hardcoding in Storyboards | **Not planned** | Never speced for Storyboards; no product need identified |
+| Participant turn order / automatic turn advancement in the coordination primitive | **Rejected by design, not merely unbuilt** | Kernel 83's spec explicitly required *no* participant order, *no* automatic rotation, *no* software-inferred "next" — explicit handoff only. This is a permanent product decision, not a future-work gap. See V11 |
+| Persisted Group Leader/Current Turn across sessions | **Rejected by design** | Ephemeral live-session state is the whole point (spec §1.5) — persisting it would be a different, unrequested feature |
+| User-created Storyboard templates (beyond the two built-in Blank/Timeline) | **Not planned** | Never requested; the two built-in templates cover current need |
+| Old six-kernel committed horizon (v2.0's own §12: audit/stabilization/Documents) | **Completed and replaced** | All three shipped (as Kernels 76, 77/77A, 78) under different titles than originally planned — see §5.7. Replaced by the Kernel 85/86 horizon in §12 |
+| Storyboards WS pump reusing a handshake-scoped context for a connection's whole life | **Repaired (Kernel 84)** | Was a real bug (late `watch_board`/board-switch operations silently failed past ~5s), not a documentation gap — see `Construction/Operations/websocket-context-lifecycle.md` |
 
 ---
 
@@ -1300,15 +1193,17 @@ This ledger must be updated whenever a planned item is not built.
 These decisions are intentionally unresolved and should not block current kernels.
 
 1. The next major Victory system after Documents, boards, and education may emerge through real use.
-2. Whether Documents support named editors in the first kernel or immediately afterward.
-3. Whether all integrations display Series → Ruleset → Module labels or relabel the same underlying hierarchy.
-4. Whether the first paid outsider receives a private Production, Production Lot, Location, or separate deployment.
-5. The exact support, hosting, and commercial model.
-6. The first real educational course.
-7. Exact legal treatment and permission for a Microscope package.
-8. Exact architecture of vector drawing storage.
-9. Capacity threshold for shared hosting versus isolated deployments.
-10. Whether a future desktop wrapper adds enough value beyond Docker-based personal distribution.
+2. Whether all integrations display Series → Ruleset → Module labels or relabel the same underlying hierarchy.
+3. Whether the first paid outsider receives a private Production, Production Lot, Location, or separate deployment.
+4. The exact support, hosting, and commercial model.
+5. The first real educational course.
+6. Exact legal treatment and permission for a Microscope package (directly gates A1's actual-package build — the generic capability no longer blocks it, see A1).
+7. Exact architecture of vector drawing storage (directly relevant to Kernel 86 — Cartograph-Style Drawing Foundation).
+8. Capacity threshold for shared hosting versus isolated deployments.
+9. Whether a future desktop wrapper adds enough value beyond Docker-based personal distribution.
+10. Whether `venuecoordination` (V11, Kernel 83) should gain a second consumer venue (e.g. The Cave's existing session/presence model) now, or remain single-consumer until a concrete second need appears — the generic package is unproven against a differently-shaped authority model.
+
+~~Whether Documents support named editors in the first kernel or immediately afterward~~ — resolved (Kernel 78): named editors shipped in the first version. Removed 2026-08-08.
 
 Open decisions belong here until evidence or operator choice resolves them.
 

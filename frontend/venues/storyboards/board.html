@@ -320,6 +320,52 @@
       flex: 0 0 auto; align-self: flex-start; writing-mode: vertical-rl;
       padding: 10px 4px; border-radius: 8px;
     }
+
+    /* ---------- Presence Tray + coordination (Kernel 83) ---------- */
+    .presence-tray {
+      display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+      margin-bottom: 10px;
+    }
+    .presence-chip {
+      display: flex; align-items: center; gap: 5px;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+      padding: 4px 10px 4px 4px; font-size: 12px; cursor: context-menu;
+      user-select: none;
+    }
+    .presence-chip-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: #6bd67a; flex: 0 0 auto;
+    }
+    .presence-chip-name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .presence-badge {
+      font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em;
+      border-radius: 4px; padding: 2px 5px; font-weight: 700;
+    }
+    .presence-badge-leader { background: rgba(255, 209, 211, 0.18); color: var(--accent-strong); }
+    .presence-badge-turn { background: rgba(155, 222, 159, 0.18); color: #9ede9f; }
+
+    .presence-context-menu {
+      position: fixed; z-index: 90; min-width: 190px;
+      background: var(--panel-strong); border: 1px solid var(--line); border-radius: 12px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4); padding: 6px;
+    }
+    .presence-context-menu button {
+      width: 100%; display: block; text-align: left; padding: 8px 10px; margin: 0;
+      border: 0; background: transparent; color: #f7eef0; border-radius: 8px;
+      cursor: pointer; font: inherit; font-size: 12.5px;
+    }
+    .presence-context-menu button:hover { background: rgba(255, 255, 255, 0.08); }
+    .presence-context-menu .presence-menu-name {
+      display: block; padding: 6px 10px 8px; font-size: 11px; color: var(--muted);
+      border-bottom: 1px solid var(--line); margin-bottom: 4px;
+    }
+
+    .reference-coordination-slot {
+      border-bottom: 1px solid var(--line); padding: 0 0 10px; margin-bottom: 10px; font-size: 12.5px;
+    }
+    .reference-coordination-slot div { margin-bottom: 3px; }
+    .reference-coordination-slot .presence-badge { margin-left: 6px; }
+    .coordination-absent-note { color: var(--muted); font-size: 10.5px; }
+
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -348,6 +394,8 @@
       </div>
     </div>
 
+    <div class="presence-tray" id="presence-tray" hidden></div>
+
     <div class="toolbar" id="structure-toolbar" hidden>
       <button id="add-column-btn" class="small">+ Column (end)</button>
       <button id="add-band-btn" class="small">+ Band</button>
@@ -371,6 +419,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Presence Tray right-click menu (Kernel 83) -->
+  <div class="presence-context-menu" id="presence-context-menu" hidden></div>
 
   <!-- Reference field editor modal (add / rename) -->
   <div class="modal-backdrop" id="reference-field-modal" hidden>
@@ -576,6 +627,7 @@
 
       renderGrid();
       renderReferencePanel();
+      renderPresenceTray();
     }
 
     function closeAllColumnMenus() {
@@ -1586,6 +1638,127 @@
       await renderGrants();
     });
 
+    // ---------- Presence Tray + Group Leader/Current Turn (Kernel 83) ----------
+    // Right-click is the one mutation surface (spec 3.1); indicators on
+    // the tray itself are read-only. Server re-derives authority on every
+    // POST regardless of what this file decides to show -- the checks
+    // below only decide which menu items are worth offering, never what a
+    // click is allowed to actually do.
+
+    function renderPresenceTray() {
+      const tray = document.getElementById("presence-tray");
+      const roster = snapshot.presence || [];
+      tray.innerHTML = "";
+      tray.hidden = roster.length === 0;
+      const coord = snapshot.coordination || {};
+
+      for (const entry of roster) {
+        const chip = document.createElement("div");
+        chip.className = "presence-chip";
+
+        const dot = document.createElement("span");
+        dot.className = "presence-chip-dot";
+        chip.appendChild(dot);
+
+        const nameEl = document.createElement("span");
+        nameEl.className = "presence-chip-name";
+        nameEl.textContent = entry.display_name || entry.handle || "Someone";
+        nameEl.title = entry.handle ? "@" + entry.handle : "";
+        chip.appendChild(nameEl);
+
+        if (coord.active && coord.group_leader_user_id === entry.user_id) {
+          const badge = document.createElement("span");
+          badge.className = "presence-badge presence-badge-leader";
+          badge.textContent = "Leader";
+          chip.appendChild(badge);
+        }
+        if (coord.active && coord.current_turn_user_id === entry.user_id) {
+          const badge = document.createElement("span");
+          badge.className = "presence-badge presence-badge-turn";
+          badge.textContent = "Turn";
+          chip.appendChild(badge);
+        }
+
+        chip.addEventListener("contextmenu", (event) => openPresenceContextMenu(event, entry));
+        tray.appendChild(chip);
+      }
+    }
+
+    function iAmGroupLeader() {
+      const coord = snapshot.coordination;
+      return !!(coord && coord.active && coord.group_leader_user_id && coord.group_leader_user_id === snapshot.viewer_user_id);
+    }
+    function iAmCurrentTurnHolder() {
+      const coord = snapshot.coordination;
+      return !!(coord && coord.active && coord.current_turn_user_id && coord.current_turn_user_id === snapshot.viewer_user_id);
+    }
+
+    async function postCoordinationAction(kind, targetUserId) {
+      const path = apiBase + "/coordination/" + (kind === "leader" ? "group-leader" : "current-turn");
+      const { res, payload } = await apiPost(path, { target_user_id: targetUserId });
+      if (!res.ok || !payload || !payload.ok) {
+        alert("Could not update: " + errorMessage(payload, res));
+        return;
+      }
+      snapshot.coordination = payload.data.coordination;
+      renderPresenceTray();
+      renderReferencePanel();
+    }
+
+    function closePresenceContextMenu() {
+      const menu = document.getElementById("presence-context-menu");
+      menu.hidden = true;
+      menu.innerHTML = "";
+    }
+
+    function openPresenceContextMenu(event, entry) {
+      event.preventDefault();
+      closePresenceContextMenu();
+
+      const coord = snapshot.coordination || {};
+      const isAlreadyLeader = coord.active && coord.group_leader_user_id === entry.user_id;
+      const isAlreadyTurn = coord.active && coord.current_turn_user_id === entry.user_id;
+      const canAssignLeader = coord.active && (affordances.canEditStructure || iAmGroupLeader());
+      const canAssignTurn = coord.active && (affordances.canEditStructure || iAmGroupLeader() || iAmCurrentTurnHolder());
+
+      const items = [];
+      if (canAssignLeader && !isAlreadyLeader) {
+        items.push(["Make Group Leader", () => postCoordinationAction("leader", entry.user_id)]);
+      }
+      if (canAssignTurn && !isAlreadyTurn) {
+        items.push(["Give Turn", () => postCoordinationAction("turn", entry.user_id)]);
+      }
+      if (items.length === 0) return; // spec 3.1: only show actions the actor is authorized to perform
+
+      const menu = document.getElementById("presence-context-menu");
+      const nameLabel = document.createElement("span");
+      nameLabel.className = "presence-menu-name";
+      nameLabel.textContent = entry.display_name || entry.handle || "Someone";
+      menu.appendChild(nameLabel);
+      for (const [label, handler] of items) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = label;
+        btn.addEventListener("click", () => {
+          closePresenceContextMenu();
+          handler();
+        });
+        menu.appendChild(btn);
+      }
+
+      menu.style.left = Math.min(event.clientX, window.innerWidth - 210) + "px";
+      menu.style.top = Math.min(event.clientY, window.innerHeight - 120) + "px";
+      menu.hidden = false;
+    }
+
+    document.addEventListener("click", (event) => {
+      const menu = document.getElementById("presence-context-menu");
+      if (!menu.hidden && !menu.contains(event.target)) closePresenceContextMenu();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closePresenceContextMenu();
+    });
+
     // ---------- Reference Panel (Kernel 82) ----------
 
     const REFERENCE_PANEL_COLLAPSE_KEY_PREFIX = "sb-refpanel-collapsed-";
@@ -1628,9 +1801,51 @@
 
       const body = document.getElementById("reference-panel-body");
       body.innerHTML = "";
+      const coordSlot = buildReferenceCoordinationSlot();
+      if (coordSlot) body.appendChild(coordSlot);
       for (const field of fields) {
         body.appendChild(buildReferenceFieldEl(field));
       }
+    }
+
+    // Kernel 83's read-only Reference Panel integration seam
+    // (Construction/Storyboards/session-state-integration-seam.md): a
+    // small slot at the top of the panel, present only while a live
+    // coordination session is active -- absent entirely otherwise, never
+    // a disabled placeholder. The Presence Tray (not this slot) is the
+    // one required, always-visible surface and the only mutation surface;
+    // this is supplementary context for anyone already looking at the
+    // panel.
+    function buildReferenceCoordinationSlot() {
+      const coord = snapshot.coordination;
+      if (!coord || !coord.active) return null;
+      if (!coord.group_leader_user_id && !coord.current_turn_user_id) return null;
+
+      const wrap = document.createElement("div");
+      wrap.className = "reference-coordination-slot";
+
+      function row(label, name, present) {
+        const line = document.createElement("div");
+        const strong = document.createElement("strong");
+        strong.textContent = label + ": ";
+        line.appendChild(strong);
+        line.appendChild(document.createTextNode(name));
+        if (!present) {
+          const note = document.createElement("span");
+          note.className = "coordination-absent-note";
+          note.textContent = " (absent)";
+          line.appendChild(note);
+        }
+        return line;
+      }
+
+      if (coord.group_leader_user_id) {
+        wrap.appendChild(row("Group Leader", coord.group_leader_display_name || coord.group_leader_handle || "Someone", coord.group_leader_present));
+      }
+      if (coord.current_turn_user_id) {
+        wrap.appendChild(row("Current Turn", coord.current_turn_display_name || coord.current_turn_handle || "Someone", coord.current_turn_present));
+      }
+      return wrap;
     }
     document.getElementById("reference-panel-collapse-btn").addEventListener("click", () => {
       setReferencePanelCollapsed(true);

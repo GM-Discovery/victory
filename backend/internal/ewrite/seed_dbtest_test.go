@@ -66,9 +66,23 @@ func TestEnsureCanonicalSocioManuscriptSeedsAndIsIdempotent(t *testing.T) {
 	if ok, err := CanEditPublication(ctx, pool, crew, p); err != nil || !ok {
 		t.Fatalf("expected a Producer at the seed location to have edit authority, ok=%v err=%v", ok, err)
 	}
+	// Asserted relative to the revision number actually loaded, not a
+	// hardcoded "2" (Kernel 84 fix): EnsureCanonicalSocioManuscript is
+	// deliberately create-if-absent-only (see this file's own package
+	// comment), so the seeded publication -- and any prior test run's own
+	// edit to it -- persists across repeated `go test` invocations against
+	// the same not-freshly-reset database. A hardcoded "2" only held on
+	// the very first run after a reset; this test must remain meaningful
+	// on every subsequent run too, the same way the real seed function's
+	// own idempotency is meant to.
+	beforeRevision, err := LoadRevision(ctx, pool, p.CurrentRevisionID)
+	if err != nil {
+		t.Fatalf("load current revision: %v", err)
+	}
+	beforeRevisionNumber := beforeRevision.RevisionNumber
 	edited := mustSave(t, pool, crew, pubID, p.SourceMarkdown+"\n\nAN EDIT A PRODUCER MADE", p.CurrentRevisionID)
-	if edited.RevisionNumber != 2 {
-		t.Fatalf("expected the edit to be revision 2, got %d", edited.RevisionNumber)
+	if edited.RevisionNumber != beforeRevisionNumber+1 {
+		t.Fatalf("expected the edit to be revision %d, got %d", beforeRevisionNumber+1, edited.RevisionNumber)
 	}
 
 	if err := EnsureCanonicalSocioManuscript(ctx, pool); err != nil {

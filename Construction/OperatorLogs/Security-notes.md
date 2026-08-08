@@ -124,7 +124,10 @@ itself confirmed recognizing). This pattern points to a pending account-level re
 side, not a configuration or code defect — see the Kernel 77 reportback for the full sequence.
 
 **Operator note, Grant's own words:** *"Remind me in kernel 78+ to check if I have been
-approved yet with Brevo."*
+approved yet with Brevo."* — acted on: Kernel 79A re-checked (2026-08-05) and hit the identical
+`535` failure; still blocked as of Kernel 84's reconciliation pass (2026-08-08). No further
+recheck is scheduled; the next one should happen only if Grant has separately confirmed Brevo
+account approval, not on a kernel-number cadence.
 
 Until delivery is proven, `victory-recover` remains the reliable path for any account,
 including the operator's own.

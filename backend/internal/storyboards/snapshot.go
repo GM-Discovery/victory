@@ -31,13 +31,27 @@ type ReferenceFieldWithItems struct {
 // *viewing*, so ReferenceFields is loaded the same way for every tier
 // that can see the board at all.
 type BoardSnapshot struct {
-	Board           Storyboard                `json:"board"`
-	ViewerTier      string                    `json:"viewer_tier"`
+	Board      Storyboard `json:"board"`
+	ViewerTier string     `json:"viewer_tier"`
+	// ViewerUserID (Kernel 83) lets the client tell which Presence Tray
+	// chip is its own connection -- e.g. to compare against
+	// Coordination.GroupLeaderUserID/CurrentTurnUserID and decide whether
+	// the acting user currently holds either state, without a second
+	// "who am I" round trip.
+	ViewerUserID    string                    `json:"viewer_user_id"`
 	Columns         []StoryboardColumn        `json:"columns"`
 	Bands           []StoryboardBand          `json:"bands"`
 	Rows            []StoryboardRow           `json:"rows"`
 	Cards           []StoryboardCard          `json:"cards"`
 	ReferenceFields []ReferenceFieldWithItems `json:"reference_fields"`
+	// Presence and Coordination (Kernel 83) are live venue-session state,
+	// not persisted board content -- they are attached by the HTTP/WS
+	// callers (see attachLiveCoordination in coordination_http.go) after
+	// ProjectBoardSnapshot returns, never by this projection itself, and
+	// are deliberately absent from export.go's ExportDocument (spec 7:
+	// Timeline export must exclude live coordination state).
+	Presence     []PresenceEntry   `json:"presence,omitempty"`
+	Coordination *CoordinationView `json:"coordination,omitempty"`
 }
 
 // ProjectBoardSnapshot requires the viewer to have some tier of access
@@ -51,7 +65,12 @@ func ProjectBoardSnapshot(ctx context.Context, pool *pgxpool.Pool, userID string
 	if tier == TierNone {
 		return nil, ErrNotAuthorized
 	}
-	return projectBoardSnapshotForTier(ctx, pool, tier, board)
+	snap, err := projectBoardSnapshotForTier(ctx, pool, tier, board)
+	if err != nil {
+		return nil, err
+	}
+	snap.ViewerUserID = userID
+	return snap, nil
 }
 
 // projectBoardSnapshotForTier is split out from ProjectBoardSnapshot so

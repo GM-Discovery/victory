@@ -127,7 +127,7 @@ Playwright is not vendored in the repo. The working install lives at `/tmp/node_
 cd /opt/victory
 NODE_PATH=/tmp/node_modules node scripts/smoke/kernel62-browser.js
 ```
-If `/tmp` has been cleared, reinstall with `npm i playwright` in a scratch dir and `npx playwright install chromium`. Scripts target the deployed site by default (`--host-resolver-rules` maps the domain to 127.0.0.1) and create clearly-named disposable accounts via real `/api/auth/signup`.
+If `/tmp` has been cleared, reinstall with `npm i playwright` in a scratch dir and `npx playwright install chromium`. Scripts target the deployed site by default (`--host-resolver-rules` maps the domain to 127.0.0.1) and create clearly-named disposable accounts. **As of Kernel 84: production password signup is closed** (`PASSWORD_SIGNUP_ENABLED=false`, confirmed live in Kernel 83), so `/api/auth/signup` is no longer a working way to create a disposable account — older scripts like `kernel62-browser.js` used it when it still worked and are left as historical reference, but new scripts must create disposable accounts via direct fixture-row insertion instead. See `kernel-maker-field-guide.md`'s "Two-Browser / Live-Update Verification Technique" for the current canonical method (raw `users` + `auth.sessions` row insertion, token hashed to match `sessions.HashToken`).
 
 ## Working Rules
 Do:

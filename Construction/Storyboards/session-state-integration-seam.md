@@ -1,4 +1,16 @@
-# Session-State Integration Seam (Kernel 82)
+# Session-State Integration Seam (Kernel 82) — wired by Kernel 83
+
+**Status: implemented.** Everything below this line describes the seam as
+it existed when Kernel 82 shipped, deliberately unwired. Kernel 83 wired
+it: `board.html`'s `buildReferenceCoordinationSlot` now renders a live
+Group Leader/Current Turn slot at the top of the Reference Panel body
+whenever `snapshot.coordination.active` is true, and is absent entirely
+(not disabled) otherwise — exactly the shape this document predicted.
+See `Construction/Venues/collaborative-venue-coordination-contract.md` and
+`Construction/Venues/presence-tray-coordination-actions.md` for the actual
+implementation; the rest of this file is kept as the historical record of
+the seam's design rationale, which turned out to need no changes once the
+real feature existed.
 
 Spec §8's requirement, verbatim: Kernel 82 must not implement Group Leader, Current Turn, participant ordering, or Presence Tray right-click behavior, but must "document a clean integration point so Timeline can later consume them."
 

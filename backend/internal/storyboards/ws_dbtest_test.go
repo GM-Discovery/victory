@@ -15,6 +15,7 @@ import (
 	"victory/backend/internal/dbtest"
 	"victory/backend/internal/network"
 	"victory/backend/internal/sessions"
+	"victory/backend/internal/venuecoordination"
 )
 
 // dialWS wires a real ServeStoryboardWS behind an httptest.Server and
@@ -77,7 +78,7 @@ func TestWSSnapshotOnWatchAndReconnect(t *testing.T) {
 	board := mustCreateBoard(t, pool, owner, "WS Board")
 
 	hub := network.NewHub()
-	server := httptest.NewServer(ServeStoryboardWS(hub, pool))
+	server := httptest.NewServer(ServeStoryboardWS(hub, pool, venuecoordination.NewRegistry()))
 	defer server.Close()
 
 	conn := dialWS(t, server, pool, owner)
@@ -108,7 +109,7 @@ func TestWSWatchRejectedForUnauthorizedUser(t *testing.T) {
 	board := mustCreateBoard(t, pool, owner, "WS Private Board")
 
 	hub := network.NewHub()
-	server := httptest.NewServer(ServeStoryboardWS(hub, pool))
+	server := httptest.NewServer(ServeStoryboardWS(hub, pool, venuecoordination.NewRegistry()))
 	defer server.Close()
 
 	conn := dialWS(t, server, pool, stranger)
@@ -135,7 +136,7 @@ func TestWSRevokedGrantRejectsNextWatch(t *testing.T) {
 	}
 
 	hub := network.NewHub()
-	server := httptest.NewServer(ServeStoryboardWS(hub, pool))
+	server := httptest.NewServer(ServeStoryboardWS(hub, pool, venuecoordination.NewRegistry()))
 	defer server.Close()
 
 	conn := dialWS(t, server, pool, member)
@@ -174,7 +175,7 @@ func TestWSCardEventDeliveredLiveAndHiddenFiltered(t *testing.T) {
 	cols, _ := ListColumns(ctx, pool, board.ID)
 
 	hub := network.NewHub()
-	server := httptest.NewServer(ServeStoryboardWS(hub, pool))
+	server := httptest.NewServer(ServeStoryboardWS(hub, pool, venuecoordination.NewRegistry()))
 	defer server.Close()
 
 	audienceConn := dialWS(t, server, pool, audience)

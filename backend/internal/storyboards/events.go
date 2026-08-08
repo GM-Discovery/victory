@@ -51,6 +51,14 @@ const (
 	// hidden-from-audience (spec 3.4 gates editing by role, not viewing),
 	// so there is no per-viewer shaping to do, unlike card events.
 	EventReferencePanelChanged = "storyboard/reference_panel_changed"
+	// EventCoordinationChanged and EventPresenceChanged (Kernel 83) cover
+	// Group Leader/Current Turn assignment and Presence Tray roster
+	// changes respectively. Both are broadcast via
+	// network.Hub.BroadcastBoardWatchers, not emitBoardEvent -- see
+	// coordination_http.go's broadcastCoordinationChanged/
+	// broadcastPresenceChanged.
+	EventCoordinationChanged = "storyboard/coordination_changed"
+	EventPresenceChanged     = "storyboard/presence_changed"
 )
 
 // emitBoardEvent resolves every current watcher of boardID, calls build

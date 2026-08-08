@@ -1,9 +1,31 @@
-# Storyboards Accessibility Notes (Kernel 81)
+# Storyboards Accessibility Notes (Kernel 81, reconciled Kernel 84)
 
 Kernel 81's spec required "keyboard/modal fallback remains available" and
 a specific "keyboard focus and Escape behavior" browser-proof item — not a
 full accessibility audit. This document is scoped honestly to what was
-actually built and verified, and flags what wasn't.
+actually built and verified, and flags what wasn't. Kernel 84 (spec §8)
+reconciled every accessibility gap named across Kernels 81/82/83's own
+reportbacks into the single canonical backlog below — this file, not a
+scattered "known issues" line in each kernel's own report, is where a
+future kernel should look first.
+
+## Canonical backlog (Kernel 84 reconciliation)
+
+| Gap | Category | Workaround today | First named in |
+|---|---|---|---|
+| Occupied-cell "Move existing" picker has no keyboard path | **Blocker** for keyboard-only users who land in this specific state | None — a keyboard-only user reaching an occupied-cell resolution currently cannot complete the move | Kernel 81 |
+| Presence Tray Group Leader/Current Turn menu opens only via right-click | **Blocker** for keyboard-only users performing this specific action | None — the action is simply unreachable without a pointer; menu contents are fully accessible once open | Kernel 83 |
+| Middle-mouse panning has no keyboard/touch equivalent | Convenience | Yes — normal scroll, scrollbar drag, arrow/Page Up/Page Down/Home/End on a focused scrollable region, or Tab-focusing a card and using the Move modal fallback all still reach any part of the board | Kernel 82 |
+| No real screen-reader pass (VoiceOver/NVDA/JAWS) performed | General, not interaction-specific | `role`/`tabIndex`/`alt` attributes are correct by inspection and repo convention, not verified by ear | Kernel 81 |
+| No formal WCAG contrast audit | General, not interaction-specific | Palette chosen for visual consistency with The Cave's card language, not measured | Kernel 81 |
+| Drag-and-drop has no keyboard-driven equivalent beyond the fallback | Mitigated | The select/select/Move modal is a complete, non-degraded accessible path (spec 7.5's literal requirement), not a stopgap | Kernel 81 |
+
+Three real, unmitigated gaps exist as of Kernel 84: the two blockers above,
+plus the general screen-reader/contrast gaps. None were fixed in Kernel 84
+(deliberately — see `kernel-84-reportback.md` §1.1: accessibility
+reconciliation was explicitly scoped to gathering the backlog, not solving
+it, and a trivial low-risk fix wasn't available for either blocker without
+expanding into the redesign work both are named as needing).
 
 ## What's actually in place
 
@@ -77,9 +99,27 @@ actually built and verified, and flags what wasn't.
   only matters during pointer-drag, which is already pointer-only by
   definition.
 
+## Kernel 83: Presence Tray right-click is mouse-first
+
+The Presence Tray's Group Leader/Current Turn context menu
+(`Construction/Venues/presence-tray-coordination-actions.md`) opens only
+via `contextmenu` (right-click). Per spec §10.3 this was the explicitly
+required interaction for Kernel 83, not an oversight — but it is a real,
+named gap in the same category as the occupied-cell picker above: a
+keyboard-only user currently has no way to open this menu at all, so they
+cannot assign Group Leader or Current Turn themselves even when otherwise
+authorized. Once open, the menu itself is fully accessible (real
+`<button>` elements, closes on `Escape` or outside click) — the gap is
+specifically the *entry point*, not the menu contents. A future kernel
+adding a focusable per-chip trigger (e.g. a "⋮" button) would not need to
+touch the menu's authority logic, only give it a second way in.
+
 ## Recommendation for a future kernel
 
 If Storyboards accessibility becomes a priority (e.g. before wider rollout
-beyond Grant's own instance), the two named gaps above — keyboard
-resolution of an occupied-cell drop, and any real screen-reader pass — are
-the concrete next steps, not a general "improve accessibility" restart.
+beyond Grant's own instance), the canonical backlog table at the top of
+this file is the starting point, not a general "improve accessibility"
+restart. Fix the two named blockers first (occupied-cell keyboard
+resolution, a Presence Tray keyboard entry point); the general
+screen-reader/contrast passes are lower-urgency since nothing currently
+depends on them to complete a task.

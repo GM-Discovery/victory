@@ -259,3 +259,25 @@ func (h *Hub) SendToBoardWatcher(boardID, userID string, msg []byte) {
 		}
 	}
 }
+
+// BroadcastBoardWatchers sends msg to every connection currently watching
+// boardID, unfiltered (mirroring BroadcastProfileWatchers's shape for
+// boards instead of profiles). Kernel 83 uses this for Presence Tray
+// roster and Group Leader/Current Turn updates -- unlike card events
+// (events.go), neither is ever hidden-from-audience content, so there is
+// no per-viewer shaping to do before it reaches the Hub.
+func (h *Hub) BroadcastBoardWatchers(boardID string, msg []byte) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for c := range h.clients {
+		if c == nil || c.WatchingBoardID == "" || c.WatchingBoardID != boardID {
+			continue
+		}
+		select {
+		case c.Send <- msg:
+		default:
+			log.Printf("dropping slow websocket client")
+		}
+	}
+}

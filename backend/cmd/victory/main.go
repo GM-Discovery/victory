@@ -51,6 +51,7 @@ import (
 	"victory/backend/internal/storyboards"
 	"victory/backend/internal/thirdplace"
 	"victory/backend/internal/tickets"
+	"victory/backend/internal/venuecoordination"
 	"victory/backend/internal/venues"
 	"victory/backend/internal/world"
 )
@@ -168,6 +169,7 @@ func main() {
 
 	hub := network.NewHub()
 	discordAudioPresenceStore := identity.NewDiscordAudioPresenceStore()
+	venueCoordination := venuecoordination.NewRegistry()
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
@@ -501,9 +503,9 @@ func main() {
 	// Kernel 80: Storyboards Core.
 	mux.HandleFunc("GET /api/storyboards", storyboards.HandleBoards(pool))
 	mux.HandleFunc("POST /api/storyboards", ratelimit.Middleware(actionLimiter, storyboards.HandleBoards(pool)))
-	mux.HandleFunc("GET /api/storyboards/{board_id}", storyboards.HandleBoardItem(pool, hub))
-	mux.HandleFunc("PATCH /api/storyboards/{board_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleBoardItem(pool, hub)))
-	mux.HandleFunc("DELETE /api/storyboards/{board_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleBoardItem(pool, hub)))
+	mux.HandleFunc("GET /api/storyboards/{board_id}", storyboards.HandleBoardItem(pool, hub, venueCoordination))
+	mux.HandleFunc("PATCH /api/storyboards/{board_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleBoardItem(pool, hub, venueCoordination)))
+	mux.HandleFunc("DELETE /api/storyboards/{board_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleBoardItem(pool, hub, venueCoordination)))
 	mux.HandleFunc("POST /api/storyboards/{board_id}/archive", ratelimit.Middleware(actionLimiter, storyboards.HandleBoardArchive(pool, hub)))
 	mux.HandleFunc("GET /api/storyboards/{board_id}/export", storyboards.HandleBoardExport(pool))
 	mux.HandleFunc("GET /api/storyboards/{board_id}/grants", storyboards.HandleGrants(pool, hub))
@@ -543,7 +545,9 @@ func main() {
 	mux.HandleFunc("PATCH /api/storyboards/{board_id}/reference-fields/{field_id}/items/{item_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleReferenceItemItem(pool, hub)))
 	mux.HandleFunc("DELETE /api/storyboards/{board_id}/reference-fields/{field_id}/items/{item_id}", ratelimit.Middleware(actionLimiter, storyboards.HandleReferenceItemItem(pool, hub)))
 	mux.HandleFunc("POST /api/storyboards/{board_id}/reference-fields/{field_id}/items/reorder", ratelimit.Middleware(actionLimiter, storyboards.HandleReferenceItemsReorder(pool, hub)))
-	mux.HandleFunc("/ws/storyboards", storyboards.ServeStoryboardWS(hub, pool))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/coordination/group-leader", ratelimit.Middleware(actionLimiter, storyboards.HandleCoordinationGroupLeader(pool, hub, venueCoordination)))
+	mux.HandleFunc("POST /api/storyboards/{board_id}/coordination/current-turn", ratelimit.Middleware(actionLimiter, storyboards.HandleCoordinationCurrentTurn(pool, hub, venueCoordination)))
+	mux.HandleFunc("/ws/storyboards", storyboards.ServeStoryboardWS(hub, pool, venueCoordination))
 
 	// Kernel 78: eWrite -- Library reading surface. Published content
 	// only; per-publication visibility enforced in the handlers.
