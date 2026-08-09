@@ -1,7 +1,14 @@
 # Victory VTT — Master Actual Implementation Guide
 
+> **STATUS: SUPERSEDED / HISTORICAL — do not use this file for kernel sequencing.**
+> **Replaced by:** `Construction/roadmaps/Victory_Canonical_Roadmap_v2.md` ("Victory Canonical Roadmap"), adopted 2026-07-30, reconciled through Kernel 84 on 2026-08-08.
+>
+> This file is preserved for planning history only. Its "Active planning and execution control document" status line below was true at v1.0 but has not been true since the Canonical Roadmap was adopted — the Canonical Roadmap's own skip/defer ledger records this file's replacement explicitly ("Separate track roadmap and master guide — Replaced — Grant cannot track multiple roadmap files; replaced by this canonical roadmap"). Nothing in this file should be read as describing current implementation state, current kernel numbering, or current sequence control. For all of that, see the Canonical Roadmap and `Construction/current-state.md`. This marker was added by Kernel 84 (Canonical Reconciliation & Runtime Cleanup, 2026-08-08) per that kernel's explicit mandate to make this file's non-canonical status unmistakable rather than merely implied elsewhere.
+
+---
+
 **Version:** 1.0  
-**Status:** Active planning and execution control document  
+**Status:** ~~Active planning and execution control document~~ — superseded, see banner above
 **Companion documents:**
 
 - `victory-track-roadmaps-v1.md`

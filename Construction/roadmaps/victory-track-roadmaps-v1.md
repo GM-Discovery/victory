@@ -1,7 +1,12 @@
 # Victory VTT — Parallel Track Roadmaps
 
+> **STATUS: SUPERSEDED / HISTORICAL — do not use this file for planning.**
+> **Replaced by:** `Construction/roadmaps/Victory_Canonical_Roadmap_v2.md`, which merged this file and the Master Actual Implementation Guide into one canonical file (adopted 2026-07-30; the Canonical Roadmap's own §6 "Track map" and Tracks V/S/A/C/O sections are this file's direct successor). Marker added by Kernel 84 (2026-08-08).
+
+---
+
 **Version:** 1.0  
-**Status:** Working control document  
+**Status:** ~~Working control document~~ — superseded, see banner above
 **Purpose:** Keep Victory, Socio, anthology modules, concierge delivery, and operational integrity moving together without pretending they are one undifferentiated backlog.
 
 ---

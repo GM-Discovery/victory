@@ -210,7 +210,7 @@ Before issuing any kernel:
 3. identify the next unused real kernel number;
 4. confirm no uncommitted or side-branch kernel already uses it.
 
-This roadmap currently refers to the next likely sequence as Kernels **76–78**, because the reported implementation has advanced through Kernel 75. The kernel maker must verify those numbers before creating files.
+As of the Kernel 84 reconciliation (2026-08-08), the reported implementation has advanced through Kernel 84 itself, and the committed horizon (§12) refers to Kernels **85–86**. The kernel maker must verify those numbers against the repository before creating files — this line will go stale again the moment another kernel ships, by design; that is exactly why §4.3's four-step check exists instead of trusting this sentence.
 
 ### 4.4 Continuation kernels
 
@@ -1237,6 +1237,21 @@ Do not preserve stale kernel numbers as though they still control implementation
 
 # 17. Change log
 
+## 2026-08-08 — Kernel 84 reconciliation
+
+- recovered the real post-Kernel-75 sequence through Kernel 83 from repository/reportback evidence (12 reportbacks read in full); full ledger in `Construction/OperatorLogs/kernel-history-reconciliation-through-83.md`;
+- closed out the old three-kernel committed horizon (§12 v2.0: audit, stabilization/security repair, Documents foundation) — all three shipped, under different titles (Kernels 76, 77/77A, 78/79), summarized in the new §5.7;
+- **Victory Documents shipped as eWrite** (Kernels 78–79, all passes) — V9 rewritten from "Required capabilities" to "Established", with real remaining opens (health-system links, anonymous public reading) named specifically;
+- **semantic banded storyboards shipped** (Kernels 80–82) — V3 rewritten from "Required next systems" to "Established"; nested cards/merged regions moved to skip/defer as an intentionally-not-built product decision (Grant's own review), not a lingering gap;
+- **added V11 — Live venue coordination**, recording Kernel 83's Group Leader/Current Turn primitive in Victory Core (explicitly not a Track S/game-rule concept, per its own spec);
+- **A1 (Microscope-style package) split into generic-capability-proven vs. actual-package-not-built**, so the track no longer reads as an open requirement when the real platform work is done — only the licensing/permission decision remains;
+- moved reliable backup/restore (V6, C4) and most of O4's authority/security list from "Open"/flat requirements to "Established", reflecting Kernel 77's proven (not just built) restore and Kernel 76–84's ongoing security posture;
+- **new committed horizon: Kernel 85 — Socio Sustained Play, then Kernel 86 — Cartograph-Style Drawing Foundation** (promoted from the old provisional P4/P6); no third slot filled — explicitly decision-gated per spec, not invented to complete the format;
+- updated the skip/defer ledger (9 new entries: Storyboards nested-card/merged-cell decision, Microscope terminology deferral, no-turn-order-by-design, no-persistence-by-design, no user templates, the old committed horizon itself, and the now-repaired WS context bug) and removed one resolved open decision (named editors — shipped Kernel 78), adding one new one (whether `venuecoordination` should gain a second consumer venue);
+- marked the old Master Actual Implementation Guide (`victory-master-actual-implementation-guide-v1.md`) unmistakably superseded/historical at the top of that file itself, not just referenced here;
+- brought `current-state.md` current through Kernel 83 (previously frozen at Kernel 78);
+- reaffirmed that repository evidence outranks roadmap text — this update exists because that principle was followed, not merely stated.
+
 ## 2026-07-30 — Version 2.0 adopted
 
 - merged the former parallel-track roadmap and master implementation guide into one canonical file;
@@ -1256,8 +1271,8 @@ Do not preserve stale kernel numbers as though they still control implementation
 
 ## 18. Immediate next action
 
-After repository numbering verification, draft the full specification for:
+After repository numbering verification (check `operator-log.md` and `Construction/Kernels/` for the true next number — Kernel 84 is the most recent completed as of this update), draft the full specification for:
 
-> **Kernel 76 — Canonical State, Security, and Hosted-Readiness Audit**
+> **Kernel 85 — Socio Sustained Play**
 
-The kernel specification must use this roadmap as planning authority and current repository evidence as implementation authority.
+The kernel specification must use this roadmap as planning authority and current repository evidence as implementation authority. Per §10.8's own instruction, Kernel 85 was deliberately not fully specified inside this reconciliation kernel — its own kernel-maker pass should audit current Catharsis/character/rules-integration state before committing to specific mechanics.

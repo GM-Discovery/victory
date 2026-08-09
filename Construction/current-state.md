@@ -2,18 +2,19 @@
 
 ## Purpose
 
-This document is the current-state canon for Victory as of **Kernel 78**. Historical kernel specifications and reportbacks describe what was true when they were written; this file wins when an older current-tense statement conflicts with the implemented repository. (Kernels 75–77A shipped without a corresponding update to this file; their reportbacks in `Construction/OperatorLogs/` are authoritative for that span.)
+This document is the current-state canon for Victory as of **Kernel 84**. Historical kernel specifications and reportbacks describe what was true when they were written; this file wins when an older current-tense statement conflicts with the implemented repository. (Kernels 75–77A shipped without a corresponding update to this file; their reportbacks in `Construction/OperatorLogs/` are authoritative for that span. Kernels 79–83's *headline* capabilities are folded into this update below, but this file's older detailed sections — Cave/Catharsis-era "Known Gaps," "Known Working End-To-End Flows," Kernel 70–74 semantics — were not exhaustively rewritten; they remain accurate as far as they go, just not comprehensive past Kernel 74. For exhaustive per-kernel detail through Kernel 83, see `Construction/OperatorLogs/kernel-history-reconciliation-through-83.md`; for sequencing/planning, see `Construction/roadmaps/Victory_Canonical_Roadmap_v2.md`, the sole canonical roadmap — this file describes reality, that one controls sequence.)
 
 For detailed vocabulary use `Construction/Dictionary.txt`. For durable implementation traps use `Construction/OperatorLogs/operator-notes.md`. For chronological kernel history use `Construction/OperatorLogs/operator-log.md`.
 
 ## Kernel State
 
-- Current completed kernel: **Kernel 78 — eWrite Foundation** (Writer's Room authoring venue, Library reading venue, safe Markdown pipeline, revisions/conflicts, stable anchors, FTS search, export, equipment→rule links)
-- Completion date: **2026-08-04**
-- Status: **PASS, deployed live, uncommitted** — migrations `084`–`085` applied to production with a pre-apply backup (ledger at 86), backend rebuilt, `scripts/test/alpha-gate.sh` green end to end (including a fresh-install smoke this kernel had to repair — it had been silently unrunnable since Kernel 76). Anonymous public reading is schema-ready but deliberately deferred; `public` visibility serves authenticated readers only. See `Construction/OperatorLogs/kernel-78-reportback.md`.
-- Between 74 and 78: Kernel 75 (tutorial completion/aftercare, PASS), 76 (security audit + DB rebuild, PASS), 77 (private-client readiness: deletion/export/backups, PASS), 77A (canonical venue seed repair, PASS) — reportbacks are authoritative for those.
-- Product state: Kernels 53–78 are implemented. Victory now has a rules-native writing/publication/reading system; the full Socio v1.1 manuscript is proven through the importer.
+- Current completed kernel: **Kernel 84 — Canonical Reconciliation & Runtime Cleanup** (repaired the Storyboards WS context-lifetime bug Kernel 83 flagged; fixed a genuine test-isolation bug in the long-flagged eWrite seed idempotency test; reconciled the Canonical Roadmap, this file, and accessibility/security docs through Kernel 83; found and documented — not fixed — a real Timeline column-boundary gap for a future kernel)
+- Completion date: **2026-08-08**
+- Status: **PASS, deployed live, uncommitted** — no migration this kernel (state is genuinely ephemeral/in-memory by design). See `Construction/OperatorLogs/kernel-84-reportback.md`.
+- Between 78 and 84: Kernel 79 (eWrite integration, 4 passes — Phase 1, 79A Skill Directory, Goal F navigation, Goal C&E object links/export — all PASS), 80 (Storyboards Core, PASS), 81 (Storyboards Presentation Rework, PASS), 81A (Structural Slugs, PASS, operator-log only), 82 (Storyboards Timeline Mode, PASS), 83 (Venue Leadership & Turn State, PASS) — reportbacks are authoritative; full ledger in `Construction/OperatorLogs/kernel-history-reconciliation-through-83.md`.
+- Product state: Kernels 53–84 are implemented. Victory now has a rules-native writing/publication/reading system (eWrite, proven against the full Socio v1.1 manuscript), a semantic Storyboards/Timeline system, and a generic live venue-coordination primitive (Group Leader/Current Turn).
 - Kernel numbers are stable historical labels. Always check the operator log before assigning the next number.
+- **Password signup is closed in production** (`PASSWORD_SIGNUP_ENABLED=false` since Kernel 76, confirmed closed live during Kernel 83) — Discord is the only account-creation path. Disposable test accounts now require direct fixture-row insertion; see `kernel-maker-field-guide.md`'s Two-Browser technique.
 - Previous completed/live kernel: **Kernel 70A — Live Stage Closure and Alpha Path Alignment**, deployed live 2026-07-16, commit `2611840`. That deploy also retroactively applied Kernel 70's own migrations (`043`–`045`), which had never reached the live database despite being committed since `920aeb7` on 2026-07-14.
 
 ## Product Shape
@@ -109,6 +110,22 @@ Stage and assets:
 - Warehouse storage policy, generated token variants, tombstone-safe asset reads, and capacity guardrails
 - First Theater and Catharsis receive Show/current-Scene snapshot context, rehearsal-availability messaging, and player Cue controls
 
+Writing and reference (eWrite, Kernels 78–79; product-facing name "eWrite," roadmap name "Victory Documents"):
+
+- Typed collection hierarchy (Ruleset→Series→Module→Publication→Section) with a safe Markdown pipeline (goldmark+bluemonday, the repository's one sanitize path)
+- Append-forward revisions with 409 save-conflict protection, stable section anchors/aliases, named editor grants
+- Writer's Room (Crew+ authoring) and Library (reading) venues; Postgres full-text search, Ruleset-scoped
+- A reusable generic "directory" abstraction (proven via a 100-entry Skill Directory)
+- Object links from Cues, index cards, Storyboard cards, dialogue Topics, and Character skills into rule sections
+- Hierarchical (Module/Series/Ruleset) zip export with per-file checksums
+- Proven at real scale against the Socio v1.1 core rulebook; anonymous public reading is schema-ready but deliberately not exposed (authenticated readers only)
+
+Storyboards and live venue coordination (Kernels 80–83):
+
+- Reusable, shareable grid boards: ownership/sharing, role-capability matrix (Owner/Director/Crew/Cast/Audience), columns/bands/rows/cards, per-viewer hidden-card WS filtering, locks, card images with lightbox, structured JSON export
+- A built-in immutable Timeline template (Beginning/Middle/Ending, server-enforced boundary-column protection, a configurable four-field Reference Panel) alongside plain Blank boards
+- A generic, venue-agnostic live coordination primitive (`backend/internal/venuecoordination`) for Group Leader/Current Turn — ephemeral per-live-session state, never a Victory role/permission, explicit-handoff-only (no participant order/rotation); Storyboards is its first consumer via a Presence Tray (right-click actions, server-reverified authority)
+
 ## Current API Families
 
 The canonical registrations live in `backend/cmd/victory/main.go`. Major route families are:
@@ -122,7 +139,9 @@ The canonical registrations live in `backend/cmd/victory/main.go`. Major route f
 - `/api/showings*`, `/api/director-console/current`
 - `/api/world/{venue}`, `/api/session/{venue}/join`, `/api/venues/*`
 - `/api/workshop/*`, `/api/warehouse/*`, `/api/assets/*`
-- `/ws/the-cave`, `/ws/catharsis`, `/ws/first-theater`, `/ws/player-profile`, `/health`
+- `/api/ewrite/*` (collections, publications, revisions, directories, search, export) — Kernels 78–79
+- `/api/storyboards*` (boards, columns, bands, rows, cards, cell reorder, grants, reference-fields, export, `{board_id}/coordination/*`) — Kernels 80–83
+- `/ws/the-cave`, `/ws/catharsis`, `/ws/first-theater`, `/ws/player-profile`, `/ws/storyboards`, `/health`
 
 Kernel 70 route additions:
 
@@ -194,10 +213,15 @@ Kernel 71 route additions:
 - Director types a Show's short code into `/showtime` and the venue Session starts or resumes with the venue auto-derived, mic off, and the Show's persistent current Scene intact; `/showtime end` closes only the technical Session
 - **Kernel 72** replaced First Theater's and Catharsis's separately-copied stage runtimes with one shared engine (`frontend/lib/stage-runtime/`), configured per venue via a small `venue.js`; embedded, checksummed, auto-backed-up migrations (`backend/internal/migrate`) are now the single schema source of truth, ending the manual-apply/drift risk that bit Kernel 70A. **Kernel 72A** replaced the hardcoded per-feature venue-slug allowlists that risk (element actions, session control) with `venues.config` capability flags, fail-closed for unknown venues.
 - **Kernel 73** adds Catharsis's first participant-local gameplay packet: a Director-authored interaction (seeded example: "Visit Kessa's Shop") opens a private Program Panel for the triggering Player only, without changing the Show's shared current Scene. The Player picks one of five authored conversational stances (disposition is fixed per stance, never flipped by the roll), attempts a Haggle skill check (server-authoritative d6-skilled/d4-unskilled roll against Target Value 5, narrative-only discount, no currency touched), and purchases seeded starting equipment that persists as durable Character inventory (viewable on its own page, `frontend/venues/greenroom/inventory.html`). Built on new reusable primitives: `equipment_items`/`character_inventory_items` (idempotent purchase, ledger-based retry safety mirroring Cues' `cue_executions` pattern), `merchant_packets` (a bounded, reusable non-dialogue-graph packet format), and `participant_interactions` (its own table, participant-scoped rather than role-scoped like Cues, attached to a Show Scene Placement through a Director authoring panel in Stage Management). The Program Panel itself (`frontend/lib/stage-runtime/program-panel.js`) is venue-agnostic and reusable for a future second merchant/program packet.
+- **Kernel 78–79 (eWrite)**: paste a nontrivial Markdown manuscript in Writer's Room, publish it, open it in Library, follow an internal heading link and a cross-Document link, search within a Ruleset, export a Module as a checksummed zip, and link from a Cue/index card/Storyboard card/Character skill directly into a rule section — all real, all live-proven at real manuscript scale.
+- **Kernels 80–82 (Storyboards)**: create a Blank board or a Timeline, add columns/bands/rows/cards, drag a card between cells (with a full keyboard/modal fallback), pin a card image, insert a column inward on a Timeline (protected boundary columns stay first/last), pan a wide board with the middle mouse button, and export the board as structured JSON.
+- **Kernel 83 (Venue Coordination)**: two participants open the same Storyboard, the owner starts as Group Leader, a Director+ (or the current Group Leader) right-clicks another participant's Presence Tray chip to assign Group Leader/Current Turn, the change appears live on every connected client, a disconnect never auto-reassigns either state, and ending the live session (last watcher leaves) clears both — a later session starts fresh.
 - **Kernel 74** closes the Player-controlled portion of the Locked Courtyard tutorial. A Player finishes with Kessa (no purchase required), which reveals a milestone-gated **interaction hotspot** aligned over the door already painted into the Courtyard map — not a duplicate door token. Clicking it opens one neutral freeform field: the Player writes what their Character tries, Victory stores those words verbatim, reports them privately to Directors+ as a durable backstage note (informational only, never a GO), and Ra interrupts before the attempt resolves. Ra is a bounded **guided-dialogue packet** — authored topics with prerequisites and per-Character seen-state, no AI and no dialogue graph — delivering the Crown Bet. `Leave Ra` is Player-controlled and moves **only that Player** onto a **participant-local stage projection**: a temporary per-Player presentation layered over the shared stage, which never writes `shows.current_show_scene_placement_id` and is cleared when a Director later flies a shared Scene. There is no Director GO anywhere inside the sequence.
 
 ## Known Gaps And Deferred Work
 
+- **Found, not fixed, by Kernel 84: a Timeline board's generic "+ Column (end)" action has no boundary awareness.** `storyboards.AddColumn` always appends at the true end regardless of `column_role` — it does not know a Timeline's `Ending` column should stay last. The UI's per-column "Insert left/right" menu items produce a correct result only because they perform a *second*, client-computed reorder call after creation (`insertColumnFlow` in `board.html`); a raw API caller, or a user who somehow reaches the generic add-at-end button on a Timeline board, can place an ordinary column after `Ending`. Discovered via Kernel 84's own regression proof, not by a user report. Bounded, low-risk fix for a future kernel: make `AddColumn` insert immediately before any `column_role = 'ending'` row when one exists, reusing the existing sort_order mechanism rather than the client-side create-then-reorder dance. Deliberately not fixed in Kernel 84 itself (out of that kernel's WS/reconciliation scope; see its cleanup ledger).
+- **Presence Tray's Group Leader/Current Turn menu has no keyboard entry point** (right-click only, Kernel 83, spec-acknowledged). See `Construction/Storyboards/storyboards-accessibility.md`'s canonical backlog.
 - **Visual Scene composition/capture is not implemented.** Base Scene versus This Show's Version currently covers metadata/configuration, not a bound visual composition over `elements`, `venue_layout_elements`, and stage actions.
 - `reveal_object`, `hide_object`, `enable_interaction`, and `disable_interaction` Cue actions are deferred until that object/state mapping is designed.
 - Kernel 70 lacks browser screenshot evidence for rehearsal messaging and Cue buttons; code paths, syntax, backend tests, and existing Node tests were used instead.
@@ -222,9 +246,9 @@ Kernel 71 route additions:
 
 ## Next Recommended Direction
 
-**Kernel 73 (Catharsis Equip Mode, Character Inventory, and Kessa Program Packet)** is implemented and verified end-to-end against the real migrated test database (a single Go integration test drives ticket→roster→character→Show→Courtyard placement→Kessa attachment→all five stances→Haggle preview/attempt→idempotent purchase→inventory persistence, plus a dedicated security-proof test file). It establishes three reusable primitives for future bounded packets: `merchant_packets`/`equipment_items`/`character_inventory_items`, `participant_interactions` (participant-scoped, distinct from Cues' role-scoped model), and the venue-agnostic `frontend/lib/stage-runtime/program-panel.js`. **Explicitly deferred, by locked scope**: NPC AI/freeform dialogue, an economy/currency system, First Theater integration, and the door/Ra-interruption/backdrop-transition/first-Show-completion sequence the Kessa Scene is a prelude to.
+Per the Canonical Roadmap's reconciled committed horizon (`Construction/roadmaps/Victory_Canonical_Roadmap_v2.md` §12, updated by Kernel 84): **Kernel 85 — Socio Sustained Play**, then **Kernel 86 — Cartograph-Style Drawing Foundation**. Neither is fully specified yet by design — each kernel's own maker should audit current state first. Socio Sustained Play moves Socio beyond the Catharsis tutorial into repeatable connected play (stances, actions/reactions, values, skill resolution, health systems, Director assistance), reusing eWrite and the live coordination primitive where a real fit exists. Cartograph-Style Drawing Foundation is the next reusable creative primitive (shared vector drawing, layers, undo, export) toward an original or permission-safe map-making proof.
 
-The natural next kernel is the **door/Ra-interruption/backdrop-transition sequence** the Kessa Equip Mode packet was built as a prelude to, or **visual Scene composition/capture**: define how reusable Base Scene content and a Show Placement's overrides bind to the existing stage-object/action model without creating a second renderer authority system. Before or alongside either: repair the nine pre-existing `dice.test.js` failures (now tracked once in `tests/stage-runtime/`, not duplicated); add browser screenshot evidence for the stage/participation/Equip-Mode controls (no browser automation tooling exists in this environment yet); finish deduplicating the three packages (`characters`, `assets/read.go`, `showings/review.go`) that each independently UNION `location_memberships`+`memberships` instead of calling one shared helper; and build a Director-facing editor for merchant packet dialogue (currently seed-only).
+Smaller, genuinely optional items surfaced by Kernel 84's own audit rather than blocking either: the Timeline `AddColumn` boundary gap above; a keyboard entry point for the Presence Tray context menu; the nine pre-existing `dice.test.js` failures (unchanged, still tracked once in `tests/stage-runtime/`); deduplicating the three packages that each independently UNION `location_memberships`+`memberships` instead of calling one shared helper (`characters`, `assets/read.go`, `showings/review.go` — unchanged since Kernel 71).
 
 ## Recording Language
 
