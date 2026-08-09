@@ -514,9 +514,37 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, view
 	// tutorial as a Player (S6.2).
 	gate := milestoneGate{pool: pool, participation: participation, bypass: isBackstageRole(viewerRole)}
 
+	// Kernel 85: a viewer assigned to a Show Cohort with its own current
+	// Scene resolves THAT placement's composition instead of the Show's
+	// shared one -- the group-scale sibling of Kernel 74's individual
+	// localProjection immediately above. Checked only when there is no
+	// active local projection (an individual tutorial-handoff override
+	// always wins) and only by cohort ASSIGNMENT, never by role or tutorial
+	// state -- which is what keeps an Ungrouped participant on the
+	// unchanged Show-global path with no separate boundary check needed
+	// (kernel-85 S5.6): Ungrouped participants have no assignment row, so
+	// this lookup always returns "", and nothing here can ever move them
+	// past the tutorial-finish Scene. snap.Session.CurrentShowScenePlacementID
+	// still reports the Show's own unchanged shared Scene either way, the
+	// same "what moved is only which Scene's elements load" guarantee
+	// documented on localProjection above.
+	cohortPlacementID := ""
+	if localProjection == nil && showID != "" && viewerUserID != "" {
+		cohortPlacementID, err = resolveCohortPlacementForViewer(ctx, pool, showID, viewerUserID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	switch {
 	case localProjection != nil:
 		compositionElements, err := loadSceneBaseCompositionAsPlacedElements(ctx, pool, localProjection.SceneID, gate)
+		if err != nil {
+			return nil, err
+		}
+		snap.Elements = append(snap.Elements, compositionElements...)
+	case cohortPlacementID != "":
+		compositionElements, err := loadSceneCompositionAsPlacedElements(ctx, pool, cohortPlacementID, gate)
 		if err != nil {
 			return nil, err
 		}

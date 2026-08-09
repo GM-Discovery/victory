@@ -254,6 +254,7 @@ func HandleGrants(pool *pgxpool.Pool, hub *network.Hub) http.HandlerFunc {
 			writeOK(w, map[string]any{"grants": grants})
 		case http.MethodPost:
 			var body struct {
+				ProfileID   string `json:"profile_id"`
 				UserHandle  string `json:"user_handle"`
 				GrantedRole string `json:"granted_role"`
 			}
@@ -261,7 +262,19 @@ func HandleGrants(pool *pgxpool.Pool, hub *network.Hub) http.HandlerFunc {
 				writeError(w, errors.New("invalid_json"))
 				return
 			}
-			g, err := AddGrant(ctx, pool, userID, boardID, body.UserHandle, body.GrantedRole)
+			// Kernel 85 §7.4: profile_id (the People Picker's canonical
+			// identity) takes precedence when present. user_handle stays
+			// working for backward compat / a manual ID-only fallback field
+			// -- it was never resolvable from what the sharer could actually
+			// see (My People shows stage names, not handles), so profile_id
+			// is the path every UI selection now takes.
+			var g *StoryboardGrant
+			var err error
+			if strings.TrimSpace(body.ProfileID) != "" {
+				g, err = AddGrantByProfile(ctx, pool, userID, boardID, body.ProfileID, body.GrantedRole)
+			} else {
+				g, err = AddGrant(ctx, pool, userID, boardID, body.UserHandle, body.GrantedRole)
+			}
 			if err != nil {
 				writeError(w, err)
 				return

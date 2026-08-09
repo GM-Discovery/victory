@@ -29,6 +29,7 @@ import (
 	"victory/backend/internal/access"
 	"victory/backend/internal/assets"
 	"victory/backend/internal/characters"
+	"victory/backend/internal/cohorts"
 	"victory/backend/internal/cues"
 	"victory/backend/internal/db"
 	"victory/backend/internal/ewrite"
@@ -48,6 +49,7 @@ import (
 	"victory/backend/internal/showruns"
 	"victory/backend/internal/shows"
 	"victory/backend/internal/showtime"
+	"victory/backend/internal/socio"
 	"victory/backend/internal/storyboards"
 	"victory/backend/internal/thirdplace"
 	"victory/backend/internal/tickets"
@@ -360,6 +362,21 @@ func main() {
 	mux.HandleFunc("POST /api/stage-elements/{element_id}/binding", scenes.HandleStageElementBinding(pool))
 	mux.HandleFunc("DELETE /api/stage-elements/{element_id}/binding", scenes.HandleStageElementBinding(pool))
 	mux.HandleFunc("GET /api/shows/{show_id}/scenes/{placement_id}/stage-composition", scenes.HandlePlacementStageComposition(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/scenes/{placement_id}/update-current-scene", scenes.HandleUpdateCurrentScene(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/scenes/{placement_id}/save-as-new-scene", scenes.HandleSaveAsNewScene(pool))
+	// Kernel 85: Show Cohorts -- Director-run sustained-play grouping.
+	mux.HandleFunc("GET /api/shows/{show_id}/cohorts", cohorts.HandleCohortsCollection(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/cohorts", cohorts.HandleCohortsCollection(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/cohorts/{cohort_id}/archive", cohorts.HandleCohortArchive(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/cohorts/{cohort_id}/assignments", cohorts.HandleCohortAssignment(pool))
+	mux.HandleFunc("DELETE /api/shows/{show_id}/cohorts/assignments/{user_id}", cohorts.HandleCohortUnassign(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/cohorts/{cohort_id}/current-scene", cohorts.HandleCohortCurrentScene(pool, hub))
+	// Kernel 85: Socio Game Status -- HP pools + status effects.
+	mux.HandleFunc("GET /api/socio/statuses", socio.HandleStatusRegistry(pool))
+	mux.HandleFunc("GET /api/shows/{show_id}/cohorts/{cohort_id}/game-status", socio.HandleGameStatus(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/characters/{character_card_id}/socio/pools/{pool_key}", socio.HandleCharacterPool(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/characters/{character_card_id}/socio/statuses", socio.HandleCharacterStatus(pool))
+	mux.HandleFunc("DELETE /api/shows/{show_id}/characters/{character_card_id}/socio/statuses/{status_key}", socio.HandleCharacterStatus(pool))
 	mux.HandleFunc("GET /api/shows/{show_id}/scenes/{placement_id}/cues", cues.HandlePlacementCuesCollection(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/scenes/{placement_id}/cues", cues.HandlePlacementCuesCollection(pool))
 	mux.HandleFunc("GET /api/shows/{show_id}/scenes/{placement_id}/player-cues", cues.HandlePlacementPlayerCues(pool))
@@ -589,6 +606,46 @@ func main() {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{
 				"ok":    false,
 				"error": "failed_to_resolve_visibility",
+			})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":   true,
+			"data": venues,
+		})
+	})
+
+	// Kernel 85 §8.2: Audition Hall's venue picker used to be a hardcoded
+	// <select> of 15 slugs typed into markup, disconnected from the real
+	// venues table. This returns the real canonical list (minus the same
+	// hidden fixture slugs /api/map/visibility already strips) so the
+	// request form can never offer a slug that doesn't exist or has been
+	// retired. Requires sign-in (unlike /api/map/visibility, which degrades
+	// to an anonymous view) since Audition Hall itself requires an account.
+	mux.HandleFunc("GET /api/venues/requestable", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		sessionCookie := ""
+		if c, err := r.Cookie("victory_session"); err == nil {
+			sessionCookie = c.Value
+		}
+		userID, err := access.CurrentUserIDFromRequest(ctx, pool, sessionCookie)
+		if err != nil || userID == "" {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{
+				"ok":    false,
+				"error": "not_authenticated",
+			})
+			return
+		}
+
+		venues, err := access.ListRequestableVenues(ctx, pool, userID)
+		if err != nil {
+			log.Printf("requestable venues failed: %v", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"ok":    false,
+				"error": "failed_to_resolve_requestable_venues",
 			})
 			return
 		}

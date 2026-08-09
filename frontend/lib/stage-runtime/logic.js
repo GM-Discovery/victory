@@ -355,6 +355,12 @@
       push("configure-grid", "Configure Grid", "create", { disabled: !canManageIndexCards });
       push("add-token", "Add Token", "create", { disabled: !canManageStageTokens });
       push("add-index-card", "Create Index Card", "create", { disabled: !canManageIndexCards, requiresPoint: true });
+      // Kernel 85: Scene Configuration is a Director+ tool action, not a
+      // stage-composition edit -- gated on the same canManageIndexCards
+      // (producer/director/operator) authority as everything else in this
+      // branch, since Crew's non-destructive-edit right does not extend to
+      // cohort Scene progression (kernel-85 S10).
+      push("open-scene-configuration", "Scene Configuration", "director", { disabled: !canManageIndexCards });
       push("inspect", "Inspect Stage", "info");
       if (hasSelection) {
         push("clear", "Clear selection", "clear");

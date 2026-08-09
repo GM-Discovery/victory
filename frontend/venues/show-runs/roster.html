@@ -79,6 +79,7 @@
             <label for="invite-message-input">Message (optional)</label>
             <input type="text" id="invite-message-input" placeholder="Join us for the next Show" />
           </div>
+          <button class="chip" type="button" id="invite-people-picker-button">Choose from My People…</button>
           <button class="chip" type="button" id="invite-player-button">Invite Player</button>
         </div>
         <p class="field-note">This creates an invitation. They must accept it in Audition Hall before they can participate. Nothing changes for them until they do.</p>
@@ -120,6 +121,7 @@
   <script src="/lib/forbidden.js"></script>
   <script src="/lib/back-to-map.js"></script>
   <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script src="/lib/people-picker.js"></script>
   <script>
     function runIdFromQuery() {
       return new URLSearchParams(window.location.search).get("id") || "";
@@ -382,6 +384,22 @@
       }
 
       document.getElementById("invite-card").hidden = false;
+
+      // Kernel 85 §7.4: the paste field is still here as a fallback (a
+      // Trailer link or profile ID a Director already has in hand), but
+      // picking from My People/Third Place is now available too -- neither
+      // path exposes a handle or account UUID, both resolve to the same
+      // opaque profile_id InviteFromDirector already expects.
+      document.getElementById("invite-people-picker-button").addEventListener("click", () => {
+        VictoryPeoplePicker.open({
+          title: "Invite a Player",
+          hint: "Select someone from My People or Third Place to fill in the field below.",
+          onSelect: (person) => {
+            document.getElementById("invite-profile-input").value = person.profile_id;
+          },
+        });
+      });
+
       document.getElementById("invite-player-button").addEventListener("click", async (event) => {
         event.target.disabled = true;
         try {

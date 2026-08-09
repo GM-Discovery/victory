@@ -107,12 +107,12 @@ func HandleInteractionSubmit(pool *pgxpool.Pool, hub *network.Hub) http.HandlerF
 
 		eligible, err := ResolveEligibleContext(ctx, pool, userID, interactionID)
 		if err != nil {
-			writeError(w, err)
+			writeErrorWithMessage(w, err, tutorialGateMessage(err.Error()))
 			return
 		}
 		result, noteRecipients, err := SubmitFreeform(ctx, pool, userID, interactionID, body.Text, body.IdempotencyKey)
 		if err != nil {
-			writeError(w, err)
+			writeErrorWithMessage(w, err, tutorialGateMessage(err.Error()))
 			return
 		}
 
@@ -164,7 +164,7 @@ func HandleInteractionDialogue(pool *pgxpool.Pool, hub *network.Hub) http.Handle
 			}
 			state, err := ReadTopic(ctx, pool, userID, interactionID, body.TopicKey)
 			if err != nil {
-				writeError(w, err)
+				writeErrorWithMessage(w, err, tutorialGateMessage(err.Error()))
 				return
 			}
 			writeOK(w, map[string]any{"dialogue": state})
@@ -172,12 +172,12 @@ func HandleInteractionDialogue(pool *pgxpool.Pool, hub *network.Hub) http.Handle
 		case "leave":
 			eligible, err := ResolveEligibleContext(ctx, pool, userID, interactionID)
 			if err != nil {
-				writeError(w, err)
+				writeErrorWithMessage(w, err, tutorialGateMessage(err.Error()))
 				return
 			}
 			out, err := LeaveDialogue(ctx, pool, userID, interactionID)
 			if err != nil {
-				writeError(w, err)
+				writeErrorWithMessage(w, err, tutorialGateMessage(err.Error()))
 				return
 			}
 			// Only this Player's own clients are told to re-read the world.

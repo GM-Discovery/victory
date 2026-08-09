@@ -311,6 +311,49 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 	return out, nil
 }
 
+// ListRequestableVenues returns every canonical venue an authenticated user
+// could plausibly ask for access to from Audition Hall (Kernel 85 §8.2).
+// Unlike ResolveVisibleVenues, this is NOT filtered down to what the caller
+// already has access to -- Audition Hall is a *request* page, so its venue
+// picker needs the full canonical list, not the caller's current map tiles.
+// It reuses ResolveVisibleVenues's Operator branch query shape ("every venue
+// minus the same hidden/internal fixture slugs"), just without the Operator
+// gate, since any authenticated user should be able to see what venues exist
+// to ask for -- venue_slug is still re-validated server-side by whatever
+// consumes the request, this endpoint only bounds the picker's options.
+func ListRequestableVenues(ctx context.Context, pool *pgxpool.Pool, userID string) ([]VisibleVenue, error) {
+	if strings.TrimSpace(userID) == "" {
+		return []VisibleVenue{}, nil
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT v.slug, v.name, v.kind
+		FROM venues v
+		ORDER BY v.slug
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []VisibleVenue{}
+	for rows.Next() {
+		var v VisibleVenue
+		if err := rows.Scan(&v.Slug, &v.Name, &v.Kind); err != nil {
+			return nil, err
+		}
+		if isHiddenMainMapVenueSlug(v.Slug) {
+			continue
+		}
+		v.VisibleBecause = "requestable"
+		out = append(out, v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func isHiddenMainMapVenueSlug(slug string) bool {
 	_, ok := hiddenMainMapVenueSlugs[strings.ToLower(strings.TrimSpace(slug))]
 	return ok

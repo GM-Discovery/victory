@@ -49,6 +49,18 @@ func writeOK(w http.ResponseWriter, data any) {
 // status. Spec S12's exact proof list drives this table: anonymous->401,
 // audience/non-roster/non-owner->403, forged IDs->404-shaped "not_found".
 func writeError(w http.ResponseWriter, err error) {
+	writeErrorWithMessage(w, err, "")
+}
+
+// writeErrorWithMessage is writeError plus an optional Player-facing
+// "message" alongside the machine-readable "error" code (Kernel 85 §8.1).
+// The code itself never changes -- kernel74_tutorial_dbtest_test.go asserts
+// the exact string "milestone_required", and that gating contract is
+// untouched here -- message is purely an additional display string a caller
+// may attach via tutorialGateMessage. An empty message omits the field
+// entirely, so every other caller of writeError (equipment CRUD, purchase,
+// etc.) is unaffected.
+func writeErrorWithMessage(w http.ResponseWriter, err error, message string) {
 	code := err.Error()
 	status := http.StatusBadRequest
 	switch {
@@ -75,7 +87,11 @@ func writeError(w http.ResponseWriter, err error) {
 		code == "unknown_target":
 		status = http.StatusNotFound
 	}
-	writeJSON(w, status, response{Ok: false, Data: map[string]any{"error": code}})
+	data := map[string]any{"error": code}
+	if strings.TrimSpace(message) != "" {
+		data["message"] = message
+	}
+	writeJSON(w, status, response{Ok: false, Data: data})
 }
 
 func methodNotAllowed(w http.ResponseWriter) {
@@ -259,14 +275,14 @@ func HandleInteractionOpen(pool *pgxpool.Pool) http.HandlerFunc {
 		case InteractionTypeFreeformSubmission:
 			out, err := OpenFreeform(ctx, pool, userID, interactionID)
 			if err != nil {
-				writeError(w, err)
+				writeErrorWithMessage(w, err, tutorialGateMessage(err.Error()))
 				return
 			}
 			writeOK(w, out)
 		case InteractionTypeGuidedDialogue:
 			state, err := OpenDialogue(ctx, pool, userID, interactionID)
 			if err != nil {
-				writeError(w, err)
+				writeErrorWithMessage(w, err, tutorialGateMessage(err.Error()))
 				return
 			}
 			writeOK(w, map[string]any{"dialogue": state})

@@ -23,11 +23,21 @@
   const CHARACTER_MAKER_REQUIRED_MESSAGE = "You haven't finished making a character. Please select the character maker in the right tray first.";
 
   function interactionErrorMessage(error) {
+    // Kernel 85 §8.1: the server now attaches a Player-facing "message"
+    // alongside the machine-readable error code for the locked-door/Ra gate
+    // states (no_character_selected / not_a_roster_member / milestone_required)
+    // -- see merchant.tutorialGateMessage. Prefer it when present so the
+    // door's copy stays authored in one place instead of drifting between
+    // this file and the backend.
+    if (error && error.friendlyMessage) {
+      return error.friendlyMessage;
+    }
     const code = String(error?.message || error || "").trim();
     // A Player who reaches the stage before Character Making has completed
     // may have neither a roster row nor a selected Character yet. Those are
     // distinct server-side authorization states, but they require the same
-    // useful next step in the Player-facing Program panel.
+    // useful next step in the Player-facing Program panel. Fallback for
+    // interaction types the server has no door-specific copy for.
     if (code === "not_a_roster_member" || code === "no_character_selected") {
       return CHARACTER_MAKER_REQUIRED_MESSAGE;
     }
@@ -45,8 +55,15 @@
     const response = await fetch(url, Object.assign({ credentials: "include" }, options || {}));
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload || payload.ok === false) {
-      const error = (payload && payload.data && payload.data.error) || `HTTP ${response.status}`;
-      throw new Error(error);
+      const code = (payload && payload.data && payload.data.error) || `HTTP ${response.status}`;
+      const error = new Error(code);
+      // Kernel 85 §8.1: an optional server-authored display string, distinct
+      // from the machine-readable code above. See interactionErrorMessage.
+      const message = payload && payload.data && payload.data.message;
+      if (message) {
+        error.friendlyMessage = message;
+      }
+      throw error;
     }
     return payload.data;
   }

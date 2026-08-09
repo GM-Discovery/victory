@@ -171,6 +171,16 @@
         return;
       }
 
+      if (action === "open-scene-configuration") {
+        // Kernel 85: a self-contained tool module, not part of the generic
+        // engine -- see runtime.js's VictoryStageKernel85Bridge for how it
+        // reads the current show id / Director+ gate without this engine
+        // knowing anything about cohorts.
+        window.VictoryKernel85Tools?.openSceneConfiguration?.();
+        deps.closeContextMenu();
+        return;
+      }
+
       if (action === "add-token") {
         deps.selectObject(null, "Selection cleared.");
         deps.openTokenPicker("create", null);

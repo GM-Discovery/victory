@@ -534,12 +534,7 @@
       <h2>Sharing</h2>
       <div id="grant-list"></div>
       <div class="field">
-        <label>People you know</label>
-        <div id="my-people-suggestions"></div>
-      </div>
-      <div class="field"><label>Handle</label><input id="grant-handle-input" /></div>
-      <div class="field">
-        <label>Role</label>
+        <label>Role for the person you pick or paste below</label>
         <select id="grant-role-input">
           <option value="audience">Audience</option>
           <option value="cast">Cast</option>
@@ -548,9 +543,17 @@
           <option value="producer">Producer</option>
         </select>
       </div>
+      <div class="field">
+        <label>People you know</label>
+        <button type="button" id="people-picker-btn">Choose a Person…</button>
+      </div>
+      <div class="field">
+        <label>Handle (fallback — exact Victory handle, ID-only)</label>
+        <input id="grant-handle-input" placeholder="Only if you already know their exact handle" />
+      </div>
       <div id="share-modal-message"></div>
       <div class="modal-actions">
-        <button id="grant-add-btn">Share</button>
+        <button id="grant-add-btn">Share by Handle</button>
         <button id="share-close-btn">Close</button>
       </div>
     </div>
@@ -563,6 +566,7 @@
   <script src="/lib/forbidden.js"></script>
   <script src="/lib/venue-account-badge.js?v=nav-1"></script>
   <script src="/lib/ewrite-rule-link.js"></script>
+  <script src="/lib/people-picker.js"></script>
   <script src="/venues/storyboards/grid-model.js"></script>
   <script src="/venues/storyboards/socket.js"></script>
   <script>
@@ -1563,7 +1567,6 @@
       document.getElementById("share-modal-message").textContent = "";
       document.getElementById("share-modal").hidden = false;
       await renderGrants();
-      await renderMyPeopleSuggestions();
     }
 
     async function renderGrants() {
@@ -1590,33 +1593,31 @@
       }
     }
 
-    // My People is a reminder of who you already know, not a picker that
-    // grants anything by itself (Kernel 80 spec 1.8) -- see board.html's
-    // prior revision for the full rationale; unchanged in Kernel 81.
-    async function renderMyPeopleSuggestions() {
-      const container = document.getElementById("my-people-suggestions");
-      container.innerHTML = "";
-      try {
-        const { res, payload } = await apiFetch("/api/player-relationships?state=active");
-        if (!res.ok || !payload || !payload.ok) return;
-        const relationships = (payload.data && payload.data.relationships) || [];
-        if (!relationships.length) return;
-        const note = document.createElement("div");
-        note.className = "status-line";
-        note.textContent = "People you know (enter their Victory handle below to share):";
-        container.appendChild(note);
-        for (const rel of relationships) {
-          const name = rel.subject && rel.subject.stage_name;
-          if (!name) continue;
-          const chip = document.createElement("span");
-          chip.className = "suggestion-chip";
-          chip.textContent = name;
-          container.appendChild(chip);
-        }
-      } catch (err) {
-        // My People is a convenience suggestion source only.
-      }
-    }
+    // Kernel 85 §7.4: My People used to be a reminder-only chip list (Kernel
+    // 80 spec 1.8) that named a stage_name a Player would then have to type
+    // as a Victory *handle* below -- a field My People never shows them, so
+    // that always failed ErrUserNotFound. Selecting a person here now shares
+    // directly by their opaque profile_id (grants.go's AddGrantByProfile),
+    // no handle typing involved. The handle field below still exists as a
+    // clearly-labeled ID-only fallback.
+    document.getElementById("people-picker-btn").addEventListener("click", () => {
+      VictoryPeoplePicker.open({
+        title: "Share this Storyboard",
+        hint: "Select someone from My People or Third Place. Their account handle is never shown or required.",
+        onSelect: async (person) => {
+          const role = document.getElementById("grant-role-input").value;
+          const { res, payload } = await apiPost(apiBase + "/grants", { profile_id: person.profile_id, granted_role: role });
+          if (!res.ok || !payload || !payload.ok) {
+            document.getElementById("share-modal-message").className = "form-error";
+            document.getElementById("share-modal-message").textContent = "Share failed: " + errorMessage(payload, res);
+            return;
+          }
+          document.getElementById("share-modal-message").className = "form-ok";
+          document.getElementById("share-modal-message").textContent = "Shared with " + person.display_name + ".";
+          await renderGrants();
+        },
+      });
+    });
 
     document.getElementById("grant-add-btn").addEventListener("click", async () => {
       const handle = document.getElementById("grant-handle-input").value.trim();

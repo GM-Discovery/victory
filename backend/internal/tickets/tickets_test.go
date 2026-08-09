@@ -309,6 +309,29 @@ func TestPlayerCannotPunchForAnotherPlayer(t *testing.T) {
 	}
 }
 
+// TestInviteFromDirectorRejectsNonDirectorActor covers Kernel 85 §7.4: the
+// People Picker's "Invite to this Show"/"Add to Current Show" actions call
+// this exact function (InviteFromDirector), reused as-is rather than a new
+// instant-grant path. A non-Director/Producer/Operator actor -- e.g. a
+// Player who is merely on the roster, or a stranger -- must be refused
+// before any ticket row is created, the same authority check SecondPunch's
+// pending_director branch already enforces on the *second* punch.
+func TestInviteFromDirectorRejectsNonDirectorActor(t *testing.T) {
+	pool := dbtest.OpenTestPool(t)
+	producer := ticketTestUser(t, pool, "ticket_producer")
+	stranger := ticketTestUser(t, pool, "ticket_stranger")
+	target := ticketTestUser(t, pool, "ticket_target")
+	f := buildTicketFixture(t, pool, producer)
+	profileID := ticketTestProfileID(t, pool, target)
+
+	if _, err := tickets.InviteFromDirector(context.Background(), pool, stranger, f.showRunID, profileID, ""); err == nil || err.Error() != "not_authorized" {
+		t.Fatalf("expected not_authorized when a non-Director actor invites, got %v", err)
+	}
+	if rosterRole(t, pool, f.showRunID, target) != "" {
+		t.Fatalf("expected no roster row after a rejected unauthorized invite")
+	}
+}
+
 func TestDirectorCannotApproveOutsideTheirAuthority(t *testing.T) {
 	pool := dbtest.OpenTestPool(t)
 	producer := ticketTestUser(t, pool, "ticket_producer")

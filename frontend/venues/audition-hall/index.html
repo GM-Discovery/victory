@@ -255,21 +255,7 @@
       <form id="request-form">
         <label for="requested-venue">Requested Venue</label>
         <select id="requested-venue" required>
-          <option value="the-cave">The Cave</option>
-          <option value="workshop">Workshop</option>
-          <option value="audition-hall">Audition Hall</option>
-          <option value="producers-office">Producer's Office</option>
-          <option value="directors-chair">The Director's Chair</option>
-          <option value="greenroom">The Greenroom</option>
-          <option value="trailers">Trailers</option>
-          <option value="victory-theater">Victory Theater</option>
-          <option value="catharsis">Catharsis</option>
-          <option value="library">Library</option>
-          <option value="warehouse">Warehouse</option>
-          <option value="soil-experts">Soil Experts</option>
-          <option value="construction">Construction</option>
-          <option value="grants-cabin">Grants Cabin</option>
-          <option value="info-booth">Info Booth</option>
+          <option value="catharsis">Loading venues...</option>
         </select>
 
         <label for="requested-role">Requested Role</label>
@@ -351,18 +337,41 @@
     const requestedRole = document.getElementById("requested-role");
     const searchParams = new URLSearchParams(window.location.search);
 
-    if (requestedVenue && searchParams.get("venue") === "catharsis") {
-      requestedVenue.value = "catharsis";
-    }
     if (requestedRole && searchParams.get("role") === "cast") {
       requestedRole.value = "cast";
     }
-
-    if (requestedVenue && !searchParams.get("venue")) {
-      requestedVenue.value = "catharsis";
-    }
     if (requestedRole && !searchParams.get("role")) {
       requestedRole.value = "cast";
+    }
+
+    // Kernel 85 §8.2: the venue picker used to be a hardcoded list of 15
+    // slugs typed into markup. It now loads the real canonical venue list
+    // from the server (minus hidden/internal fixtures), so a request can
+    // never be submitted for a slug that doesn't exist or has been retired.
+    async function loadRequestableVenues() {
+      requestedVenue.innerHTML = `<option value="">Loading venues...</option>`;
+      try {
+        const res = await fetch("/api/venues/requestable", { credentials: "include" });
+        const text = await res.text();
+        const payload = text ? JSON.parse(text) : {};
+        if (!res.ok || !payload.ok) {
+          throw new Error(payload.error || `Failed to load venues (HTTP ${res.status})`);
+        }
+        const venueList = Array.isArray(payload.data) ? payload.data : [];
+        requestedVenue.innerHTML = "";
+        for (const v of venueList) {
+          const option = document.createElement("option");
+          option.value = v.slug;
+          option.textContent = v.name || v.slug;
+          requestedVenue.appendChild(option);
+        }
+        const wanted = searchParams.get("venue") || "catharsis";
+        if (venueList.some((v) => v.slug === wanted)) {
+          requestedVenue.value = wanted;
+        }
+      } catch (err) {
+        requestedVenue.innerHTML = `<option value="">Could not load venues</option>`;
+      }
     }
 
     async function loadMyRequests() {
@@ -629,6 +638,7 @@
         .replaceAll("'", "&#39;");
     }
 
+    loadRequestableVenues();
     loadMyRequests();
     loadMyTickets();
   </script>

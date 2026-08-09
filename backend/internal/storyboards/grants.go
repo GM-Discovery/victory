@@ -130,6 +130,81 @@ func AddGrant(ctx context.Context, pool *pgxpool.Pool, grantorID, boardID, userH
 	return &g, nil
 }
 
+// resolveGrantSubjectUserID maps an opaque Player Workbook / profile ID to
+// the account's stable UUID -- a local copy of the same helper
+// playerrelationships.resolveSubjectUserID and tickets.resolveProfileUserID
+// duplicate (Kernel 61 contract reuse), matching this codebase's established
+// per-package-duplication convention (see either of those two functions'
+// doc comments for why: no shared package sits below both without an import
+// cycle risk, and the query itself is ten lines).
+func resolveGrantSubjectUserID(ctx context.Context, pool *pgxpool.Pool, profileID string) (string, error) {
+	profileID = strings.TrimSpace(profileID)
+	if profileID == "" {
+		return "", errors.New("profile_id_required")
+	}
+	var userID string
+	if err := pool.QueryRow(ctx, `
+		SELECT user_id::text FROM player_profile_workbooks WHERE id = $1
+	`, profileID).Scan(&userID); err != nil {
+		return "", ErrUserNotFound
+	}
+	return userID, nil
+}
+
+// AddGrantByProfile is AddGrant's sibling for Kernel 85 §7.4: instead of a
+// hand-typed user_handle (a field the client is never otherwise shown --
+// playerprofile/types.go's Face projections deliberately never include
+// handle), the caller identifies the subject by the same opaque profile_id
+// already used throughout this codebase's People Picker precedents
+// (playerrelationships.resolveSubjectUserID, tickets.resolveProfileUserID).
+// This is what lets a Storyboard share actually succeed for someone visible
+// in My People/Third Place, instead of failing ErrUserNotFound against a
+// field (handle) that was never shown to the sharer in the first place.
+func AddGrantByProfile(ctx context.Context, pool *pgxpool.Pool, grantorID, boardID, subjectProfileID, grantedRole string) (*StoryboardGrant, error) {
+	grantedRole = strings.ToLower(strings.TrimSpace(grantedRole))
+	if !validGrantedRoles[grantedRole] {
+		return nil, ErrInvalidGrantedRole
+	}
+	board, err := LoadBoard(ctx, pool, boardID)
+	if err != nil {
+		return nil, err
+	}
+	if ok, err := CanManageSharing(ctx, pool, grantorID, board); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, ErrNotAuthorized
+	}
+
+	userID, err := resolveGrantSubjectUserID(ctx, pool, subjectProfileID)
+	if err != nil {
+		return nil, err
+	}
+	if userID == board.OwnerUserID {
+		// Owner is never a grant row (see migration 090's comment) --
+		// silently refuse rather than create a confusing, capability-less
+		// duplicate row for the owner's own account.
+		return nil, errors.New("cannot_grant_to_owner")
+	}
+
+	var g StoryboardGrant
+	err = pool.QueryRow(ctx, `
+		INSERT INTO storyboard_grants (storyboard_id, user_id, granted_role, granted_by)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (storyboard_id, user_id) DO UPDATE
+		  SET granted_role = EXCLUDED.granted_role, granted_by = EXCLUDED.granted_by, updated_at = NOW()
+		RETURNING id::text, created_at, updated_at
+	`, boardID, userID, grantedRole, grantorID).Scan(&g.ID, &g.CreatedAt, &g.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	g.StoryboardID = boardID
+	g.UserID = userID
+	_ = pool.QueryRow(ctx, `SELECT COALESCE(handle, '') FROM users WHERE id = $1`, userID).Scan(&g.UserHandle)
+	g.GrantedRole = grantedRole
+	g.GrantedBy = grantorID
+	return &g, nil
+}
+
 // RemoveGrant revokes one grant by id. Requires CanManageSharing.
 func RemoveGrant(ctx context.Context, pool *pgxpool.Pool, userID, boardID, grantID string) error {
 	board, err := LoadBoard(ctx, pool, boardID)

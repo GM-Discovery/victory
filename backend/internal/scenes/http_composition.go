@@ -261,3 +261,63 @@ func HandlePlacementStageComposition(pool *pgxpool.Pool) http.HandlerFunc {
 		writeOK(w, map[string]any{"composition": composition})
 	}
 }
+
+// HandleUpdateCurrentScene handles POST
+// /api/shows/{show_id}/scenes/{placement_id}/update-current-scene (kernel-85
+// S6.1). Director+ only.
+func HandleUpdateCurrentScene(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		placementID := strings.TrimSpace(r.PathValue("placement_id"))
+		composition, err := UpdateCurrentScene(ctx, pool, userID, placementID)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeOK(w, map[string]any{"composition": composition})
+	}
+}
+
+// HandleSaveAsNewScene handles POST
+// /api/shows/{show_id}/scenes/{placement_id}/save-as-new-scene (body:
+// {"title": "...", "slug": "..."}, kernel-85 S6.2). Director+ only.
+func HandleSaveAsNewScene(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		placementID := strings.TrimSpace(r.PathValue("placement_id"))
+		var body struct {
+			Title string `json:"title"`
+			Slug  string `json:"slug"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeError(w, errors.New("invalid_request_body"))
+			return
+		}
+		newScene, err := SaveArrangementAsNewScene(ctx, pool, userID, placementID, body.Title, body.Slug)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeOK(w, map[string]any{"scene": newScene})
+	}
+}

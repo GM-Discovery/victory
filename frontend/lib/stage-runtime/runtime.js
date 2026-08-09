@@ -499,6 +499,19 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       return canManageIndexCards(role);
     }
 
+    // Kernel 85: a narrow read-only bridge so a venue-independent tool
+    // module (kernel85-cohort-tools.js) can pull the current show id and
+    // Director+ gate without the engine importing anything about cohorts,
+    // matching this codebase's "generic engine, game-specific layer reads
+    // it" convention already used for VictoryStageVenue. Closures over the
+    // same currentRole/currentSnapshot the rest of this file uses, so it
+    // always reflects the latest snapshot with no separate sync step.
+    window.VictoryStageKernel85Bridge = {
+      getShowID: () => currentSnapshot?.session?.show_id || "",
+      getViewerRole: () => currentRole,
+      canManageStage: () => canManageIndexCards(currentRole),
+    };
+
     function loadPixiLibrary() {
       if (window.PIXI) {
         return Promise.resolve(window.PIXI);

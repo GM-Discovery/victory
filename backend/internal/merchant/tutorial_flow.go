@@ -57,6 +57,36 @@ func participationFor(eligible EligibleContext) tutorial.Participation {
 	}
 }
 
+// Kernel 85 §8.1: the locked courtyard door's two distinct blocked states
+// used to surface no copy at all -- the door/Ra Program panel just showed
+// the raw error code ("milestone_required" verbatim, or a generic
+// character-maker prompt that didn't mention the door). tutorialGateMessage
+// supplies the Player-facing sentence for each state; the machine-readable
+// error CODE these come from (no_character_selected / not_a_roster_member /
+// milestone_required) is untouched -- this is copy only, attached alongside
+// the code via writeErrorWithMessage, never replacing it.
+//
+// Deliberately scoped to the door/Ra dialogue handlers (HandleInteractionOpen's
+// freeform_submission/guided_dialogue branches, HandleInteractionSubmit,
+// HandleInteractionDialogue) rather than folded into the generic writeError
+// table: "before you can interact with the locked door" would be a wrong
+// thing to say from, say, HandleEquipmentItemByID.
+const (
+	gateMessageNoCharacter     = "You need a character before you can interact with the locked door."
+	gateMessageKessaIncomplete = "Speak with Kessa first so you leave her stall with more than the clothes on your back. You cannot proceed until you have finished with Kessa."
+)
+
+func tutorialGateMessage(code string) string {
+	switch code {
+	case "no_character_selected", "not_a_roster_member":
+		return gateMessageNoCharacter
+	case "milestone_required":
+		return gateMessageKessaIncomplete
+	default:
+		return ""
+	}
+}
+
 // requireBindingMilestone enforces a gated interaction's milestone on
 // INVOCATION, not merely on discovery.
 //

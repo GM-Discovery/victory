@@ -81,6 +81,15 @@
         <p id="readonly-description" class="status-line"></p>
       </section>
 
+      <section class="card" id="people-card" hidden>
+        <h2 style="margin-top:0;">People</h2>
+        <p class="status-line">Invite someone from My People or Third Place to this Show's Show Run. This creates an invitation they must accept in Audition Hall -- nothing changes for them until they do (Kernel 85 §7).</p>
+        <p class="launchbar">
+          <button class="chip" type="button" id="invite-picker-button">Invite to this Show…</button>
+        </p>
+        <p class="status-line" id="invite-picker-status"></p>
+      </section>
+
       <section class="card" id="manage-card" hidden>
         <h2 style="margin-top:0;">Manage</h2>
         <div class="form-grid">
@@ -190,6 +199,7 @@
   <script src="/lib/back-to-map.js"></script>
   <script src="/lib/venue-account-badge.js?v=nav-1"></script>
   <script src="/lib/ewrite-rule-link.js"></script>
+  <script src="/lib/people-picker.js"></script>
   <script>
     function showIdFromQuery() {
       return new URLSearchParams(window.location.search).get("id") || "";
@@ -259,6 +269,7 @@
         return;
       }
 
+      document.getElementById("people-card").hidden = false;
       document.getElementById("manage-card").hidden = false;
       document.getElementById("session-card").hidden = false;
       document.getElementById("scenes-card").hidden = false;
@@ -266,6 +277,39 @@
       const locationId = payload.data.location_id;
       document.getElementById("scene-library-link").href = "/venues/show-runs/scenes.html?location_id=" + encodeURIComponent(locationId);
       document.getElementById("roster-link").href = "/venues/show-runs/roster.html?id=" + encodeURIComponent(show.show_run_id);
+
+      // Kernel 85 §7.4: "Add to Current Show" reuses the existing canonical
+      // Show-Run invite mechanism (tickets.InviteFromDirector via
+      // POST /api/show-runs/{id}/tickets/invite) rather than a parallel
+      // instant-grant path -- it is a two-punch flow the target must accept,
+      // same as roster.html's own "Invite a Player" field. This is the
+      // People-Picker-driven front door to that same endpoint, scoped to
+      // this Show's parent Show Run.
+      document.getElementById("invite-picker-button").addEventListener("click", () => {
+        const statusEl = document.getElementById("invite-picker-status");
+        VictoryPeoplePicker.open({
+          title: "Invite to this Show",
+          hint: "Select someone from My People or Third Place. This sends an invitation to this Show's Show Run -- they must accept it in Audition Hall.",
+          onSelect: async (person) => {
+            statusEl.textContent = "Inviting " + person.display_name + "…";
+            try {
+              const res = await fetch(`/api/show-runs/${encodeURIComponent(show.show_run_id)}/tickets/invite`, {
+                method: "POST", credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ target_profile_id: person.profile_id, message: "Invited from " + (show.title || "a Show") }),
+              });
+              const p = await res.json().catch(() => null);
+              if (!res.ok || !p?.ok) {
+                statusEl.textContent = "Could not invite " + person.display_name + ": " + (p?.data?.error || `HTTP ${res.status}`);
+                return;
+              }
+              statusEl.textContent = "Invitation sent to " + person.display_name + ". They must accept it in Audition Hall before anything changes for them.";
+            } catch (err) {
+              statusEl.textContent = "Could not send the invitation.";
+            }
+          },
+        });
+      });
       let currentShowScenePlacementId = payload.data.current_show_scene_placement_id || null;
 
       function newIdempotencyKey() {
