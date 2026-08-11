@@ -113,6 +113,29 @@
         return { kind: "error", error: String(msg.error || "action_denied"), message: msg };
       }
 
+      // Kernel 86: a transient/static dice projection derived from a
+      // just-stored roll/dice Action, already shaped to this viewer's
+      // resolved audience server-side (backend/internal/rollaudience) --
+      // never a second source of canonical roll truth.
+      if (msg.type === "stage_effect") {
+        return { kind: "stage_effect", effect: msg.data || {}, message: msg };
+      }
+
+      if (msg.type === "stage_effect_pinned") {
+        return { kind: "stage_effect_pinned", effect: msg.data || {}, message: msg };
+      }
+
+      if (msg.type === "stage_effect_dismissed") {
+        return { kind: "stage_effect_dismissed", effectId: String(msg.effect_id || ""), message: msg };
+      }
+
+      // Sent once on connect/reconnect, right after "snapshot" -- every
+      // currently-pinned effect this viewer is authorized to see (kernel
+      // §10's "preserve it across ordinary reconnect").
+      if (msg.type === "stage_effects/pinned") {
+        return { kind: "stage_effects_pinned", effects: Array.isArray(msg.data) ? msg.data : [], message: msg };
+      }
+
       if (msg.type === "action") {
         const action = normalizeAction(msg.data || msg.payload || {});
         state?.applyEvent?.(action, { event: msg });

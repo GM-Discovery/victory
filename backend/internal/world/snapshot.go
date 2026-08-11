@@ -11,9 +11,27 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"victory/backend/internal/rollaudience"
 	"victory/backend/internal/showings"
 	"victory/backend/internal/tutorial"
 )
+
+// resolveStoredRollAudienceMode defaults an absent/malformed stored
+// audienceMode to Show -- deliberately not rollaudience.NormalizeMode,
+// whose "" case means "apply the Cohort default" for a *new* roll request.
+// A roll/dice Action already in the actions table either predates Kernel
+// 86 (no audienceMode key at all) or has a value written by
+// actions.StoreDiceRoll; either way "" here must fail open to the old
+// unrestricted (Show) behavior, matching network/ws.go's identical
+// resolvedStoredMode for the live-delivery side of the same contract.
+func resolveStoredRollAudienceMode(raw string) string {
+	switch strings.TrimSpace(raw) {
+	case rollaudience.ModeCohort, rollaudience.ModeDirector, rollaudience.ModePrivate, rollaudience.ModeShow:
+		return strings.TrimSpace(raw)
+	default:
+		return rollaudience.ModeShow
+	}
+}
 
 type Snapshot struct {
 	Location       string          `json:"location"`
@@ -440,6 +458,19 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, view
 			"persona":      a.Persona,
 		}
 		a.Timestamp = ts.UTC().Format(time.RFC3339)
+
+		if a.Type == "roll/dice" {
+			audienceMode, _ := a.Visibility["audienceMode"].(string)
+			cohortID, _ := a.Visibility["cohortId"].(string)
+			decision := rollaudience.Decision{Mode: resolveStoredRollAudienceMode(audienceMode), CohortID: cohortID}
+			visible, verr := rollaudience.VisibleToViewer(ctx, pool, decision, a.ActorID, showID, viewerUserID, viewerRole)
+			if verr != nil {
+				return nil, verr
+			}
+			if !visible {
+				continue
+			}
+		}
 
 		snap.Actions = append(snap.Actions, a)
 	}

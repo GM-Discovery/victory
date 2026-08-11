@@ -229,3 +229,65 @@ func TestRollAtomicCapAndSourceError(t *testing.T) {
 		t.Fatalf("expected source error, got %v", err)
 	}
 }
+
+// TestOrdinaryExpressionsNeverAutoExplode is the Kernel 86A §2.3/§13
+// explosion-safety audit made explicit and permanent: a default/ordinary
+// roll expression (no literal "!") must never set ExplodeOnMax, and even
+// when every atomic throw lands on the maximum face, ExplosionCount must
+// stay zero. Explosion is opt-in per spec -- only a macro/expression that
+// explicitly writes "!" may trigger it (rollExplodingD20Single in
+// characters/parentage_roll.go is one such explicit, named macro, not the
+// default path).
+func TestOrdinaryExpressionsNeverAutoExplode(t *testing.T) {
+	ordinary := []string{"d20", "3d12", "2d6+3", "d100", "4d8-2", "d10+d4-1"}
+	for _, raw := range ordinary {
+		spec, _, err := ParseExpression(raw)
+		if err != nil {
+			t.Fatalf("ParseExpression(%q): unexpected error %v", raw, err)
+		}
+		for _, group := range spec.Groups {
+			if group.ExplodeOnMax {
+				t.Fatalf("ParseExpression(%q): group %+v set ExplodeOnMax without a literal '!'", raw, group)
+			}
+		}
+
+		// Every atomic throw returns the maximum face for its die --
+		// if explosion were ever implicit, this would chain forever /
+		// hit the atomic roll cap. It must not.
+		values := make([]int, 0, MaxBaseDiceCount)
+		for _, group := range spec.Groups {
+			for i := 0; i < group.Count; i++ {
+				values = append(values, group.Sides-1) // Intn is exclusive; sides-1 -> face == sides (max)
+			}
+		}
+		result, err := Roll(context.Background(), spec, &fakeSource{values: values})
+		if err != nil {
+			t.Fatalf("Roll(%q) with all-max throws: unexpected error %v", raw, err)
+		}
+		if result.ExplosionCount != 0 {
+			t.Fatalf("Roll(%q): ordinary expression exploded (ExplosionCount=%d) despite no '!' anywhere in it", raw, result.ExplosionCount)
+		}
+	}
+}
+
+// TestExplicitExplosionStillChains proves the inverse: a macro/expression
+// that DOES write "!" keeps exploding on max faces exactly as before --
+// Kernel 86A must not accidentally close off legitimate explosion use,
+// only the implicit/default case.
+func TestExplicitExplosionStillChains(t *testing.T) {
+	spec, _, err := ParseExpression("1d6!")
+	if err != nil {
+		t.Fatalf("ParseExpression: unexpected error %v", err)
+	}
+	// First throw explodes (max face, index 5 -> value 6), second does not.
+	result, err := Roll(context.Background(), spec, &fakeSource{values: []int{5, 2}})
+	if err != nil {
+		t.Fatalf("Roll: unexpected error %v", err)
+	}
+	if result.ExplosionCount != 1 {
+		t.Fatalf("expected exactly one explosion, got %d", result.ExplosionCount)
+	}
+	if len(result.Dice) != 1 || !reflect.DeepEqual(result.Dice[0].Chain, []int{6, 3}) {
+		t.Fatalf("expected explicit explosion chain [6 3], got %+v", result.Dice)
+	}
+}

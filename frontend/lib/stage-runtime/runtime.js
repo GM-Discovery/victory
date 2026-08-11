@@ -139,6 +139,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     const stageEngineSceneNodesModule = window.VictoryStageSceneNodes || null;
     const stageEngineTokenUiModule = window.VictoryStageTokenUI || null;
     const stageEngineDiceModule = window.VictoryStageDice || null;
+    const stageEngineDiceProjectionModule = window.VictoryStageDiceProjection || null;
     const stageEngineActionRouterModule = window.VictoryStageActionRouter || null;
     const stageEngineSocketControllerModule = window.VictoryStageSocketController || null;
     const stageEngineSessionSyncModule = window.VictoryStageSessionSync || null;
@@ -256,6 +257,9 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     let currentVenueMapBounds = null;
     let mapEditorDirty = false;
     let diceTray = null;
+    let diceProjection = null;
+    let diceProjectionLayer = null;
+    let diceWorldLayer = null;
     let mapEditorDragState = null;
     let mapEditorPreviewURL = "";
     let venueMapTexture = null;
@@ -1887,7 +1891,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         try {
           const result = await diceTray.roll({
             expression,
-            visibility: "public",
           });
           appendSystemChatNotice(diceTray?.formatRollSummary?.(result) || `Rolled ${expression}.`);
         } catch (error) {
@@ -2425,6 +2428,25 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       timeoutMs: 15000,
     }) || null;
 
+    // Kernel 86: constructed here (deps only need stable closures, no live
+    // PIXI layer yet) but not mounted until the Pixi scene itself mounts
+    // (diceProjection.mount(diceProjectionLayer), where diceProjectionLayer
+    // is created) -- enqueue/applyPinned degrade gracefully with no
+    // container in between, matching how diceTray is likewise constructed
+    // long before its DOM root necessarily exists.
+    diceProjection = stageEngineDiceProjectionModule?.createDiceProjectionController?.({
+      PIXI: window.PIXI,
+      getStageSize: () => getStageSize(),
+      getDefaultTokenSize: () => tokenPlacementBaseSize(null),
+      // Kernel 86A: dice land at map-relative coordinates inside the
+      // active map's own world-space bounds (the same rectangle already
+      // fed to stageCamera.setWorldBounds), not each viewer's live
+      // pan/zoomed viewport -- see dice-projection.js's placement-
+      // determinism comment for why.
+      getMapWorldBounds: () => currentVenueMapBounds,
+      sendAction: (...args) => sendAction(...args),
+    }) || null;
+
     sessionSync = stageEngineSessionSyncModule?.createSessionSync?.({
       fetch: (...args) => fetch(...args),
       getCurrentIdentity: () => currentIdentity,
@@ -2465,6 +2487,10 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       handleDiceTrayAction: (action) => diceTray?.handleAction?.(action),
       handleDiceTrayError: (errorText, message) => diceTray?.handleError?.(errorText, message),
       rejectPendingDiceTrayRolls: (reason) => diceTray?.rejectPendingRolls?.(reason),
+      handleStageEffect: (effect) => diceProjection?.enqueue?.(effect),
+      handleStageEffectPinned: (effect) => diceProjection?.applyPinned?.(effect),
+      handleStageEffectDismissed: (effectId) => diceProjection?.removePinned?.(effectId),
+      hydrateStageEffectsPinned: (effects) => diceProjection?.hydratePinned?.(effects),
       syncCurrentObjectsFromProjectedState: () => syncCurrentObjectsFromProjectedState(),
       canManageIndexCards: (...args) => canManageIndexCards(...args),
       canManageStageTokens: (...args) => canManageStageTokens(...args),
@@ -4253,17 +4279,33 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       gridLayer.zIndex = 1;
       pinnedObjectLayer = new PIXI.Container();
       pinnedObjectLayer.zIndex = 2;
+      // Kernel 86A: landed dice are world-space (a child of worldLayer, so
+      // stageCamera's pan/zoom carries them like any other map object,
+      // spec 1.4), added after pinnedObjectLayer so they render above
+      // tokens/pins during their brief transient/pinned life.
+      diceWorldLayer = new PIXI.Container();
+      diceWorldLayer.zIndex = 3;
       facadeLayer = new PIXI.Container();
       facadeLayer.zIndex = 8;
       overlayObjectLayer = new PIXI.Container();
       overlayObjectLayer.zIndex = 10;
       floatingObjectLayer = new PIXI.Container();
       floatingObjectLayer.zIndex = 15;
+      // Kernel 86A: the dice THEMSELVES land in diceWorldLayer (world-
+      // space, inside worldLayer -- see above). diceProjectionLayer now
+      // carries only the HUD announcement banner: above tokens/Scene
+      // elements/floating nodes but below uiLayer, so a critical modal
+      // (uiLayer, z20) still wins -- screen-space like floatingObjectLayer/
+      // uiLayer (a direct sceneRoot child, never panned/zoomed by
+      // stageCamera, which only wraps worldLayer).
+      diceProjectionLayer = new PIXI.Container();
+      diceProjectionLayer.zIndex = 18;
       uiLayer = new PIXI.Container();
       uiLayer.zIndex = 20;
       pixiApp.stage.addChild(sceneRoot);
-      worldLayer.addChild(mapLayer, gridLayer, pinnedObjectLayer);
-      sceneRoot.addChild(backgroundLayer, worldLayer, facadeLayer, overlayObjectLayer, floatingObjectLayer, uiLayer);
+      worldLayer.addChild(mapLayer, gridLayer, pinnedObjectLayer, diceWorldLayer);
+      sceneRoot.addChild(backgroundLayer, worldLayer, facadeLayer, overlayObjectLayer, floatingObjectLayer, diceProjectionLayer, uiLayer);
+      diceProjection?.mount?.(diceProjectionLayer, diceWorldLayer);
       runtimeLifecycle.track(() => {
         try {
           pixiApp?.destroy?.(true);
@@ -4807,6 +4849,17 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       },
       refreshWorld,
       loadPixiLibrary,
+      // Kernel 86: exposed for browser-proof/debug access to the dice tray
+      // and theatrical roll projection controllers, matching this object's
+      // existing role as the runtime's external control surface
+      // (refreshWorld/loadPixiLibrary above serve the same purpose).
+      diceTray: () => diceTray,
+      diceProjection: () => diceProjection,
+      // Kernel 86A: exposed so browser-proof tooling can drive a real
+      // pan/zoom and confirm landed dice move with the map (spec 1.4),
+      // not just inspect state.
+      getStageCamera: () => stageCamera,
+      getWorldLayer: () => worldLayer,
     };
     runtimeLifecycle.listen(window, "beforeunload", () => runtimeLifecycle.dispose());
     window.VictoryStageCleanup = () => runtimeLifecycle.dispose();

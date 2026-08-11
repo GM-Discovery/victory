@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/dice"
+	"victory/backend/internal/rollaudience"
 	"victory/backend/internal/showings"
 )
 
@@ -89,12 +90,31 @@ func SkillRolledThisSession(ctx context.Context, pool *pgxpool.Pool, sessionID, 
 	return exists, err
 }
 
+// normalizeDiceVisibilityMode is now a thin wrapper over
+// rollaudience.NormalizeMode (Kernel 86): "" and "public" both mean "use
+// the resolver's default/legacy behavior" rather than a single hardcoded
+// "public" value. The actual audience (including the Ungrouped->Show
+// fallback) is computed later in StoreDiceRoll by rollaudience.Resolve,
+// which needs the actor/session to decide, not just the raw string.
 func normalizeDiceVisibilityMode(raw string) string {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "", "public":
-		return "public"
+	return rollaudience.NormalizeMode(raw)
+}
+
+// rolesForAudienceMode derives the legacy informational `visibility.toRoles`
+// value from a resolved rollaudience.Decision. This field is not the
+// enforcement mechanism -- world.LoadVenueSnapshot's roll/dice filter and
+// live-delivery recipients are both computed fresh from
+// visibility.audienceMode/cohortId via rollaudience, never read back from
+// toRoles -- but it's kept populated for the same display/back-compat
+// reasons every other action writer in this package populates it.
+func rolesForAudienceMode(mode string) []string {
+	switch mode {
+	case rollaudience.ModeDirector:
+		return []string{"director", "producer"}
+	case rollaudience.ModePrivate:
+		return []string{}
 	default:
-		return ""
+		return []string{"audience", "cast", "crew", "director", "producer"}
 	}
 }
 
@@ -151,6 +171,11 @@ func StoreDiceRoll(ctx context.Context, pool *pgxpool.Pool, req DiceRollRequest)
 		return nil, &ActionDeniedError{Reason: decision.Reason}
 	}
 
+	audience, err := rollaudience.Resolve(ctx, tx, req.SessionID, req.ActorID, req.Visibility)
+	if err != nil {
+		return nil, err
+	}
+
 	showing, err := showings.EnsureForSession(ctx, tx, req.SessionID, req.ActorID)
 	if err != nil {
 		return nil, err
@@ -194,7 +219,7 @@ func StoreDiceRoll(ctx context.Context, pool *pgxpool.Pool, req DiceRollRequest)
 		"modifier":        rolled.Modifier,
 		"total":           rolled.Total,
 		"roll_version":    rolled.RollVersion,
-		"visibility_mode": req.Visibility,
+		"visibility_mode": audience.Mode,
 		"label":           req.Label,
 		"actor_persona":   persona,
 	}
@@ -206,8 +231,11 @@ func StoreDiceRoll(ctx context.Context, pool *pgxpool.Pool, req DiceRollRequest)
 		"audienceSegments": []string{"all"},
 	}
 	visibility := map[string]any{
-		"toRoles":   []string{"audience", "cast", "crew", "director", "producer"},
-		"privateTo": []string{},
+		"toRoles":      rolesForAudienceMode(audience.Mode),
+		"privateTo":    []string{},
+		"audienceMode": audience.Mode,
+		"cohortId":     audience.CohortID,
+		"showId":       audience.ShowID,
 	}
 
 	targetJSON, _ := json.Marshal(target)

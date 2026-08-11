@@ -199,6 +199,46 @@ func (h *Hub) BroadcastToSessionUser(sessionID, userID string, msg []byte) {
 	}
 }
 
+// SendToUsers sends msg to every client connected to sessionID whose
+// UserID is in userIDs (multi-tab safe, one pass over the client set) --
+// the Kernel 86 targeted-delivery primitive for Cohort/Director/Private
+// roll projections, extending BroadcastToSessionUser's single-user shape to
+// a caller-resolved recipient set. The Hub does no audience/role resolution
+// of its own here either, per this package's standing invariant: callers
+// (backend/internal/rollaudience, backend/internal/network/ws.go) decide
+// who belongs in userIDs before this is ever called.
+func (h *Hub) SendToUsers(sessionID string, userIDs []string, msg []byte) {
+	if len(userIDs) == 0 {
+		return
+	}
+	want := make(map[string]struct{}, len(userIDs))
+	for _, id := range userIDs {
+		if id != "" {
+			want[id] = struct{}{}
+		}
+	}
+	if len(want) == 0 {
+		return
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for c := range h.clients {
+		if c == nil || c.SessionID != sessionID {
+			continue
+		}
+		if _, ok := want[c.UserID]; !ok {
+			continue
+		}
+		select {
+		case c.Send <- msg:
+		default:
+			log.Printf("dropping slow websocket client")
+		}
+	}
+}
+
 func (h *Hub) Presence() *PresenceRegistry {
 	return h.presence
 }

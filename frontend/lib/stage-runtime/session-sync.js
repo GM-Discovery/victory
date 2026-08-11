@@ -546,6 +546,32 @@
         return msg;
       }
 
+      // Kernel 86: theatrical dice projection. handleStageEffect/
+      // handleStageEffectPinned/handleStageEffectDismissed/
+      // hydrateStageEffectsPinned are thin deps closures over the Pixi
+      // dice-projection controller runtime.js owns -- this module never
+      // touches Pixi directly, matching how diceTray itself is only ever
+      // reached through the handleDiceTray* deps above.
+      if (msg.kind === "stage_effect" && msg.effect) {
+        deps.handleStageEffect?.(msg.effect);
+        return msg;
+      }
+
+      if (msg.kind === "stage_effect_pinned" && msg.effect) {
+        deps.handleStageEffectPinned?.(msg.effect);
+        return msg;
+      }
+
+      if (msg.kind === "stage_effect_dismissed") {
+        deps.handleStageEffectDismissed?.(msg.effectId);
+        return msg;
+      }
+
+      if (msg.kind === "stage_effects_pinned") {
+        deps.hydrateStageEffectsPinned?.(msg.effects);
+        return msg;
+      }
+
       if (msg.kind === "error") {
         const errorText = String(msg.error || "action_denied");
         handleDiceTrayError(errorText, msg);

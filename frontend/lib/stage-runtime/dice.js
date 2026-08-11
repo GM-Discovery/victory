@@ -444,7 +444,27 @@
       labelInput.value = "";
       label.appendChild(labelInput);
 
-      controls.append(countLabel, sidesLabel, explodeLabel, modifierLabel, label);
+      // Kernel 86: audience/visibility control (spec §11 -- "add only
+      // required controls"). Server resolves the actual recipients
+      // (backend/internal/rollaudience); this select only states intent.
+      const visibilityLabel = doc.createElement("label");
+      visibilityLabel.textContent = "Visible to";
+      const visibilitySelect = doc.createElement("select");
+      [
+        ["cohort", "Cohort"],
+        ["show", "Whole Show"],
+        ["director", "Director+"],
+        ["private", "Only Me"],
+      ].forEach(([value, text]) => {
+        const option = doc.createElement("option");
+        option.value = value;
+        option.textContent = text;
+        visibilitySelect.appendChild(option);
+      });
+      visibilitySelect.value = "cohort";
+      visibilityLabel.appendChild(visibilitySelect);
+
+      controls.append(countLabel, sidesLabel, explodeLabel, modifierLabel, label, visibilityLabel);
 
       const expressionLabel = doc.createElement("label");
       expressionLabel.textContent = "Expression";
@@ -500,6 +520,7 @@
         explode,
         modifier,
         label: labelInput,
+        visibility: visibilitySelect,
         expression,
         preview,
         actionRow,
@@ -542,7 +563,7 @@
     async function submitRoll() {
       const expression = getControlsExpression();
       const label = String(elements.label?.value || "").trim();
-      const visibility = "public";
+      const visibility = String(elements.visibility?.value || "cohort").trim().toLowerCase() || "cohort";
       try {
         const result = await roll({ expression, visibility, label });
         setStageStatus(formatRollSummary(result));
@@ -571,10 +592,13 @@
       }
     }
 
-    function roll({ expression, visibility = "public", label = "", skillId = "" } = {}) {
+    function roll({ expression, visibility = "cohort", label = "", skillId = "" } = {}) {
       const normalizedExpression = String(expression || "").trim();
       const normalizedLabel = String(label || "").trim();
-      const normalizedVisibility = String(visibility || "public").trim().toLowerCase() || "public";
+      // Kernel 86 default is Cohort, with a safe Show fallback the server
+      // resolves for an Ungrouped roller (backend/internal/rollaudience) --
+      // this client never needs to know the roller's own grouping status.
+      const normalizedVisibility = String(visibility || "cohort").trim().toLowerCase() || "cohort";
       const normalizedSkillId = String(skillId || "").trim();
       if (!normalizedExpression) {
         return Promise.reject(new Error("expression_required"));
@@ -729,6 +753,11 @@
       setLabel: (value) => {
         if (elements.label) {
           elements.label.value = String(value || "");
+        }
+      },
+      setVisibility: (value) => {
+        if (elements.visibility) {
+          elements.visibility.value = String(value || "cohort");
         }
       },
       setManualExpressionOverride: (value) => {

@@ -16,6 +16,8 @@ import (
 	"victory/backend/internal/actions"
 	"victory/backend/internal/identity"
 	"victory/backend/internal/ratelimit"
+	"victory/backend/internal/rollaudience"
+	"victory/backend/internal/stageeffects"
 	"victory/backend/internal/world"
 )
 
@@ -73,6 +75,77 @@ var storeUpdateTokenFunc = actions.StoreUpdateToken
 var storePersonaEquipFunc = actions.StorePersonaEquip
 var storePersonaUnequipFunc = actions.StorePersonaUnequip
 var discordBridgeConfig identity.DiscordServerLinkConfig
+
+// stageEffectRegistry is a single process-wide in-memory store, matching
+// hub's own singleton lifecycle (one Hub, created once in cmd/victory/
+// main.go). It carries no DB/pool dependency, so unlike venuecoordination
+// (threaded explicitly into storyboards' handlers for its DI-friendly
+// signature) it can live as a package var here the same way
+// rollDiceLimiter and wsMessageLimiter already do -- avoiding a signature
+// change to ServeVenueWS/ServeCaveWS/handleVenuePayload/handleCavePayload
+// and every existing caller/test of them.
+var stageEffectRegistry = stageeffects.NewRegistry()
+
+// stageEffectDefaultDurationMs / stageEffectMaxDurationMs bound the
+// transient hold Kernel 86 §1.4 asks for (~3-4s default) while still
+// letting a caller request a longer hold within reason -- never unbounded,
+// per §16's "queue must not enable unbounded client memory growth."
+const stageEffectDefaultDurationMs = 3500
+const stageEffectMaxDurationMs = 15000
+
+// resolvedStoredMode defaults an already-stored (or absent/malformed)
+// audience mode to Show -- deliberately NOT rollaudience.NormalizeMode,
+// whose "" case means "client didn't request a mode, apply the Cohort
+// default" for a *new* roll request. Here "" means "this stored/mocked
+// effect never got an audienceMode written," which must fail open to the
+// old unrestricted behavior (Show), not silently reinterpret it as a fresh
+// Cohort request.
+func resolvedStoredMode(raw string) string {
+	switch strings.TrimSpace(raw) {
+	case rollaudience.ModeCohort, rollaudience.ModeDirector, rollaudience.ModePrivate, rollaudience.ModeShow:
+		return strings.TrimSpace(raw)
+	default:
+		return rollaudience.ModeShow
+	}
+}
+
+// deliverStageMessage sends msg to exactly the audience Kernel 86 resolved
+// for a roll (backend/internal/rollaudience), reusing the same Decision
+// shape StoreDiceRoll already computed and stored on the Action's
+// visibility. Show mode is delivered via Hub.BroadcastSession (every
+// socket on this session, not the entire server -- the audit's global-leak
+// fix) rather than enumerating a recipient set.
+func deliverStageMessage(ctx context.Context, hub *Hub, pool *pgxpool.Pool, sessionID, actorID, audienceMode, cohortID string, msg []byte) {
+	decision := rollaudience.Decision{Mode: resolvedStoredMode(audienceMode), CohortID: strings.TrimSpace(cohortID)}
+
+	recipients, useSessionBroadcast, err := rollaudience.LiveRecipients(ctx, pool, decision, actorID, sessionID)
+	if err != nil {
+		log.Printf("stage effect recipient resolution failed: session=%s err=%v", sessionID, err)
+		return
+	}
+	if useSessionBroadcast {
+		hub.BroadcastSession(sessionID, msg)
+		return
+	}
+	hub.SendToUsers(sessionID, recipients, msg)
+}
+
+// stageEffectAuthorized reports whether userID may pin/dismiss e: the
+// roller always may; otherwise Director+ may, for any audience except
+// Private (kernel §10: "unrelated users cannot dismiss another cohort's
+// private/static projection" -- Private has no authorized viewer besides
+// the roller in the first place, so no one else should be able to touch it
+// either).
+func stageEffectAuthorized(ctx context.Context, pool *pgxpool.Pool, e stageeffects.Effect, userID string) (bool, error) {
+	userID = strings.TrimSpace(userID)
+	if userID != "" && userID == e.ActorID {
+		return true, nil
+	}
+	if e.Audience == rollaudience.ModePrivate {
+		return false, nil
+	}
+	return rollaudience.IsDirectorPlus(ctx, pool, e.SessionID, userID)
+}
 
 func ServeCaveWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordServerLinkConfig) http.HandlerFunc {
 	return ServeVenueWS(hub, pool, discordLinkCfg, "the-cave")
@@ -187,6 +260,36 @@ func ServeVenueWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordS
 			"users": presenceSnapshot,
 		}); err != nil {
 			log.Printf("ws presence snapshot failed: %v", err)
+			hub.Presence().Disconnect(sessionIdentity.SessionID, client.UserID)
+			_ = conn.Close()
+			hub.Remove(client)
+			return
+		}
+
+		// Kernel 86 §10: a pinned/static roll projection survives ordinary
+		// reconnect. Each pinned effect is re-checked against this viewer's
+		// current audience authority (never trusted from what it was
+		// created with) before being sent -- the same rollaudience.
+		// VisibleToViewer test snapshot filtering uses, so a reconnecting
+		// viewer never receives a pinned effect their role/cohort no longer
+		// authorizes.
+		visiblePinned := make([]stageeffects.Effect, 0)
+		for _, e := range stageEffectRegistry.ListPinned(sessionIdentity.SessionID) {
+			decision := rollaudience.Decision{Mode: resolvedStoredMode(e.Audience), CohortID: e.CohortID}
+			visible, err := rollaudience.VisibleToViewer(ctx, pool, decision, e.ActorID, snapshot.Session.ShowID, sessionIdentity.UserID, sessionIdentity.Role)
+			if err != nil {
+				log.Printf("ws pinned stage effect visibility check failed: %v", err)
+				continue
+			}
+			if visible {
+				visiblePinned = append(visiblePinned, e)
+			}
+		}
+		if err := conn.WriteJSON(map[string]any{
+			"type": "stage_effects/pinned",
+			"data": visiblePinned,
+		}); err != nil {
+			log.Printf("ws pinned stage effects write failed: %v", err)
 			hub.Presence().Disconnect(sessionIdentity.SessionID, client.UserID)
 			_ = conn.Close()
 			hub.Remove(client)
@@ -502,11 +605,93 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 				return
 			}
 
+			audienceMode, _ := storedAction.Visibility["audienceMode"].(string)
+			cohortID, _ := storedAction.Visibility["cohortId"].(string)
+
 			msgOut, _ := json.Marshal(map[string]any{
 				"type": "action",
 				"data": storedAction,
 			})
-			hub.Broadcast(msgOut)
+			deliverCtx, deliverCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			deliverStageMessage(deliverCtx, hub, pool, sessionID, actorID, audienceMode, cohortID, msgOut)
+
+			durationMs := stageEffectDefaultDurationMs
+			if raw, ok := payload["duration_ms"].(float64); ok && raw > 0 {
+				durationMs = int(raw)
+				if durationMs > stageEffectMaxDurationMs {
+					durationMs = stageEffectMaxDurationMs
+				}
+			}
+			effect := stageEffectRegistry.Create(sessionID, stageeffects.Effect{
+				Type:           "dice_roll",
+				SourceActionID: storedAction.ID,
+				CohortID:       cohortID,
+				Audience:       audienceMode,
+				ActorID:        actorID,
+				Label:          label,
+				DurationMs:     durationMs,
+				Payload: map[string]any{
+					"actor":           storedAction.Actor,
+					"label":           storedAction.Payload["label"],
+					"expression":      storedAction.Payload["expression"],
+					"dice":            storedAction.Payload["dice"],
+					"modifier":        storedAction.Payload["modifier"],
+					"total":           storedAction.Payload["total"],
+					"explosion_count": storedAction.Payload["explosion_count"],
+					"skill_id":        storedAction.Payload["skill_id"],
+				},
+			})
+			effectMsg, _ := json.Marshal(map[string]any{
+				"type": "stage_effect",
+				"data": effect,
+			})
+			deliverStageMessage(deliverCtx, hub, pool, sessionID, actorID, audienceMode, cohortID, effectMsg)
+			deliverCancel()
+		}
+
+	case "stage_effect/pin", "stage_effect/dismiss":
+		{
+			effectID, _ := payload["effect_id"].(string)
+			sessionID := c.SessionID
+			if strings.TrimSpace(sessionID) == "" || strings.TrimSpace(effectID) == "" {
+				_ = c.Conn.WriteJSON(map[string]any{"type": "error", "error": "effect_id_required"})
+				return
+			}
+
+			effect, ok := stageEffectRegistry.Get(sessionID, effectID)
+			if !ok {
+				_ = c.Conn.WriteJSON(map[string]any{"type": "error", "error": "stage_effect_not_found"})
+				return
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			authorized, err := stageEffectAuthorized(ctx, pool, effect, c.UserID)
+			if err != nil {
+				cancel()
+				_ = c.Conn.WriteJSON(map[string]any{"type": "error", "error": "access_check_failed"})
+				return
+			}
+			if !authorized {
+				cancel()
+				_ = c.Conn.WriteJSON(map[string]any{"type": "error", "error": "forbidden"})
+				return
+			}
+
+			if payload["type"] == "stage_effect/pin" {
+				pinned, ok := stageEffectRegistry.Pin(sessionID, effectID)
+				if !ok {
+					cancel()
+					_ = c.Conn.WriteJSON(map[string]any{"type": "error", "error": "stage_effect_not_found"})
+					return
+				}
+				msgOut, _ := json.Marshal(map[string]any{"type": "stage_effect_pinned", "data": pinned})
+				deliverStageMessage(ctx, hub, pool, sessionID, effect.ActorID, effect.Audience, effect.CohortID, msgOut)
+			} else {
+				stageEffectRegistry.Dismiss(sessionID, effectID)
+				msgOut, _ := json.Marshal(map[string]any{"type": "stage_effect_dismissed", "effect_id": effectID})
+				deliverStageMessage(ctx, hub, pool, sessionID, effect.ActorID, effect.Audience, effect.CohortID, msgOut)
+			}
+			cancel()
 		}
 
 	case "perform/speak":

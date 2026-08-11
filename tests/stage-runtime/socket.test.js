@@ -83,6 +83,44 @@ test("malformed messages are ignored safely", () => {
   assert.equal(result.kind, "malformed");
 });
 
+// Kernel 86: the dispatcher must recognize all four Stage Effect message
+// types the server can now send over the same venue websocket, and pass
+// each payload through untouched (audience/authority filtering already
+// happened server-side -- backend/internal/rollaudience -- before any of
+// these are ever sent).
+test("stage effect messages are dispatched with the expected kind and payload", () => {
+  const dispatcher = createDispatcher({});
+
+  const created = dispatcher.dispatch({
+    type: "stage_effect",
+    data: { effect_id: "fx_1", type: "dice_roll" },
+  });
+  assert.equal(created.kind, "stage_effect");
+  assert.equal(created.effect.effect_id, "fx_1");
+
+  const pinned = dispatcher.dispatch({
+    type: "stage_effect_pinned",
+    data: { effect_id: "fx_1", pinned: true },
+  });
+  assert.equal(pinned.kind, "stage_effect_pinned");
+  assert.equal(pinned.effect.pinned, true);
+
+  const dismissed = dispatcher.dispatch({
+    type: "stage_effect_dismissed",
+    effect_id: "fx_1",
+  });
+  assert.equal(dismissed.kind, "stage_effect_dismissed");
+  assert.equal(dismissed.effectId, "fx_1");
+
+  const hydrated = dispatcher.dispatch({
+    type: "stage_effects/pinned",
+    data: [{ effect_id: "fx_2" }],
+  });
+  assert.equal(hydrated.kind, "stage_effects_pinned");
+  assert.equal(hydrated.effects.length, 1);
+  assert.equal(hydrated.effects[0].effect_id, "fx_2");
+});
+
 test("bind does not duplicate message handlers on remount", () => {
   const state = createProjectedState({ viewerRole: "director" });
   const dispatcher = createDispatcher({ state });
