@@ -121,6 +121,13 @@ func AllCommands() []Command {
 			Category:    "ooc",
 		},
 		{
+			Path:        "ic",
+			Title:       "In Character",
+			Description: "Send an In Character message as your currently selected Character for this Show. Requires a Character to be selected on your Show Run roster row.",
+			Usage:       "/ic <message>",
+			Category:    "ic",
+		},
+		{
 			Path:        "help",
 			Title:       "Help",
 			Description: "List available commands, or show usage for one command.",

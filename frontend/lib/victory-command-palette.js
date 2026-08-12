@@ -74,6 +74,7 @@
         return { path, args: [] };
       }
       case "ooc":
+      case "ic":
         return { path, args: [rest] };
       case "help":
         return { path, args: rest ? [rest.trim()] : [] };

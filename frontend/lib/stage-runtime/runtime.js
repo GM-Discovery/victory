@@ -278,10 +278,12 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     let gridLayer = null;
     let facadeLayer = null;
     let pinnedObjectLayer = null;
+    let drawingWorldLayer = null;
     let overlayObjectLayer = null;
     let floatingObjectLayer = null;
     let uiLayer = null;
     let stageCamera = null;
+    let runtimeDrawing = null;
     let mapEditorOriginalState = null;
     let currentVenueGridConfig = null;
     let gridEditorOriginalState = null;
@@ -392,18 +394,21 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     const rightHelpButton = document.getElementById("right-help-button");
     const chatLogTab = document.getElementById("chat-log-tab");
     const chatOOCTab = document.getElementById("chat-ooc-tab");
+    const chatICTab = document.getElementById("chat-ic-tab");
     const chatDiceTab = document.getElementById("chat-dice-tab");
     const chatGameEventsTab = document.getElementById("chat-game-events-tab");
     const chatHelpTab = document.getElementById("chat-help-tab");
     const chatBackstageTab = document.getElementById("chat-backstage-tab");
     const chatLogPanel = document.getElementById("chat-log-panel");
     const chatOOCPanel = document.getElementById("chat-ooc-panel");
+    const chatICPanel = document.getElementById("chat-ic-panel");
     const chatDicePanel = document.getElementById("chat-dice-panel");
     const chatGameEventsPanel = document.getElementById("chat-game-events-panel");
     const chatHelpPanel = document.getElementById("chat-help-panel");
     const chatBackstagePanel = document.getElementById("chat-backstage-panel");
     const chatBackstageLog = document.getElementById("chat-backstage-log");
     const chatOOCLog = document.getElementById("chat-ooc-log");
+    const chatICLog = document.getElementById("chat-ic-log");
     const chatGameEventsLog = document.getElementById("chat-game-events-log");
     const venueSheetRoot = document.getElementById("venue-sheet");
     const venueSheetPortrait = document.getElementById("venue-sheet-portrait");
@@ -1646,6 +1651,17 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       const source = String(action?.payload?.source || action?.source || "").trim().toLowerCase();
       const edited = Boolean(action?.payload?.edited || action?.edited);
       const isOOC = String(action?.type || "").trim() === "chat/ooc";
+      const isIC = String(action?.type || "").trim() === "chat/ic_message";
+      if (isIC) {
+        // Kernel 87 §10: the speaker label is the Character name stamped
+        // into the payload at send time -- never the live/current
+        // Character, and never the accountable user's own display name.
+        // Old messages therefore keep showing whoever was selected when
+        // they were sent, even after the sender switches Characters.
+        const characterName = String(action?.payload?.character_name || "").trim() || "Unknown Character";
+        appendChatEntry(characterName, text, chatICLog);
+        return;
+      }
       const label = source === "discord" ? `${author} via Discord Bridge${edited ? " (edited)" : ""}` : `${author}${isOOC ? " (OOC)" : ""}`;
       appendChatEntry(label, text, isOOC ? chatOOCLog : chatLog);
     }
@@ -1693,6 +1709,9 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       custom_skill_description_required: "Custom skills need a --description.",
       attribute_required: "Custom skills need an --attribute.",
       attribute_not_found: "That attribute name isn't recognized.",
+      // Kernel 87 §10: the clean "choose a Character first" failure --
+      // never a silent send, never a client-guessed fallback identity.
+      no_character_selected: "Choose a Character first (Show Run roster) to speak In Character.",
     };
 
     function describeCommandExecution(parsed, response) {
@@ -1734,6 +1753,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
           }
           return "Journal entry added privately.";
         case "ooc":
+        case "ic":
           return "";
         case "help": {
           const entries = data.entries || [];
@@ -1747,6 +1767,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     const chatTabEntries = [
       { name: "chat", tab: chatLogTab, panel: chatLogPanel },
       { name: "ooc", tab: chatOOCTab, panel: chatOOCPanel },
+      { name: "ic", tab: chatICTab, panel: chatICPanel },
       { name: "dice", tab: chatDiceTab, panel: chatDicePanel },
       { name: "game_events", tab: chatGameEventsTab, panel: chatGameEventsPanel },
       { name: "help", tab: chatHelpTab, panel: chatHelpPanel },
@@ -4279,6 +4300,18 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       gridLayer.zIndex = 1;
       pinnedObjectLayer = new PIXI.Container();
       pinnedObjectLayer.zIndex = 2;
+      // Kernel 87: Cartograph drawing objects render just above tokens/pins
+      // and just below dice -- world-space (child of worldLayer, so pan/
+      // zoom/fullscreen carries it exactly like any other map object,
+      // kernel-87 §2 "Pan/zoom/fullscreen/theatrical fit must not change
+      // object placement"), added between pinnedObjectLayer and
+      // diceWorldLayer in insertion order (worldLayer has no
+      // sortableChildren flag, so addChild order IS z-order here) so
+      // pinned spatial dice from Kernel 86A stay on top of drawings
+      // (kernel-87 §5).
+      drawingWorldLayer = new PIXI.Container();
+      drawingWorldLayer.zIndex = 2.5;
+      drawingWorldLayer.sortableChildren = true;
       // Kernel 86A: landed dice are world-space (a child of worldLayer, so
       // stageCamera's pan/zoom carries them like any other map object,
       // spec 1.4), added after pinnedObjectLayer so they render above
@@ -4303,7 +4336,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       uiLayer = new PIXI.Container();
       uiLayer.zIndex = 20;
       pixiApp.stage.addChild(sceneRoot);
-      worldLayer.addChild(mapLayer, gridLayer, pinnedObjectLayer, diceWorldLayer);
+      worldLayer.addChild(mapLayer, gridLayer, pinnedObjectLayer, drawingWorldLayer, diceWorldLayer);
       sceneRoot.addChild(backgroundLayer, worldLayer, facadeLayer, overlayObjectLayer, floatingObjectLayer, diceProjectionLayer, uiLayer);
       diceProjection?.mount?.(diceProjectionLayer, diceWorldLayer);
       runtimeLifecycle.track(() => {
@@ -4335,6 +4368,40 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         }
       });
       updateCameraControls(stageCamera?.getView?.());
+
+      // Kernel 87: Cartograph. Feature-gated on the venue capability flag
+      // (cartograph_enabled, seeded true for catharsis only -- matches
+      // Kernel 73's Equip-Mode-is-Catharsis-only precedent) so venues that
+      // never opt in pay no cost and see no toolbar. The module owns its
+      // own toolbar DOM, tool state, and drawing-object fetch/broadcast --
+      // this call only hands it the shared PIXI world layer (so pan/zoom/
+      // fullscreen carries drawings for free) and enough session context
+      // to call the Kernel 87 backend.
+      if (window.VictoryStageDrawing && venueConfigFlag(currentSnapshot?.venue?.config, "cartograph_enabled", false)) {
+        try {
+          runtimeDrawing = window.VictoryStageDrawing.mount({
+            hostElement: stageHost,
+            worldLayer: drawingWorldLayer,
+            pixiApp,
+            getSessionId: () => currentSnapshot?.session?.id || "",
+            getShowId: () => currentSnapshot?.session?.show_id || "",
+            getViewerRole: () => currentRole || "audience",
+            getWorldBounds: () => getPlayableBounds(),
+            stagePointFromClient,
+            getUserId: () => currentIdentity?.user_id || "",
+            getCamera: () => stageCamera,
+          });
+          runtimeLifecycle.track(() => {
+            try {
+              runtimeDrawing?.destroy?.();
+            } catch (error) {
+              console.warn("drawing module cleanup failed", error);
+            }
+          });
+        } catch (error) {
+          console.warn("Kernel 87 drawing module failed to mount", error);
+        }
+      }
 
       runtimeLifecycle.listen(stageHost, "pointermove", (event) => {
         const screenPoint = stageScreenPointFromClient(event.clientX, event.clientY);
@@ -5096,6 +5163,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     });
     chatLogTab?.addEventListener("click", () => setChatTab("chat"));
     chatOOCTab?.addEventListener("click", () => setChatTab("ooc"));
+    chatICTab?.addEventListener("click", () => setChatTab("ic"));
     chatDiceTab?.addEventListener("click", () => setChatTab("dice"));
     chatGameEventsTab?.addEventListener("click", () => setChatTab("game_events"));
     chatHelpTab?.addEventListener("click", () => setChatTab("help"));

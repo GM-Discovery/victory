@@ -57,6 +57,7 @@ var upgrader = websocket.Upgrader{
 
 var storeReactionFunc = actions.StoreReaction
 var storeChatMessageFunc = actions.StoreChatMessage
+var storeICChatMessageFunc = actions.StoreICChatMessage
 var storeSpeakFunc = actions.StoreSpeak
 var storeRevealFunc = actions.StoreReveal
 var storeDiceRollFunc = actions.StoreDiceRoll
@@ -554,6 +555,46 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			})
 			hub.Broadcast(msgOut)
 			go mirrorVictoryChatToDiscord(context.Background(), pool, discordBridgeConfig, storedAction)
+		}
+
+	case "chat/ic_message":
+		{
+			// Kernel 87 §10: the client sends only session_id/text. The
+			// speaker Character is resolved server-side inside
+			// storeICChatMessageFunc -- there is no character_id field
+			// read from payload here, by design, so there is nothing a
+			// forged request could populate to impersonate a Character.
+			sessionID, _ := payload["session_id"].(string)
+			actorID := c.UserID
+			text, _ := payload["text"].(string)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			storedAction, err := storeICChatMessageFunc(ctx, pool, actions.ICChatMessageRequest{
+				SessionID: sessionID,
+				ActorID:   actorID,
+				Text:      text,
+			})
+			cancel()
+
+			if err != nil {
+				reason := err.Error()
+				var denied *actions.ActionDeniedError
+				if errors.As(err, &denied) {
+					reason = denied.Reason
+				}
+				_ = c.Conn.WriteJSON(map[string]any{
+					"type":  "error",
+					"error": reason,
+				})
+				log.Printf("ic chat store failed: user=%s session=%s err=%v", actorID, sessionID, err)
+				return
+			}
+
+			msgOut, _ := json.Marshal(map[string]any{
+				"type": "action",
+				"data": storedAction,
+			})
+			hub.Broadcast(msgOut)
 		}
 
 	case "roll/dice":

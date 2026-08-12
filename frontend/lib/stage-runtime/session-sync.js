@@ -525,6 +525,14 @@
       // triggering the refetch.
       if (msg.kind === "show_stage_updated") {
         await refreshWorld();
+        // Kernel 87: Cartograph drawing create/edit/delete/lock/z-order/
+        // coordination changes are pushed as a content-free
+        // show/stage_updated invalidation (backend/internal/drawing/
+        // http.go's notifyChanged), exactly like every other Show-stage
+        // change already handled above -- the drawing module re-fetches
+        // its own scope-filtered object list rather than this file
+        // knowing anything about drawing payload shape.
+        window.VictoryStageDrawing?.refresh?.();
         return msg;
       }
 

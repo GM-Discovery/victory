@@ -30,6 +30,7 @@ import (
 	"victory/backend/internal/assets"
 	"victory/backend/internal/characters"
 	"victory/backend/internal/cohorts"
+	"victory/backend/internal/drawing"
 	"victory/backend/internal/cues"
 	"victory/backend/internal/db"
 	"victory/backend/internal/ewrite"
@@ -371,6 +372,18 @@ func main() {
 	mux.HandleFunc("POST /api/shows/{show_id}/cohorts/{cohort_id}/assignments", cohorts.HandleCohortAssignment(pool))
 	mux.HandleFunc("DELETE /api/shows/{show_id}/cohorts/assignments/{user_id}", cohorts.HandleCohortUnassign(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/cohorts/{cohort_id}/current-scene", cohorts.HandleCohortCurrentScene(pool, hub))
+	// Kernel 87: Cartograph shared drawing objects + measured tabletop.
+	mux.HandleFunc("GET /api/sessions/{session_id}/drawing-objects", drawing.HandleObjectsCollection(pool, hub, venueCoordination))
+	mux.HandleFunc("POST /api/sessions/{session_id}/drawing-objects", drawing.HandleObjectsCollection(pool, hub, venueCoordination))
+	mux.HandleFunc("PATCH /api/sessions/{session_id}/drawing-objects/{object_id}", drawing.HandleObjectItem(pool, hub))
+	mux.HandleFunc("DELETE /api/sessions/{session_id}/drawing-objects/{object_id}", drawing.HandleObjectItem(pool, hub))
+	mux.HandleFunc("POST /api/sessions/{session_id}/drawing-objects/{object_id}/lock", drawing.HandleObjectLock(pool, hub))
+	mux.HandleFunc("POST /api/sessions/{session_id}/drawing-objects/{object_id}/z-order", drawing.HandleObjectZOrder(pool, hub))
+	mux.HandleFunc("GET /api/shows/{show_id}/drawing-settings", drawing.HandleSettings(pool, hub))
+	mux.HandleFunc("PUT /api/shows/{show_id}/drawing-settings", drawing.HandleSettings(pool, hub))
+	mux.HandleFunc("GET /api/drawing/stamps", drawing.HandleStampPalette())
+	mux.HandleFunc("GET /api/sessions/{session_id}/drawing-coordination/{role}", drawing.HandleCoordination(pool, venueCoordination, hub))
+	mux.HandleFunc("POST /api/sessions/{session_id}/drawing-coordination/{role}", drawing.HandleCoordination(pool, venueCoordination, hub))
 	// Kernel 85: Socio Game Status -- HP pools + status effects.
 	mux.HandleFunc("GET /api/socio/statuses", socio.HandleStatusRegistry(pool))
 	mux.HandleFunc("GET /api/shows/{show_id}/cohorts/{cohort_id}/game-status", socio.HandleGameStatus(pool))

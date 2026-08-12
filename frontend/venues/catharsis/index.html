@@ -3909,6 +3909,11 @@
                   <div class="chat-tabs" role="tablist" aria-label="Chat tabs">
                     <button id="chat-log-tab" class="chat-tab is-active" type="button" role="tab" aria-selected="true">Chat</button>
                     <button id="chat-ooc-tab" class="chat-tab" type="button" role="tab" aria-selected="false">OOC</button>
+                    <!-- Kernel 87 S10: In Character tab. Speaker is
+                         server-resolved from the Show Run roster
+                         selection; the client never supplies a
+                         Character. Use "/ic <message>" in the composer. -->
+                    <button id="chat-ic-tab" class="chat-tab" type="button" role="tab" aria-selected="false">In Character</button>
                     <button id="chat-dice-tab" class="chat-tab" type="button" role="tab" aria-selected="false">Dice</button>
                     <button id="chat-game-events-tab" class="chat-tab" type="button" role="tab" aria-selected="false">Game Events</button>
                     <button id="chat-help-tab" class="chat-tab" type="button" role="tab" aria-selected="false">Guide</button>
@@ -3927,6 +3932,9 @@
                     </div>
                     <div id="chat-ooc-panel" class="chat-tab-panel" hidden>
                       <div class="chat-log" id="chat-ooc-log"></div>
+                    </div>
+                    <div id="chat-ic-panel" class="chat-tab-panel" hidden>
+                      <div class="chat-log" id="chat-ic-log"></div>
                     </div>
                     <div id="chat-dice-panel" class="chat-tab-panel" hidden>
                       <div id="catharsis-dice-tray" class="chat-dice-tray"></div>
@@ -4219,6 +4227,7 @@
   <script src="/lib/stage-runtime/program-panel.js?v=aftercare-layout-1"></script>
   <script src="/lib/stage-runtime/participant-interactions.js?v=character-maker-guidance-1"></script>
   <script src="/lib/stage-runtime/kernel85-cohort-tools.js?v=kernel85-1"></script>
+  <script src="/lib/stage-runtime/drawing.js?v=kernel87-1"></script>
   <script>
     window.VictoryDiscordAudio?.mount({
       venueSlug: "catharsis",

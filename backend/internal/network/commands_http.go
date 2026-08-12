@@ -173,6 +173,28 @@ func HandleCommandsExecute(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": result})
 			return
 
+		case "ic":
+			text := strings.TrimSpace(strings.Join(args, " "))
+			result, replayed, err := commands.ExecuteIdempotent(ctx, pool, userID, "ic.send", req.IdempotencyKey, func(ctx context.Context) (map[string]any, error) {
+				stored, err := commands.ExecuteIC(ctx, pool, userID, sessionID, text)
+				if err != nil {
+					return nil, err
+				}
+				return map[string]any{"action": stored}, nil
+			})
+			if err != nil {
+				writeCommandsError(w, err)
+				return
+			}
+			if !replayed {
+				if action, ok := result["action"]; ok {
+					msgOut, _ := json.Marshal(map[string]any{"type": "action", "data": action})
+					hub.Broadcast(msgOut)
+				}
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": result})
+			return
+
 		case "char":
 			handleCharExecute(ctx, w, hub, pool, userID, sessionID, args, req.IdempotencyKey)
 			return
