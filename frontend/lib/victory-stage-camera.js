@@ -47,6 +47,17 @@
     const stageElement = options.stageElement instanceof Element ? options.stageElement : null;
     const worldLayer = options.worldLayer && typeof options.worldLayer.addChild === "function" ? options.worldLayer : null;
     const getPlayableBounds = typeof options.getPlayableBounds === "function" ? options.getPlayableBounds : () => ({ x: 0, y: 0, width: 1, height: 1 });
+    // Bug fix: worldBounds used to be a one-time snapshot (options.worldBounds,
+    // captured once at mount and only ever changed by an explicit setWorldBounds
+    // call that nothing in the codebase actually makes) while playableBounds is
+    // re-read live via getPlayableBounds() on every clampState(). Whenever the
+    // live value drifted from that frozen snapshot (window resize, layout
+    // settling after mount), clampState()'s pan clamp fought the caller's
+    // requested pan against a stale boundary -- invisible at normal zoom, but a
+    // visible X/Y drift for Kernel 87 Detail View's near-max-zoom single-cell
+    // regions. getWorldBounds mirrors getPlayableBounds's live-function pattern
+    // so both boundaries always agree.
+    const getWorldBoundsOption = typeof options.getWorldBounds === "function" ? options.getWorldBounds : null;
     const onChange = typeof options.onChange === "function" ? options.onChange : () => {};
     const minZoom = clamp(options.minZoom, 0.01, 10, 0.7);
     const maxZoom = clamp(options.maxZoom, 0.01, 10, 4);
@@ -102,7 +113,7 @@
 
     function clampState() {
       playableBounds = normalizeBounds(getPlayableBounds(), playableBounds.width, playableBounds.height);
-      worldBounds = normalizeBounds(worldBounds, worldBounds.width, worldBounds.height);
+      worldBounds = normalizeBounds(getWorldBoundsOption ? getWorldBoundsOption() : worldBounds, worldBounds.width, worldBounds.height);
 
       const scaledWidth = worldBounds.width * state.zoomRelativeToFit;
       const scaledHeight = worldBounds.height * state.zoomRelativeToFit;

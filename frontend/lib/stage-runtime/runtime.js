@@ -4356,6 +4356,10 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         maxZoom: cameraDefaults.maxZoom,
         getPlayableBounds,
         worldBounds: getPlayableBounds(),
+        // Kernel 87 Detail View drift fix: keep the camera's pan-clamp
+        // boundary (worldBounds) live instead of a one-time mount snapshot.
+        // See victory-stage-camera.js's getWorldBoundsOption comment.
+        getWorldBounds: getPlayableBounds,
         onChange(view) {
           updateCameraControls(view);
         },
@@ -4390,6 +4394,14 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
             stagePointFromClient,
             getUserId: () => currentIdentity?.user_id || "",
             getCamera: () => stageCamera,
+            // Toolbar placement fix (kernel-87 §19): dock the panel into
+            // the same fixed overlay layer the Map/Grid/Card/Token editor
+            // panels use, not directly on top of the stage/canvas host, so
+            // it floats as a draggable card off the map instead of
+            // painting over it. Drag math is measured against stageShell
+            // (same reference frame as beginMapEditorDrag et al.).
+            panelHost: overlayRoot || stageHost,
+            dragBoundsElement: stageShell || stageHost,
           });
           runtimeLifecycle.track(() => {
             try {
@@ -4922,6 +4934,12 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       // (refreshWorld/loadPixiLibrary above serve the same purpose).
       diceTray: () => diceTray,
       diceProjection: () => diceProjection,
+      // Kernel 87: same browser-proof/debug access pattern as diceTray/
+      // diceProjection above -- exposes the Cartograph drawing module's
+      // own getState()/setTool()/refresh() so smoke scripts can inspect
+      // selection/tool state directly instead of only inferring it from
+      // screenshots.
+      cartograph: () => runtimeDrawing,
       // Kernel 86A: exposed so browser-proof tooling can drive a real
       // pan/zoom and confirm landed dice move with the map (spec 1.4),
       // not just inspect state.

@@ -8,7 +8,9 @@
       "Bash(gofmt -l *)",
       "Bash(go doc *)",
       "Bash(bash -n *)",
-      "Bash(docker exec victory-backend wget -qO- http://127.0.0.1:8081/health)"
+      "Bash(docker exec victory-backend wget -qO- http://127.0.0.1:8081/health)",
+      "Bash(kill -0 2227105)",
+      "Bash(kill 2270181 2270236)"
     ]
   }
 }

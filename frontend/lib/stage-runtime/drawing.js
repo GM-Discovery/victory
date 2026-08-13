@@ -195,6 +195,17 @@
       stagePointFromClient,
       getUserId,
       getCamera,
+      // Kernel 87 toolbar-placement fix: the toolbar panel is docked into
+      // the same DOM overlay layer the Map/Grid/Card/Token editor panels
+      // already use (#overlay-root, position:fixed inset:0), not injected
+      // directly into the stage/canvas host -- so it floats as a
+      // draggable, collapsible card alongside those editors instead of
+      // sitting fixed on top of the map (kernel-87 §19 "map remains
+      // visually dominant"). panelHost/dragBoundsElement are optional so
+      // callers/tests that don't pass them still get the old
+      // stage-host-anchored behavior rather than a null-ref crash.
+      panelHost,
+      dragBoundsElement,
     } = options;
 
     if (!hostElement || !worldLayer || !pixiApp) return null;
@@ -233,17 +244,72 @@
     layerNode.addChild(measureLayer);
 
     // --- Toolbar DOM -------------------------------------------------
+    // Docked panel styling matches the established .map-editor/.card-editor
+    // convention (see frontend/venues/catharsis/index.html): a translucent
+    // dark rounded card, positioned absolute within the fixed overlay
+    // layer (not the stage/canvas host), with a drag-by-header grip. CSS
+    // class does the heavy styling (see .cartograph-toolbar in the venue
+    // stylesheet); inline style here only sets initial position/z-index/
+    // display so the module still degrades gracefully with no stylesheet.
+    const mountHost = panelHost || hostElement;
     const panel = el("div", {
       class: "cartograph-toolbar",
       style: {
-        position: "absolute", top: "12px", left: "12px", zIndex: "40",
-        background: "rgba(24,20,17,0.92)", border: "1px solid #4a3f34", borderRadius: "10px",
-        padding: "8px", color: "#f1e9dc", font: "12px system-ui, sans-serif",
-        display: "none", maxWidth: "260px", boxShadow: "0 6px 18px rgba(0,0,0,0.35)",
+        position: "absolute", top: "16px", right: "16px", zIndex: "18",
+        display: "none",
       },
     });
-    hostElement.style.position = hostElement.style.position || "relative";
-    hostElement.appendChild(panel);
+    if (mountHost === hostElement) {
+      hostElement.style.position = hostElement.style.position || "relative";
+    }
+    mountHost.appendChild(panel);
+
+    const header = el("div", { class: "cartograph-toolbar-header" }, [
+      el("strong", { text: "Cartograph" }),
+      el("span", { class: "cartograph-toolbar-grip", text: "drag" }),
+    ]);
+    const collapseBtn = el("button", {
+      type: "button", class: "cartograph-toolbar-collapse", title: "Collapse/expand the drawing toolbar",
+      text: "−",
+    });
+    header.appendChild(collapseBtn);
+    panel.appendChild(header);
+
+    const body = el("div", { class: "cartograph-toolbar-body" });
+    panel.appendChild(body);
+
+    let collapsed = false;
+    collapseBtn.addEventListener("click", () => {
+      collapsed = !collapsed;
+      body.style.display = collapsed ? "none" : "";
+      collapseBtn.textContent = collapsed ? "□" : "−";
+    });
+
+    // Drag-by-header, matching the offsetX/offsetY pointer-capture pattern
+    // runtime.js already uses for the Map/Grid/Card/Token editor panels
+    // (beginMapEditorDrag et al.), kept self-contained here rather than
+    // adding another copy of that per-panel wiring to runtime.js.
+    let panelDrag = null;
+    header.addEventListener("pointerdown", (evt) => {
+      if (evt.button !== 0 || evt.target === collapseBtn) return;
+      evt.preventDefault();
+      const rect = panel.getBoundingClientRect();
+      panelDrag = { offsetX: evt.clientX - rect.left, offsetY: evt.clientY - rect.top };
+      header.setPointerCapture?.(evt.pointerId);
+      header.style.cursor = "grabbing";
+    });
+    header.addEventListener("pointermove", (evt) => {
+      if (!panelDrag) return;
+      const boundsEl = dragBoundsElement || mountHost;
+      const boundsRect = boundsEl.getBoundingClientRect?.() || { left: 0, top: 0 };
+      panel.style.left = `${evt.clientX - boundsRect.left - panelDrag.offsetX}px`;
+      panel.style.top = `${evt.clientY - boundsRect.top - panelDrag.offsetY}px`;
+      panel.style.right = "auto";
+    });
+    ["pointerup", "pointercancel"].forEach((type) => header.addEventListener(type, () => {
+      panelDrag = null;
+      header.style.cursor = "move";
+    }));
 
     const toolRow = el("div", { style: { display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" } });
     const toolButtons = {};
@@ -256,7 +322,7 @@
       toolButtons[tool] = btn;
       toolRow.appendChild(btn);
     });
-    panel.appendChild(toolRow);
+    body.appendChild(toolRow);
 
     const styleRow = el("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center", marginBottom: "6px" } });
     const strokeInput = el("input", { type: "color", value: state.strokeColor, title: "Stroke color", onchange: (e) => { state.strokeColor = e.target.value; } });
@@ -274,7 +340,7 @@
     styleRow.appendChild(el("label", { text: "Width " }, [widthInput]));
     styleRow.appendChild(el("label", { text: "Opacity " }, [opacityInput]));
     styleRow.appendChild(lineStyleSelect);
-    panel.appendChild(styleRow);
+    body.appendChild(styleRow);
 
     const stampRow = el("div", { style: { display: "none", flexWrap: "wrap", gap: "4px", marginBottom: "6px" } });
     Object.keys(STAMP_GLYPHS).forEach((key) => {
@@ -284,7 +350,7 @@
         onclick: () => { state.stampKey = key; },
       }));
     });
-    panel.appendChild(stampRow);
+    body.appendChild(stampRow);
 
     const scopeRow = el("div", { style: { display: "flex", gap: "6px", marginBottom: "6px", alignItems: "center" } });
     const scopeSelect = el("select", { onchange: (e) => { state.scope = e.target.value; } }, [
@@ -292,7 +358,7 @@
       el("option", { value: "show", text: "Scope: Show" }),
     ]);
     scopeRow.appendChild(scopeSelect);
-    panel.appendChild(scopeRow);
+    body.appendChild(scopeRow);
 
     const actionRow = el("div", { style: { display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" } });
     const btnDuplicate = el("button", { text: "Duplicate", onclick: () => duplicateSelected() });
@@ -306,22 +372,22 @@
       Object.assign(b.style, { padding: "3px 6px", fontSize: "11px", cursor: "pointer", borderRadius: "5px", border: "1px solid #6b5c4c", background: "#2e2721", color: "#f1e9dc" });
       actionRow.appendChild(b);
     });
-    panel.appendChild(actionRow);
+    body.appendChild(actionRow);
 
     const detailRow = el("div", { style: { display: "flex", gap: "4px", marginBottom: "6px" } });
     const btnDetailOpen = el("button", { text: "Open Detail View (select region first)", style: { fontSize: "11px" }, onclick: () => openDetailViewFromSelection() });
     const btnDetailClose = el("button", { text: "Close Detail View", style: { fontSize: "11px", display: "none" }, onclick: () => closeDetailView() });
     detailRow.appendChild(btnDetailOpen);
     detailRow.appendChild(btnDetailClose);
-    panel.appendChild(detailRow);
+    body.appendChild(detailRow);
 
     const exportRow = el("div", { style: { display: "flex", gap: "4px", marginBottom: "4px" } });
     const btnExport = el("button", { text: "Export Map PNG", onclick: () => exportPNG() });
     exportRow.appendChild(btnExport);
-    panel.appendChild(exportRow);
+    body.appendChild(exportRow);
 
     const statusLine = el("div", { style: { fontSize: "10px", opacity: "0.8", marginTop: "4px" } });
-    panel.appendChild(statusLine);
+    body.appendChild(statusLine);
 
     function setStatus(text) { statusLine.textContent = text || ""; }
 
@@ -408,6 +474,27 @@
           g.zIndex = index;
           g.__obj = obj;
           drawObjectGraphic(g, obj);
+          // Rotate around the object's own bounding-box center, not the
+          // world origin: geometry is drawn in absolute world coordinates
+          // inside each per-object Graphics, so an un-pivoted g.rotation
+          // would orbit the object around (0,0) instead of spinning it in
+          // place. Setting pivot == position to the bounds center cancels
+          // the translation while making that point the rotation origin.
+          const b = objectBounds(obj);
+          if (b) {
+            const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
+            g.pivot.set(cx, cy);
+            g.position.set(cx, cy);
+            // Explicit hit area, not PIXI's default fill-based hit-test:
+            // an unfilled shape (no fill_color -- the common case for a
+            // stroke-only rectangle/ellipse/polygon) otherwise only
+            // accepts pointer events exactly on its outline pixels, so
+            // clicking anywhere in the shape's visible interior silently
+            // fails to select it. Padded slightly so thin freehand/line
+            // strokes and small stamps/text stay comfortably clickable.
+            const pad = 6;
+            g.hitArea = new PIXI.Rectangle(b.x - pad, b.y - pad, Math.max(1, b.width + pad * 2), Math.max(1, b.height + pad * 2));
+          }
         });
       // Remove graphics for deleted objects.
       Array.from(graphicById.keys()).forEach((id) => {
@@ -432,19 +519,19 @@
       drawSelectionOverlay();
     }
 
-    function drawSelectionOverlay() {
+    function drawSelectionOverlay(previewBounds) {
       selectionOverlay.clear();
       const obj = state.objects.find((o) => o.id === state.selectedId);
       if (!obj) return;
-      const bounds = objectBounds(obj);
+      const bounds = previewBounds || objectBounds(obj);
       if (!bounds) return;
       selectionOverlay.lineStyle(1.5, 0xffcc66, 0.9);
       selectionOverlay.drawRect(bounds.x - 4, bounds.y - 4, bounds.width + 8, bounds.height + 8);
-      // Move/resize/rotate handles: three small squares (drag semantics
-      // wired in pointer handlers below). Kept intentionally simple
-      // (single resize handle, single rotate handle) per kernel-87 §3
-      // "No node-by-node Bezier editing" and the effort spent instead on
-      // correctness of server authority.
+      // Move/resize/rotate handles: two small handles (drag semantics
+      // wired via handleHitTest + onPointerDown/Move/Up above). Kept
+      // intentionally simple (single resize handle, single rotate handle)
+      // per kernel-87 §3 "No node-by-node Bezier editing" and the effort
+      // spent instead on correctness of server authority.
       selectionOverlay.beginFill(0xffcc66, 1);
       selectionOverlay.drawRect(bounds.x + bounds.width - 2, bounds.y + bounds.height - 2, 8, 8); // resize
       selectionOverlay.drawCircle(bounds.x + bounds.width / 2, bounds.y - 16, 5); // rotate
@@ -473,8 +560,44 @@
       return { x: p.x, y: p.y };
     }
 
+    function handleHitTest(p) {
+      // Hit-test the resize (bottom-right square) and rotate (circle above
+      // top-center) handles drawn by drawSelectionOverlay for the current
+      // selection. Kept as a simple radius/box check against the same
+      // bounds math used to draw them, rather than a PIXI interactive
+      // child, so it works uniformly across all object types.
+      const obj = state.objects.find((o) => o.id === state.selectedId);
+      if (!obj || obj.locked) return null;
+      const bounds = objectBounds(obj);
+      if (!bounds) return null;
+      const resizeX = bounds.x + bounds.width + 2, resizeY = bounds.y + bounds.height + 2;
+      if (Math.hypot(p.x - resizeX, p.y - resizeY) <= 10) return { mode: "resize", obj, bounds };
+      const rotateX = bounds.x + bounds.width / 2, rotateY = bounds.y - 16;
+      if (Math.hypot(p.x - rotateX, p.y - rotateY) <= 10) return { mode: "rotate", obj, bounds };
+      return null;
+    }
+
     function onPointerDown(evt) {
-      if (state.tool === "select") return; // handled per-object + drag below
+      if (state.tool === "select") {
+        if (state.selectedId && !state.canDraw) return;
+        const p = worldPointFromEvent(evt);
+        const hit = handleHitTest(p);
+        if (hit && hit.mode === "resize") {
+          state.dragState = {
+            mode: "resize", obj: hit.obj, startBounds: hit.bounds,
+            startGeometry: JSON.parse(JSON.stringify(hit.obj.geometry || {})),
+            startScale: hit.obj.geometry?.scale, start: p,
+          };
+        } else if (hit && hit.mode === "rotate") {
+          const cx = hit.bounds.x + hit.bounds.width / 2, cy = hit.bounds.y + hit.bounds.height / 2;
+          const startAngle = Math.atan2(p.y - cy, p.x - cx);
+          state.dragState = {
+            mode: "rotate", obj: hit.obj, center: { x: cx, y: cy },
+            startAngle, startRotation: Number(hit.obj.rotation) || 0,
+          };
+        }
+        return; // plain selection is handled per-object via each Graphics' own pointerdown
+      }
       if (!state.canDraw && state.tool !== "measure") {
         setStatus("You are not authorized to draw right now.");
         return;
@@ -519,8 +642,14 @@
     }
 
     function onPointerMove(evt) {
-      if (!state.dragState?.drawing) return;
+      if (!state.dragState) return;
       const p = worldPointFromEvent(evt);
+      if (state.dragState.mode === "resize" || state.dragState.mode === "rotate") {
+        state.dragState.current = p;
+        drawSelectionOverlay(previewBoundsFor(state.dragState, p));
+        return;
+      }
+      if (!state.dragState.drawing) return;
       if (state.tool === "freehand") {
         const last = state.pendingPoints[state.pendingPoints.length - 1];
         if (!last || Math.hypot(p.x - last.x, p.y - last.y) > 2) {
@@ -534,7 +663,51 @@
       }
     }
 
-    function onPointerUp() {
+    function previewBoundsFor(dragState, p) {
+      if (dragState.mode === "resize") {
+        const b = dragState.startBounds;
+        return { x: b.x, y: b.y, width: Math.max(4, p.x - b.x), height: Math.max(4, p.y - b.y) };
+      }
+      return null; // rotate preview keeps the same bounds box; only the handle position implies angle
+    }
+
+    async function onPointerUp() {
+      if (state.dragState?.mode === "resize") {
+        const { obj, startBounds, startGeometry, current } = state.dragState;
+        state.dragState = null;
+        if (!current) { drawSelectionOverlay(); return; }
+        const newWidth = Math.max(4, current.x - startBounds.x);
+        const newHeight = Math.max(4, current.y - startBounds.y);
+        const scaleX = startBounds.width > 0 ? newWidth / startBounds.width : 1;
+        const scaleY = startBounds.height > 0 ? newHeight / startBounds.height : 1;
+        const geometry = JSON.parse(JSON.stringify(startGeometry));
+        if (Array.isArray(geometry.points)) {
+          geometry.points = geometry.points.map((pt) => ({
+            x: startBounds.x + (pt.x - startBounds.x) * scaleX,
+            y: startBounds.y + (pt.y - startBounds.y) * scaleY,
+          }));
+        } else if (obj.object_type === "stamp") {
+          geometry.scale = Math.max(0.1, (geometry.scale || 1) * ((scaleX + scaleY) / 2));
+        } else if ("width" in geometry || "height" in geometry) {
+          geometry.width = newWidth;
+          geometry.height = newHeight;
+        } else {
+          drawSelectionOverlay();
+          return; // e.g. text: synthetic bounds only, nothing real to resize
+        }
+        await persistGeometry(obj, geometry);
+        return;
+      }
+      if (state.dragState?.mode === "rotate") {
+        const { obj, center, startAngle, startRotation, current } = state.dragState;
+        state.dragState = null;
+        if (!current) { drawSelectionOverlay(); return; }
+        const angle = Math.atan2(current.y - center.y, current.x - center.x);
+        const deltaDeg = ((angle - startAngle) * 180) / Math.PI;
+        const rotation = ((startRotation + deltaDeg) % 360 + 360) % 360;
+        await persistRotation(obj, rotation);
+        return;
+      }
       if (state.tool === "freehand" && state.dragState?.drawing) {
         state.dragState = null;
         if (state.pendingPoints.length >= 2) {
@@ -554,6 +727,30 @@
           finishShape(state.tool, { x, y, width, height });
         }
         redrawPending();
+      }
+    }
+
+    async function persistGeometry(obj, geometry) {
+      const sessionId = getSessionId();
+      if (!sessionId) return;
+      try {
+        await apiSend("PATCH", `/api/sessions/${encodeURIComponent(sessionId)}/drawing-objects/${encodeURIComponent(obj.id)}`, { session_id: sessionId, geometry });
+        await refresh();
+        setStatus("Resized.");
+      } catch (err) {
+        setStatus("Resize failed: " + err.message);
+      }
+    }
+
+    async function persistRotation(obj, rotation) {
+      const sessionId = getSessionId();
+      if (!sessionId) return;
+      try {
+        await apiSend("PATCH", `/api/sessions/${encodeURIComponent(sessionId)}/drawing-objects/${encodeURIComponent(obj.id)}`, { session_id: sessionId, rotation });
+        await refresh();
+        setStatus("Rotated.");
+      } catch (err) {
+        setStatus("Rotate failed: " + err.message);
       }
     }
 
@@ -740,6 +937,25 @@
           panX: playableCenterX - regionCenterX * zoom,
           panY: playableCenterY - regionCenterY * zoom,
         });
+        // The camera clamps zoomRelativeToFit to its own [minZoom,maxZoom]
+        // (victory-stage-camera.js), which a small single-cell region can
+        // easily exceed (a 28x28 region wants ~40x zoom; the camera's
+        // default ceiling is far lower). If the applied zoom differs from
+        // what was requested above, the panX/panY already sent were
+        // computed against the WRONG zoom and no longer center the
+        // region -- re-read the camera's actually-applied zoom and, if it
+        // was clamped, recompute+resend pan for that real value so the
+        // region stays correctly framed instead of drifting off to an
+        // unrelated part of the map.
+        const applied = camera.getView?.();
+        if (applied && Math.abs(Number(applied.zoomRelativeToFit) - zoom) > 0.001) {
+          const appliedZoom = Number(applied.zoomRelativeToFit) || zoom;
+          camera.setView({
+            zoomRelativeToFit: appliedZoom,
+            panX: playableCenterX - regionCenterX * appliedZoom,
+            panY: playableCenterY - regionCenterY * appliedZoom,
+          });
+        }
       } else {
         state.detailView = { previousView: null };
       }

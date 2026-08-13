@@ -50,9 +50,18 @@ const server = http.createServer((req, res) => {
 });
 
 server.on("upgrade", (req, socket, head) => {
+  // Browser-proof runs open/close many short-lived WS connections (one per
+  // signed-up account/context); a client tab closing mid-upgrade produces
+  // a plain ECONNRESET on these sockets, which Node treats as an unhandled
+  // 'error' event (process-fatal) unless something listens for it. This is
+  // a dev-proxy robustness fix only -- it never touches production, which
+  // doesn't run this script at all.
+  socket.on("error", () => {});
   const url = new URL(req.url, BACKEND_TARGET);
   const target = http.request(url, { method: "GET", headers: req.headers });
+  target.on("error", () => { try { socket.destroy(); } catch (_e) { /* already closed */ } });
   target.on("upgrade", (proxyRes, proxySocket, proxyHead) => {
+    proxySocket.on("error", () => {});
     socket.write(`HTTP/1.1 ${proxyRes.statusCode} ${proxyRes.statusMessage}\r\n` +
       Object.entries(proxyRes.headers).map(([k, v]) => `${k}: ${v}`).join("\r\n") + "\r\n\r\n");
     proxySocket.pipe(socket);
