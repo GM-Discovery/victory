@@ -6,6 +6,12 @@
 // authority is re-checked on every request by the backend
 // (backend/internal/cohorts, backend/internal/socio, backend/internal/
 // scenes' capture actions) -- everything here is presentation only.
+//
+// Kernel 88 extends this same file (rather than forking a parallel Director
+// tool file) with Fate/Stance/blank-flag controls on the existing Game
+// Status card, plus two new panels -- Current Turn and the Help/Interrupt
+// stack -- reusing this file's api()/escapeHtml()/buttonStyle()/
+// makeDraggable() helpers instead of re-implementing them.
 (function () {
   "use strict";
 
@@ -20,7 +26,10 @@
     cohortPanel: null,
     scenePanel: null,
     statusPanel: null,
+    turnPanel: null,
+    interruptPanel: null,
     lastShowID: "",
+    statusPollTimer: null,
   };
 
   function bridge() {
@@ -60,9 +69,13 @@
     el.innerHTML = `
       <button type="button" data-k85="cohorts" style="${buttonStyle()}">Cohorts</button>
       <button type="button" data-k85="game-status" style="${buttonStyle()}">Game Status</button>
+      <button type="button" data-k88="current-turn" style="${buttonStyle()}">Current Turn</button>
+      <button type="button" data-k88="help-stack" style="${buttonStyle()}">Help Stack</button>
     `;
     el.querySelector('[data-k85="cohorts"]').addEventListener("click", () => openCohortPanel());
     el.querySelector('[data-k85="game-status"]').addEventListener("click", () => openGameStatusPanel());
+    el.querySelector('[data-k88="current-turn"]').addEventListener("click", () => openCurrentTurnPanel());
+    el.querySelector('[data-k88="help-stack"]').addEventListener("click", () => openInterruptPanel());
     document.body.appendChild(el);
     state.toolbar = el;
     return el;
@@ -81,16 +94,39 @@
     return btn;
   }
 
+  // Anything a mouse press is supposed to *do something else* with. A
+  // mousedown handler that calls preventDefault() over one of these
+  // suppresses the browser's own behaviour -- notably it stops a <select>
+  // from opening its popup at all and stops an <input> taking focus from a
+  // click. Dragging must therefore give way wherever a real control lives.
+  const INTERACTIVE_SELECTOR =
+    "button, select, input, textarea, option, optgroup, label, a, [contenteditable=''], [contenteditable='true']";
+
   function makeDraggable(panel, handle) {
+    // Panels are created once and re-rendered many times via innerHTML,
+    // which leaves the panel element's own listeners intact -- so bind the
+    // drag exactly once instead of stacking a fresh pair of window
+    // listeners onto every render.
+    if (panel.dataset.k85Draggable === "1") return;
+    panel.dataset.k85Draggable = "1";
+
     let dragging = false;
     let startX = 0, startY = 0, startLeft = 0, startTop = 0;
     handle.style.cursor = "move";
     handle.addEventListener("mousedown", (event) => {
-      if (event.target.closest("button")) return;
-      dragging = true;
+      if (event.target.closest(INTERACTIVE_SELECTOR)) return;
       const rect = panel.getBoundingClientRect();
+      dragging = true;
       startX = event.clientX; startY = event.clientY;
       startLeft = rect.left; startTop = rect.top;
+      // Panels centred with translateX(-50%) would jump on the first drag,
+      // because the measured rect already includes the transform. Bake the
+      // measured position into left/top and drop the transform.
+      if (panel.style.transform) {
+        panel.style.transform = "none";
+        panel.style.left = startLeft + "px";
+        panel.style.top = startTop + "px";
+      }
       event.preventDefault();
     });
     window.addEventListener("mousemove", (event) => {
@@ -100,6 +136,22 @@
       panel.style.right = "auto";
     });
     window.addEventListener("mouseup", () => { dragging = false; });
+  }
+
+  // The selected cohort is held across re-renders and across panels, so it
+  // can outlive the cohort it names (archiving the selected cohort used to
+  // leave a dangling id: the <select> fell back to displaying the first
+  // option while every fetch still asked for the archived cohort). Resolve
+  // it against the live list on every render.
+  function resolveCohortSelection(cohorts) {
+    const known = new Set(cohorts.map((c) => c.id));
+    if (state.selectedCohortId && state.selectedCohortId !== "ungrouped" && !known.has(state.selectedCohortId)) {
+      state.selectedCohortId = "";
+    }
+    if (!state.selectedCohortId && cohorts.length) {
+      state.selectedCohortId = cohorts[0].id;
+    }
+    return state.selectedCohortId || "ungrouped";
   }
 
   // --- Cohort management panel ----------------------------------------
@@ -228,9 +280,7 @@
       });
     });
 
-    if (!state.selectedCohortId && cohorts.length) {
-      state.selectedCohortId = cohorts[0].id;
-    }
+    resolveCohortSelection(cohorts);
   }
 
   // --- Scene Configuration modal ---------------------------------------
@@ -271,11 +321,11 @@
     }
     const cohorts = roster.cohorts || [];
     const placements = scenesResp?.placements || scenesResp || [];
-    if (!state.selectedCohortId && cohorts.length) state.selectedCohortId = cohorts[0].id;
-    const selected = cohorts.find((c) => c.id === state.selectedCohortId) || null;
+    const cohortValue = resolveCohortSelection(cohorts);
+    const selected = cohorts.find((c) => c.id === cohortValue) || null;
 
     const cohortOptions = cohorts.map((c) =>
-      `<option value="${c.id}" ${c.id === state.selectedCohortId ? "selected" : ""}>${escapeHtml(c.name)}</option>`
+      `<option value="${c.id}" ${c.id === cohortValue ? "selected" : ""}>${escapeHtml(c.name)}</option>`
     ).join("");
 
     const sceneRows = (Array.isArray(placements) ? placements : []).map((p) => {
@@ -297,7 +347,7 @@
         Cohort:
         <select data-select-cohort style="margin-left:6px; background:#20242c; color:#e8e8ec; border:1px solid #454b59; border-radius:4px;">
           ${cohortOptions}
-          <option value="ungrouped" ${state.selectedCohortId === "ungrouped" ? "selected" : ""}>Ungrouped (no per-cohort Scene)</option>
+          <option value="ungrouped" ${cohortValue === "ungrouped" ? "selected" : ""}>Ungrouped (no per-cohort Scene)</option>
         </select>
       </label>
       <div style="margin-bottom:10px;">${sceneRows}</div>
@@ -354,6 +404,57 @@
 
   // --- Game Status panel -------------------------------------------------
 
+  // Fate and Stance are shared state: a Player spending Fate from their HUD
+  // changes the same row this card displays. Fetching once at render time
+  // left the Director looking at a snapshot that silently drifted out of
+  // agreement with the Player's HUD, so these two fields are re-read on a
+  // poll. Only non-editable text is overwritten unconditionally -- a control
+  // the Director is actively using is left alone rather than yanked out from
+  // under them, and the HP fields are never touched by the poll at all
+  // because the Director types into those.
+  async function refreshCharacterLiveFields(showID, card) {
+    const characterCardID = card.dataset.character;
+    if (!characterCardID) return;
+    let projection;
+    try {
+      projection = (await api(
+        `/api/shows/${encodeURIComponent(showID)}/characters/${encodeURIComponent(characterCardID)}/socio/view`
+      )).projection;
+    } catch (_e) {
+      return; // best-effort; the panel keeps whatever it last showed
+    }
+    if (!card.isConnected) return;
+
+    const balanceEl = card.querySelector("[data-fate-balance]");
+    if (balanceEl) balanceEl.textContent = String(projection?.fate_balance ?? "?");
+
+    const stanceSelect = card.querySelector("[data-set-stance]");
+    if (stanceSelect && document.activeElement !== stanceSelect) {
+      stanceSelect.value = projection?.stance_key || "";
+    }
+  }
+
+  function stopStatusPolling() {
+    if (state.statusPollTimer) {
+      window.clearInterval(state.statusPollTimer);
+      state.statusPollTimer = null;
+    }
+  }
+
+  function startStatusPolling(showID) {
+    stopStatusPolling();
+    state.statusPollTimer = window.setInterval(() => {
+      const panel = state.statusPanel;
+      if (!panel || panel.style.display === "none" || !panel.isConnected) {
+        stopStatusPolling();
+        return;
+      }
+      panel.querySelectorAll("[data-character]").forEach((card) => {
+        refreshCharacterLiveFields(showID, card);
+      });
+    }, 3000);
+  }
+
   function ensureStatusPanel() {
     if (state.statusPanel) return state.statusPanel;
     const el = document.createElement("div");
@@ -384,8 +485,7 @@
       return;
     }
     const cohorts = roster.cohorts || [];
-    if (!state.selectedCohortId && cohorts.length) state.selectedCohortId = cohorts[0].id;
-    const cohortValue = state.selectedCohortId || "ungrouped";
+    const cohortValue = resolveCohortSelection(cohorts);
 
     let blocks = [];
     try {
@@ -415,18 +515,41 @@
           }).join("")}
         </div>
         <button type="button" data-save-pools style="${buttonStyle("margin-top:6px; font-size:11px;")}">Save HP</button>
+
+        <div style="margin-top:10px; padding-top:8px; border-top:1px solid #2a2e37;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="opacity:0.7;">Fate:</span>
+            <strong data-fate-balance>&hellip;</strong>
+            <input type="number" data-fate-delta value="1" style="width:44px; background:#20242c; color:#e8e8ec; border:1px solid #454b59; border-radius:4px;">
+            <button type="button" data-award-fate style="${buttonStyle("padding:3px 8px; font-size:11px;")}">Award</button>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+            <span style="opacity:0.7;">Stance:</span>
+            <select data-set-stance style="background:#20242c; color:#e8e8ec; border:1px solid #454b59; border-radius:4px; font-size:11px;"></select>
+          </div>
+        </div>
+
         <div style="margin-top:8px;">
           <div data-active-statuses>
-            ${(block.active_statuses || []).map((s) => `
+            ${(block.active_statuses || []).map((s) => (s.is_blank ? `
+              <span data-flag-chip="${s.id}" style="display:inline-block; background:#26313a; border:1px solid #3d5568; border-radius:10px; padding:2px 8px; margin:2px; font-size:11px;">
+                ${escapeHtml(s.label)}
+                <button type="button" data-clear-flag="${s.id}" style="background:none;border:none;color:#e8e8ec;cursor:pointer;">&times;</button>
+              </span>
+            ` : `
               <span data-status-chip="${s.status_key}" style="display:inline-block; background:#3a2f1f; border:1px solid #6a5230; border-radius:10px; padding:2px 8px; margin:2px; font-size:11px;">
                 ${escapeHtml(s.label)}${s.intensity != null ? " " + s.intensity : ""}
                 <button type="button" data-clear-status="${s.status_key}" style="background:none;border:none;color:#e8e8ec;cursor:pointer;">&times;</button>
               </span>
-            `).join("") || `<span style="opacity:0.6;">No active statuses.</span>`}
+            `)).join("") || `<span style="opacity:0.6;">No active statuses.</span>`}
           </div>
           <div style="margin-top:6px; display:flex; gap:6px;">
             <select data-apply-status style="background:#20242c; color:#e8e8ec; border:1px solid #454b59; border-radius:4px; font-size:11px;"></select>
             <button type="button" data-apply-status-btn style="${buttonStyle("padding:3px 8px; font-size:11px;")}">Apply</button>
+          </div>
+          <div style="margin-top:6px; display:flex; gap:6px;">
+            <input type="text" data-flag-label placeholder="Blank state (e.g. Holding the gate)" maxlength="60" style="flex:1; background:#20242c; color:#e8e8ec; border:1px solid #454b59; border-radius:4px; font-size:11px; padding:2px 6px;">
+            <button type="button" data-add-flag-btn style="${buttonStyle("padding:3px 8px; font-size:11px;")}">Add</button>
           </div>
         </div>
       </div>
@@ -445,8 +568,9 @@
       ${characterBlocks}
       <div data-status style="margin-top:6px; font-size:11px; opacity:0.7;"></div>
     `;
-    panel.prepend(closeButton(() => { panel.style.display = "none"; }));
+    panel.prepend(closeButton(() => { panel.style.display = "none"; stopStatusPolling(); }));
     makeDraggable(panel, panel);
+    startStatusPolling(showID);
 
     const status = (msg) => { const s = panel.querySelector("[data-status]"); if (s) s.textContent = msg || ""; };
 
@@ -456,7 +580,9 @@
     });
 
     let statusRegistry = [];
-    try { statusRegistry = (await api("/api/socio/statuses")) || []; } catch (_e) { /* best-effort */ }
+    try { statusRegistry = (await api("/api/socio/statuses")).statuses || []; } catch (_e) { /* best-effort */ }
+    let stanceRegistry = [];
+    try { stanceRegistry = (await api("/api/socio/stances")).stances || []; } catch (_e) { /* best-effort */ }
 
     panel.querySelectorAll("[data-character]").forEach((card) => {
       const characterCardID = card.dataset.character;
@@ -464,6 +590,60 @@
       if (select) {
         select.innerHTML = statusRegistry.map((s) => `<option value="${s.key}">${escapeHtml(s.label)}</option>`).join("");
       }
+
+      const stanceSelect = card.querySelector("[data-set-stance]");
+      if (stanceSelect) {
+        stanceSelect.innerHTML = `<option value="">&hellip;</option>` +
+          stanceRegistry.map((s) => `<option value="${s.key}">${escapeHtml(s.label)}</option>`).join("");
+        stanceSelect.addEventListener("change", async () => {
+          const key = stanceSelect.value;
+          if (!key) return;
+          try {
+            await api(`/api/shows/${encodeURIComponent(showID)}/characters/${encodeURIComponent(characterCardID)}/socio/stance`, {
+              method: "POST", body: JSON.stringify({ stance_key: key }),
+            });
+            status("Stance set.");
+          } catch (err) { status("Stance failed: " + err.message); }
+        });
+      }
+
+      // Initial values come from the same refresh the poll below reuses, so
+      // there is exactly one code path that decides what these fields say.
+      refreshCharacterLiveFields(showID, card);
+
+      card.querySelector("[data-award-fate]")?.addEventListener("click", async () => {
+        const delta = Number(card.querySelector("[data-fate-delta]")?.value || 0);
+        if (!delta) return;
+        try {
+          const res = await api(`/api/shows/${encodeURIComponent(showID)}/characters/${encodeURIComponent(characterCardID)}/socio/fate/award`, {
+            method: "POST", body: JSON.stringify({ delta, reason: "director_award" }),
+          });
+          const balanceEl = card.querySelector("[data-fate-balance]");
+          if (balanceEl) balanceEl.textContent = String(res.fate?.balance ?? "?");
+          status("Fate awarded.");
+        } catch (err) { status("Fate award failed: " + err.message); }
+      });
+
+      card.querySelector("[data-add-flag-btn]")?.addEventListener("click", async () => {
+        const input = card.querySelector("[data-flag-label]");
+        const label = (input?.value || "").trim();
+        if (!label) return;
+        try {
+          await api(`/api/shows/${encodeURIComponent(showID)}/characters/${encodeURIComponent(characterCardID)}/socio/flags`, {
+            method: "POST", body: JSON.stringify({ label }),
+          });
+          await renderGameStatusPanel(showID);
+        } catch (err) { status("Add flag failed: " + err.message); }
+      });
+      card.querySelectorAll("[data-clear-flag]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          try {
+            await api(`/api/shows/${encodeURIComponent(showID)}/characters/${encodeURIComponent(characterCardID)}/socio/flags/${encodeURIComponent(btn.dataset.clearFlag)}`, { method: "DELETE" });
+            await renderGameStatusPanel(showID);
+          } catch (err) { status("Clear flag failed: " + err.message); }
+        });
+      });
+
       card.querySelector("[data-save-pools]")?.addEventListener("click", async () => {
         try {
           for (const [key] of POOL_LABELS) {
@@ -497,6 +677,216 @@
     });
   }
 
+  // --- Kernel 88: Current Turn panel --------------------------------------
+
+  function ensureTurnPanel() {
+    if (state.turnPanel) return state.turnPanel;
+    const el = document.createElement("div");
+    el.id = "kernel88-turn-panel";
+    el.style.cssText = PANEL_BASE_STYLE + "top: 60px; right: 12px; width: 340px; max-height: 70vh; overflow-y: auto; padding: 12px; display: none;";
+    document.body.appendChild(el);
+    state.turnPanel = el;
+    return el;
+  }
+
+  async function openCurrentTurnPanel() {
+    const b = bridge();
+    const showID = b?.getShowID?.();
+    if (!showID) return;
+    const panel = ensureTurnPanel();
+    panel.style.display = "block";
+    panel.innerHTML = `<div>Loading Current Turn&hellip;</div>`;
+    await renderTurnPanel(showID);
+  }
+
+  async function renderTurnPanel(showID) {
+    const panel = state.turnPanel;
+    let roster;
+    try {
+      roster = await api(`/api/shows/${encodeURIComponent(showID)}/cohorts`);
+    } catch (err) {
+      panel.innerHTML = `<div style="color:#e88;">Failed to load cohorts: ${escapeHtml(err.message)}</div>`;
+      return;
+    }
+    const cohorts = roster.cohorts || [];
+    const cohortValue = resolveCohortSelection(cohorts);
+    const participants = cohortValue === "ungrouped" ? (roster.ungrouped || []) : (cohorts.find((c) => c.id === cohortValue)?.members || []);
+
+    let coordination = {};
+    try {
+      coordination = (await api(`/api/shows/${encodeURIComponent(showID)}/cohorts/${encodeURIComponent(cohortValue)}/socio/current-turn`))?.coordination || {};
+    } catch (err) {
+      panel.innerHTML = `<div></div><div style="color:#e88;">Failed to load Current Turn: ${escapeHtml(err.message)}</div>`;
+      panel.prepend(closeButton(() => { panel.style.display = "none"; }));
+      return;
+    }
+
+    const cohortOptions = cohorts.map((c) => `<option value="${c.id}" ${c.id === cohortValue ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
+
+    panel.innerHTML = `
+      <div></div>
+      <h3 style="margin:0 0 8px 0; font-size:14px;">Current Turn</h3>
+      <label style="display:block; margin-bottom:10px;">
+        Cohort:
+        <select data-select-cohort style="margin-left:6px; background:#20242c; color:#e8e8ec; border:1px solid #454b59; border-radius:4px;">
+          ${cohortOptions}
+          <option value="ungrouped" ${cohortValue === "ungrouped" ? "selected" : ""}>Ungrouped</option>
+        </select>
+      </label>
+      <div style="margin-bottom:10px;">
+        Currently: <strong>${coordination.current_turn_character_name ? escapeHtml(coordination.current_turn_character_name) : (coordination.current_turn_user_id ? "someone with no Character selected" : "unset")}</strong>
+      </div>
+      <div>
+        ${participants.map((p) => `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:3px 0;">
+            <span>${escapeHtml(p.display_name || "Participant")}${p.character_name ? " &middot; " + escapeHtml(p.character_name) : ""}</span>
+            <button type="button" data-give-turn="${p.user_id}" style="${buttonStyle("padding:2px 8px; font-size:11px;")}" ${coordination.current_turn_user_id === p.user_id ? "disabled" : ""}>Give Turn</button>
+          </div>
+        `).join("") || `<div style="opacity:0.6;">No participants in this selection.</div>`}
+      </div>
+      <div data-status style="margin-top:10px; font-size:11px; opacity:0.7;"></div>
+    `;
+    panel.prepend(closeButton(() => { panel.style.display = "none"; }));
+    makeDraggable(panel, panel);
+
+    const status = (msg) => { const s = panel.querySelector("[data-status]"); if (s) s.textContent = msg || ""; };
+
+    panel.querySelector("[data-select-cohort]")?.addEventListener("change", (event) => {
+      state.selectedCohortId = event.target.value;
+      renderTurnPanel(showID);
+    });
+    panel.querySelectorAll("[data-give-turn]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        try {
+          await api(`/api/shows/${encodeURIComponent(showID)}/cohorts/${encodeURIComponent(cohortValue)}/socio/current-turn`, {
+            method: "POST", body: JSON.stringify({ target_user_id: btn.dataset.giveTurn }),
+          });
+          await renderTurnPanel(showID);
+        } catch (err) { status("Give Turn failed: " + err.message); }
+      });
+    });
+  }
+
+  // --- Kernel 88: Help / Interrupt stack panel ----------------------------
+
+  function ensureInterruptPanel() {
+    if (state.interruptPanel) return state.interruptPanel;
+    const el = document.createElement("div");
+    el.id = "kernel88-interrupt-panel";
+    el.style.cssText = PANEL_BASE_STYLE + "top: 60px; left: 12px; width: 400px; max-height: 78vh; overflow-y: auto; padding: 12px; display: none;";
+    document.body.appendChild(el);
+    state.interruptPanel = el;
+    return el;
+  }
+
+  async function openInterruptPanel() {
+    const b = bridge();
+    const showID = b?.getShowID?.();
+    if (!showID) return;
+    const panel = ensureInterruptPanel();
+    panel.style.display = "block";
+    panel.innerHTML = `<div>Loading Help/Interrupt stack&hellip;</div>`;
+    await renderInterruptPanel(showID);
+  }
+
+  // Nesting depth is rendered as indentation -- a small stack, not a
+  // workflow diagram (kernel-88 spec §13.3: "keep it visually restrained").
+  function pendingActionDepth(actions, action) {
+    let depth = 0;
+    let current = action;
+    while (current.parent_id) {
+      depth += 1;
+      current = actions.find((a) => a.id === current.parent_id);
+      if (!current) break;
+    }
+    return depth;
+  }
+
+  async function renderInterruptPanel(showID) {
+    const panel = state.interruptPanel;
+    let actions = [];
+    try {
+      actions = (await api(`/api/shows/${encodeURIComponent(showID)}/socio/pending-actions`))?.pending_actions || [];
+    } catch (err) {
+      panel.innerHTML = `<div></div><div style="color:#e88;">Failed to load stack: ${escapeHtml(err.message)}</div>`;
+      panel.prepend(closeButton(() => { panel.style.display = "none"; }));
+      return;
+    }
+
+    const rows = actions.map((a) => {
+      const depth = pendingActionDepth(actions, a);
+      const isInterrupt = a.kind === "interrupt";
+      return `
+        <div data-action="${a.id}" style="margin-left:${depth * 16}px; border:1px solid #333844; border-radius:6px; padding:6px 8px; margin-top:6px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span>${isInterrupt ? "&#8618; " : ""}<strong>${escapeHtml(a.title || (isInterrupt ? "Help" : "Action"))}</strong>${isInterrupt ? ` (TC ${a.target_complexity ?? "?"})` : ""}</span>
+            <button type="button" data-cancel-action="${a.id}" style="${buttonStyle("padding:2px 6px; font-size:11px;")}">Cancel</button>
+          </div>
+          <div style="margin-top:4px; display:flex; gap:6px;">
+            <input type="text" data-helper-card placeholder="Helper Character ID" style="flex:1; background:#20242c; color:#e8e8ec; border:1px solid #454b59; border-radius:4px; font-size:11px; padding:2px 6px;">
+            <input type="number" data-target-complexity placeholder="TC" style="width:50px; background:#20242c; color:#e8e8ec; border:1px solid #454b59; border-radius:4px; font-size:11px;">
+            <button type="button" data-open-interrupt="${a.id}" style="${buttonStyle("padding:2px 6px; font-size:11px;")}">Interrupt</button>
+          </div>
+          ${isInterrupt ? `
+            <div style="margin-top:4px; display:flex; gap:6px;">
+              <input type="number" data-roll-total placeholder="Roll total" style="width:70px; background:#20242c; color:#e8e8ec; border:1px solid #454b59; border-radius:4px; font-size:11px;">
+              <button type="button" data-resolve-interrupt="${a.id}" style="${buttonStyle("padding:2px 6px; font-size:11px;")}">Resolve</button>
+            </div>
+          ` : ""}
+        </div>
+      `;
+    }).join("") || `<div style="opacity:0.6;">No pending actions -- the stack is empty.</div>`;
+
+    panel.innerHTML = `
+      <div></div>
+      <h3 style="margin:0 0 8px 0; font-size:14px;">Help / Interrupt Stack</h3>
+      <p style="margin:0 0 8px 0; font-size:11px; opacity:0.7;">
+        Primary actions are opened by Players on their own Current Turn. Directors adjudicate Interrupts here.
+      </p>
+      ${rows}
+      <div data-status style="margin-top:10px; font-size:11px; opacity:0.7;"></div>
+    `;
+    panel.prepend(closeButton(() => { panel.style.display = "none"; }));
+    makeDraggable(panel, panel);
+
+    const status = (msg) => { const s = panel.querySelector("[data-status]"); if (s) s.textContent = msg || ""; };
+
+    panel.querySelectorAll("[data-open-interrupt]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const row = btn.closest("[data-action]");
+        const helperCardID = row.querySelector("[data-helper-card]")?.value.trim();
+        const tc = Number(row.querySelector("[data-target-complexity]")?.value || 0);
+        if (!helperCardID || !tc) { status("Helper Character ID and target complexity are required."); return; }
+        try {
+          await api(`/api/shows/${encodeURIComponent(showID)}/socio/pending-actions/${encodeURIComponent(btn.dataset.openInterrupt)}/interrupt`, {
+            method: "POST", body: JSON.stringify({ helper_character_card_id: helperCardID, target_complexity: tc }),
+          });
+          await renderInterruptPanel(showID);
+        } catch (err) { status("Open interrupt failed: " + err.message); }
+      });
+    });
+    panel.querySelectorAll("[data-resolve-interrupt]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const row = btn.closest("[data-action]");
+        const rollTotal = Number(row.querySelector("[data-roll-total]")?.value || 0);
+        try {
+          await api(`/api/shows/${encodeURIComponent(showID)}/socio/pending-actions/${encodeURIComponent(btn.dataset.resolveInterrupt)}/resolve`, {
+            method: "POST", body: JSON.stringify({ roll_total: rollTotal }),
+          });
+          await renderInterruptPanel(showID);
+        } catch (err) { status("Resolve failed: " + err.message); }
+      });
+    });
+    panel.querySelectorAll("[data-cancel-action]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        try {
+          await api(`/api/shows/${encodeURIComponent(showID)}/socio/pending-actions/${encodeURIComponent(btn.dataset.cancelAction)}/cancel`, { method: "POST" });
+          await renderInterruptPanel(showID);
+        } catch (err) { status("Cancel failed: " + err.message); }
+      });
+    });
+  }
+
   // --- Toolbar visibility polling ---------------------------------------
 
   function pollToolbarVisibility() {
@@ -510,7 +900,8 @@
       // and close open panels rather than showing another Show's data.
       state.lastShowID = showID;
       state.selectedCohortId = "";
-      [state.cohortPanel, state.scenePanel, state.statusPanel].forEach((p) => { if (p) p.style.display = "none"; });
+      stopStatusPolling();
+      [state.cohortPanel, state.scenePanel, state.statusPanel, state.turnPanel, state.interruptPanel].forEach((p) => { if (p) p.style.display = "none"; });
     }
   }
 
@@ -529,5 +920,7 @@
     openSceneConfiguration,
     openCohortPanel,
     openGameStatusPanel,
+    openCurrentTurnPanel,
+    openInterruptPanel,
   };
 })();

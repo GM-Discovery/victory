@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>K88A player HUD harness</title></head>
+<body>
+<script>
+  window.__sent = [];
+  window.VictoryStageKernel88Bridge = {
+    getShowID: () => "show-1",
+    getViewerRole: () => "cast",
+    canManageStage: () => false,
+    getUserID: () => "user-grant",
+    getMyCharacterID: () => "card-1",
+    getSessionID: () => "session-1",
+    sendAction: (type, extra) => { window.__sent.push({ type, extra }); return true; },
+  };
+
+  window.__requests = [];
+  window.fetch = async (path, options = {}) => {
+    window.__requests.push(String(path));
+    let data = {};
+    let ok = true;
+    if (/socio\/stances$/.test(path)) {
+      data = { stances: [
+        { key: "insight", label: "Insight" }, { key: "command", label: "Command" },
+        { key: "convince", label: "Convince" }, { key: "sympathize", label: "Sympathize" },
+        { key: "follow", label: "Follow" },
+      ] };
+    } else if (/socio\/view$/.test(path)) {
+      data = { projection: {
+        character_card_id: "card-1", tier: "owner",
+        fate_balance: window.__fate ?? 1, stance_key: "insight",
+        qualitative_pools: [{ key: "health", label: "Health", condition: "wounded" }],
+        flags: [],
+      } };
+    } else if (/socio\/mechanics$/.test(path)) {
+      data = { tier: "owner", mechanics: [
+        { skill_id: "insight", skill_name: "Insight", attribute_name: "Awareness", expression: "1d6!", ladder_step: 1 },
+      ] };
+    } else if (/venue-sheet/.test(path)) {
+      // The persona-equip path 404s in the real bug scenario; the HUD must
+      // still render everything that does not depend on it.
+      ok = false;
+      return { ok: false, status: 404, json: async () => ({ ok: false, error: "no_active_character" }) };
+    }
+    return { ok, status: 200, json: async () => ({ ok: true, data }) };
+  };
+</script>
+<script src="/lib/stage-runtime/kernel88-socio-player-hud.js"></script>
+</body>
+</html>

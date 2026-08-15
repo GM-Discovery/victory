@@ -30,11 +30,11 @@ import (
 // drift here fails loudly in the dbtests rather than silently omitting a
 // clause.
 const (
-	milestoneKessaCompleted  = "kessa_intro_completed"
-	milestoneDoorSubmitted   = "door_intention_submitted"
-	milestoneRaCompleted     = "ra_intro_completed"
-	milestoneGateOpened      = "tutorial_gate_opened"
-	milestoneTutorialDone    = "tutorial_completed"
+	milestoneKessaCompleted = "kessa_intro_completed"
+	milestoneDoorSubmitted  = "door_intention_submitted"
+	milestoneRaCompleted    = "ra_intro_completed"
+	milestoneGateOpened     = "tutorial_gate_opened"
+	milestoneTutorialDone   = "tutorial_completed"
 )
 
 type template func(Inputs, Rules) (DraftEvent, bool)
@@ -76,8 +76,80 @@ func Generate(in Inputs, rules Rules) []DraftEvent {
 			out = append(out, draft)
 		}
 	}
-	// Equipment is the one template that yields several clauses.
+	// Equipment, Fate awards, and Help resolutions each yield zero-to-many
+	// clauses (one row per source item), unlike the single-clause templates
+	// in the slice above.
 	out = append(out, generateEquipmentLines(in)...)
+	out = append(out, generateFateLines(in)...)
+	out = append(out, generateHelpLines(in)...)
+	return out
+}
+
+// generateFateLines emits one clause per Director-awarded Fate ledger
+// entry (kernel-88 spec §4.6, §19: "meaningful Fate awards... should be
+// recorded"). Player self-spends never reach Inputs.FateAwards -- the
+// caller has already filtered to award-reason rows -- so there is nothing
+// for this template to filter further.
+func generateFateLines(in Inputs) []DraftEvent {
+	if len(in.FateAwards) == 0 {
+		return nil
+	}
+	name := characterName(in)
+	out := make([]DraftEvent, 0, len(in.FateAwards))
+	for _, a := range in.FateAwards {
+		if a.Delta == 0 {
+			continue
+		}
+		verb := "was awarded"
+		if a.Delta < 0 {
+			verb = "had a Fate correction of"
+		}
+		out = append(out, DraftEvent{
+			EventType:  EventFatePointsAwarded,
+			Title:      "Fate awarded",
+			Summary:    fmt.Sprintf("%s %s %d Fate.", name, verb, a.Delta),
+			SourceKind: SourceSocioFateLedger,
+			SourceRef:  a.LedgerID,
+			OccurredAt: a.CreatedAt,
+		})
+	}
+	return out
+}
+
+// generateHelpLines emits one clause per resolved Help/interrupt outcome
+// (kernel-88 spec §19: "significant Help/interruption"). Only resolved
+// entries reach Inputs.HelpResolutions -- opened-but-unresolved interrupts
+// and cancellations are not meaningful history.
+func generateHelpLines(in Inputs) []DraftEvent {
+	if len(in.HelpResolutions) == 0 {
+		return nil
+	}
+	out := make([]DraftEvent, 0, len(in.HelpResolutions))
+	for _, h := range in.HelpResolutions {
+		helper := strings.TrimSpace(h.HelperName)
+		if helper == "" {
+			helper = "A helper"
+		}
+		var summary string
+		if h.Succeeded {
+			primary := strings.TrimSpace(h.PrimaryActorName)
+			if primary == "" {
+				summary = fmt.Sprintf("%s helped, adding %d to the action underway.", helper, h.Overage)
+			} else {
+				summary = fmt.Sprintf("%s helped %s, adding %d to the action underway.", helper, primary, h.Overage)
+			}
+		} else {
+			summary = fmt.Sprintf("%s tried to help, but the attempt fell short.", helper)
+		}
+		out = append(out, DraftEvent{
+			EventType:  EventHelpResolved,
+			Title:      "Help resolved",
+			Summary:    summary,
+			SourceKind: SourceSocioPendingAction,
+			SourceRef:  h.PendingActionID,
+			OccurredAt: h.ResolvedAt,
+		})
+	}
 	return out
 }
 

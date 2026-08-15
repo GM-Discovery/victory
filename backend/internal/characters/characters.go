@@ -281,6 +281,16 @@ func HandleChapter2Stage(pool *pgxpool.Pool) http.HandlerFunc {
 			WHERE character_card_id = $1 AND ruleset_key = 'socio'
 		`, strings.TrimSpace(input.CharacterCardID), 2, currentEvent, string(wbContextJSON))
 
+		// Kernel 88: Chapter 2 just finished -- hand its final FP balance off
+		// to Socio's canonical live-play Fate table exactly once. Best-effort
+		// (matches this handler's existing treatment of the two persistence
+		// writes above): Chapter 2 itself already succeeded, so a handoff
+		// failure here shouldn't fail a request whose primary effect already
+		// committed.
+		if result.NextStage == 0 {
+			_ = HandoffCreationFateToSocio(ctx, pool, userID, strings.TrimSpace(input.CharacterCardID), result.FPBalance)
+		}
+
 		writeJSON(w, http.StatusOK, response{Ok: true, Data: result})
 	}
 }
@@ -1625,7 +1635,6 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
 }
-
 
 // syncRosterCharacterSelection points every Show Run where this user is an
 // ACTIVE PLAYER at the Character they just activated.

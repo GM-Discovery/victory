@@ -61,6 +61,7 @@ var storeICChatMessageFunc = actions.StoreICChatMessage
 var storeSpeakFunc = actions.StoreSpeak
 var storeRevealFunc = actions.StoreReveal
 var storeDiceRollFunc = actions.StoreDiceRoll
+var storePlayerMechanicRollFunc = actions.StorePlayerMechanicRoll
 var storeOverlayShowFunc = actions.StoreOverlayShow
 var storeOverlayHideFunc = actions.StoreOverlayHide
 var storeIndexCardCreateFunc = actions.StoreIndexCardCreate
@@ -643,6 +644,108 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 				}
 				_ = c.Conn.WriteJSON(errorPayload)
 				log.Printf("dice store failed: user=%s session=%s action=%s err=%v", actorID, sessionID, payload["type"], err)
+				return
+			}
+
+			audienceMode, _ := storedAction.Visibility["audienceMode"].(string)
+			cohortID, _ := storedAction.Visibility["cohortId"].(string)
+
+			msgOut, _ := json.Marshal(map[string]any{
+				"type": "action",
+				"data": storedAction,
+			})
+			deliverCtx, deliverCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			deliverStageMessage(deliverCtx, hub, pool, sessionID, actorID, audienceMode, cohortID, msgOut)
+
+			durationMs := stageEffectDefaultDurationMs
+			if raw, ok := payload["duration_ms"].(float64); ok && raw > 0 {
+				durationMs = int(raw)
+				if durationMs > stageEffectMaxDurationMs {
+					durationMs = stageEffectMaxDurationMs
+				}
+			}
+			effect := stageEffectRegistry.Create(sessionID, stageeffects.Effect{
+				Type:           "dice_roll",
+				SourceActionID: storedAction.ID,
+				CohortID:       cohortID,
+				Audience:       audienceMode,
+				ActorID:        actorID,
+				Label:          label,
+				DurationMs:     durationMs,
+				Payload: map[string]any{
+					"actor":           storedAction.Actor,
+					"label":           storedAction.Payload["label"],
+					"expression":      storedAction.Payload["expression"],
+					"dice":            storedAction.Payload["dice"],
+					"modifier":        storedAction.Payload["modifier"],
+					"total":           storedAction.Payload["total"],
+					"explosion_count": storedAction.Payload["explosion_count"],
+					"skill_id":        storedAction.Payload["skill_id"],
+				},
+			})
+			effectMsg, _ := json.Marshal(map[string]any{
+				"type": "stage_effect",
+				"data": effect,
+			})
+			deliverStageMessage(deliverCtx, hub, pool, sessionID, actorID, audienceMode, cohortID, effectMsg)
+			deliverCancel()
+		}
+
+	case "roll/dice_own_mechanic":
+		{
+			// Kernel 88 §11: the client sends no expression and no
+			// character_id -- both are resolved/computed server-side inside
+			// storePlayerMechanicRollFunc from the caller's own Show-Run
+			// roster selection and their own Character's own compiler-backed
+			// skill, mirroring chat/ic_message's identity-resolution pattern
+			// above. Delivery mirrors "roll/dice" exactly (same action
+			// broadcast, same theatrical stage_effect) so a Player's own
+			// roll plays out on stage for the Audience the same way a
+			// Director-triggered roll does.
+			sessionID, _ := payload["session_id"].(string)
+			actorID := c.UserID
+			requestID, _ := payload["request_id"].(string)
+			skillID, _ := payload["skill_id"].(string)
+			primaryActionID, _ := payload["primary_action_id"].(string)
+			visibility, _ := payload["visibility"].(string)
+			label, _ := payload["label"].(string)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			storedAction, err := storePlayerMechanicRollFunc(ctx, pool, actions.PlayerMechanicRollRequest{
+				SessionID:       sessionID,
+				ActorID:         actorID,
+				RequestID:       requestID,
+				SkillID:         skillID,
+				PrimaryActionID: primaryActionID,
+				Visibility:      visibility,
+				Label:           label,
+			})
+			cancel()
+
+			if err != nil {
+				var denied *actions.ActionDeniedError
+				if errors.As(err, &denied) {
+					errorPayload := map[string]any{
+						"type":  "error",
+						"error": denied.Reason,
+					}
+					if strings.TrimSpace(requestID) != "" {
+						errorPayload["request_id"] = requestID
+					}
+					_ = c.Conn.WriteJSON(errorPayload)
+					log.Printf("player mechanic roll denied: user=%s session=%s reason=%s", actorID, sessionID, denied.Reason)
+					return
+				}
+
+				errorPayload := map[string]any{
+					"type":  "error",
+					"error": err.Error(),
+				}
+				if strings.TrimSpace(requestID) != "" {
+					errorPayload["request_id"] = requestID
+				}
+				_ = c.Conn.WriteJSON(errorPayload)
+				log.Printf("player mechanic roll store failed: user=%s session=%s err=%v", actorID, sessionID, err)
 				return
 			}
 

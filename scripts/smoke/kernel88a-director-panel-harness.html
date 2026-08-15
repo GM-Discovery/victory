@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>K88 cohort-tools interaction harness</title></head>
+<body>
+<script>
+  // Narrow stub of the read-only bridge runtime.js exposes.
+  window.VictoryStageKernel85Bridge = {
+    getShowID: () => "show-1",
+    getViewerRole: () => "director",
+    canManageStage: () => true,
+  };
+
+  // Record every request the panel makes so the test can assert the real
+  // assignment POST fired, and serve the roster/game-status shapes the
+  // panels expect.
+  window.__requests = [];
+  window.fetch = async (path, options = {}) => {
+    window.__requests.push({ path: String(path), method: options.method || "GET", body: options.body || null });
+    let data = {};
+    if (/\/cohorts$/.test(path) && (options.method || "GET") === "GET") {
+      data = {
+        cohorts: [
+          { id: "cohort-19", name: "Cohort 19", members: [] },
+          { id: "cohort-20", name: "Cohort 20", members: [] },
+        ],
+        ungrouped: [{ user_id: "user-grant", display_name: "Grant A. Murray", character_name: "Niava" }],
+      };
+    } else if (/game-status$/.test(path)) {
+      data = {
+        characters: [{
+          character_card_id: "card-1",
+          character_name: "Niava",
+          pools: [{ key: "health", current: 3, max: 10 }],
+          active_statuses: [],
+        }],
+      };
+    } else if (/socio\/statuses$/.test(path)) {
+      data = { statuses: [{ key: "shaken", label: "Shaken" }] };
+    } else if (/socio\/stances$/.test(path)) {
+      data = { stances: [{ key: "command", label: "Command" }] };
+    }
+    return { ok: true, status: 200, json: async () => ({ ok: true, data }) };
+  };
+</script>
+<script src="/lib/stage-runtime/kernel85-cohort-tools.js"></script>
+</body>
+</html>

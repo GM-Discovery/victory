@@ -93,7 +93,7 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 		return Decision{Allowed: false, Reason: "not_session_participant"}, nil
 	}
 	if actionType != "act/reveal_element" && actionType != "act/hide_element" {
-		if actionType != "create/index_card" && actionType != "update/index_card" && actionType != "delete/index_card" && actionType != "create/token" && actionType != "update/token" && actionType != "act/place_element" && actionType != "act/duplicate_element" && actionType != "act/remove_element" && actionType != "act/show_overlay" && actionType != "act/hide_overlay" && actionType != "act/set_element_lock" && actionType != "act/set_nameplate_visibility" && actionType != "chat/message" && actionType != "chat/ooc" && actionType != "chat/ic_message" && actionType != "persona/equip" && actionType != "persona/unequip" && actionType != "roll/dice" && actionType != "game/event" {
+		if actionType != "create/index_card" && actionType != "update/index_card" && actionType != "delete/index_card" && actionType != "create/token" && actionType != "update/token" && actionType != "act/place_element" && actionType != "act/duplicate_element" && actionType != "act/remove_element" && actionType != "act/show_overlay" && actionType != "act/hide_overlay" && actionType != "act/set_element_lock" && actionType != "act/set_nameplate_visibility" && actionType != "chat/message" && actionType != "chat/ooc" && actionType != "chat/ic_message" && actionType != "persona/equip" && actionType != "persona/unequip" && actionType != "roll/dice" && actionType != "roll/dice_own_mechanic" && actionType != "game/event" {
 			return Decision{Allowed: false, Reason: "unknown_action"}, nil
 		}
 	}
@@ -167,6 +167,10 @@ func CanAct(ctx context.Context, q actionQuerier, userID, actionType string, ses
 
 	if actionType == "roll/dice" {
 		return canActDiceRoll(ctx, q, userID, sessionID)
+	}
+
+	if actionType == "roll/dice_own_mechanic" {
+		return canActPlayerMechanicRoll(ctx, q, userID, sessionID)
 	}
 
 	if actionType == "game/event" {
@@ -843,6 +847,37 @@ func canActDiceRoll(ctx context.Context, q actionQuerier, userID, sessionID stri
 
 	switch normalizeActionRole(participantRole) {
 	case "director", "producer":
+		return Decision{Allowed: true, Reason: "allowed"}, nil
+	default:
+		return Decision{Allowed: false, Reason: "insufficient_role"}, nil
+	}
+}
+
+// canActPlayerMechanicRoll is Kernel 88's Player-own-mechanic roll
+// authority: distinct from canActDiceRoll (Director/Producer, unrestricted
+// dice expression) -- this path is for an ordinary cast-role participant
+// rolling their own selected Character's own canonical skill. Character/
+// skill ownership is re-verified inside StorePlayerMechanicRoll (this
+// function only confirms session participation and role); Director+ do not
+// need this path, they already have canActDiceRoll.
+func canActPlayerMechanicRoll(ctx context.Context, q actionQuerier, userID, sessionID string) (Decision, error) {
+	var participantRole string
+	err := q.QueryRow(ctx, `
+		SELECT sp.role::text
+		FROM session_participants sp
+		WHERE sp.session_id = $1::uuid
+		  AND sp.user_id = $2
+		LIMIT 1
+	`, sessionID, userID).Scan(&participantRole)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Decision{Allowed: false, Reason: "not_session_participant"}, nil
+		}
+		return Decision{}, err
+	}
+
+	switch normalizeActionRole(participantRole) {
+	case "cast":
 		return Decision{Allowed: true, Reason: "allowed"}, nil
 	default:
 		return Decision{Allowed: false, Reason: "insufficient_role"}, nil

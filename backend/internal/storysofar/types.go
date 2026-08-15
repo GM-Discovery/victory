@@ -45,19 +45,27 @@ const (
 	EventDirectorMoment    = "director_moment"
 	EventAftercare         = "aftercare"
 	EventTutorialCompleted = "tutorial_completed"
+	// Kernel 88: Director-awarded Fate and resolved Help/interrupt outcomes.
+	// Deliberately narrow -- only Director-award-reason ledger entries and
+	// resolved (not every opened) interrupts qualify, matching kernel-88
+	// spec §19's "do not turn every button click into Story So Far noise."
+	EventFatePointsAwarded = "fate_points_awarded"
+	EventHelpResolved      = "help_resolved"
 )
 
 // Source kinds, mirroring character_story_events_source_kind_check.
 const (
-	SourceNone              = ""
-	SourceTutorialMilestone = "tutorial_milestone"
-	SourceInventoryItem     = "inventory_item"
+	SourceNone               = ""
+	SourceTutorialMilestone  = "tutorial_milestone"
+	SourceInventoryItem      = "inventory_item"
 	SourceFreeformSubmission = "freeform_submission"
 	SourceInteractionAttempt = "interaction_attempt"
-	SourceDialogueTopic     = "dialogue_topic"
-	SourceWorkbookEntry     = "workbook_entry"
-	SourceCharacterJournal  = "character_journal"
-	SourceAftercare         = "aftercare"
+	SourceDialogueTopic      = "dialogue_topic"
+	SourceWorkbookEntry      = "workbook_entry"
+	SourceCharacterJournal   = "character_journal"
+	SourceAftercare          = "aftercare"
+	SourceSocioFateLedger    = "socio_fate_ledger"
+	SourceSocioPendingAction = "socio_pending_action"
 )
 
 // GeneratorVersion is the revision of the template library below. Bump it
@@ -67,24 +75,24 @@ const GeneratorVersion = 1
 
 // StoryEvent is a stored row.
 type StoryEvent struct {
-	ID              string    `json:"id"`
-	CharacterCardID string    `json:"character_card_id"`
-	OwnerUserID     string    `json:"owner_user_id"`
-	EventType       string    `json:"event_type"`
-	Title           string    `json:"title"`
-	Summary         string    `json:"summary"`
-	ShowRunID       string    `json:"show_run_id,omitempty"`
-	ShowID          string    `json:"show_id,omitempty"`
-	SessionID       string    `json:"session_id,omitempty"`
-	PlacementID     string    `json:"show_scene_placement_id,omitempty"`
-	SourceKind      string    `json:"source_kind,omitempty"`
-	SourceRef       string    `json:"source_ref,omitempty"`
-	VisibilityState string    `json:"visibility_state"`
-	AuthoredByUserID string   `json:"authored_by_user_id,omitempty"`
-	AuthoredByName  string    `json:"authored_by_name,omitempty"`
-	GeneratorVersion int      `json:"generator_version"`
-	OccurredAt      time.Time `json:"occurred_at"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID               string    `json:"id"`
+	CharacterCardID  string    `json:"character_card_id"`
+	OwnerUserID      string    `json:"owner_user_id"`
+	EventType        string    `json:"event_type"`
+	Title            string    `json:"title"`
+	Summary          string    `json:"summary"`
+	ShowRunID        string    `json:"show_run_id,omitempty"`
+	ShowID           string    `json:"show_id,omitempty"`
+	SessionID        string    `json:"session_id,omitempty"`
+	PlacementID      string    `json:"show_scene_placement_id,omitempty"`
+	SourceKind       string    `json:"source_kind,omitempty"`
+	SourceRef        string    `json:"source_ref,omitempty"`
+	VisibilityState  string    `json:"visibility_state"`
+	AuthoredByUserID string    `json:"authored_by_user_id,omitempty"`
+	AuthoredByName   string    `json:"authored_by_name,omitempty"`
+	GeneratorVersion int       `json:"generator_version"`
+	OccurredAt       time.Time `json:"occurred_at"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 // Generated reports whether this entry was written by the template library
@@ -195,6 +203,14 @@ type Inputs struct {
 	Attempts      []Attempt
 	Topics        []DialogueTopicSeen
 
+	// FateAwards and HelpResolutions are Kernel 88's Socio play-surface
+	// sources. Already pre-filtered by the caller to the "meaningful"
+	// subset (Director-award-reason ledger rows; resolved, not merely
+	// opened, interrupts) -- this package only renders, it does not decide
+	// what counts as meaningful (kernel-88 spec §19).
+	FateAwards      []FateAwardLine
+	HelpResolutions []HelpResolutionLine
+
 	ShowRunID   string
 	ShowID      string
 	SessionID   string
@@ -203,4 +219,24 @@ type Inputs struct {
 	// CompletedAt anchors every generated entry's occurred_at. Passed in
 	// rather than read from the clock so Generate stays pure and testable.
 	CompletedAt time.Time
+}
+
+// FateAwardLine is one Director-awarded (not player-spent) Fate ledger
+// entry (character_socio_fate_ledger, backend/internal/socio).
+type FateAwardLine struct {
+	LedgerID  string
+	Delta     int
+	Reason    string
+	CreatedAt time.Time
+}
+
+// HelpResolutionLine is one resolved Help/interrupt outcome
+// (socio_pending_actions, backend/internal/socio).
+type HelpResolutionLine struct {
+	PendingActionID  string
+	HelperName       string
+	PrimaryActorName string
+	Overage          int
+	Succeeded        bool
+	ResolvedAt       time.Time
 }

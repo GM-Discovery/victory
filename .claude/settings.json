@@ -10,7 +10,8 @@
       "Bash(bash -n *)",
       "Bash(docker exec victory-backend wget -qO- http://127.0.0.1:8081/health)",
       "Bash(kill -0 2227105)",
-      "Bash(kill 2270181 2270236)"
+      "Bash(kill 2270181 2270236)",
+      "Bash(TEST_DATABASE_URL=\"postgres://victory:REDACTED@127.0.0.1:5432/victory_test?sslmode=disable\" scripts/test/setup-test-database.sh)"
     ]
   }
 }

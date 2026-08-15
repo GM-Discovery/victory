@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -29,13 +30,14 @@ func ListStatusDefinitions(ctx context.Context, pool *pgxpool.Pool) ([]StatusDef
 }
 
 // ListActiveStatuses returns a Character's currently-applied (uncleared)
-// statuses. No authority check -- same "caller gates read access" pattern
-// as GetState.
+// statuses, canonical tags and Kernel 88 blank flags alike (LEFT JOIN
+// because blank-flag rows have a NULL status_key -- see migration 102). No
+// authority check -- same "caller gates read access" pattern as GetState.
 func ListActiveStatuses(ctx context.Context, pool *pgxpool.Pool, characterCardID string) ([]ActiveStatus, error) {
 	rows, err := pool.Query(ctx, `
-		SELECT e.id::text, e.status_key, s.label, e.intensity, e.applied_by_user_id::text, e.applied_at
+		SELECT e.id::text, COALESCE(e.status_key, ''), COALESCE(s.label, ''), COALESCE(e.custom_label, ''), e.intensity, e.applied_by_user_id::text, e.applied_at
 		FROM character_socio_status_effects e
-		JOIN socio_statuses s ON s.key = e.status_key
+		LEFT JOIN socio_statuses s ON s.key = e.status_key
 		WHERE e.character_card_id = $1 AND e.cleared_at IS NULL
 		ORDER BY e.applied_at ASC
 	`, characterCardID)
@@ -46,8 +48,12 @@ func ListActiveStatuses(ctx context.Context, pool *pgxpool.Pool, characterCardID
 	out := []ActiveStatus{}
 	for rows.Next() {
 		var a ActiveStatus
-		if err := rows.Scan(&a.ID, &a.StatusKey, &a.Label, &a.Intensity, &a.AppliedByUserID, &a.AppliedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.StatusKey, &a.Label, &a.CustomLabel, &a.Intensity, &a.AppliedByUserID, &a.AppliedAt); err != nil {
 			return nil, err
+		}
+		if a.StatusKey == "" {
+			a.IsBlank = true
+			a.Label = a.CustomLabel
 		}
 		out = append(out, a)
 	}
@@ -113,5 +119,59 @@ func ClearStatus(ctx context.Context, pool *pgxpool.Pool, actorUserID, showID, c
 		SET cleared_at = NOW(), cleared_by_user_id = $3
 		WHERE character_card_id = $1 AND status_key = $2 AND cleared_at IS NULL
 	`, characterCardID, statusKey, actorUserID)
+	return err
+}
+
+// AddFlag creates a Kernel 88 Director-authored blank state label (e.g.
+// "Waiting on Kessa") -- distinct from a canonical socio_statuses tag: it
+// has no registry entry, is free text capped at 60 characters (migration
+// 102's check constraint), and unlike ApplyStatus there is no "re-apply
+// updates intensity" collapsing -- each AddFlag call is a new row, since
+// blank states aren't a fixed vocabulary to dedupe against. Director+ only.
+func AddFlag(ctx context.Context, pool *pgxpool.Pool, actorUserID, showID, characterCardID, label string) (ActiveStatus, error) {
+	if err := requireShowCharacterAuthority(ctx, pool, actorUserID, showID, characterCardID); err != nil {
+		return ActiveStatus{}, err
+	}
+	label = strings.TrimSpace(label)
+	if label == "" {
+		return ActiveStatus{}, errors.New("label_required")
+	}
+	if len(label) > 60 {
+		return ActiveStatus{}, errors.New("label_too_long")
+	}
+
+	var id string
+	var appliedAt time.Time
+	err := pool.QueryRow(ctx, `
+		INSERT INTO character_socio_status_effects (character_card_id, custom_label, applied_by_user_id)
+		VALUES ($1, $2, $3)
+		RETURNING id::text, applied_at
+	`, characterCardID, label, actorUserID).Scan(&id, &appliedAt)
+	if err != nil {
+		return ActiveStatus{}, err
+	}
+	return ActiveStatus{
+		ID: id, CustomLabel: label, Label: label, IsBlank: true,
+		AppliedByUserID: actorUserID, AppliedAt: appliedAt,
+	}, nil
+}
+
+// ClearFlag clears one blank-state row by ID -- IDs, not labels, since
+// blank states aren't unique per Character the way canonical status_keys
+// are. Director+ only. Clearing an already-cleared or unknown ID is a
+// no-op success, matching ClearStatus's idempotency.
+func ClearFlag(ctx context.Context, pool *pgxpool.Pool, actorUserID, showID, characterCardID, flagID string) error {
+	if err := requireShowCharacterAuthority(ctx, pool, actorUserID, showID, characterCardID); err != nil {
+		return err
+	}
+	flagID = strings.TrimSpace(flagID)
+	if flagID == "" {
+		return errors.New("flag_id_required")
+	}
+	_, err := pool.Exec(ctx, `
+		UPDATE character_socio_status_effects
+		SET cleared_at = NOW(), cleared_by_user_id = $3
+		WHERE id = $2 AND character_card_id = $1 AND status_key IS NULL AND cleared_at IS NULL
+	`, characterCardID, flagID, actorUserID)
 	return err
 }

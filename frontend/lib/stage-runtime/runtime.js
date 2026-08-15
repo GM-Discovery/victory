@@ -521,6 +521,35 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       canManageStage: () => canManageIndexCards(currentRole),
     };
 
+    // Kernel 88: same narrow-bridge convention as Kernel 85's above, adding
+    // what the Socio Player HUD/Director tools need that the Kernel 85
+    // bridge doesn't expose -- the viewer's own user id and their
+    // currently-selected Character (both already tracked on currentIdentity
+    // for other purposes; this just gives a venue-independent module a read
+    // path to them without importing anything about identity itself).
+    window.VictoryStageKernel88Bridge = {
+      getShowID: () => currentSnapshot?.session?.show_id || "",
+      getViewerRole: () => currentRole,
+      canManageStage: () => canManageIndexCards(currentRole),
+      getUserID: () => String(currentIdentity?.user_id || "").trim(),
+      // Deliberately theater_context.selected_character_id (Kernel 71's
+      // Show-Run-roster-scoped selection, world/snapshot.go's
+      // resolveTheaterContext), NOT currentIdentity.active_character --
+      // the latter is the unrelated global "active_user_characters"/
+      // Greenroom concept and is not what backend/internal/socio's
+      // authority checks (LoadMyRosterMember) key off of. Using the wrong
+      // one here would show a Character the Player isn't actually playing
+      // in this Show, or none at all for a Player with no global active
+      // Character but a valid roster selection.
+      getMyCharacterID: () => String(currentSnapshot?.theater_context?.selected_character_id || "").trim(),
+      getSessionID: () => currentSnapshot?.session?.id || "",
+      // Generic typed-message send, reusing the same socketController
+      // pipeline every other stage-runtime module sends through (session_id
+      // is filled in automatically; actor identity is resolved server-side
+      // from the authenticated connection, never read from this payload).
+      sendAction: (type, extra) => sendAction(type, extra),
+    };
+
     function loadPixiLibrary() {
       if (window.PIXI) {
         return Promise.resolve(window.PIXI);

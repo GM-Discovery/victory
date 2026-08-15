@@ -82,14 +82,19 @@ type StatusDefinition struct {
 }
 
 // ActiveStatus is one currently-applied (uncleared) status effect on a
-// Character.
+// Character. Exactly one of StatusKey (a canonical socio_statuses tag) or
+// CustomLabel (a Kernel 88 Director-authored blank state, e.g. "Waiting on
+// Kessa") is set -- migration 102's check constraint enforces this at the
+// database level; IsBlank mirrors that split for callers.
 type ActiveStatus struct {
-	ID              string     `json:"id"`
-	StatusKey       string     `json:"status_key"`
-	Label           string     `json:"label"`
-	Intensity       *int       `json:"intensity,omitempty"`
-	AppliedByUserID string     `json:"applied_by_user_id"`
-	AppliedAt       time.Time  `json:"applied_at"`
+	ID              string    `json:"id"`
+	StatusKey       string    `json:"status_key,omitempty"`
+	Label           string    `json:"label"`
+	CustomLabel     string    `json:"custom_label,omitempty"`
+	IsBlank         bool      `json:"is_blank"`
+	Intensity       *int      `json:"intensity,omitempty"`
+	AppliedByUserID string    `json:"applied_by_user_id"`
+	AppliedAt       time.Time `json:"applied_at"`
 }
 
 // CharacterBlock is one Character's full Game Status card: identity, HP

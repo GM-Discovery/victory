@@ -483,3 +483,53 @@ func RecordSkillAdvancement(ctx context.Context, pool *pgxpool.Pool, actorUserID
 		NewStep:    newStep,
 	}, historyEntryID, nil
 }
+
+// ListCharacterSkillsForAuthorizedReader returns a Character's skills with NO
+// authority check of its own. It exists because ListCharacterSkills (and
+// every other read path into this data) gates on CanEditCard -- an *edit*
+// permission -- which is correct for Greenroom's editing surfaces but wrong
+// for a read by someone the caller has already authorized on different,
+// stricter grounds. Kernel 88A's socio.ListCharacterMechanics is the motivating
+// case: it resolves the viewer's tier with socio.ResolveTier (owning Player of
+// the Show-Run roster Character, or Director+ on that Show) and then needs the
+// skill list; routing that through CanEditCard denied Players their own
+// mechanics whenever they lacked location-level drafting rights.
+//
+// CONTRACT: callers MUST have established the viewer's authority over cardID
+// before calling this. Do not call it from a handler that has not. If you are
+// reaching for this from a surface where the viewer is merely authenticated,
+// you want ListCharacterSkills instead.
+func ListCharacterSkillsForAuthorizedReader(ctx context.Context, pool *pgxpool.Pool, cardID string) ([]CharacterSkill, error) {
+	cardID = strings.TrimSpace(cardID)
+	if cardID == "" {
+		return nil, errors.New("character_card_id_required")
+	}
+
+	if err := ensureChapter4SkillBackfill(ctx, pool, cardID); err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT id::text, character_card_id::text, skill_id, skill_name, attribute_name, ladder_step, is_helper, source, improvement_count, created_at, updated_at
+		FROM character_skills
+		WHERE character_card_id = $1
+		ORDER BY attribute_name, skill_name
+	`, cardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []CharacterSkill{}
+	for rows.Next() {
+		var s CharacterSkill
+		var createdAt, updatedAt time.Time
+		if err := rows.Scan(&s.ID, &s.CharacterCardID, &s.SkillID, &s.SkillName, &s.AttributeName, &s.LadderStep, &s.IsHelper, &s.Source, &s.ImprovementCount, &createdAt, &updatedAt); err != nil {
+			return nil, err
+		}
+		s.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+		s.UpdatedAt = updatedAt.UTC().Format(time.RFC3339)
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}

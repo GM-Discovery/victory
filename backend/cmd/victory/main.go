@@ -30,9 +30,9 @@ import (
 	"victory/backend/internal/assets"
 	"victory/backend/internal/characters"
 	"victory/backend/internal/cohorts"
-	"victory/backend/internal/drawing"
 	"victory/backend/internal/cues"
 	"victory/backend/internal/db"
+	"victory/backend/internal/drawing"
 	"victory/backend/internal/ewrite"
 	"victory/backend/internal/identity"
 	"victory/backend/internal/mailer"
@@ -390,6 +390,28 @@ func main() {
 	mux.HandleFunc("POST /api/shows/{show_id}/characters/{character_card_id}/socio/pools/{pool_key}", socio.HandleCharacterPool(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/characters/{character_card_id}/socio/statuses", socio.HandleCharacterStatus(pool))
 	mux.HandleFunc("DELETE /api/shows/{show_id}/characters/{character_card_id}/socio/statuses/{status_key}", socio.HandleCharacterStatus(pool))
+	// Kernel 88: Socio Guided Play Surface -- Fate, Stance, blank state
+	// flags, tiered Player/Director projection, Current Turn, and the
+	// Interrupt/Help pending-action stack. Reuses the same venueCoordination
+	// registry Storyboards/drawing already share (Kernel 83) -- it's
+	// venue-agnostic and Socio's session-ID scheme ("showID:cohortID")
+	// can't collide with those venues' own IDs.
+	mux.HandleFunc("GET /api/shows/{show_id}/characters/{character_card_id}/socio/view", socio.HandleSocioProjection(pool))
+	mux.HandleFunc("GET /api/shows/{show_id}/characters/{character_card_id}/socio/mechanics", socio.HandleCharacterMechanics(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/characters/{character_card_id}/socio/fate/spend", socio.HandleFateSpend(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/characters/{character_card_id}/socio/fate/award", socio.HandleFateAward(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/characters/{character_card_id}/socio/fate/creation-mode", socio.HandleFateCreationMode(pool))
+	mux.HandleFunc("GET /api/socio/stances", socio.HandleStanceRegistry(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/characters/{character_card_id}/socio/stance", socio.HandleCharacterStance(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/characters/{character_card_id}/socio/flags", socio.HandleCharacterFlags(pool))
+	mux.HandleFunc("DELETE /api/shows/{show_id}/characters/{character_card_id}/socio/flags/{flag_id}", socio.HandleCharacterFlags(pool))
+	mux.HandleFunc("GET /api/shows/{show_id}/cohorts/{cohort_id}/socio/current-turn", socio.HandleCurrentTurn(pool, venueCoordination))
+	mux.HandleFunc("POST /api/shows/{show_id}/cohorts/{cohort_id}/socio/current-turn", socio.HandleCurrentTurn(pool, venueCoordination))
+	mux.HandleFunc("GET /api/shows/{show_id}/socio/pending-actions", socio.HandlePendingActions(pool, venueCoordination))
+	mux.HandleFunc("POST /api/shows/{show_id}/socio/pending-actions", socio.HandlePendingActions(pool, venueCoordination))
+	mux.HandleFunc("POST /api/shows/{show_id}/socio/pending-actions/{action_id}/interrupt", socio.HandleInterrupt(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/socio/pending-actions/{action_id}/resolve", socio.HandleInterruptResolve(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/socio/pending-actions/{action_id}/cancel", socio.HandlePendingActionCancel(pool))
 	mux.HandleFunc("GET /api/shows/{show_id}/scenes/{placement_id}/cues", cues.HandlePlacementCuesCollection(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/scenes/{placement_id}/cues", cues.HandlePlacementCuesCollection(pool))
 	mux.HandleFunc("GET /api/shows/{show_id}/scenes/{placement_id}/player-cues", cues.HandlePlacementPlayerCues(pool))
