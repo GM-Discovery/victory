@@ -582,6 +582,16 @@
 
       if (msg.kind === "error") {
         const errorText = String(msg.error || "action_denied");
+
+        // Kernel 88B: give the module that originated this request first
+        // refusal. If it claims the error it is showing the failure in its
+        // own context (next to the control the person actually pressed), so
+        // the generic surfaces below would be duplicate noise -- and worse,
+        // the chat notice would announce a private failure to the room.
+        if (msg.requestId && deps.handleActionError?.(msg.requestId, errorText, msg) === true) {
+          return msg;
+        }
+
         handleDiceTrayError(errorText, msg);
         setStageStatus(`Action denied: ${errorText}`);
         setMovementLine(`Denied: ${errorText}`);

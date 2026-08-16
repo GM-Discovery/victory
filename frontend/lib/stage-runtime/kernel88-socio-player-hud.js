@@ -446,12 +446,31 @@
 
     state.body.querySelectorAll("[data-roll-skill]").forEach((btn) => {
       btn.addEventListener("click", () => {
+        const requestID = `k88-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+        const skillName = btn.textContent.trim().split(" (")[0] || "mechanic";
+
+        // Kernel 88B: claim this request's failure before sending it. A
+        // rolled mechanic that the server refuses used to report "Roll sent."
+        // and then nothing at all -- the error frame existed but only reached
+        // the generic stage surfaces, never the control that was pressed.
+        // Registered first so the handler is in place even if the server
+        // rejects faster than this function returns.
+        const unregister = b?.registerActionRequest?.(requestID, (errorText) => {
+          status(`${skillName} roll refused: ${errorText}`);
+          return true; // claimed -- do not also announce it to the room
+        });
+
         const ok = b?.sendAction?.("roll/dice_own_mechanic", {
-          request_id: `k88-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+          request_id: requestID,
           skill_id: btn.dataset.rollSkill,
           visibility: "",
         });
-        status(ok ? "Roll sent." : "Could not send roll -- not connected.");
+        if (!ok) {
+          unregister?.();
+          status("Could not send roll -- not connected.");
+          return;
+        }
+        status(`${skillName} roll sent…`);
       });
     });
   }

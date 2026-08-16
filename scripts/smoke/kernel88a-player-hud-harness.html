@@ -11,8 +11,21 @@
     getUserID: () => "user-grant",
     getMyCharacterID: () => "card-1",
     getSessionID: () => "session-1",
-    sendAction: (type, extra) => { window.__sent.push({ type, extra }); return true; },
+    sendAction: (type, extra) => {
+      window.__sent.push({ type, extra });
+      // __sendFails lets a test drive the "socket closed" path.
+      return !window.__sendFails;
+    },
+    // Kernel 88B: record registrations in order so a test can assert the HUD
+    // registers BEFORE it sends (a server that refuses faster than sendAction
+    // returns must still find a handler waiting).
+    registerActionRequest: (requestId, handler) => {
+      window.__registered.push({ requestId, handler, at: window.__sent.length });
+      return () => { window.__unregistered.push(requestId); };
+    },
   };
+  window.__registered = [];
+  window.__unregistered = [];
 
   window.__requests = [];
   window.fetch = async (path, options = {}) => {

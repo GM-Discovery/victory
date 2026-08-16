@@ -196,12 +196,17 @@ func TestStageEffectPrivateRollNeverReachesAnotherSocket(t *testing.T) {
 }
 
 // TestStageEffectAuthorizedPrivateHasNoDirectorException is a direct unit
-// test of stageEffectAuthorized (not routed through handleCavePayload/
-// Conn.WriteJSON, which needs a real websocket connection for its error
-// path): it proves a Private effect rejects every non-actor -- including
-// Director+ -- purely from e.Audience, without ever reaching the
-// rollaudience.IsDirectorPlus DB lookup (pool is nil here and must not be
-// touched).
+// test of stageEffectAuthorized: it proves a Private effect rejects every
+// non-actor -- including Director+ -- purely from e.Audience, without ever
+// reaching the rollaudience.IsDirectorPlus DB lookup (pool is nil here and
+// must not be touched).
+//
+// (Kernel 88B note: this used to add "not routed through handleCavePayload/
+// Conn.WriteJSON, which needs a real websocket connection for its error path".
+// Error replies now go through Client.SendJSON and land on the Send channel,
+// so that is no longer a constraint -- see kernel88b_ws_error_reply_test.go.
+// This test stays a direct unit test because it is testing the authority
+// predicate itself, not the reply plumbing.)
 func TestStageEffectAuthorizedPrivateHasNoDirectorException(t *testing.T) {
 	effect := stageEffectRegistry.Create("auth-test-session", stageEffectFixture("private-actor"))
 	// Re-fetch through the registry rather than trusting the struct

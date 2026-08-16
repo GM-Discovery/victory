@@ -217,7 +217,12 @@ func ServeVenueWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordS
 
 		client := &Client{
 			Conn:      conn,
-			Send:      make(chan []byte, 16),
+			// Kernel 88B raised this from 16: per-client replies (pong,
+			// error frames, command acks) used to bypass this buffer via a
+			// direct connection write, so it was sized for broadcasts alone.
+			// Now every write shares it, and overflow means a dropped reply,
+			// not just a skipped broadcast frame.
+			Send:      make(chan []byte, 64),
 			UserID:    sessionIdentity.UserID,
 			SessionID: sessionIdentity.SessionID,
 			Presence: PresenceUser{
@@ -233,6 +238,14 @@ func ServeVenueWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordS
 
 		presenceSnapshot, joined := hub.Presence().Connect(sessionIdentity.SessionID, client.Presence)
 
+		// The handshake writes below deliberately stay on conn.WriteJSON
+		// rather than Client.SendJSON. They run before `go writePump(client)`
+		// starts, so this goroutine is provably the connection's only writer
+		// -- the race SendJSON exists to prevent cannot occur here -- and each
+		// one needs its error synchronously in order to abandon the
+		// connection. Queuing them would hand the failure to a goroutine that
+		// has not been started yet. Everything after writePump starts must use
+		// SendJSON.
 		snapshot, err := world.LoadVenueSnapshot(ctx, pool, sessionIdentity.Role, sessionIdentity.UserID, venueSlug)
 		if err != nil {
 			log.Printf("ws snapshot failed: %v", err)
@@ -386,13 +399,13 @@ func handleCavePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[stri
 func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[string]any, venueSlug string) {
 	switch payload["type"] {
 	case "ping":
-		_ = c.Conn.WriteJSON(map[string]any{
+		_ = c.SendJSON(map[string]any{
 			"type": "pong",
 			"ts":   time.Now().UTC().Format(time.RFC3339),
 		})
 
 	case "character/projection_updated":
-		_ = c.Conn.WriteJSON(map[string]any{
+		_ = c.SendJSON(map[string]any{
 			"type":  "error",
 			"error": "server_authored_event_only",
 		})
@@ -401,7 +414,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 		{
 			sessionID := c.SessionID
 			if strings.TrimSpace(sessionID) == "" {
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": "not_session_participant",
 				})
@@ -412,14 +425,14 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			allowed, err := canAccessDirectorConsole(ctx, pool, c.UserID)
 			cancel()
 			if err != nil {
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": "access_check_failed",
 				})
 				return
 			}
 			if !allowed {
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": "forbidden",
 				})
@@ -503,7 +516,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			cancel()
 
 			if err != nil {
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": err.Error(),
 				})
@@ -534,7 +547,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			if err != nil {
 				var denied *actions.ActionDeniedError
 				if errors.As(err, &denied) {
-					_ = c.Conn.WriteJSON(map[string]any{
+					_ = c.SendJSON(map[string]any{
 						"type":  "error",
 						"error": denied.Reason,
 					})
@@ -542,7 +555,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					return
 				}
 
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": err.Error(),
 				})
@@ -583,7 +596,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 				if errors.As(err, &denied) {
 					reason = denied.Reason
 				}
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": reason,
 				})
@@ -630,7 +643,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					if strings.TrimSpace(requestID) != "" {
 						errorPayload["request_id"] = requestID
 					}
-					_ = c.Conn.WriteJSON(errorPayload)
+					_ = c.SendJSON(errorPayload)
 					log.Printf("dice denied: user=%s session=%s action=%s reason=%s", actorID, sessionID, payload["type"], denied.Reason)
 					return
 				}
@@ -642,7 +655,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 				if strings.TrimSpace(requestID) != "" {
 					errorPayload["request_id"] = requestID
 				}
-				_ = c.Conn.WriteJSON(errorPayload)
+				_ = c.SendJSON(errorPayload)
 				log.Printf("dice store failed: user=%s session=%s action=%s err=%v", actorID, sessionID, payload["type"], err)
 				return
 			}
@@ -732,7 +745,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					if strings.TrimSpace(requestID) != "" {
 						errorPayload["request_id"] = requestID
 					}
-					_ = c.Conn.WriteJSON(errorPayload)
+					_ = c.SendJSON(errorPayload)
 					log.Printf("player mechanic roll denied: user=%s session=%s reason=%s", actorID, sessionID, denied.Reason)
 					return
 				}
@@ -744,7 +757,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 				if strings.TrimSpace(requestID) != "" {
 					errorPayload["request_id"] = requestID
 				}
-				_ = c.Conn.WriteJSON(errorPayload)
+				_ = c.SendJSON(errorPayload)
 				log.Printf("player mechanic roll store failed: user=%s session=%s err=%v", actorID, sessionID, err)
 				return
 			}
@@ -798,13 +811,13 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			effectID, _ := payload["effect_id"].(string)
 			sessionID := c.SessionID
 			if strings.TrimSpace(sessionID) == "" || strings.TrimSpace(effectID) == "" {
-				_ = c.Conn.WriteJSON(map[string]any{"type": "error", "error": "effect_id_required"})
+				_ = c.SendJSON(map[string]any{"type": "error", "error": "effect_id_required"})
 				return
 			}
 
 			effect, ok := stageEffectRegistry.Get(sessionID, effectID)
 			if !ok {
-				_ = c.Conn.WriteJSON(map[string]any{"type": "error", "error": "stage_effect_not_found"})
+				_ = c.SendJSON(map[string]any{"type": "error", "error": "stage_effect_not_found"})
 				return
 			}
 
@@ -812,12 +825,12 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			authorized, err := stageEffectAuthorized(ctx, pool, effect, c.UserID)
 			if err != nil {
 				cancel()
-				_ = c.Conn.WriteJSON(map[string]any{"type": "error", "error": "access_check_failed"})
+				_ = c.SendJSON(map[string]any{"type": "error", "error": "access_check_failed"})
 				return
 			}
 			if !authorized {
 				cancel()
-				_ = c.Conn.WriteJSON(map[string]any{"type": "error", "error": "forbidden"})
+				_ = c.SendJSON(map[string]any{"type": "error", "error": "forbidden"})
 				return
 			}
 
@@ -825,7 +838,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 				pinned, ok := stageEffectRegistry.Pin(sessionID, effectID)
 				if !ok {
 					cancel()
-					_ = c.Conn.WriteJSON(map[string]any{"type": "error", "error": "stage_effect_not_found"})
+					_ = c.SendJSON(map[string]any{"type": "error", "error": "stage_effect_not_found"})
 					return
 				}
 				msgOut, _ := json.Marshal(map[string]any{"type": "stage_effect_pinned", "data": pinned})
@@ -849,7 +862,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			cancel()
 
 			if err != nil {
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": err.Error(),
 				})
@@ -887,7 +900,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			if err != nil {
 				var denied *actions.ActionDeniedError
 				if errors.As(err, &denied) {
-					_ = c.Conn.WriteJSON(map[string]any{
+					_ = c.SendJSON(map[string]any{
 						"type":  "error",
 						"error": denied.Reason,
 					})
@@ -895,7 +908,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					return
 				}
 
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": err.Error(),
 				})
@@ -943,7 +956,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			if err != nil {
 				var denied *actions.ActionDeniedError
 				if errors.As(err, &denied) {
-					_ = c.Conn.WriteJSON(map[string]any{
+					_ = c.SendJSON(map[string]any{
 						"type":  "error",
 						"error": denied.Reason,
 					})
@@ -951,7 +964,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					return
 				}
 
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": err.Error(),
 				})
@@ -1005,7 +1018,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			if err != nil {
 				var denied *actions.ActionDeniedError
 				if errors.As(err, &denied) {
-					_ = c.Conn.WriteJSON(map[string]any{
+					_ = c.SendJSON(map[string]any{
 						"type":  "error",
 						"error": denied.Reason,
 					})
@@ -1013,7 +1026,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					return
 				}
 
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": err.Error(),
 				})
@@ -1073,7 +1086,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			if err != nil {
 				var denied *actions.ActionDeniedError
 				if errors.As(err, &denied) {
-					_ = c.Conn.WriteJSON(map[string]any{
+					_ = c.SendJSON(map[string]any{
 						"type":  "error",
 						"error": denied.Reason,
 					})
@@ -1081,7 +1094,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					return
 				}
 
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": err.Error(),
 				})
@@ -1145,7 +1158,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			if err != nil {
 				var denied *actions.ActionDeniedError
 				if errors.As(err, &denied) {
-					_ = c.Conn.WriteJSON(map[string]any{
+					_ = c.SendJSON(map[string]any{
 						"type":  "error",
 						"error": denied.Reason,
 					})
@@ -1153,7 +1166,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					return
 				}
 
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": err.Error(),
 				})
@@ -1228,7 +1241,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			if err != nil {
 				var denied *actions.ActionDeniedError
 				if errors.As(err, &denied) {
-					_ = c.Conn.WriteJSON(map[string]any{
+					_ = c.SendJSON(map[string]any{
 						"type":  "error",
 						"error": denied.Reason,
 					})
@@ -1236,7 +1249,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					return
 				}
 
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": err.Error(),
 				})
@@ -1274,7 +1287,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			if err != nil {
 				var denied *actions.ActionDeniedError
 				if errors.As(err, &denied) {
-					_ = c.Conn.WriteJSON(map[string]any{
+					_ = c.SendJSON(map[string]any{
 						"type":  "error",
 						"error": denied.Reason,
 					})
@@ -1282,7 +1295,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					return
 				}
 
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": err.Error(),
 				})
@@ -1322,7 +1335,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			if err != nil {
 				var denied *actions.ActionDeniedError
 				if errors.As(err, &denied) {
-					_ = c.Conn.WriteJSON(map[string]any{
+					_ = c.SendJSON(map[string]any{
 						"type":  "error",
 						"error": denied.Reason,
 					})
@@ -1330,7 +1343,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					return
 				}
 
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": err.Error(),
 				})
@@ -1365,7 +1378,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			if err != nil {
 				var denied *actions.ActionDeniedError
 				if errors.As(err, &denied) {
-					_ = c.Conn.WriteJSON(map[string]any{
+					_ = c.SendJSON(map[string]any{
 						"type":  "error",
 						"error": denied.Reason,
 					})
@@ -1373,7 +1386,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					return
 				}
 
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": err.Error(),
 				})
@@ -1434,7 +1447,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			if err != nil {
 				var denied *actions.ActionDeniedError
 				if errors.As(err, &denied) {
-					_ = c.Conn.WriteJSON(map[string]any{
+					_ = c.SendJSON(map[string]any{
 						"type":  "error",
 						"error": denied.Reason,
 					})
@@ -1442,7 +1455,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					return
 				}
 
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": err.Error(),
 				})
@@ -1475,7 +1488,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			if err != nil {
 				var denied *actions.ActionDeniedError
 				if errors.As(err, &denied) {
-					_ = c.Conn.WriteJSON(map[string]any{
+					_ = c.SendJSON(map[string]any{
 						"type":  "error",
 						"error": denied.Reason,
 					})
@@ -1483,7 +1496,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					return
 				}
 
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": err.Error(),
 				})
@@ -1516,7 +1529,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			if err != nil {
 				var denied *actions.ActionDeniedError
 				if errors.As(err, &denied) {
-					_ = c.Conn.WriteJSON(map[string]any{
+					_ = c.SendJSON(map[string]any{
 						"type":  "error",
 						"error": denied.Reason,
 					})
@@ -1524,7 +1537,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					return
 				}
 
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": err.Error(),
 				})
@@ -1564,7 +1577,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			if err != nil {
 				var denied *actions.ActionDeniedError
 				if errors.As(err, &denied) {
-					_ = c.Conn.WriteJSON(map[string]any{
+					_ = c.SendJSON(map[string]any{
 						"type":  "error",
 						"error": denied.Reason,
 					})
@@ -1572,7 +1585,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					return
 				}
 
-				_ = c.Conn.WriteJSON(map[string]any{
+				_ = c.SendJSON(map[string]any{
 					"type":  "error",
 					"error": err.Error(),
 				})

@@ -1,0 +1,31 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>88B wiring</title></head><body>
+<script src="/lib/stage-runtime/socket.js"></script>
+<script src="/lib/stage-runtime/action-requests.js"></script>
+<script src="/lib/stage-runtime/session-sync.js"></script>
+<script>
+  // Exercise the real three-module chain exactly as the page loads it:
+  // a raw socket frame -> socket.js normalization -> session-sync ->
+  // the registry, with the generic surfaces recorded.
+  window.__generic = [];
+  const registry = window.VictoryStageActionRequests.createActionRequestRegistry();
+  const sync = window.VictoryStageSessionSync.createSessionSync({
+    handleActionError: (id, text, msg) => registry.dispatch(id, text, msg),
+    handleDiceTrayError: () => window.__generic.push("diceTray"),
+    setStageStatus: (t) => window.__generic.push("status:" + t),
+    setMovementLine: () => window.__generic.push("movement"),
+    appendSystemChatNotice: () => window.__generic.push("chat"),
+  });
+  window.__run = (frame, register) => {
+    window.__generic = [];
+    let claimedText = "";
+    if (register) {
+      registry.register(register, (text) => { claimedText = text; return true; });
+    }
+    const d = window.VictoryStageSocket.createDispatcher({ onError: () => {} });
+    const normalized = d.dispatch(JSON.stringify(frame));
+    sync.handleSocketMessage(normalized);
+    return { claimedText, generic: window.__generic.slice(), requestId: normalized.requestId };
+  };
+</script>
+</body></html>

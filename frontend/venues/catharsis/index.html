@@ -4274,7 +4274,8 @@
   <script src="/lib/victory-command-palette.js?v=kernel59-1"></script>
   <script src="/venues/catharsis/venue.js?v=kernel72-1"></script>
   <script src="/lib/stage-runtime/state.js?v=kernel72-1"></script>
-  <script src="/lib/stage-runtime/socket.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/socket.js?v=kernel88b-1"></script>
+  <script src="/lib/stage-runtime/action-requests.js?v=kernel88b-1"></script>
   <script src="/lib/stage-runtime/logic.js?v=kernel75-1"></script>
   <script src="/lib/stage-runtime/geometry.js?v=kernel72-2"></script>
   <script src="/lib/stage-runtime/stage-controls.js?v=kernel72-1"></script>
@@ -4285,14 +4286,14 @@
   <script src="/lib/stage-runtime/dice-projection.js?v=kernel86-1"></script>
   <script src="/lib/stage-runtime/action-router.js?v=kernel72-1"></script>
   <script src="/lib/stage-runtime/socket-controller.js?v=kernel72-1"></script>
-  <script src="/lib/stage-runtime/session-sync.js?v=kernel72-1"></script>
+  <script src="/lib/stage-runtime/session-sync.js?v=kernel88b-1"></script>
   <script src="/lib/stage-runtime/editors.js?v=kernel72-1"></script>
   <script src="/lib/stage-runtime/lifecycle.js?v=kernel72-1"></script>
   <script src="/lib/stage-runtime/context.js?v=kernel72-1"></script>
   <script src="/lib/stage-runtime/program-panel.js?v=aftercare-layout-1"></script>
   <script src="/lib/stage-runtime/participant-interactions.js?v=character-maker-guidance-1"></script>
   <script src="/lib/stage-runtime/kernel85-cohort-tools.js?v=kernel88a-1"></script>
-  <script src="/lib/stage-runtime/kernel88-socio-player-hud.js?v=kernel88a-1"></script>
+  <script src="/lib/stage-runtime/kernel88-socio-player-hud.js?v=kernel88b-1"></script>
   <script src="/lib/stage-runtime/drawing.js?v=kernel87-1"></script>
   <script>
     window.VictoryDiscordAudio?.mount({
@@ -4306,7 +4307,7 @@
       window.__catharsisBootWiring = true;
 
       const script = document.createElement("script");
-      script.src = "/lib/stage-runtime/runtime.js?v=kernel88-1";
+      script.src = "/lib/stage-runtime/runtime.js?v=kernel88b-1";
       script.dataset.victoryRuntime = "catharsis";
       script.addEventListener("load", () => {
         window.VictoryStage?.start?.();

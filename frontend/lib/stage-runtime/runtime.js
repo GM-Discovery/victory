@@ -548,6 +548,12 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       // is filled in automatically; actor identity is resolved server-side
       // from the authenticated connection, never read from this payload).
       sendAction: (type, extra) => sendAction(type, extra),
+      // Kernel 88B: claim the server's error reply for a request_id this
+      // module is about to send, so a refusal lands next to the control the
+      // Player pressed instead of only in the generic stage surfaces.
+      // Returns an unregister function. See registerActionRequest.
+      registerActionRequest: (requestId, handler, timeoutMs) =>
+        registerActionRequest(requestId, handler, timeoutMs),
     };
 
     function loadPixiLibrary() {
@@ -2537,6 +2543,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       handleDiceTrayAction: (action) => diceTray?.handleAction?.(action),
       handleDiceTrayError: (errorText, message) => diceTray?.handleError?.(errorText, message),
       rejectPendingDiceTrayRolls: (reason) => diceTray?.rejectPendingRolls?.(reason),
+      handleActionError: (requestId, errorText, message) => dispatchActionError(requestId, errorText, message),
       handleStageEffect: (effect) => diceProjection?.enqueue?.(effect),
       handleStageEffectPinned: (effect) => diceProjection?.applyPinned?.(effect),
       handleStageEffectDismissed: (effectId) => diceProjection?.removePinned?.(effectId),
@@ -4888,6 +4895,25 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
 
     function sendAction(type, extra = {}) {
       return socketController?.sendAction?.(type, extra) || false;
+    }
+
+    // Kernel 88B: per-request error routing, so a module that sent an action
+    // learns when the server refuses it instead of the failure surfacing only
+    // as generic stage noise. See action-requests.js for the full rationale.
+    // Degrade rather than take the stage down with it: error routing is a
+    // nicety, but a missing script tag throwing here would leave the venue
+    // with no stage at all. Loud in the console, harmless on screen.
+    const actionRequests = window.VictoryStageActionRequests?.createActionRequestRegistry?.() || (() => {
+      console.error("VictoryStageActionRequests missing -- action errors will not route back to their sender");
+      return { register: () => () => {}, dispatch: () => false, pendingCount: () => 0 };
+    })();
+
+    function registerActionRequest(requestId, handler, timeoutMs) {
+      return actionRequests.register(requestId, handler, timeoutMs);
+    }
+
+    function dispatchActionError(requestId, errorText, message) {
+      return actionRequests.dispatch(requestId, errorText, message);
     }
 
     function buildFocusPingPayload() {

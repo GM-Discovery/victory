@@ -349,3 +349,158 @@ The HUD reports "Roll sent." on a successful socket write, but the server's
 has no listener on the socket, only `sendAction`. A rejected roll is therefore
 still silent. Worth a Kernel 88B: route WS errors carrying a `request_id` back
 to whichever module originated that request.
+
+---
+
+# Kernel 88B — Per-Request Error Routing (2026-08-15)
+
+Closes the gap flagged at the end of the 88A pass: an action refused by the
+server produced a `{type:"error", request_id}` frame that only ever reached
+generic surfaces (stage status line, movement line, system chat notice, dice
+tray). The module that *sent* the action never learned it had failed. The Socio
+HUD's mechanic roll was the motivating case — "Roll sent.", then nothing.
+
+## Design
+
+A module registers the `request_id` it is about to send, paired with a handler.
+If an error for that id arrives, the handler runs and **claims** the error, and
+the generic surfaces stand down. Claiming matters for more than tidiness: the
+generic path appends a system chat notice, so an unclaimed private failure gets
+announced to the whole room.
+
+New module `frontend/lib/stage-runtime/action-requests.js`
+(`createActionRequestRegistry`) — deliberately a separate UMD module in the
+style of `socket.js`/`session-sync.js` rather than a closure inside
+`runtime.js`, because `runtime.js` is browser-only and untestable outside a
+page. Extracting it made the registry unit-testable in plain Node.
+
+Chain: `socket.js` normalization now carries `requestId` → `session-sync.js`
+offers the error to `deps.handleActionError` first and returns early if claimed
+→ `runtime.js` owns the registry and exposes `registerActionRequest` on
+`VictoryStageKernel88Bridge`.
+
+Deliberate properties:
+- **Fails open.** An unknown id, a missing id, a handler returning `false`, or a
+  handler that throws all leave the error unclaimed and fall through to the old
+  behaviour. The cost of failing open is a duplicate message; the cost of
+  failing closed is a silent failure, which is the bug being fixed.
+- **Registrations expire** (15s default). The common outcome is success, which
+  produces no reply at all, so without expiry every successful action would leak
+  a handler for the life of the page.
+- **Register before send.** A server that refuses faster than `sendAction`
+  returns must still find a handler waiting; a send that fails withdraws its
+  registration rather than leaving one waiting for a reply that cannot come.
+- **Degrades loudly.** `runtime.js` falls back to a no-op registry with a
+  console error if the module is missing, rather than throwing and taking the
+  entire stage down for a non-essential feature.
+
+## Server side: no change needed, and why
+
+Audited all 45 error writes in `network/ws.go`. Exactly two handlers accept a
+`request_id` at all — `roll/dice` and `roll/dice_own_mechanic` — and both echo
+it on **both** of their error branches. So the invariant "every handler that
+receives a request_id echoes it on every error path" already holds. The other
+43 error writes belong to actions whose senders never supply an id; those
+frames route to the generic surfaces exactly as before (pinned by a test).
+
+Retrofitting `request_id` across every action type was considered and rejected:
+it is broad regression surface with no consumer asking for it. It should be
+driven by the second module that actually needs it.
+
+## Verification
+
+- `scripts/smoke/kernel88b-action-error-routing-test.js` — 14/14, plain Node
+  (these modules are UMD factories). Covers delivery, unknown/missing id,
+  explicit decline, throwing handler, once-only delivery, expiry, withdrawal,
+  re-registration replacing rather than stacking, and both socket normalization
+  cases.
+- `scripts/smoke/kernel88b-wiring-browser.js` — loads socket.js,
+  action-requests.js and session-sync.js into a real browser in the venue
+  pages' load order and pushes a raw frame through the whole chain. This is the
+  part the Node tests cannot reach, since `runtime.js` is browser-only.
+- `scripts/smoke/kernel88a-player-hud-browser.js` — now 16/16, extended with
+  the HUD's half of the contract: registers before sending, registered id
+  matches the sent id, a refusal appears on the HUD naming the mechanic, the
+  error is claimed, and a roll that cannot be sent withdraws its handler.
+- Go suite green; no backend change in this pass.
+
+## Known gap (closed same day -- see Kernel 88C below)
+
+The `ws.go` error paths wrote via `c.Conn.WriteJSON` directly, so the server's
+error branches could not be exercised by the existing `handleCavePayload` test
+seam. Verifying the request_id echo invariant meant reading the six relevant
+lines rather than testing them. Closed by the 88C pass below -- which found a
+real concurrency defect sitting underneath it.
+
+---
+
+# Kernel 88C — WebSocket Write Consolidation (2026-08-16)
+
+Closes 88B's known gap. Started as a testability refactor; the audit found a
+real concurrency defect underneath it.
+
+## The actual bug: two goroutines writing one connection
+
+Every venue and storyboard socket runs `writePump` in its own goroutine,
+draining `Client.Send` with `Conn.WriteMessage`. Meanwhile 51 handler call
+sites wrote to the *same* connection directly with `c.Conn.WriteJSON`, from the
+read goroutine.
+
+`gorilla/websocket` supports exactly one concurrent writer. Any broadcast
+landing while a handler was replying was a `concurrent write to websocket
+connection` panic waiting on timing. It had presumably never fired often enough
+to be noticed, but nothing prevented it -- it was luck, not design. Two sockets
+were affected (`network/ws.go`, `storyboards/ws.go`), both with the same shape.
+
+## The change
+
+New `Client.SendJSON` queues onto the same `Send` channel the writePump drains,
+so the connection has exactly one writer by construction. All 51 direct writes
+converted; `network` and `storyboards` now pass `go test -race`.
+
+Four writes deliberately remain on `conn.WriteJSON`: the handshake sequence
+(snapshot, presence snapshot, pinned stage effects, and their failure reply).
+Those run *before* `go writePump(client)` starts, so that goroutine is provably
+the only writer, and each needs its error synchronously to abandon the
+connection -- queuing would hand the failure to a goroutine that does not exist
+yet. Marked with a comment saying so, since they otherwise look like misses.
+
+Two consequences worth recording:
+
+- **`CloseSend` + `closeSendOnce`.** The session-revocation path used to write
+  a `session_revoked` notice and immediately `Conn.Close()`. Queuing the notice
+  and then closing the socket would usually lose it, so that path now closes
+  the *channel* instead: writePump drains the buffer, delivers the notice, then
+  its deferred `Conn.Close` tears down the socket. That gave `Send` a second
+  closer alongside `Hub.Remove`, and closing a channel twice panics -- hence the
+  `sync.Once` guard. Pinned by `TestCloseSendIsIdempotent` and
+  `TestQueuedMessageSurvivesCloseSend`.
+- **Buffer raised 16 -> 64** on both sockets. Per-client replies used to bypass
+  the buffer entirely, so 16 was sized for broadcast traffic alone. Now every
+  write shares it, and overflow drops a *reply*, not just a broadcast frame.
+
+## What this unlocked
+
+`kernel88b_ws_error_reply_test.go` -- 9 tests, all previously impossible.
+Every client in it is built with a **nil `Conn`**, which is the structural
+proof: a handler still writing to the connection directly would panic rather
+than fail an assertion.
+
+The 88B invariant is now enforced rather than asserted by inspection: both
+`roll/dice` and `roll/dice_own_mechanic` echo `request_id` on their denial
+branch *and* their store-failure branch, and omit the key entirely when the
+client sent none (an empty-string id would be a trap -- the client treats "" as
+"nobody is waiting"). Also covers the server-authored-event rejection,
+ping/pong, and SendJSON's drop-rather-than-block contract, since blocking there
+would wedge the read loop.
+
+## Verification
+
+- 9 new Go tests in `internal/network`; full Go suite green.
+- `go test -race ./internal/network/ ./internal/storyboards/` clean.
+- Deployed. Live `/ws/catharsis` and `/ws/storyboards` reject unauthenticated
+  upgrades cleanly (403/401) with no hang or panic; no errors in the logs after
+  restart.
+- All four frontend proofs re-run green (14/14, wiring OK, 16/16, 7/7).
+- Stale comment in `kernel86_stage_effect_test.go` that documented the old
+  untestability corrected rather than left to mislead.

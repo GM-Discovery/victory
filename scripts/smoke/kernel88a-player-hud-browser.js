@@ -81,6 +81,46 @@ function check(name, ok, detail) {
     sent.length === 1 && sent[0].type === "roll/dice_own_mechanic" && sent[0].extra.skill_id === "insight",
     JSON.stringify(sent));
 
+  // --- Kernel 88B: the HUD claims its own roll failures -------------------
+  const registration = await page.evaluate(() => {
+    const reg = window.__registered;
+    return {
+      count: reg.length,
+      requestId: reg[0]?.requestId || "",
+      sentRequestId: window.__sent[0]?.extra?.request_id || "",
+      registeredBeforeSend: reg[0]?.at === 0,
+    };
+  });
+  check("the roll registers its request id before sending",
+    registration.count === 1 && registration.registeredBeforeSend,
+    JSON.stringify(registration));
+  check("the registered id is the id actually sent",
+    registration.requestId !== "" && registration.requestId === registration.sentRequestId,
+    `${registration.requestId} vs ${registration.sentRequestId}`);
+
+  const refusal = await page.evaluate(() => {
+    const claimed = window.__registered[0].handler("not_your_turn", {});
+    return { claimed, status: document.querySelector("[data-status]")?.textContent || "" };
+  });
+  check("a refused roll is reported on the HUD, not left silent",
+    refusal.status.includes("not_your_turn") && refusal.status.includes("Insight"),
+    JSON.stringify(refusal));
+  check("the HUD claims the error so it is not announced to the room",
+    refusal.claimed === true);
+
+  // A roll that never leaves the socket must withdraw its registration.
+  await page.evaluate(() => { window.__sendFails = true; });
+  await page.click("[data-roll-skill]");
+  await page.waitForTimeout(150);
+  const failedSend = await page.evaluate(() => ({
+    unregistered: window.__unregistered.length,
+    status: document.querySelector("[data-status]")?.textContent || "",
+  }));
+  check("a roll that cannot be sent withdraws its handler",
+    failedSend.unregistered === 1 && failedSend.status.includes("not connected"),
+    JSON.stringify(failedSend));
+  await page.evaluate(() => { window.__sendFails = false; });
+
   // --- Stance wheel is one hue -------------------------------------------
   // Chromium serializes hsl() back out as rgb(), so read the rendered colours
   // and recompute the hue rather than pattern-matching the authored string.

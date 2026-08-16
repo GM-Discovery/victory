@@ -110,7 +110,16 @@
 
       if (msg.type === "error") {
         handlers.onError(String(msg.error || "action_denied"), msg);
-        return { kind: "error", error: String(msg.error || "action_denied"), message: msg };
+        // Kernel 88B: request_id is echoed back by every server error path
+        // that received one, which is what lets the module that originated
+        // the action claim its own failure instead of the error surfacing
+        // only as generic stage noise.
+        return {
+          kind: "error",
+          error: String(msg.error || "action_denied"),
+          requestId: String(msg.request_id || ""),
+          message: msg,
+        };
       }
 
       // Kernel 86: a transient/static dice projection derived from a

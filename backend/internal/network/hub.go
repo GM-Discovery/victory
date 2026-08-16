@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"sync"
 
@@ -15,6 +16,12 @@ type Client struct {
 	UserID    string
 	SessionID string
 	Presence  PresenceUser
+
+	// closeSendOnce guards close(Send). Kernel 88B gave the channel a second
+	// closer -- the session-revocation path, which queues a final notice and
+	// then needs writePump to drain it and shut down -- and closing a channel
+	// twice panics.
+	closeSendOnce sync.Once
 
 	// WatchingProfileID is set by a client on the lightweight player-profile
 	// websocket (ServeProfileWS) to declare which Player Workbook/Face it
@@ -40,6 +47,42 @@ type Hub struct {
 	presence *PresenceRegistry
 }
 
+// SendJSON queues a message for delivery to this one client.
+//
+// Kernel 88B: every write to a connection must go through the client's Send
+// channel, which the single writePump goroutine drains. Handlers used to call
+// c.Conn.WriteJSON directly from the read goroutine while writePump wrote from
+// its own -- gorilla/websocket supports exactly one concurrent writer, so that
+// was a latent "concurrent write to websocket connection" panic that only
+// needed a broadcast to land while a handler was replying. Routing all writes
+// through the one channel removes the race by construction rather than by
+// timing luck.
+//
+// It also makes replies observable: a test can read Send, whereas a direct
+// Conn write needs a live socket. That is what previously made every WS error
+// path untestable while the success paths (already channel-based) were fine.
+//
+// Drop-on-full matches Hub.Broadcast: a client too slow to drain its buffer is
+// dropped rather than allowed to block the read loop. Returns false when the
+// message could not be queued.
+func (c *Client) SendJSON(payload any) bool {
+	if c == nil || c.Send == nil {
+		return false
+	}
+	msg, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("websocket reply marshal failed: %v", err)
+		return false
+	}
+	select {
+	case c.Send <- msg:
+		return true
+	default:
+		log.Printf("dropping slow websocket client")
+		return false
+	}
+}
+
 func NewHub() *Hub {
 	return &Hub{
 		clients:  make(map[*Client]struct{}),
@@ -57,7 +100,18 @@ func (h *Hub) Remove(c *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	delete(h.clients, c)
-	close(c.Send)
+	c.CloseSend()
+}
+
+// CloseSend closes the client's outbound channel exactly once. writePump
+// drains whatever is still buffered before exiting, so a message queued
+// immediately before this call is still delivered, and writePump's deferred
+// Conn.Close is what actually tears the socket down.
+func (c *Client) CloseSend() {
+	if c == nil || c.Send == nil {
+		return
+	}
+	c.closeSendOnce.Do(func() { close(c.Send) })
 }
 
 func (h *Hub) Broadcast(msg []byte) {
@@ -126,8 +180,13 @@ func (h *Hub) RevalidateSessions(ctx context.Context, pool *pgxpool.Pool) {
 			checked[c.UserID] = stillValid
 		}
 		if !stillValid {
-			_ = c.Conn.WriteJSON(map[string]any{"type": "error", "error": "session_revoked"})
-			_ = c.Conn.Close()
+			// Queue the notice, then close the channel rather than the socket:
+			// writePump drains the buffer first, so the client learns *why* it
+			// was disconnected instead of just seeing the socket drop. Closing
+			// Conn directly here would race writePump for the connection's
+			// single writer slot, which is the bug this pass removes.
+			c.SendJSON(map[string]any{"type": "error", "error": "session_revoked"})
+			c.CloseSend()
 		}
 	}
 }

@@ -97,7 +97,9 @@ func ServeStoryboardWS(hub *network.Hub, pool *pgxpool.Pool, reg *venuecoordinat
 
 		client := &network.Client{
 			Conn:   conn,
-			Send:   make(chan []byte, 16),
+			// See the venue socket's buffer comment (network/ws.go): Kernel
+			// 88B moved this socket's replies onto the same channel too.
+			Send:   make(chan []byte, 64),
 			UserID: userID,
 		}
 		hub.Add(client)
@@ -179,7 +181,7 @@ func handleWatchBoard(connCtx context.Context, hub *network.Hub, pool *pgxpool.P
 
 	board, err := LoadBoard(ctx, pool, boardID)
 	if err != nil {
-		_ = c.Conn.WriteJSON(map[string]any{"type": "error", "error": "storyboard_not_found"})
+		_ = c.SendJSON(map[string]any{"type": "error", "error": "storyboard_not_found"})
 		return
 	}
 	allowed, err := CanViewBoard(ctx, pool, c.UserID, board)
@@ -188,7 +190,7 @@ func handleWatchBoard(connCtx context.Context, hub *network.Hub, pool *pgxpool.P
 		// board existence/access by watch-spamming IDs -- the error
 		// response is identical whether the board doesn't exist or
 		// the caller just isn't authorized for it.
-		_ = c.Conn.WriteJSON(map[string]any{"type": "error", "error": "not_authorized"})
+		_ = c.SendJSON(map[string]any{"type": "error", "error": "not_authorized"})
 		return
 	}
 
@@ -207,11 +209,11 @@ func handleWatchBoard(connCtx context.Context, hub *network.Hub, pool *pgxpool.P
 
 	snap, err := ProjectBoardSnapshot(ctx, pool, c.UserID, board)
 	if err != nil {
-		_ = c.Conn.WriteJSON(map[string]any{"type": "error", "error": "snapshot_failed"})
+		_ = c.SendJSON(map[string]any{"type": "error", "error": "snapshot_failed"})
 		return
 	}
 	attachLiveCoordination(ctx, pool, hub, reg, board, snap)
-	_ = c.Conn.WriteJSON(map[string]any{"type": "snapshot", "data": snap})
+	_ = c.SendJSON(map[string]any{"type": "snapshot", "data": snap})
 
 	if !isFirstOnNewBoard {
 		// Someone joined a board that already had watchers -- tell
