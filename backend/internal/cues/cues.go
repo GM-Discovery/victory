@@ -12,6 +12,7 @@ import (
 	"victory/backend/internal/scenes"
 	"victory/backend/internal/showruns"
 	"victory/backend/internal/shows"
+	"victory/backend/internal/stageobjects"
 )
 
 const cueColumns = `
@@ -63,10 +64,13 @@ func placementShowShowRunLocation(ctx context.Context, pool *pgxpool.Pool, place
 }
 
 // validateCueActions checks structural shape server-side: each action's
-// Type must be one of the three implemented types, with its corresponding
-// typed field present. Show-membership/eligibility of a go_to_scene target
-// is deliberately NOT checked here -- that can change between Cue creation
-// and firing, so it's re-validated fresh at execution time instead.
+// Type must be one of the implemented types, with its corresponding typed
+// field present. Show-membership/eligibility of a go_to_scene target is
+// deliberately NOT checked here -- that can change between Cue creation
+// and firing, so it's re-validated fresh at execution time instead. Kernel
+// 90's stage-object targets follow that same rule for the same reason: an
+// object can be deleted between authoring and the GO press, so ResolveRef
+// runs at execution, not here.
 func validateCueActions(list []CueAction) error {
 	for _, a := range list {
 		switch a.Type {
@@ -81,6 +85,25 @@ func validateCueActions(list []CueAction) error {
 		case ActionTypeSetShowVariable:
 			if a.SetShowVariable == nil || strings.TrimSpace(a.SetShowVariable.Key) == "" {
 				return errors.New("set_show_variable_key_required")
+			}
+		case ActionTypeRevealObject, ActionTypeHideObject,
+			ActionTypeEnableInteraction, ActionTypeDisableInteraction:
+			// Kernel 90 §22: authoring requires canonical identity to be
+			// PRESENT and well-formed. Requiring both halves here is what
+			// makes it impossible to author a Cue whose target is a label or
+			// a coordinate -- there is no field for one.
+			if a.StageObject == nil ||
+				strings.TrimSpace(a.StageObject.ObjectKind) == "" ||
+				strings.TrimSpace(a.StageObject.ObjectID) == "" {
+				return errors.New("stage_object_target_required")
+			}
+			// The kind is checked against the closed canonical set at
+			// authoring time (unlike the id, which is a row that may come and
+			// go), so a Cue can never be saved pointing at an ephemeral
+			// effect -- §39's "Cue cannot target unsupported ephemeral
+			// effect" holds before the Cue is ever fired.
+			if !stageobjects.IsSupportedKind(a.StageObject.ObjectKind) {
+				return errors.New("unsupported_object_kind")
 			}
 		default:
 			return errors.New("unknown_cue_action_type")

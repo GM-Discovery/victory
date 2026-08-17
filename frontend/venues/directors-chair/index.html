@@ -853,6 +853,41 @@
         <div id="aftercare-table"><p class="muted">Select a Show to see its Aftercare.</p></div>
       </div>
     </section>
+
+    <!--
+      Kernel 89 §3: the Director's Chair is where preparation is authored.
+      What lives here is only what a Director wants to think about BEFORE
+      the room fills up -- target complexities and announcement wording.
+
+      What deliberately does NOT live here: anything that needs the live
+      stage in front of you. Exposing a merchant to a Cohort, sending
+      Aftercare, and pushing an announcement all happen in the venue,
+      because each of them is a decision about a moment. §3's other half --
+      "do not require the Director to leave the live venue just to use
+      already-prepared material" -- is why the same records are editable
+      from the venue's Roll Prep and Announce panels too.
+    -->
+    <section class="content">
+      <div class="card">
+        <h2>Preparations</h2>
+        <p class="muted small">
+          Prepared values you can recall mid-scene. Recalling one shows it to you —
+          it never rolls, never picks a skill, and never decides what a Player may attempt.
+        </p>
+        <div id="prep-status" class="status"></div>
+        <div class="form-grid">
+          <label>
+            Show Run
+            <select id="prep-show-run"><option value="">Loading…</option></select>
+          </label>
+          <label>
+            Show
+            <select id="prep-show"><option value="">Select a Show Run first</option></select>
+          </label>
+        </div>
+        <div id="prep-body"><p class="muted">Select a Show to prepare for it.</p></div>
+      </div>
+    </section>
   </div>
 
   <script>
@@ -1963,6 +1998,186 @@
     });
     aftercareFilter?.addEventListener("input", renderAftercareRows);
 
+    // --- Kernel 89: Preparations -------------------------------------------
+
+    const prepShowRunSelect = document.getElementById("prep-show-run");
+    const prepShowSelect = document.getElementById("prep-show");
+    const prepBody = document.getElementById("prep-body");
+    const prepStatus = document.getElementById("prep-status");
+    const PREP_STORAGE_KEY = "victory:directors-chair:preparations";
+    let prepAnnouncementStyles = [];
+
+    function prepRemember(runId, showId) {
+      try {
+        window.localStorage.setItem(PREP_STORAGE_KEY, JSON.stringify({ runId, showId }));
+      } catch (_error) { /* private browsing */ }
+    }
+
+    function prepRecall() {
+      try {
+        return JSON.parse(window.localStorage.getItem(PREP_STORAGE_KEY) || "null") || null;
+      } catch (_error) { return null; }
+    }
+
+    async function prepFetch(url, options) {
+      const response = await fetch(url, { credentials: "include", headers: { "Content-Type": "application/json" }, ...(options || {}) });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.ok === false) {
+        throw new Error(payload?.data?.error || payload?.error || ("request_failed_" + response.status));
+      }
+      return payload?.data ?? payload;
+    }
+
+    async function loadPreparationShowRuns() {
+      const data = await prepFetch("/api/show-runs");
+      const runs = data.show_runs || data.runs || [];
+      prepShowRunSelect.innerHTML = "";
+      const blank = document.createElement("option");
+      blank.value = "";
+      blank.textContent = runs.length ? "Select a Show Run" : "No Show Runs yet";
+      prepShowRunSelect.appendChild(blank);
+      for (const run of runs) {
+        const option = document.createElement("option");
+        option.value = run.id;
+        option.textContent = run.title || run.slug || run.id;
+        prepShowRunSelect.appendChild(option);
+      }
+      const remembered = prepRecall();
+      if (remembered?.runId && runs.some((r) => r.id === remembered.runId)) {
+        prepShowRunSelect.value = remembered.runId;
+        await loadPreparationShows(remembered.runId, remembered.showId);
+      }
+    }
+
+    async function loadPreparationShows(runId, preselectShowId) {
+      prepShowSelect.innerHTML = "";
+      prepBody.innerHTML = '<p class="muted">Select a Show to prepare for it.</p>';
+      if (!runId) {
+        const blank = document.createElement("option");
+        blank.value = "";
+        blank.textContent = "Select a Show Run first";
+        prepShowSelect.appendChild(blank);
+        return;
+      }
+      const data = await prepFetch("/api/show-runs/" + encodeURIComponent(runId) + "/shows");
+      const shows = data.shows || [];
+      const blank = document.createElement("option");
+      blank.value = "";
+      blank.textContent = shows.length ? "Select a Show" : "No Shows yet";
+      prepShowSelect.appendChild(blank);
+      for (const show of shows) {
+        const option = document.createElement("option");
+        option.value = show.id;
+        option.textContent = show.title || show.slug || show.id;
+        prepShowSelect.appendChild(option);
+      }
+      if (preselectShowId && shows.some((s) => s.id === preselectShowId)) {
+        prepShowSelect.value = preselectShowId;
+        await renderPreparations(preselectShowId);
+      }
+    }
+
+    async function renderPreparations(showId) {
+      if (!showId) {
+        prepBody.innerHTML = '<p class="muted">Select a Show to prepare for it.</p>';
+        return;
+      }
+      prepStatus.textContent = "";
+      prepBody.innerHTML = '<p class="muted">Loading…</p>';
+      let items = [];
+      try {
+        if (!prepAnnouncementStyles.length) {
+          prepAnnouncementStyles = (await prepFetch("/api/announcement-styles")).styles || [];
+        }
+        items = (await prepFetch("/api/shows/" + encodeURIComponent(showId) + "/director-preparations")).preparations || [];
+      } catch (error) {
+        prepBody.innerHTML = "";
+        prepStatus.textContent = "Could not load preparations: " + (error.message || String(error));
+        return;
+      }
+
+      const complexities = items.filter((p) => p.kind === "target_complexity");
+      const announcements = items.filter((p) => p.kind === "announcement");
+
+      const row = (p, detail) => `
+        <div class="prep-row" style="display:flex; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+          <span style="flex:1;"><strong>${escapeHtml(p.label)}</strong> <span class="muted small">${detail}</span></span>
+          <button type="button" class="chip" data-prep-delete="${escapeHtml(p.id)}">Delete</button>
+        </div>`;
+
+      const styleOptions = prepAnnouncementStyles
+        .map((st) => `<option value="${escapeHtml(st.key)}">${escapeHtml(st.label)}</option>`).join("");
+
+      prepBody.innerHTML = `
+        <h3>Target complexities</h3>
+        ${complexities.map((p) => row(p, "TC " + escapeHtml(String(p.payload?.value ?? "?")))).join("")
+          || '<p class="muted small">Nothing prepared yet.</p>'}
+        <div class="form-grid" style="margin-top:8px;">
+          <label>Label <input id="prep-tc-label" type="text" placeholder="Climb Training Wall" /></label>
+          <label>Target complexity <input id="prep-tc-value" type="number" min="1" max="99" placeholder="14" /></label>
+        </div>
+        <div class="form-actions"><button type="button" class="button" id="prep-tc-save">Save target complexity</button></div>
+
+        <h3 style="margin-top:18px;">Announcements</h3>
+        ${announcements.map((p) => row(p, escapeHtml(String(p.payload?.style || "")) + " — " + escapeHtml(String(p.payload?.text || "")))).join("")
+          || '<p class="muted small">Nothing saved yet. The full preset palette is always available in the venue.</p>'}
+        <div class="form-grid" style="margin-top:8px;">
+          <label>Name <input id="prep-ann-label" type="text" placeholder="Wall collapses" /></label>
+          <label>Style <select id="prep-ann-style">${styleOptions}</select></label>
+          <label>Words <input id="prep-ann-text" type="text" maxlength="160" placeholder="The training wall gives way!" /></label>
+        </div>
+        <div class="form-actions"><button type="button" class="button" id="prep-ann-save">Save announcement</button></div>
+      `;
+
+      document.getElementById("prep-tc-save")?.addEventListener("click", async () => {
+        const label = document.getElementById("prep-tc-label").value.trim();
+        const value = Number(document.getElementById("prep-tc-value").value || 0);
+        if (!label || !value) { prepStatus.textContent = "A label and a number are both required."; return; }
+        try {
+          await prepFetch("/api/shows/" + encodeURIComponent(showId) + "/director-preparations", {
+            method: "POST",
+            body: JSON.stringify({ kind: "target_complexity", label, payload: { value } }),
+          });
+          await renderPreparations(showId);
+        } catch (error) { prepStatus.textContent = "Save failed: " + (error.message || String(error)); }
+      });
+
+      document.getElementById("prep-ann-save")?.addEventListener("click", async () => {
+        const label = document.getElementById("prep-ann-label").value.trim();
+        const style = document.getElementById("prep-ann-style").value;
+        const text = document.getElementById("prep-ann-text").value.trim();
+        if (!label) { prepStatus.textContent = "Give the announcement a name so you can find it."; return; }
+        try {
+          await prepFetch("/api/shows/" + encodeURIComponent(showId) + "/director-preparations", {
+            method: "POST",
+            body: JSON.stringify({ kind: "announcement", label, payload: { style, text } }),
+          });
+          await renderPreparations(showId);
+        } catch (error) { prepStatus.textContent = "Save failed: " + (error.message || String(error)); }
+      });
+
+      prepBody.querySelectorAll("[data-prep-delete]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          try {
+            await prepFetch("/api/director-preparations/" + encodeURIComponent(button.dataset.prepDelete), { method: "DELETE" });
+            await renderPreparations(showId);
+          } catch (error) { prepStatus.textContent = "Delete failed: " + (error.message || String(error)); }
+        });
+      });
+    }
+
+    prepShowRunSelect?.addEventListener("change", () => {
+      prepRemember(prepShowRunSelect.value, "");
+      loadPreparationShows(prepShowRunSelect.value, "").catch((error) => {
+        prepStatus.textContent = "Could not load Shows: " + (error.message || String(error));
+      });
+    });
+    prepShowSelect?.addEventListener("change", () => {
+      prepRemember(prepShowRunSelect.value, prepShowSelect.value);
+      renderPreparations(prepShowSelect.value);
+    });
+
+
     (async () => {
       try {
         const response = await fetch("/api/session/me", { credentials: "include" });
@@ -1988,6 +2203,11 @@
           // failure in the newest section must degrade that section only,
           // never take the Director Console down with it.
           loadAftercareReview().catch(() => {}),
+          // Same fail-soft rule as Aftercare above: a preparations failure
+          // must not blank the Director Console.
+          loadPreparationShowRuns().catch((error) => {
+            prepStatus.textContent = "Could not load Show Runs: " + (error.message || String(error));
+          }),
         ]);
       } catch (error) {
         console.error("director chair bootstrap failed", error);

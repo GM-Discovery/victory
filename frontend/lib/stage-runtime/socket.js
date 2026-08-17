@@ -145,6 +145,13 @@
         return { kind: "stage_effects_pinned", effects: Array.isArray(msg.data) ? msg.data : [], message: msg };
       }
 
+      // Kernel 89 §17: the Director asked this specific Player to write
+      // Aftercare. Per-user targeted, never a broadcast -- see
+      // backend/internal/merchant/kernel89_aftercare_send.go.
+      if (msg.type === "aftercare/offer") {
+        return { kind: "aftercare_offer", showId: String(msg.show_id || ""), message: msg };
+      }
+
       if (msg.type === "action") {
         const action = normalizeAction(msg.data || msg.payload || {});
         state?.applyEvent?.(action, { event: msg });

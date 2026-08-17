@@ -580,6 +580,14 @@
         return msg;
       }
 
+      // Kernel 89 §17: open this Player's own Aftercare form. Nothing is
+      // written here -- the Director's send opens a door, it does not
+      // answer anything on the Player's behalf.
+      if (msg.kind === "aftercare_offer") {
+        deps.handleAftercareOffer?.(msg.showId);
+        return msg;
+      }
+
       if (msg.kind === "error") {
         const errorText = String(msg.error || "action_denied");
 

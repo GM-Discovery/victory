@@ -15,6 +15,7 @@ import (
 	"victory/backend/internal/scenes"
 	"victory/backend/internal/showruns"
 	"victory/backend/internal/shows"
+	"victory/backend/internal/stageobjects"
 )
 
 const participantInteractionColumns = `
@@ -278,6 +279,26 @@ func ResolveEligibleContext(ctx context.Context, pool *pgxpool.Pool, actorUserID
 		return EligibleContext{}, err
 	}
 
+	// Kernel 90 §35/§53: the Director may have disabled this interaction for
+	// the rest of this Show. Enforced HERE, at the same single Player-
+	// eligibility gate Kernel 89 §9.3's cohort targeting chose, so
+	// exposure/open/stance/haggle/purchase all inherit it without a second
+	// check to keep in sync.
+	//
+	// This is the difference between an interaction that is not offered and
+	// one that is disabled: world/snapshot.go stops advertising it to the
+	// client, and this refuses the Player who calls anyway. Distinct from
+	// interaction.Enabled checked above -- that is the global authoring
+	// kill-switch, this is in-play Show state (see the bridge documented on
+	// migration 106's interaction_enabled column).
+	invocable, err := stageobjects.InteractionInvocable(ctx, pool, showID, interaction.ID)
+	if err != nil {
+		return EligibleContext{}, err
+	}
+	if !invocable {
+		return EligibleContext{}, errors.New("interaction_disabled")
+	}
+
 	venueSlug, err := resolvePlacementVenueSlug(ctx, pool, interaction.ShowScenePlacementID)
 	if err != nil {
 		return EligibleContext{}, err
@@ -309,6 +330,31 @@ func ResolveEligibleContext(ctx context.Context, pool *pgxpool.Pool, actorUserID
 	participation, err := ResolveShowParticipation(ctx, pool, actorUserID, showID)
 	if err != nil {
 		return EligibleContext{}, err
+	}
+
+	// Kernel 89 §9.3: an interaction may be aimed at ONE Cohort rather than
+	// at every eligible Player on the placement. Enforced here, at the one
+	// Player-eligibility gate every participant action already funnels
+	// through, so exposure/open/stance/haggle/purchase all inherit it
+	// without a second check to keep in sync -- and so a Player who guesses
+	// the interaction id still cannot open a merchant aimed at another
+	// Cohort. There is no whole-Show targeting keyword and no user-list
+	// targeting: §9.3 explicitly keeps that out of this kernel.
+	if targetCohortID := targetCohortIDFromConfig(interaction.ConfigurationJSON); targetCohortID != "" {
+		var inCohort bool
+		if err := pool.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1 FROM show_cohort_assignments a
+				JOIN show_cohorts c ON c.id = a.cohort_id
+				WHERE a.show_id = $1 AND a.user_id = $2
+				  AND a.cohort_id = $3::uuid AND c.archived_at IS NULL
+			)
+		`, showID, actorUserID, targetCohortID).Scan(&inCohort); err != nil {
+			return EligibleContext{}, err
+		}
+		if !inCohort {
+			return EligibleContext{}, errors.New("not_targeted")
+		}
 	}
 
 	var sessionID string
@@ -391,6 +437,16 @@ func ListTriggerableInteractionsForViewer(ctx context.Context, pool *pgxpool.Poo
 		out = append(out, PlayerVisibleInteraction{ID: it.ID, Label: it.StageButtonLabel, InteractionType: it.InteractionType})
 	}
 	return out, nil
+}
+
+// targetCohortIDFromConfig reads Kernel 89's optional Cohort target.
+// Absent/blank means "every eligible Player on this placement", which is
+// the Kernel 73 behaviour every existing interaction keeps unchanged.
+func targetCohortIDFromConfig(config map[string]any) string {
+	if v, ok := config["target_cohort_id"].(string); ok {
+		return strings.TrimSpace(v)
+	}
+	return ""
 }
 
 func packetSlugFromConfig(config map[string]any) string {

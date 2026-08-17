@@ -813,6 +813,13 @@
       return;
     }
 
+    // Kernel 89 §7: a target complexity the Director prepared and just
+    // recalled prefills this field. It is a prefill and nothing more --
+    // the Director still names the helper and presses Interrupt, and the
+    // server still adjudicates. Recall never rolls and never acts.
+    const recalledTC = window.VictoryKernel89DirectorTools?.recalledTargetComplexity?.() ?? null;
+    const recalledLabel = window.VictoryKernel89DirectorTools?.recalledLabel?.() || "";
+
     const rows = actions.map((a) => {
       const depth = pendingActionDepth(actions, a);
       const isInterrupt = a.kind === "interrupt";
@@ -824,7 +831,7 @@
           </div>
           <div style="margin-top:4px; display:flex; gap:6px;">
             <input type="text" data-helper-card placeholder="Helper Character ID" style="flex:1; background:#20242c; color:#e8e8ec; border:1px solid #454b59; border-radius:4px; font-size:11px; padding:2px 6px;">
-            <input type="number" data-target-complexity placeholder="TC" style="width:50px; background:#20242c; color:#e8e8ec; border:1px solid #454b59; border-radius:4px; font-size:11px;">
+            <input type="number" data-target-complexity placeholder="TC" value="${recalledTC == null ? "" : recalledTC}" title="${recalledTC == null ? "" : "Recalled: " + escapeHtml(recalledLabel)}" style="width:50px; background:#20242c; color:#e8e8ec; border:1px solid #454b59; border-radius:4px; font-size:11px;">
             <button type="button" data-open-interrupt="${a.id}" style="${buttonStyle("padding:2px 6px; font-size:11px;")}">Interrupt</button>
           </div>
           ${isInterrupt ? `
@@ -894,7 +901,14 @@
     const showID = b?.getShowID?.() || "";
     const canManage = Boolean(b?.canManageStage?.());
     const toolbar = ensureToolbar();
-    toolbar.style.display = showID && canManage ? "flex" : "none";
+    // Kernel 89 took over the top-right Director surface and re-presents
+    // these same panels as grouped tool families (§5: one tool button, not
+    // a row of them). When that module is present this file keeps every
+    // panel and drops only its own flat button row -- so removing
+    // kernel89-director-tools.js from a page restores the Kernel 85/88
+    // toolbar rather than leaving the Director with no tools at all.
+    const kernel89OwnsToolbar = window.VictoryDirectorToolbarOwner === "kernel89";
+    toolbar.style.display = showID && canManage && !kernel89OwnsToolbar ? "flex" : "none";
     if (showID !== state.lastShowID) {
       // A different Show came into view -- drop any stale cohort selection
       // and close open panels rather than showing another Show's data.

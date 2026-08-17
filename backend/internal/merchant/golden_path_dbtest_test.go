@@ -242,6 +242,13 @@ type goldenPathFixture struct {
 	interactionID            string
 	showID                   string
 	showRunID                string
+	// Kernel 89 additions -- context the Kernel 73 golden path never
+	// needed but the merchant-authoring/Cohort-targeting/Aftercare-send
+	// tests do. Additive only; nothing above changed.
+	locationID     string
+	directorUserID string
+	placementID    string
+	sessionID      string
 }
 
 func buildGoldenPathFixture(ctx context.Context, t *testing.T, pool *pgxpool.Pool) goldenPathFixture {
@@ -301,6 +308,8 @@ func buildGoldenPathFixture(ctx context.Context, t *testing.T, pool *pgxpool.Poo
 	fx.otherPlayerUserID = mustUser("k73_player2_" + suffix)
 	fx.audienceUserID = mustUser("k73_audience_" + suffix)
 	directorUserID := mustUser("k73_director_" + suffix)
+	fx.locationID = locationID
+	fx.directorUserID = directorUserID
 
 	var showRunID string
 	if err := pool.QueryRow(ctx, `
@@ -388,6 +397,7 @@ func buildGoldenPathFixture(ctx context.Context, t *testing.T, pool *pgxpool.Poo
 	`, fixtureVenueID, fx.showID).Scan(&sessionID); err != nil {
 		t.Fatalf("fixture session: %v", err)
 	}
+	fx.sessionID = sessionID
 	// CanAct (the authority path StoreGameEvent's stance/haggle/purchase
 	// events go through) hard-requires a showings row for the session --
 	// normally created the first time anyone acts in the venue.
@@ -419,6 +429,7 @@ func buildGoldenPathFixture(ctx context.Context, t *testing.T, pool *pgxpool.Poo
 	`, fx.showID, courtyardSceneID, fixtureVenueID).Scan(&placementID); err != nil {
 		t.Fatalf("fixture placement: %v", err)
 	}
+	fx.placementID = placementID
 	if _, err := pool.Exec(ctx, `UPDATE shows SET current_show_scene_placement_id = $2::uuid WHERE id = $1::uuid`, fx.showID, placementID); err != nil {
 		t.Fatalf("fixture set current placement: %v", err)
 	}

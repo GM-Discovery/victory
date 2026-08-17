@@ -103,6 +103,15 @@ type Object struct {
 	StampKey           string         `json:"stamp_key,omitempty"`
 	CreatedAt          time.Time      `json:"created_at"`
 	UpdatedAt          time.Time      `json:"updated_at"`
+
+	// HiddenBackstageOnly reports that this object is hidden from ordinary
+	// viewers by Kernel 90 canonical state, and is present in this response
+	// only because the reader is backstage (§14). Not stored on the row --
+	// visibility lives in stage_object_states, keyed by Show, because Kernel
+	// 87 drawings are Show-scoped while their visibility may differ per Show
+	// viewer. Never true in a response to a viewer who is not permitted to
+	// perceive the object, because such a viewer does not receive the object.
+	HiddenBackstageOnly bool `json:"hidden_backstage_only,omitempty"`
 }
 
 // CreateRequest is the payload for creating one new drawing object.

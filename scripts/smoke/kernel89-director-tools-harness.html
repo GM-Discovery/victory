@@ -1,0 +1,152 @@
+<!doctype html>
+<!--
+  Harness for the Kernel 89 UI proof. It loads the real, unmodified
+  director-tools and announcement modules and gives them the same narrow
+  bridge runtime.js exposes, plus the real context-menu markup and CSS the
+  venues use. Everything under test is the shipping file; only the stage
+  around it is a stand-in.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Kernel 89 Director Tools Harness</title>
+  <style>
+    body { margin: 0; background: #0f0d0b; color: #f5efe4; font-family: system-ui, sans-serif; }
+    #stage-shell { position: absolute; inset: 0; }
+
+    .context-menu {
+      position: fixed; z-index: 220; min-width: 240px; border-radius: 16px;
+      background: rgba(18, 14, 11, 0.98); border: 1px solid rgba(255,255,255,0.12);
+      padding: 8px; pointer-events: auto;
+    }
+    .context-menu[hidden] { display: none; }
+    .context-menu button {
+      width: 100%; display: block; text-align: left; padding: 10px 12px;
+      margin: 0; border: 0; background: transparent; color: #f5efe4;
+      border-radius: 10px; cursor: pointer; font: inherit;
+    }
+    .context-menu .menu-separator { height: 1px; margin: 6px 4px; background: rgba(255,255,255,0.1); }
+    .context-menu .menu-submenu[hidden] { display: none; }
+    .context-menu .menu-submenu {
+      margin: 2px 0 4px 10px; padding-left: 8px;
+      border-left: 2px solid rgba(255,255,255,0.14);
+    }
+    .context-menu button.menu-child { padding: 8px 12px; font-size: 0.94em; }
+  </style>
+</head>
+<body>
+  <div id="stage-shell"></div>
+  <div id="pixi-context-menu" class="context-menu" hidden></div>
+
+  <script>
+    // The narrow read-only bridge, exactly the shape runtime.js publishes.
+    window.VictoryStageKernel88Bridge = {
+      getShowID: () => "11111111-1111-1111-1111-111111111111",
+      getViewerRole: () => "director",
+      canManageStage: () => true,
+      getUserID: () => "22222222-2222-2222-2222-222222222222",
+      getMyCharacterID: () => "",
+      getSessionID: () => "33333333-3333-3333-3333-333333333333",
+      sendAction: (type, extra) => {
+        window.__sentActions = window.__sentActions || [];
+        window.__sentActions.push({ type, extra });
+        return true;
+      },
+      registerActionRequest: () => () => {},
+    };
+    window.VictoryStageKernel85Bridge = window.VictoryStageKernel88Bridge;
+    // Stand-in for the Kernel 85 panels, so the availability filter sees
+    // them present and the family entries are real click targets.
+    window.VictoryKernel85Tools = {
+      __opened: [],
+      openSceneConfiguration() { this.__opened.push("scene"); },
+      openCohortPanel() { this.__opened.push("cohorts"); },
+      openGameStatusPanel() { this.__opened.push("game-status"); },
+      openCurrentTurnPanel() { this.__opened.push("current-turn"); },
+      openInterruptPanel() { this.__opened.push("help-stack"); },
+    };
+  </script>
+
+  <script src="/lib/stage-runtime/logic.js"></script>
+  <script src="/lib/stage-runtime/kernel89-announcements.js"></script>
+  <script src="/lib/stage-runtime/kernel89-director-tools.js"></script>
+
+  <script>
+    // Render a context menu using the SAME renderer runtime.js uses. Copied
+    // rather than imported because runtime.js is a browser-only monolith
+    // that expects a whole venue page; the two blocks must stay in step,
+    // and the test asserts the resulting DOM, which is what actually
+    // matters for the nesting claim.
+    const contextMenu = document.getElementById("pixi-context-menu");
+    function escapeHtml(value) {
+      return String(value == null ? "" : value)
+        .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+    }
+    window.renderStageMenu = function (items) {
+      const renderItem = (item, index, list) => {
+        let separator = "";
+        if (index > 0 && list[index - 1].group !== item.group) {
+          separator = '<div class="menu-separator"></div>';
+        }
+        const disabled = item.disabled ? " disabled" : "";
+        if (Array.isArray(item.submenu) && item.submenu.length) {
+          const children = item.submenu
+            .map((child) => `<button type="button" class="menu-child" data-menu-action="${escapeHtml(child.action)}"${child.disabled ? " disabled" : ""}>${escapeHtml(child.label)}</button>`)
+            .join("");
+          return `${separator}<button type="button" data-menu-submenu="${escapeHtml(item.action)}" aria-expanded="false"${disabled}>${escapeHtml(item.label)} ▸</button><div class="menu-submenu" data-menu-submenu-for="${escapeHtml(item.action)}" hidden>${children}</div>`;
+        }
+        return `${separator}<button type="button" data-menu-action="${escapeHtml(item.action)}"${disabled}>${escapeHtml(item.label)}</button>`;
+      };
+      contextMenu.innerHTML = items.map((item, i) => renderItem(item, i, items)).join("");
+      contextMenu.hidden = false;
+      contextMenu.style.left = "40px";
+      contextMenu.style.top = "40px";
+    };
+
+    contextMenu.addEventListener("click", (event) => {
+      const submenuToggle = event.target.closest("[data-menu-submenu]");
+      if (submenuToggle) {
+        if (submenuToggle.disabled) return;
+        const key = submenuToggle.getAttribute("data-menu-submenu");
+        const panel = contextMenu.querySelector(`[data-menu-submenu-for="${CSS.escape(key)}"]`);
+        const opening = panel && panel.hidden;
+        contextMenu.querySelectorAll("[data-menu-submenu-for]").forEach((el) => { el.hidden = true; });
+        contextMenu.querySelectorAll("[data-menu-submenu]").forEach((el) => el.setAttribute("aria-expanded", "false"));
+        if (panel && opening) {
+          panel.hidden = false;
+          submenuToggle.setAttribute("aria-expanded", "true");
+        }
+        return;
+      }
+      const button = event.target.closest("[data-menu-action]");
+      if (!button || button.disabled) return;
+      window.__menuActions = window.__menuActions || [];
+      window.__menuActions.push(button.getAttribute("data-menu-action"));
+      const action = button.getAttribute("data-menu-action");
+      if (action.startsWith("k89-")) {
+        const tools = window.VictoryKernel89DirectorTools;
+        ({
+          "k89-announce": tools && tools.openAnnouncePanel,
+          "k89-roll-prep": tools && tools.openRollPrepPanel,
+          "k89-merchant": tools && tools.openMerchantPanel,
+          "k89-aftercare": tools && tools.openAftercarePanel,
+          "k89-state": window.VictoryKernel85Tools.openGameStatusPanel.bind(window.VictoryKernel85Tools),
+        }[action] || (() => {}))();
+      }
+      contextMenu.hidden = true;
+    });
+
+    window.openDirectorStageMenu = function () {
+      const items = window.VictoryStageLogic.resolveStageObjectActions(
+        { kind: "stage", key: "stage", label: "Stage", live: false },
+        {
+          role: "director", canManageIndexCards: true, canManageStageTokens: true,
+          canActorRevealHideStageObjects: true, hasSelection: false,
+        });
+      window.renderStageMenu(items);
+      return items.length;
+    };
+  </script>
+</body>
+</html>

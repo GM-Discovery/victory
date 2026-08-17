@@ -40,16 +40,29 @@ func isValidTriggerScope(scope string) bool {
 	}
 }
 
-// Cue action types (Kernel 70 §6.3). This kernel implements exactly these
-// three -- reveal_object/hide_object/enable_interaction/disable_interaction
-// are explicitly deferred (would require extending the per-session
-// visibility-layer derivation in world/snapshot.go to a second show-scoped
-// source, which is the "second object model" the kernel doc says to avoid
-// without a fuller renderer pass).
+// Cue action types (Kernel 70 §6.3).
+//
+// The first three shipped with Kernel 70. The four visibility actions were
+// deferred there for a stated reason -- there was no canonical object
+// identity to target, so implementing them would have meant extending
+// world/snapshot.go's per-session visibility-layer derivation into a second
+// show-scoped source, i.e. building the second object model that kernel doc
+// told us to avoid.
+//
+// Kernel 90 removed that blocker rather than working around it. There is now
+// one canonical object identity (stageobjects.Ref) and one canonical state
+// path (stageobjects.ApplyMutation), and these four actions call exactly the
+// mutation the manual Director controls call. That shared call is what makes
+// Kernel 90 §24's manual/Cue parity structural instead of a coincidence
+// maintained by tests.
 const (
 	ActionTypeGoToScene       = "go_to_scene"
 	ActionTypeEmitGameEvent   = "emit_game_event"
 	ActionTypeSetShowVariable = "set_show_variable"
+	ActionTypeRevealObject       = "reveal_object"
+	ActionTypeHideObject         = "hide_object"
+	ActionTypeEnableInteraction  = "enable_interaction"
+	ActionTypeDisableInteraction = "disable_interaction"
 )
 
 // CueAction is one entry in a Cue's ordered actions array. Exactly one of
@@ -62,6 +75,24 @@ type CueAction struct {
 	GoToScene       *GoToSceneAction       `json:"go_to_scene,omitempty"`
 	EmitGameEvent   *EmitGameEventAction   `json:"emit_game_event,omitempty"`
 	SetShowVariable *SetShowVariableAction `json:"set_show_variable,omitempty"`
+	// StageObject carries the target for all four Kernel 90 visibility
+	// actions. One field rather than four, because the four actions differ
+	// only in which canonical operation they request -- the target shape is
+	// identical, and four identical structs would invite them to drift.
+	StageObject *StageObjectAction `json:"stage_object,omitempty"`
+}
+
+// StageObjectAction targets one durable stage object by canonical identity
+// (Kernel 90 §22).
+//
+// ObjectKind + ObjectID only. Deliberately no selector, no label, no
+// coordinate: §54 makes a DOM selector or screen coordinate as Cue identity
+// a FAIL condition, and the reason is practical rather than stylistic -- a
+// Cue authored today must still resolve after the stage is re-laid out, the
+// object is moved, or its label is edited.
+type StageObjectAction struct {
+	ObjectKind string `json:"object_kind"`
+	ObjectID   string `json:"object_id"`
 }
 
 type GoToSceneAction struct {

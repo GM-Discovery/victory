@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/rollaudience"
+	"victory/backend/internal/stageobjects"
 	"victory/backend/internal/venuecoordination"
 )
 
@@ -293,6 +294,26 @@ func List(ctx context.Context, pool *pgxpool.Pool, sessionID, viewerUserID strin
 		return nil, err
 	}
 
+	// Kernel 90 §28: drawing objects are durable Pixi stage objects with
+	// stable ids, so they join the canonical visibility model. This projector
+	// is what makes a Director-hidden drawing absent from a Player's list
+	// rather than merely dimmed client-side (§36).
+	//
+	// Note the two DIFFERENT scoping mechanisms below, which is deliberate and
+	// not a duplication: drawing_objects.cohort_id is Kernel 87 AUTHORING
+	// scope ("this was drawn on Cohort A's private layer"), while canonical
+	// state is Kernel 90 in-play visibility ("the Director has hidden this").
+	// Both must pass. Collapsing them would mean a Director revealing a
+	// drawing could expose another Cohort's private working layer.
+	projector, err := stageobjects.ProjectorFor(ctx, pool, showID, stageobjects.Viewer{
+		UserID:    viewerUserID,
+		Backstage: isDirector,
+		CohortID:  viewerCohortID.CohortID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	rows, err := pool.Query(ctx, `
 		SELECT id::text, show_id::text, COALESCE(cohort_id::text, ''), creator_user_id::text,
 			COALESCE(creator_character_id::text, ''), object_type, geometry, stroke_color,
@@ -322,6 +343,14 @@ func List(ctx context.Context, pool *pgxpool.Pool, sessionID, viewerUserID strin
 				continue
 			}
 		}
+		ref := stageobjects.Ref{Kind: stageobjects.KindDrawingObject, ID: obj.ID}
+		if !projector.CanPerceive(ref) {
+			continue
+		}
+		// §14: the Director keeps hidden drawings on their working stage and
+		// needs them distinguishable. Only ever true for a viewer already
+		// permitted to perceive the object, so it leaks nothing.
+		obj.HiddenBackstageOnly = projector.HiddenFor(ref)
 		_ = json.Unmarshal(geomRaw, &obj.Geometry)
 		out = append(out, obj)
 	}

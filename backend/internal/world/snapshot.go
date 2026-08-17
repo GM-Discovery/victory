@@ -13,6 +13,7 @@ import (
 
 	"victory/backend/internal/rollaudience"
 	"victory/backend/internal/showings"
+	"victory/backend/internal/stageobjects"
 	"victory/backend/internal/tutorial"
 )
 
@@ -590,45 +591,184 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, view
 
 	snap.Overlay = deriveActiveOverlay(snap.Actions, snap.Elements)
 
-	layerVisibility := deriveElementLayerVisibility(snap.Actions)
+	// Kernel 90: canonical stage-object projection replaces the per-session
+	// act/reveal_element action replay that used to derive an actor/audience
+	// layer binary here (the old deriveElementLayerVisibility /
+	// effectiveAudienceVisible / elementVisibilityForLayer trio, deleted with
+	// this change).
+	//
+	// Three things made the old path the wrong foundation, and all three are
+	// why Kernel 90 §0 called it one of the mechanisms to converge rather
+	// than something to extend:
+	//
+	//   1. Visibility was a derived property of an append-only log, so it
+	//      could not express WHO an object is revealed to -- only "revealed"
+	//      or "hidden" against two fixed layers. Cohort- and
+	//      Character-scoped visibility were unrepresentable.
+	//   2. Being session-scoped, it did not survive Kernel 70A's session
+	//      replacement, so hidden state silently reset when a Show restarted
+	//      -- §25 requires the opposite.
+	//   3. It applied only to live warehouse elements. Scene-authored
+	//      composition elements had no visibility control at all.
+	//
+	// Per Grant's explicit instruction (2026-08-17) no backfill was
+	// performed: pre-Kernel-90 act/reveal_element rows remain readable in
+	// closed Showings through showings/review.go, but they no longer decide
+	// what anyone sees. Anything hidden under the old mechanism reads as
+	// visible until re-hidden through the new controls.
+	// The viewer's SELECTED Character is passed in rather than re-resolved,
+	// because resolveTheaterContext above already established it for the
+	// milestone gate. It matters that it is the selected Character and not
+	// merely one they own: switching Character must change what they perceive
+	// (§17), the same scoping Kernel 74's local projection already uses.
+	stageViewer, err := stageobjects.ResolveViewer(ctx, pool, snap.Session.ID, showID, viewerUserID, viewerRole, theaterContext.SelectedCharacterID)
+	if err != nil {
+		return nil, err
+	}
+	stageProjector, err := stageobjects.ProjectorFor(ctx, pool, showID, stageViewer)
+	if err != nil {
+		return nil, err
+	}
+	backstage := isBackstageRole(viewerRole)
 
 	filtered := make([]PlacedElement, 0, len(snap.Elements))
 	for _, el := range snap.Elements {
-		audienceVisible := effectiveAudienceVisible(layerVisibility, el)
-		if strings.TrimSpace(strings.ToLower(el.Surface)) == "stage" {
-			el.Visibility = cloneMap(el.Visibility)
-			el.Visibility["visible"] = audienceVisible
-			el.State = cloneMap(el.State)
-			el.State["visible"] = audienceVisible
+		// Non-stage surfaces are venue chrome, not stage objects, and remain
+		// backstage-only exactly as before. They are deliberately NOT given
+		// canonical object state: actions/reveal.go already refuses any
+		// element whose surface is not 'stage' ("element is not revealable"),
+		// so no reveal action could ever have targeted one, and §19 is
+		// explicit that genuine presentation surfaces must not be forced into
+		// the new object model.
+		if strings.TrimSpace(strings.ToLower(el.Surface)) != "stage" {
+			if backstage {
+				filtered = append(filtered, el)
+			}
+			continue
 		}
 
-		switch normalizeRole(viewerRole) {
-		case "producer", "director":
-			filtered = append(filtered, el)
-
-		case "actor", "crew", "cast":
-			if strings.TrimSpace(strings.ToLower(el.Surface)) == "stage" {
-				filtered = append(filtered, el)
-				continue
-			}
-			if elementVisibilityForLayer(layerVisibility, el, "actor", false) {
+		ref, hasRef := canonicalRefForElement(el)
+		if !hasRef {
+			// A stage element with no canonical identity cannot be scoped.
+			// Fail CLOSED for ordinary viewers rather than open: an object
+			// this function cannot name is an object whose hidden state it
+			// cannot check, and §54 makes leaking hidden state a FAIL.
+			if backstage {
 				filtered = append(filtered, el)
 			}
-
-		case "audience":
-			if audienceVisible {
-				filtered = append(filtered, el)
-			}
-
-		default:
-			if audienceVisible {
-				filtered = append(filtered, el)
-			}
+			continue
 		}
+
+		if !stageProjector.CanPerceive(ref) {
+			// Omitted from the payload entirely -- not shipped with a flag
+			// (§36, §54). The same discipline Kernel 74 applies to
+			// milestone-gated elements.
+			continue
+		}
+
+		hidden := stageProjector.HiddenFor(ref)
+
+		el.Visibility = cloneMap(el.Visibility)
+		el.State = cloneMap(el.State)
+		// "visible" keeps its established client meaning -- "ordinary viewers
+		// can see this" -- so the existing Hide/Show context-menu label logic
+		// reads correctly against canonical state with no client change.
+		el.Visibility["visible"] = !hidden
+		el.State["visible"] = !hidden
+		if backstage {
+			// §14: the Director keeps hidden objects on their working stage
+			// and needs them visually distinguishable. This flag is the
+			// signal the renderer dims/badges on. Sent only to backstage
+			// viewers -- an ordinary viewer either has the object (it is not
+			// hidden from them) or does not have it at all, so they never
+			// need it, and the scope list would leak Cohort-B metadata to
+			// Cohort A (§35) if it were sent wider.
+			el.State["hidden_backstage_only"] = hidden
+			if scopes := stageProjector.ScopesFor(ref); len(scopes) > 0 {
+				el.State["visibility_scopes"] = scopes
+			}
+			el.State["stage_object_kind"] = ref.Kind
+			el.State["stage_object_id"] = ref.ID
+		}
+
+		// §8: interaction state is a separate dimension from visibility, so
+		// it is applied to an element that has already been judged
+		// perceivable. A disabled interaction stays visible and simply
+		// cannot be invoked.
+		applyInteractionState(&el, stageProjector)
+
+		filtered = append(filtered, el)
 	}
 	snap.Elements = filtered
 
 	return &snap, nil
+}
+
+// canonicalRefForElement maps a snapshot element onto its canonical Kernel 90
+// object reference.
+//
+// The two spellings of ElementID are pre-existing and load-bearing:
+// loadCompositionRows prefixes Scene-authored elements with "scene:" (and
+// documents why -- so a client can tell them apart from warehouse elements
+// sharing the array), while live warehouse elements carry a bare UUID. That
+// existing distinction is exactly the object-kind discriminator §5 asked for,
+// so this function reads identity that is already there rather than inventing
+// a parallel id scheme.
+func canonicalRefForElement(el PlacedElement) (stageobjects.Ref, bool) {
+	id := strings.TrimSpace(el.ElementID)
+	if id == "" {
+		return stageobjects.Ref{}, false
+	}
+	if rest, ok := strings.CutPrefix(id, "scene:"); ok {
+		rest = strings.TrimSpace(rest)
+		if rest == "" {
+			return stageobjects.Ref{}, false
+		}
+		return stageobjects.Ref{Kind: stageobjects.KindSceneStageElement, ID: rest}, true
+	}
+	return stageobjects.Ref{Kind: stageobjects.KindVenueLayoutElement, ID: id}, true
+}
+
+// applyInteractionState narrows a bound interaction's advertised `enabled`
+// flag by the Director's Show-scoped interaction state.
+//
+// The AND of two booleans here is Kernel 90 §20's documented bridge, not a
+// competing truth: loadCompositionRows already set `enabled` from
+// participant_interactions.enabled, which is global AUTHORING state ("does
+// this interaction exist at all"), while canonical state answers "has the
+// Director switched it off for this Show". Requiring both means a Director
+// disabling Kessa mid-scene cannot disable Kessa in the tutorial or in
+// another Show, and re-enabling her cannot resurrect an interaction an author
+// switched off globally.
+//
+// Enforcement does not stop here: this only stops the client OFFERING the
+// interaction. The invoke path refuses independently -- see
+// stageobjects.InteractionInvocable, called by the interaction endpoints --
+// because a client that forges a snapshot must still be refused (§35).
+func applyInteractionState(el *PlacedElement, projector *stageobjects.Projector) {
+	binding, ok := el.Data["binding"].(map[string]any)
+	if !ok {
+		return
+	}
+	interactionID, _ := binding["participant_interaction_id"].(string)
+	interactionID = strings.TrimSpace(interactionID)
+	if interactionID == "" {
+		return
+	}
+	globallyEnabled, _ := binding["enabled"].(bool)
+	showEnabled := projector.InteractionEnabled(stageobjects.Ref{
+		Kind: stageobjects.KindParticipantInteraction,
+		ID:   interactionID,
+	})
+
+	binding = cloneMap(binding)
+	binding["enabled"] = globallyEnabled && showEnabled
+	// Kept distinct from `enabled` so a Director's panel can say "you turned
+	// this off" rather than "this is broken", and so the two dimensions stay
+	// legible to anyone debugging a snapshot.
+	binding["show_interaction_enabled"] = showEnabled
+	el.Data = cloneMap(el.Data)
+	el.Data["binding"] = binding
 }
 
 // loadSceneCompositionAsPlacedElements resolves a Show Scene Placement's
@@ -771,14 +911,20 @@ func loadCompositionRows(ctx context.Context, pool *pgxpool.Pool, sceneID, place
 		if visibility == nil {
 			visibility = map[string]any{"toRoles": []any{"audience", "cast", "crew", "director", "producer"}, "privateTo": []any{}}
 		}
-		// Bridge Kernel 73A's {toRoles, privateTo} visibility model onto the
-		// older {visible: bool} model effectiveAudienceVisible/
-		// elementVisibilityForLayer actually read (inherited from warehouse
-		// tokens) -- without this, a composition element with no explicit
-		// "visible" key reads as invisible by default for every audience-
-		// tier viewer, silently, regardless of toRoles ever including
-		// "audience". This was a real bug: Kessa's own base-layer token
-		// vanished for any viewer whose session role resolved to audience.
+		// Normalize Kernel 73A's authored {toRoles, privateTo} shape onto the
+		// {visible: bool} key the client renderer reads (inherited from
+		// warehouse tokens). Retained after Kernel 90 because this is
+		// AUTHORED composition data, not live state: it is what the Scene
+		// says about an element before any Director has hidden anything.
+		//
+		// Kernel 90 replaced the consumers this used to feed
+		// (effectiveAudienceVisible / elementVisibilityForLayer, both
+		// deleted); the canonical projector now overwrites "visible" further
+		// down with the Show-scoped answer. The normalization still matters
+		// on its own terms: it once caused a real bug where Kessa's base-layer
+		// token vanished for any viewer whose role resolved to audience,
+		// because a missing "visible" key read as invisible regardless of
+		// toRoles including "audience".
 		if _, hasVisibleKey := visibility["visible"]; !hasVisibleKey {
 			visibleToAudience := true
 			if toRoles, ok := visibility["toRoles"].([]any); ok {
@@ -892,12 +1038,6 @@ func resolveTheaterContext(ctx context.Context, pool *pgxpool.Pool, viewerUserID
 	}
 
 	return TheaterContext{Kind: "audience", Message: "You are watching this Show. Player controls are not active."}, nil
-}
-
-func effectiveAudienceVisible(layerVisibility map[string]bool, el PlacedElement) bool {
-	defaultVisible := strings.TrimSpace(strings.ToLower(el.Surface)) == "stage" &&
-		visibilityBool(el.Visibility, "visible", false)
-	return elementVisibilityForLayer(layerVisibility, el, "audience", defaultVisible)
 }
 
 func cloneMap(in map[string]any) map[string]any {
@@ -1510,56 +1650,6 @@ func actionTargetElementID(a Action) string {
 		return id
 	}
 	return ""
-}
-
-func deriveElementLayerVisibility(actions []Action) map[string]bool {
-	out := map[string]bool{}
-
-	for _, a := range actions {
-		layer := actionTargetLayer(a)
-		if layer == "" {
-			continue
-		}
-
-		elementID := actionTargetElementID(a)
-		elementSlug := actionTargetElementSlug(a)
-
-		targetKey := ""
-		if elementID != "" {
-			targetKey = elementID + ":" + layer
-		} else if elementSlug != "" {
-			targetKey = "slug:" + elementSlug + ":" + layer
-		} else {
-			continue
-		}
-
-		if _, exists := out[targetKey]; exists {
-			continue
-		}
-
-		switch a.Type {
-		case "act/reveal_element":
-			out[targetKey] = true
-		case "act/hide_element":
-			out[targetKey] = false
-		}
-	}
-
-	return out
-}
-
-func elementVisibilityForLayer(visibility map[string]bool, el PlacedElement, layer string, defaultVisible bool) bool {
-	if el.ElementID != "" {
-		if v, ok := visibility[el.ElementID+":"+layer]; ok {
-			return v
-		}
-	}
-	if el.Slug != "" {
-		if v, ok := visibility["slug:"+el.Slug+":"+layer]; ok {
-			return v
-		}
-	}
-	return defaultVisible
 }
 
 func visibilityBool(visibility map[string]any, key string, fallback bool) bool {

@@ -14,6 +14,7 @@ import (
 
 	"victory/backend/internal/access"
 	"victory/backend/internal/actions"
+	"victory/backend/internal/announcements"
 	"victory/backend/internal/identity"
 	"victory/backend/internal/ratelimit"
 	"victory/backend/internal/rollaudience"
@@ -94,6 +95,14 @@ var stageEffectRegistry = stageeffects.NewRegistry()
 // per §16's "queue must not enable unbounded client memory growth."
 const stageEffectDefaultDurationMs = 3500
 const stageEffectMaxDurationMs = 15000
+
+// announcementDefaultDurationMs holds a Kernel 89 announcement longer than
+// a dice roll: a roll's own dice are the thing being read and the caption
+// only labels them, whereas an announcement IS the whole message and needs
+// long enough for a table mid-conversation to look up and take it in.
+// Still bounded by stageEffectMaxDurationMs like everything else on the
+// registry.
+const announcementDefaultDurationMs = 5000
 
 // resolvedStoredMode defaults an already-stored (or absent/malformed)
 // audience mode to Show -- deliberately NOT rollaudience.NormalizeMode,
@@ -806,6 +815,101 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			deliverCancel()
 		}
 
+	case "announce/push":
+		{
+			// Kernel 89 §10: a theatrical Director announcement. The
+			// Director chooses BOTH the words and what the moment means --
+			// nothing here reads a die, a total, or a target complexity,
+			// and §10.4 forbids adding such a mapping later without an
+			// explicit canonical rule requiring it.
+			//
+			// Deliberately a Stage Effect and not an Action: an
+			// announcement is presentation derived from a decision the
+			// Director already made out loud, not a new canonical fact
+			// about the world. That keeps it on Kernel 86's existing
+			// ephemeral registry (no table, no migration, no second dice-
+			// history universe) and gives it pin/dismiss for free.
+			sessionID, _ := payload["session_id"].(string)
+			if strings.TrimSpace(sessionID) == "" {
+				sessionID = c.SessionID
+			}
+			actorID := c.UserID
+			requestID, _ := payload["request_id"].(string)
+			styleKey, _ := payload["style"].(string)
+			text, _ := payload["text"].(string)
+			visibility, _ := payload["visibility"].(string)
+
+			fail := func(reason string) {
+				errorPayload := map[string]any{"type": "error", "error": reason}
+				if strings.TrimSpace(requestID) != "" {
+					errorPayload["request_id"] = requestID
+				}
+				_ = c.SendJSON(errorPayload)
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			// Authority first, before the palette is even consulted: a
+			// non-Director must not be able to probe which style keys exist
+			// by watching which error comes back.
+			isDirector, err := rollaudience.IsDirectorPlus(ctx, pool, sessionID, actorID)
+			if err != nil {
+				fail("access_check_failed")
+				return
+			}
+			if !isDirector {
+				log.Printf("announcement denied: user=%s session=%s", actorID, sessionID)
+				fail("not_authorized")
+				return
+			}
+
+			style, resolvedText, err := announcements.Compose(styleKey, text)
+			if err != nil {
+				fail(err.Error())
+				return
+			}
+
+			mode := rollaudience.NormalizeMode(visibility)
+			if mode == "" {
+				fail("unsupported_visibility_mode")
+				return
+			}
+			decision, err := rollaudience.Resolve(ctx, pool, sessionID, actorID, mode)
+			if err != nil {
+				fail(err.Error())
+				return
+			}
+
+			durationMs := announcementDefaultDurationMs
+			if raw, ok := payload["duration_ms"].(float64); ok && raw > 0 {
+				durationMs = int(raw)
+				if durationMs > stageEffectMaxDurationMs {
+					durationMs = stageEffectMaxDurationMs
+				}
+			}
+
+			effect := stageEffectRegistry.Create(sessionID, stageeffects.Effect{
+				Type:       "announcement",
+				SessionID:  sessionID,
+				ShowID:     decision.ShowID,
+				CohortID:   decision.CohortID,
+				Audience:   decision.Mode,
+				ActorID:    actorID,
+				Label:      style.Label,
+				DurationMs: durationMs,
+				Payload: map[string]any{
+					"text":  resolvedText,
+					"style": style,
+				},
+			})
+			effectMsg, _ := json.Marshal(map[string]any{
+				"type": "stage_effect",
+				"data": effect,
+			})
+			deliverStageMessage(ctx, hub, pool, sessionID, actorID, decision.Mode, decision.CohortID, effectMsg)
+		}
+
 	case "stage_effect/pin", "stage_effect/dismiss":
 		{
 			effectID, _ := payload["effect_id"].(string)
@@ -915,6 +1019,24 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 				log.Printf("action store failed: user=%s session=%s action=%s target=%s err=%v", actorID, sessionID, payload["type"], elementSlug, err)
 				return
 			}
+
+			// Kernel 90: the action row above is now evidence, not authority.
+			// world/snapshot.go no longer replays act/reveal_element to decide
+			// what anyone sees, so this control has to write canonical state
+			// or it would appear to work and change nothing.
+			//
+			// Both this legacy control and the Kernel 90 Director menu now
+			// reach the same stageobjects.ApplyMutation, so they are two doors
+			// to one room rather than the two competing mechanisms §0 asked us
+			// to converge. Kept working rather than deleted because the Cave
+			// venue still drives it.
+			//
+			// A session with no Show has no canonical state to write (state is
+			// Show-scoped per §26) -- pre-Show legacy sessions therefore lose
+			// reveal/hide entirely rather than silently hiding things nobody
+			// can un-hide. Recorded in the reportback as a known consequence
+			// of the no-backfill decision.
+			applyLegacyRevealToCanonicalState(pool, hub, sessionID, c.UserID, storedAction, visible)
 
 			msgOut, _ := json.Marshal(map[string]any{
 				"type": "action",

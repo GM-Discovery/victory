@@ -171,6 +171,53 @@
         return;
       }
 
+      // Kernel 90 §11: canonical visibility/interaction state. Routed to a
+      // self-contained tool module, the same convention Kernel 85's Scene
+      // Configuration and Kernel 89's tool families use -- the generic engine
+      // stays ignorant of what a visibility scope is.
+      //
+      // Note what this does NOT do: it sends no WS action and applies no
+      // optimistic local state. Unlike the old "hide"/"show" handler below,
+      // which flipped model.state.visible immediately, canonical state is
+      // server-authoritative (§13) and a hidden object is OMITTED from
+      // payloads rather than flagged (§36) -- so the truthful update is the
+      // snapshot that arrives after the server's stage invalidation, not a
+      // guess this file makes locally.
+      if (action.startsWith("k90-")) {
+        const tools = window.VictoryKernel90VisibilityTools;
+        if (action === "k90-visibility-scope") {
+          tools?.openScopePanel?.(objectModel);
+        } else {
+          const op = {
+            "k90-visibility-visible": "reveal_object",
+            "k90-visibility-hidden": "hide_object",
+            "k90-interaction-enabled": "enable_interaction",
+            "k90-interaction-disabled": "disable_interaction",
+          }[action];
+          if (op) tools?.applyOperation?.(objectModel, op);
+        }
+        deps.closeContextMenu();
+        return;
+      }
+
+      // Kernel 89: the context-menu door into the Director tool families.
+      // Same shape as Kernel 85's Scene Configuration below -- a
+      // self-contained tool module reached through a global, so the generic
+      // engine never learns what an announcement or a merchant is.
+      if (action.startsWith("k89-")) {
+        const tools = window.VictoryKernel89DirectorTools;
+        const opener = {
+          "k89-announce": tools?.openAnnouncePanel,
+          "k89-roll-prep": tools?.openRollPrepPanel,
+          "k89-merchant": tools?.openMerchantPanel,
+          "k89-aftercare": tools?.openAftercarePanel,
+          "k89-state": window.VictoryKernel85Tools?.openGameStatusPanel,
+        }[action];
+        opener?.();
+        deps.closeContextMenu();
+        return;
+      }
+
       if (action === "open-scene-configuration") {
         // Kernel 85: a self-contained tool module, not part of the generic
         // engine -- see runtime.js's VictoryStageKernel85Bridge for how it

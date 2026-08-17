@@ -32,6 +32,7 @@ import (
 	"victory/backend/internal/cohorts"
 	"victory/backend/internal/cues"
 	"victory/backend/internal/db"
+	"victory/backend/internal/directorprep"
 	"victory/backend/internal/drawing"
 	"victory/backend/internal/ewrite"
 	"victory/backend/internal/identity"
@@ -51,6 +52,7 @@ import (
 	"victory/backend/internal/shows"
 	"victory/backend/internal/showtime"
 	"victory/backend/internal/socio"
+	"victory/backend/internal/stageobjects"
 	"victory/backend/internal/storyboards"
 	"victory/backend/internal/thirdplace"
 	"victory/backend/internal/tickets"
@@ -464,6 +466,10 @@ func main() {
 	// these paths. The two gates differ on purpose -- reading the table is
 	// backstage visibility (CanViewBackstage), while exporting takes
 	// Player-written reflection off the platform (CanManageShowRun).
+	// Kernel 89 §17: Send Aftercare, the Director's manual delivery of the
+	// Kernel 75 form above. Deliberately NOT reached by /showtime end --
+	// see backend/internal/merchant/kernel89_aftercare_send.go.
+	mux.HandleFunc("POST /api/shows/{show_id}/aftercare/send", merchant.HandleShowAftercareSend(pool, hub))
 	mux.HandleFunc("GET /api/shows/{show_id}/aftercare-review", merchant.HandleShowAftercareReview(pool))
 	mux.HandleFunc("GET /api/shows/{show_id}/aftercare-review.csv", merchant.HandleShowAftercareReviewCSV(pool))
 	// Dialogue authoring (Kernel 75). Reads take CanViewBackstage; writes
@@ -481,6 +487,43 @@ func main() {
 	mux.HandleFunc("GET /api/venues/{venue_slug}/equipment", merchant.HandleVenueEquipmentCollection(pool))
 	mux.HandleFunc("POST /api/venues/{venue_slug}/equipment", merchant.HandleVenueEquipmentCollection(pool))
 	mux.HandleFunc("PATCH /api/equipment/{equipment_item_id}", merchant.HandleEquipmentItemByID(pool))
+	// Kernel 89 §9: merchant authoring over Kernel 73's canonical
+	// merchant_packets model, with stock chosen from the one existing
+	// equipment_items corpus (returned alongside as "catalog").
+	mux.HandleFunc("GET /api/shows/{show_id}/merchant-packets", merchant.HandleShowMerchantPackets(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/merchant-packets", merchant.HandleShowMerchantPackets(pool))
+	mux.HandleFunc("PATCH /api/merchant-packets/{packet_id}", merchant.HandleMerchantPacketByID(pool))
+	// Kernel 89 §7/§10/§26: Director preparations. Director+ only end to
+	// end -- there is no Player-facing read path in this family at all.
+	mux.HandleFunc("GET /api/announcement-styles", directorprep.HandleAnnouncementStyles(pool))
+	mux.HandleFunc("GET /api/shows/{show_id}/director-preparations", directorprep.HandleShowPreparations(pool))
+	mux.HandleFunc("POST /api/shows/{show_id}/director-preparations", directorprep.HandleShowPreparations(pool))
+	mux.HandleFunc("PATCH /api/director-preparations/{preparation_id}", directorprep.HandlePreparationByID(pool))
+	mux.HandleFunc("DELETE /api/director-preparations/{preparation_id}", directorprep.HandlePreparationByID(pool))
+
+	// Kernel 90: canonical stage-object visibility/interaction state. Both
+	// routes are Director+ only, the READ included -- the state set describes
+	// what is hidden and from whom, so exposing it to a Player would hand
+	// them exactly the metadata §35/§36 require be withheld.
+	//
+	// The Director gate and the projection-invalidation notifier are injected
+	// rather than imported by stageobjects, and the reason is structural, not
+	// stylistic: world/snapshot.go imports stageobjects for projection, while
+	// shows -> network -> world means importing either showruns or network
+	// inside stageobjects would close a real import cycle. Wiring them here
+	// keeps stageobjects a leaf package and still leaves exactly one opinion
+	// in the product about what Director+ means (directorprep.RequireDirector,
+	// which itself defers to showruns.CanManageShowRun).
+	stageObjectDirectorGate := func(ctx context.Context, actorUserID, showID string) error {
+		return directorprep.RequireDirector(ctx, pool, actorUserID, showID)
+	}
+	stageObjectNotifier := func(ctx context.Context, showID string) {
+		network.BroadcastShowStageInvalidation(ctx, hub, pool, showID, "stage_object_state_changed")
+	}
+	mux.HandleFunc("GET /api/shows/{show_id}/stage-object-states", stageobjects.HandleShowObjectStates(pool, stageObjectDirectorGate, stageObjectNotifier))
+	mux.HandleFunc("POST /api/shows/{show_id}/stage-object-states", stageobjects.HandleShowObjectStates(pool, stageObjectDirectorGate, stageObjectNotifier))
+	mux.HandleFunc("GET /api/shows/{show_id}/stage-object-scope-targets", stageobjects.HandleSupportedScopeTargets(pool, stageObjectDirectorGate))
+
 	mux.HandleFunc("GET /api/characters/parentage-chart", characters.HandleParentageChart())
 	mux.HandleFunc("GET /api/characters/chapter2-rules", characters.HandleChapter2Rules())
 	mux.HandleFunc("GET /api/character-cards/me", characters.HandleMyCharacterCards(pool))

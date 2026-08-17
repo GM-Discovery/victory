@@ -1237,6 +1237,26 @@ Do not preserve stale kernel numbers as though they still control implementation
 
 # 17. Change log
 
+## 2026-08-17 — Kernel 89 note (NOT a reconciliation)
+
+This roadmap's last full reconciliation was Kernel 84. **Kernels 85, 86, 86A, 87, 88 (+88A/88B/88C) and 89 have shipped since**, so §12's committed horizon (Kernel 85, then Kernel 86) is now history rather than a plan, and several "Open" entries below are stale. Kernel 89 deliberately did **not** rewrite this document: its own §38 lists "full Kernel 90 visibility reconciliation" as a non-goal, and a partial rewrite would be worse than a dated one. Per-kernel truth is in the reportbacks; `current-state.md` is current through Kernel 89.
+
+Kernel 89 itself added: bounded Director preparation (`director_preparations`, Director-only end to end), a grouped Director tool surface replacing four flat top-level buttons, a server-defined theatrical announcement palette delivered as Kernel 86 Stage Effects, merchant authoring over Kernel 73's canonical packet tables with Cohort-scoped exposure, and manual Director-triggered Aftercare delivery. No macro engine, no dialogue trees, no quest engine — see `Construction/OperatorLogs/kernel-89-reportback.md` §7.
+
+**Recorded for Kernel 90's reconciliation, as Kernel 89 §23 asks:** reveal/hide/enable/disable state is genuinely fragmented across three unrelated mechanisms today, and Kernel 89 deliberately added no fourth. They are (1) the `act/reveal_element` / `act/hide_element` stage actions on live stage objects, plus `act/show_overlay` / `act/hide_overlay`, which is the Cave-era text-overlay surface; (2) the Cue actions `reveal_object`, `hide_object`, `enable_interaction`, `disable_interaction`, still **unimplemented and deferred** pending an object-identity model (see `backend/internal/cues/types.go`'s own note); and (3) `participant_interactions.enabled`, a per-interaction boolean with no relationship to either. A Director today cannot "reveal an object" and "enable an interaction" through one coherent concept. That is the reconciliation Kernel 90 should take on, not a bug for a smaller pass to patch around.
+
+## 2026-08-17 — Kernel 90 note (NOT a reconciliation)
+
+**Kernels 85–90 have now all shipped.** Kernel 90 closes the reconciliation the 2026-08-17 Kernel 89 note above asked for: canonical stage-object identity (`stageobjects.Ref{kind,id}`), one visibility/interaction state model (`stage_object_states` + `stage_object_scope_grants`, migration 106), and one mutation path (`stageobjects.ApplyMutation`) called by both manual Director controls and the four previously-deferred Cue actions (`reveal_object`, `hide_object`, `enable_interaction`, `disable_interaction`). §24's manual/Cue parity is structural, not tested-into-agreement: there is one function, not two.
+
+Of the three fragmented mechanisms the Kernel 89 note listed: (1) `act/reveal_element`/`act/hide_element` were reconciled onto canonical state (the legacy per-session layer replay in `world/snapshot.go` was deleted, not kept as a second source of truth; `act/show_overlay`/`act/hide_overlay` were left alone as genuine Cave-era presentation, per Kernel 90 §19's own instruction not to force real presentation effects into the object model); (2) the deferred Cue actions are now real; (3) `participant_interactions.enabled` keeps its distinct meaning as a global authoring kill-switch, bridged to (not merged with) the new Show-scoped `interaction_enabled` dimension — documented on migration 106.
+
+**No backfill was performed** (Grant's explicit instruction): anything hidden under the old per-session mechanism reads as visible after this kernel: the old mechanism never recorded *who* something was hidden from, so there was nothing honest to convert.
+
+**A real pre-existing bug surfaced and was worked around, not fixed:** the live-venue role lookup (`cmd/victory`'s `lookupVenueRole` → `participation.ResolveParticipationContext`, called with no Show Run hint) resolves every Show Run roster Player to `"audience"`. Kernel 90's Cast/Audience scoping resolves Cast from Show participation (the roster) directly rather than trusting that role string, so it is correct regardless — but the underlying resolver is still wrong for any other caller that trusts its output on this path. Not fixed here: it is shared code well outside this kernel's object-identity scope.
+
+Full ledger and evidence: `Construction/OperatorLogs/kernel-90-reportback.md`; operator guide: `Construction/Operations/stage-object-visibility.md`.
+
 ## 2026-08-08 — Kernel 84 reconciliation
 
 - recovered the real post-Kernel-75 sequence through Kernel 83 from repository/reportback evidence (12 reportbacks read in full); full ledger in `Construction/OperatorLogs/kernel-history-reconciliation-through-83.md`;
@@ -1271,8 +1291,8 @@ Do not preserve stale kernel numbers as though they still control implementation
 
 ## 18. Immediate next action
 
-After repository numbering verification (check `operator-log.md` and `Construction/Kernels/` for the true next number — Kernel 84 is the most recent completed as of this update), draft the full specification for:
+**Superseded.** Kernel 85 shipped, as did 86, 86A, 87, 88 and 89. The immediate next action is Grant's own live walkthrough of Kernel 89's Training Arena sequence (`Construction/Operations/director-prepared-play.md` §8), after which **Kernel 90** should take on the visibility/reveal-state reconciliation recorded in §17's 2026-08-17 entry — which is where the original text below belongs as history:
 
-> **Kernel 85 — Socio Sustained Play**
+> ~~After repository numbering verification (check `operator-log.md` and `Construction/Kernels/` for the true next number — Kernel 84 is the most recent completed as of this update), draft the full specification for **Kernel 85 — Socio Sustained Play**.~~
 
 The kernel specification must use this roadmap as planning authority and current repository evidence as implementation authority. Per §10.8's own instruction, Kernel 85 was deliberately not fully specified inside this reconciliation kernel — its own kernel-maker pass should audit current Catharsis/character/rules-integration state before committing to specific mechanics.

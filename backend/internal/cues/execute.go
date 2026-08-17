@@ -11,6 +11,7 @@ import (
 
 	"victory/backend/internal/actions"
 	"victory/backend/internal/shows"
+	"victory/backend/internal/stageobjects"
 )
 
 // ExecuteCue is the GO press (Kernel 70 §6.4). Authority is re-checked
@@ -191,9 +192,82 @@ func executeOneAction(ctx context.Context, pool *pgxpool.Pool, showID, activeSes
 			return errors.New("set_show_variable_key_required")
 		}
 		return executeSetShowVariable(ctx, pool, showID, activeSessionID, actorUserID, *action.SetShowVariable)
+	case ActionTypeRevealObject, ActionTypeHideObject,
+		ActionTypeEnableInteraction, ActionTypeDisableInteraction:
+		if action.StageObject == nil {
+			return errors.New("stage_object_target_required")
+		}
+		return executeStageObjectState(ctx, pool, showID, activeSessionID, actorUserID, action.Type, *action.StageObject)
 	default:
 		return errors.New("unknown_cue_action_type")
 	}
+}
+
+// executeStageObjectState is the Cue half of Kernel 90 §24's parity
+// requirement, and it is deliberately thin: it maps the Cue action name onto
+// a canonical operation and calls stageobjects.ApplyMutation. There is no
+// Cue-only state, no Cue-only validation, and no Cue-only projection path
+// (§21: "do not implement separate Cue-only state").
+//
+// The Cue action names and the canonical operation names are 1:1 by design,
+// so this mapping is a rename rather than a translation -- if a fifth
+// operation is ever added, the compiler will not let this switch silently
+// ignore it, because ApplyMutation rejects an unknown op.
+//
+// Target validation is NOT relaxed for Cues (§35: "Cue execution cannot
+// bypass normal target validation"). ApplyMutation calls the same
+// stageobjects.ResolveRef the manual path uses, so a Cue whose target was
+// deleted, belongs to another Show, or names the map fails cleanly here and
+// is recorded as a per-action failure by the caller, rather than appearing
+// to succeed.
+func executeStageObjectState(ctx context.Context, pool *pgxpool.Pool, showID, activeSessionID, actorUserID, actionType string, in StageObjectAction) error {
+	var op string
+	switch actionType {
+	case ActionTypeRevealObject:
+		op = stageobjects.OpReveal
+	case ActionTypeHideObject:
+		op = stageobjects.OpHide
+	case ActionTypeEnableInteraction:
+		op = stageobjects.OpEnableInteraction
+	case ActionTypeDisableInteraction:
+		op = stageobjects.OpDisableInteraction
+	default:
+		return errors.New("unknown_cue_action_type")
+	}
+
+	// Scopes are deliberately not settable from a Cue. §21 lists exactly
+	// four required Cue actions and none of them is "set scope"; a Cue
+	// therefore reveals to whoever the Director already scoped the object
+	// for, which keeps the scope decision in one place (the Director's own
+	// deliberate choice) instead of duplicated across every Cue that touches
+	// the object.
+	if _, err := stageobjects.ApplyMutation(ctx, pool, stageobjects.Mutation{
+		ShowID:  showID,
+		Ref:     stageobjects.Ref{Kind: in.ObjectKind, ID: in.ObjectID},
+		Op:      op,
+		ActorID: actorUserID,
+	}); err != nil {
+		return err
+	}
+
+	// §23 steps 5/6 (publish the projection update to affected viewers and
+	// the Director's working view) need no code here: HandleCueGo already
+	// broadcasts a show-scoped stage invalidation after every successful
+	// execution, and that invalidation is payload-free, so each client
+	// re-reads its own scope-filtered snapshot and the broadcast itself
+	// cannot leak a hidden object to the wrong viewer. Adding a second
+	// broadcast would just make every client snapshot twice.
+	//
+	// §23 step 7: audit evidence follows the existing Cue convention -- the
+	// same one-row-tagged-with-both-ids shape go_to_scene and
+	// set_show_variable already use, so Cue history folds identically.
+	if activeSessionID != "" {
+		return insertCueActionRow(ctx, pool, activeSessionID, showID, actorUserID, "cue/"+actionType, map[string]any{
+			"object_kind": in.ObjectKind,
+			"object_id":   in.ObjectID,
+		})
+	}
+	return nil
 }
 
 // executeGoToScene sets the Show's persistent current-Scene pointer

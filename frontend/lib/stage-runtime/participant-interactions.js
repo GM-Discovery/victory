@@ -631,7 +631,30 @@
       }
     }
 
+    // Kernel 89 §17: the Director-pushed entry point.
+    //
+    // It opens THE SAME form, from the same endpoint, that finishing the
+    // tutorial opens -- §17.3's "do not create a second Aftercare system"
+    // holds because there is no second renderer here, only a second door.
+    // The only difference is the Back button: a pushed Aftercare has no
+    // completion screen behind it to go back to, so `completion` is a bare
+    // {show_id} and renderAftercareForm's Back re-renders nothing useful.
+    // Handled by omitting it (see renderAftercareForm's `canGoBack`).
+    async function openAftercareFromDirector(showID) {
+      const id = String(showID || "").trim();
+      if (!id) return;
+      panel.open({
+        title: "Aftercare",
+        subtitle: "",
+        onClose: () => { currentInteractionId = null; currentContext = null; },
+      });
+      await openAftercare({ show_id: id, __pushed: true });
+    }
+
     function renderAftercareForm(completion, state) {
+      // A Director-pushed Aftercare has no tutorial-completion screen
+      // behind it, so it offers no Back.
+      const canGoBack = !(completion && completion.__pushed);
       const prompts = state.prompts || [];
       const draft = (state.draft && state.draft.responses) || {};
       const fields = prompts.map((p) => `
@@ -653,7 +676,7 @@
           <div class="victory-program-panel__buttons">
             <button type="button" class="is-primary" data-action="aftercare-save">Save and Close</button>
             <button type="button" data-action="aftercare-skip">Skip</button>
-            <button type="button" data-action="aftercare-back">Back</button>
+            ${canGoBack ? `<button type="button" data-action="aftercare-back">Back</button>` : ""}
           </div>
         </section>
       `);
@@ -817,7 +840,7 @@
       }
     }
 
-    return { openInteraction, openTutorialCompletion };
+    return { openInteraction, openTutorialCompletion, openAftercareFromDirector };
   }
 
   return { createParticipantInteractionsController, interactionErrorMessage };

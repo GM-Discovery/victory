@@ -46,6 +46,62 @@
     };
   }
 
+  // Kernel 90 §5/§22: the canonical stage-object reference for a rendered
+  // object, read from what the server already put in the snapshot rather
+  // than reconstructed here.
+  //
+  // world/snapshot.go sends stage_object_kind/stage_object_id only to
+  // backstage viewers, which is exactly the right gate: a Player has no
+  // visibility controls to target, and shipping them identity they cannot
+  // use would only widen what a forged client could name. So an absent ref
+  // is the normal, correct state for an ordinary viewer -- not an error.
+  //
+  // Deliberately NOT derived from the DOM node, the Pixi display object, or
+  // the label. §54 makes a DOM selector or screen coordinate as object
+  // identity a FAIL condition, and this is the function that would have been
+  // the tempting place to introduce one.
+  function canonicalStageObjectRef(model) {
+    const state = model?.state || model?.source?.state || {};
+    const kind = String(state.stage_object_kind || "").trim();
+    const id = String(state.stage_object_id || "").trim();
+    if (!kind || !id) return null;
+    return { kind, id };
+  }
+
+  // The participant interaction bound to this object, if any. This is what
+  // decides whether Interaction controls appear at all -- §12 is explicit
+  // that they must not be shown for objects that cannot be acted upon, and
+  // an Enabled/Disabled pair on an inert prop would be a lie about what the
+  // object can do.
+  function boundInteractionRef(model) {
+    const binding = model?.source?.data?.binding;
+    const id = String(binding?.participant_interaction_id || "").trim();
+    if (!id) return null;
+    return {
+      kind: "participant_interaction",
+      id,
+      // The AND of the global authoring flag and the Show-scoped Director
+      // state, as computed server-side. Read for the CURRENT state display
+      // only; the server re-decides on every mutation.
+      enabled: Boolean(binding?.enabled),
+      showEnabled: binding?.show_interaction_enabled !== false,
+      label: String(binding?.stage_button_label || "").trim(),
+    };
+  }
+
+  // Whether the object is hidden from ordinary viewers. Backstage-only
+  // information (§14/§35), so it reads the flag the server sends only to
+  // backstage viewers and falls back to the established "visible" key --
+  // which the canonical projector now writes -- for any caller that has one
+  // and not the other.
+  function stageObjectHidden(model) {
+    const state = model?.state || model?.source?.state || {};
+    if (typeof state.hidden_backstage_only === "boolean") {
+      return state.hidden_backstage_only;
+    }
+    return !objectState(model).visible;
+  }
+
   function updateObjectMatches(a, b) {
     if (!a || !b) return false;
     const aKey = String(a.key || "");
@@ -340,6 +396,48 @@
       ? context.tokenLayerForModel
       : tokenLayerForModel;
 
+    // Kernel 90 §11/§12: canonical visibility and interaction state, grouped.
+    //
+    // This REPLACES the flat "Hide Audience" / "Show Audience" toggle that
+    // used to live in the token/card branch. That toggle could only say
+    // hidden-or-not against a fixed audience layer, and it existed only for
+    // live warehouse objects -- Scene-authored elements had no visibility
+    // control at all. Both limitations were in the old mechanism's storage,
+    // not its UI, which is why §0 asked for convergence rather than a fourth
+    // control.
+    //
+    // Two nested families, never a flat row of five, and Interaction is
+    // omitted entirely for objects with nothing to interact with (§12). The
+    // current state is marked on the entry rather than encoded in the verb,
+    // so a Director reads "Visibility: Hidden" instead of inferring it from
+    // whether the menu offers "Hide" or "Show".
+    const pushStageObjectStateFamilies = (push, objectModel, canManageIndexCards, canReveal) => {
+      if (!canManageIndexCards || !canReveal) return;
+      if (objectState(objectModel).locked) return;
+      const ref = canonicalStageObjectRef(objectModel);
+      if (!ref) return;
+
+      const hidden = stageObjectHidden(objectModel);
+      const mark = (isCurrent, label) => (isCurrent ? `${label} ✓` : label);
+
+      push("k90-visibility", "Visibility", "visibility", {
+        submenu: [
+          { action: "k90-visibility-visible", label: mark(!hidden, "Visible") },
+          { action: "k90-visibility-hidden", label: mark(hidden, "Hidden") },
+          { action: "k90-visibility-scope", label: "Scope…" },
+        ],
+      });
+
+      const interaction = boundInteractionRef(objectModel);
+      if (!interaction) return;
+      push("k90-interaction", "Interaction", "visibility", {
+        submenu: [
+          { action: "k90-interaction-enabled", label: mark(interaction.showEnabled, "Enabled") },
+          { action: "k90-interaction-disabled", label: mark(!interaction.showEnabled, "Disabled") },
+        ],
+      });
+    };
+
     const push = (action, label, group, options = {}) => {
       actions.push({
         action,
@@ -347,8 +445,28 @@
         group,
         requiresPoint: Boolean(options.requiresPoint),
         disabled: Boolean(options.disabled),
+        // Kernel 89 §25: an item may carry a submenu of related choices
+        // instead of an action of its own. The renderer shows those only
+        // after the family is picked -- "show related choices after
+        // selection, not all choices at once" -- which is what keeps a
+        // Director's stage menu from becoming the flat wall §40 marks as a
+        // PARTIAL. `submenu` is plain data here; this module stays pure.
+        submenu: Array.isArray(options.submenu) ? options.submenu : undefined,
       });
     };
+
+    // The Director tool family shared by the stage and token menus. It
+    // duplicates NOTHING: every entry opens the same panel the grouped
+    // toolbar opens, so the context menu is a second door to one room
+    // rather than a second room.
+    const directorToolFamily = (extra = []) => [
+      { action: "k89-announce", label: "Announce…" },
+      { action: "k89-roll-prep", label: "Roll Prep…" },
+      { action: "k89-merchant", label: "Merchant…" },
+      { action: "k89-state", label: "State…" },
+      ...extra,
+      { action: "k89-aftercare", label: "Send Aftercare" },
+    ];
 
     if (kind === "stage") {
       push("set-map", "Add / Replace Map", "create", { disabled: !canManageIndexCards });
@@ -361,6 +479,13 @@
       // branch, since Crew's non-destructive-edit right does not extend to
       // cohort Scene progression (kernel-85 S10).
       push("open-scene-configuration", "Scene Configuration", "director", { disabled: !canManageIndexCards });
+      // Kernel 89 §4/§25: the prepared tools a Director needs mid-scene,
+      // reachable by right-clicking the stage rather than only from the
+      // toolbar -- and nested, so they cost one line of menu, not six.
+      push("k89-director-tools", "Director Tools", "director", {
+        disabled: !canManageIndexCards,
+        submenu: directorToolFamily([{ action: "open-scene-configuration", label: "Scene Configuration…" }]),
+      });
       push("inspect", "Inspect Stage", "info");
       if (hasSelection) {
         push("clear", "Clear selection", "clear");
@@ -394,6 +519,13 @@
       if (binding?.participant_interaction_id && binding?.enabled) {
         push(`open-bound-interaction:${binding.participant_interaction_id}`, binding.stage_button_label || "Interact", "interact");
       }
+      // Kernel 90: Scene-authored composition elements reach the visibility
+      // and interaction families HERE, and this branch is the one that
+      // matters most -- these objects previously had no visibility control of
+      // any kind, in any menu. Kessa's stall could not be hidden from one
+      // Cohort without editing the Scene, which is exactly the Scene-as-
+      // visibility-container confusion §2 forbids.
+      pushStageObjectStateFamilies(push, objectModel, canManageIndexCards, canReveal);
       if (hasSelection) {
         push("clear", "Clear selection", "clear");
       }
@@ -431,9 +563,7 @@
       push("move-here", "Move here", "move", { requiresPoint: true });
     }
 
-    if (canToggleLiveVisibility(objectModel, canManageIndexCards, canReveal)) {
-      push(state.visible ? "hide" : "show", state.visible ? "Hide Audience" : "Show Audience", "visibility");
-    }
+    pushStageObjectStateFamilies(push, objectModel, canManageIndexCards, canReveal);
 
     if (kind === "card" && canToggleNameplate(objectModel, canManageIndexCards)) {
       push(state.nameplateVisible ? "hide-nameplate" : "show-nameplate", state.nameplateVisible ? "Hide Nameplate" : "Show Nameplate", "visibility");
@@ -461,6 +591,15 @@
 
     if (kind === "token" && canDuplicateLiveStageObject(objectModel, canManageIndexCards)) {
       push("duplicate", "Duplicate Token", "duplicate");
+    }
+
+    // Kernel 89 §12: token-targeted access to the same Director tool
+    // family. Deliberately the same entries as the stage menu rather than
+    // a token-specific subset -- §12's "do not force every Director
+    // preparation to attach to a token" cuts both ways: a token is a
+    // convenient place to reach a tool, not the tool's owner.
+    if (kind === "token" && canManageIndexCards) {
+      push("k89-director-tools", "Director Tools", "director", { submenu: directorToolFamily() });
     }
 
     return actions;
@@ -503,6 +642,9 @@
     tokenDisplaySizeForModel,
     cardStatusBadgeText,
     canToggleLiveVisibility,
+    canonicalStageObjectRef,
+    boundInteractionRef,
+    stageObjectHidden,
     canToggleNameplate,
     canToggleLock,
     canTogglePinState,

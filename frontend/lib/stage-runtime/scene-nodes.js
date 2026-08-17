@@ -34,6 +34,53 @@
     const renderPixiScene = deps.renderPixiScene;
     const stageState = deps.stageState;
 
+    // Kernel 90 §14/§45: mark an object that is hidden from ordinary viewers
+    // but present on the Director's working stage.
+    //
+    // The Director's stage must NOT lose the object (§14 is explicit that
+    // hidden objects stay visible while directing, absent a dedicated
+    // preview-as-audience mode), so the treatment has to be legible without
+    // being loud: reduced opacity plus a dashed outline, reusing the same
+    // faded-backstage idiom makeHotspotNode already uses for unusable nodes.
+    // No debug label and no state inspector -- §45 rules both out, and the
+    // existing "HIDDEN" status badge already carries the words for objects
+    // that show a nameplate.
+    //
+    // This can only ever fire for a backstage viewer, because an ordinary
+    // viewer does not receive a hidden object at all (world/snapshot.go omits
+    // it). The role check is therefore belt-and-braces rather than the
+    // security boundary -- the boundary is server-side, per §36.
+    function markHiddenForDirector(container, model) {
+      const st = model?.state || model?.source?.state || {};
+      if (st.hidden_backstage_only !== true) return;
+      if (!["producer", "director", "operator", "crew"].includes(currentRole())) return;
+
+      container.alpha = Math.min(container.alpha ?? 1, 0.45);
+
+      const outline = new PIXI.Graphics();
+      const bounds = container.getLocalBounds();
+      outline.lineStyle(2, 0x7fb2ff, 0.85);
+      // Dashed by hand: PIXI v7 has no dash support on Graphics, and a solid
+      // outline reads as "selected" in this renderer, which would collide
+      // with the real selection treatment.
+      const step = 9;
+      const x0 = bounds.x - 3;
+      const y0 = bounds.y - 3;
+      const x1 = bounds.x + bounds.width + 3;
+      const y1 = bounds.y + bounds.height + 3;
+      for (let x = x0; x < x1; x += step * 2) {
+        outline.moveTo(x, y0); outline.lineTo(Math.min(x + step, x1), y0);
+        outline.moveTo(x, y1); outline.lineTo(Math.min(x + step, x1), y1);
+      }
+      for (let y = y0; y < y1; y += step * 2) {
+        outline.moveTo(x0, y); outline.lineTo(x0, Math.min(y + step, y1));
+        outline.moveTo(x1, y); outline.lineTo(x1, Math.min(y + step, y1));
+      }
+      outline.eventMode = "none";
+      outline.zIndex = 9999;
+      container.addChild(outline);
+    }
+
     // removeChildren() only detaches DisplayObjects from the tree -- it does
     // not release their GPU-side geometry/mesh data, so a full scene rebuild
     // (fires on every snapshot replace) leaked every prior token/card node
@@ -160,6 +207,7 @@
       title.on("contextmenu", openCardContextMenu);
       faceButton.on("contextmenu", openCardContextMenu);
       container.on("contextmenu", openCardContextMenu);
+      markHiddenForDirector(container, model);
       return node;
     }
 
@@ -354,6 +402,7 @@
       sprite.on("rightclick", openTokenContextMenu);
       container.on("contextmenu", (event) => { if (wasContextMenuHandled(event)) return; cancelContextMenuEvent(event); openResolvedContextMenu(event); });
       sprite.on("contextmenu", (event) => { if (wasContextMenuHandled(event)) return; cancelContextMenuEvent(event); openResolvedContextMenu(event); });
+      markHiddenForDirector(container, model);
       return node;
     }
 

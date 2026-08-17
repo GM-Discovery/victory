@@ -259,6 +259,12 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     let diceTray = null;
     let diceProjection = null;
     let diceProjectionLayer = null;
+    // Kernel 89's announcement renderer is a standalone DOM module with no
+    // PIXI dependency, so it is read straight off window rather than
+    // constructed here. Absent (e.g. a venue that does not load it) means
+    // announcements simply fall through to the dice path and are ignored --
+    // never a thrown error that takes the stage down.
+    const announcementProjection = window.VictoryKernel89Announcements || null;
     let diceWorldLayer = null;
     let mapEditorDragState = null;
     let mapEditorPreviewURL = "";
@@ -554,6 +560,10 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       // Returns an unregister function. See registerActionRequest.
       registerActionRequest: (requestId, handler, timeoutMs) =>
         registerActionRequest(requestId, handler, timeoutMs),
+      // Kernel 90: the engine's own stage status line, so a tool module
+      // reports success or refusal where a Director is already looking
+      // instead of adding a second status surface per module.
+      setStageStatus: (text) => setStageStatus(text),
     };
 
     function loadPixiLibrary() {
@@ -2544,10 +2554,36 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       handleDiceTrayError: (errorText, message) => diceTray?.handleError?.(errorText, message),
       rejectPendingDiceTrayRolls: (reason) => diceTray?.rejectPendingRolls?.(reason),
       handleActionError: (requestId, errorText, message) => dispatchActionError(requestId, errorText, message),
-      handleStageEffect: (effect) => diceProjection?.enqueue?.(effect),
-      handleStageEffectPinned: (effect) => diceProjection?.applyPinned?.(effect),
-      handleStageEffectDismissed: (effectId) => diceProjection?.removePinned?.(effectId),
-      hydrateStageEffectsPinned: (effects) => diceProjection?.hydratePinned?.(effects),
+      handleAftercareOffer: (showId) =>
+        getParticipantInteractionsController()?.openAftercareFromDirector?.(
+          showId || currentSnapshot?.session?.show_id || ""),
+      // Kernel 89: Stage Effects are now a small family, not one shape.
+      // Announcements are claimed first by their own renderer, which
+      // returns true when it took ownership; anything it does not claim
+      // (today: dice) falls through to the Kernel 86 projection unchanged.
+      // Routing here rather than inside dice-projection.js keeps that
+      // module about dice, which is what its whole coordinate model is for.
+      handleStageEffect: (effect) => {
+        if (announcementProjection?.present?.(effect, { canDismiss: canManageIndexCards(currentRole) })) return;
+        diceProjection?.enqueue?.(effect);
+      },
+      handleStageEffectPinned: (effect) => {
+        if (announcementProjection?.pin?.(effect)) return;
+        diceProjection?.applyPinned?.(effect);
+      },
+      handleStageEffectDismissed: (effectId) => {
+        if (announcementProjection?.dismiss?.(effectId)) return;
+        diceProjection?.removePinned?.(effectId);
+      },
+      hydrateStageEffectsPinned: (effects) => {
+        const forDice = (Array.isArray(effects) ? effects : []).filter((effect) => {
+          if (String(effect?.type || "") !== "announcement") return true;
+          announcementProjection?.present?.(effect, { canDismiss: canManageIndexCards(currentRole) });
+          announcementProjection?.pin?.(effect);
+          return false;
+        });
+        diceProjection?.hydratePinned?.(forDice);
+      },
       syncCurrentObjectsFromProjectedState: () => syncCurrentObjectsFromProjectedState(),
       canManageIndexCards: (...args) => canManageIndexCards(...args),
       canManageStageTokens: (...args) => canManageStageTokens(...args),
@@ -2827,15 +2863,28 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       openMapEditor: (...args) => openMapEditor(...args),
       openGridEditor: (...args) => openGridEditor(...args),
       renderContextMenu: (items) => {
+        // Kernel 89 §25: an item carrying a `submenu` renders as a
+        // disclosure, and its children stay hidden until it is picked.
+        // Kept as a disclosure inside the same menu box rather than a
+        // hover-out flyout: flyouts on a live stage are easy to lose the
+        // pointer out of mid-scene, and this menu is already positioned
+        // against the viewport edges.
+        const renderItem = (item, index, list) => {
+          let separator = "";
+          if (index > 0 && list[index - 1].group !== item.group) {
+            separator = '<div class="menu-separator"></div>';
+          }
+          const disabled = item.disabled ? " disabled" : "";
+          if (Array.isArray(item.submenu) && item.submenu.length) {
+            const children = item.submenu
+              .map((child) => `<button type="button" class="menu-child" data-menu-action="${escapeHtml(child.action)}"${child.disabled ? " disabled" : ""}>${escapeHtml(child.label)}</button>`)
+              .join("");
+            return `${separator}<button type="button" data-menu-submenu="${escapeHtml(item.action)}" aria-expanded="false"${disabled}>${escapeHtml(item.label)} ▸</button><div class="menu-submenu" data-menu-submenu-for="${escapeHtml(item.action)}" hidden>${children}</div>`;
+          }
+          return `${separator}<button type="button" data-menu-action="${escapeHtml(item.action)}"${disabled}>${escapeHtml(item.label)}</button>`;
+        };
         contextMenu.innerHTML = items
-          .map((item, index) => {
-            let separator = "";
-            if (index > 0 && items[index - 1].group !== item.group) {
-              separator = '<div class="menu-separator"></div>';
-            }
-            const disabled = item.disabled ? " disabled" : "";
-            return `${separator}<button type="button" data-menu-action="${escapeHtml(item.action)}"${disabled}>${escapeHtml(item.label)}</button>`;
-          })
+          .map((item, index) => renderItem(item, index, items))
           .join("") + `<div class="menu-separator"></div><button type="button" data-menu-action="copy" disabled>Copy</button><button type="button" data-menu-action="paste" disabled>Paste</button>`;
       },
       positionContextMenu: (x, y) => {
@@ -5660,6 +5709,25 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
 
     contextMenu?.addEventListener("click", (event) => {
       event.stopPropagation();
+
+      // Kernel 89 §25: a submenu header reveals its own children and
+      // collapses any sibling that was open, so the menu shows one family's
+      // choices at a time rather than all of them at once.
+      const submenuToggle = event.target.closest("[data-menu-submenu]");
+      if (submenuToggle) {
+        if (submenuToggle.disabled) return;
+        const key = submenuToggle.getAttribute("data-menu-submenu");
+        const panel = contextMenu.querySelector(`[data-menu-submenu-for="${CSS.escape(key)}"]`);
+        const opening = panel?.hidden;
+        contextMenu.querySelectorAll("[data-menu-submenu-for]").forEach((el) => { el.hidden = true; });
+        contextMenu.querySelectorAll("[data-menu-submenu]").forEach((el) => el.setAttribute("aria-expanded", "false"));
+        if (panel && opening) {
+          panel.hidden = false;
+          submenuToggle.setAttribute("aria-expanded", "true");
+        }
+        return;
+      }
+
       const button = event.target.closest("[data-menu-action]");
       if (!button) return;
       const action = button.getAttribute("data-menu-action");

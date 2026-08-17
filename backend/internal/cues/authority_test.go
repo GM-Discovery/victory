@@ -43,10 +43,43 @@ func TestCreateCueValidatesActionShape(t *testing.T) {
 		t.Fatalf("expected go_to_scene_target_required, got %v", err)
 	}
 
+	// Kernel 90 made reveal_object real, so it is no longer an unknown type.
+	// What replaced that assertion is stricter, not weaker: the action is
+	// accepted as a TYPE but refused without canonical identity, which is
+	// what makes it impossible to author a Cue targeting a label or a
+	// coordinate (§22/§54) -- there is no field for one and the id is
+	// mandatory.
 	if _, err := CreateCue(context.Background(), pool, producer, f.placementID, CreateCueInput{
-		InternalName: "Unknown Type Cue", Actions: []CueAction{{Type: "reveal_object"}},
+		InternalName: "Untargeted Reveal Cue", Actions: []CueAction{{Type: ActionTypeRevealObject}},
+	}); err == nil || err.Error() != "stage_object_target_required" {
+		t.Fatalf("expected stage_object_target_required, got %v", err)
+	}
+
+	if _, err := CreateCue(context.Background(), pool, producer, f.placementID, CreateCueInput{
+		InternalName: "Half Targeted Cue",
+		Actions: []CueAction{{Type: ActionTypeHideObject, StageObject: &StageObjectAction{
+			ObjectKind: "scene_stage_element",
+		}}},
+	}); err == nil || err.Error() != "stage_object_target_required" {
+		t.Fatalf("expected stage_object_target_required for a kind with no id, got %v", err)
+	}
+
+	// An ephemeral effect can never be authored as a Cue target, and it is
+	// refused at authoring time rather than only at fire time (§39).
+	if _, err := CreateCue(context.Background(), pool, producer, f.placementID, CreateCueInput{
+		InternalName: "Ephemeral Target Cue",
+		Actions: []CueAction{{Type: ActionTypeHideObject, StageObject: &StageObjectAction{
+			ObjectKind: "stage_effect", ObjectID: "00000000-0000-0000-0000-000000000001",
+		}}},
+	}); err == nil || err.Error() != "unsupported_object_kind" {
+		t.Fatalf("expected unsupported_object_kind for an ephemeral effect target, got %v", err)
+	}
+
+	// A genuinely unknown action type is still refused.
+	if _, err := CreateCue(context.Background(), pool, producer, f.placementID, CreateCueInput{
+		InternalName: "Unknown Type Cue", Actions: []CueAction{{Type: "summon_dragon"}},
 	}); err == nil || err.Error() != "unknown_cue_action_type" {
-		t.Fatalf("expected unknown_cue_action_type for a deferred action type, got %v", err)
+		t.Fatalf("expected unknown_cue_action_type, got %v", err)
 	}
 }
 
