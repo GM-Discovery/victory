@@ -127,6 +127,8 @@ var bareRouteAllowlist = []string{
 	"/api/character-journals",
 	"/api/index-cards",
 	"/api/map/visibility",
+	"/api/tours/state",
+	"/api/tours/history",
 	"/api/workshop/venues",
 	"/api/world/the-cave",
 	"/api/world/catharsis",

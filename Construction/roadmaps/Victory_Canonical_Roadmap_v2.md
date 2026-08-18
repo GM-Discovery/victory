@@ -1257,6 +1257,14 @@ Of the three fragmented mechanisms the Kernel 89 note listed: (1) `act/reveal_el
 
 Full ledger and evidence: `Construction/OperatorLogs/kernel-90-reportback.md`; operator guide: `Construction/Operations/stage-object-visibility.md`.
 
+## 2026-08-18 — Kernel 91 note (NOT a reconciliation)
+
+**Kernels 85–91 have now all shipped.** Kernel 91 (Victory Campus Tours & Guided Onboarding) built a shared, reusable guided-tour engine (`frontend/lib/tour-engine.js`) and a new `backend/internal/tour/` package, replacing the old localStorage-only map welcome modal with a server-persisted, role-aware system. Scope was confirmed with Grant before implementation and is narrower than the full spec: the engine, schema, and API support every role, but authored tour content shipped only for the mandatory campus orientation, the skippable campus continuation, the Catharsis Cast tour, and the Director's Chair role-overlay tour (the spec's own core acceptance proof — a Cast member who becomes Director gets the toolbox tour without replaying the Cast one). Producer/Crew/Operator/Audience tour content remains unauthored, deferred per the spec's own boundaries (deeper Audience UX is Kernel 93's territory, deeper Operator/slash-command training is Kernel 95's).
+
+**Three real bugs were found in production by Grant, not in review, all fixed same-day** — recorded in full in `operator-notes.md` since they're general lessons, not Victory-specific ones: a full-viewport dimming overlay that physically intercepted every click regardless of click-gating logic; a `MutationObserver` watching the same attributes it was writing into, causing an infinite self-triggering loop; and a click-gated step whose target causes real navigation racing an ordinary `fetch()` and losing, fixed with `navigator.sendBeacon` plus a new resumable-cursor table (migration 108, added mid-kernel once the bug was found).
+
+Full ledger: `Construction/OperatorLogs/kernel-91-reportback.md`.
+
 ## 2026-08-08 — Kernel 84 reconciliation
 
 - recovered the real post-Kernel-75 sequence through Kernel 83 from repository/reportback evidence (12 reportbacks read in full); full ledger in `Construction/OperatorLogs/kernel-history-reconciliation-through-83.md`;

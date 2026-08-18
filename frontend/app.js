@@ -20,8 +20,8 @@ const soilExpertsState = {
 
 const mapState = {
   venues: [],
+  pinsReady: false,
 };
-const ONBOARDING_KEY = "victory:map-onboarding-v1";
 
 const hiddenMainMapVenueSlugs = new Set([
   "gateway-thread",
@@ -252,6 +252,7 @@ function createVenuePin(venue, assetURL, fallbackPositions) {
     pin.classList.add("venue-pin--first-theater");
   }
   pin.type = "button";
+  pin.dataset.venueSlug = venue.slug;
   pin.setAttribute("aria-label", venueDisplayName(venue));
 
   const fallback = fallbackPositions[venue.slug] || { x: 50, y: 50 };
@@ -436,32 +437,33 @@ function renderMapMenu() {
   }
 }
 
-function maybeShowMapOnboarding() {
-  if (localStorage.getItem(ONBOARDING_KEY)) return;
-  const overlay = document.getElementById("onboarding-overlay");
-  const dismissButton = document.getElementById("onboarding-dismiss-button");
-  if (!overlay || !dismissButton) return;
+// Kernel 91: registers the campus map's tour targets (venue pins) and
+// starts the mandatory/continuation campus tour. Replaces the old
+// localStorage-only "Welcome to Victory" modal (S12: server-persisted
+// completion, not browser storage). Waits for both venue pins to be
+// rendered (loadVenues) and account state to resolve as signed-in
+// (loadAccountLink) before autostarting, since a mandatory-tour target like
+// venue:audition-hall must already exist in the DOM to be spotlighted.
+function registerCampusTourTargets() {
+  if (!window.VictoryTourEngine) return;
+  window.VictoryTourEngine.registerTargets({
+    "venue:audition-hall": () => document.querySelector('[data-venue-slug="audition-hall"]'),
+    "venue:trailers": () => document.querySelector('[data-venue-slug="trailers"]'),
+    "venue:catharsis": () => document.querySelector('[data-venue-slug="catharsis"]'),
+    "venue:greenroom": () => document.querySelector('[data-venue-slug="greenroom"]'),
+  });
+}
 
-  const dismiss = () => {
-    overlay.hidden = true;
-    document.body.classList.remove("modal-open");
-    localStorage.setItem(ONBOARDING_KEY, "1");
-  };
+function maybeStartCampusTour() {
+  if (!window.VictoryTourEngine || !mapState.pinsReady) return;
+  registerCampusTourTargets();
 
-  overlay.hidden = false;
-  document.body.classList.add("modal-open");
-  dismissButton.addEventListener("click", dismiss, { once: true });
-  overlay.addEventListener("click", (event) => {
-    if (event.target === overlay) dismiss();
-  }, { once: true });
-
-  const onKeydown = (event) => {
-    if (event.key === "Escape" && !overlay.hidden) {
-      dismiss();
-      document.removeEventListener("keydown", onKeydown);
-    }
-  };
-  document.addEventListener("keydown", onKeydown);
+  const replayKey = new URLSearchParams(window.location.search).get("replay-tour");
+  if (replayKey === "campus_mandatory" || replayKey === "campus_continuation") {
+    window.VictoryTourEngine.start(replayKey, { replay: true });
+    return;
+  }
+  window.VictoryTourEngine.autostart({});
 }
 
 // Map positions are known even when a venue is hidden (fallbackPositions is
@@ -742,6 +744,8 @@ async function loadVenues() {
 
     renderMapFog(venues, fallbackPositions);
     renderMapMenu();
+    mapState.pinsReady = true;
+    maybeStartCampusTour();
   } catch (error) {
     statusEl.textContent = "Failed to load venues.";
     console.error(error);
@@ -898,7 +902,7 @@ async function loadAccountLink() {
       if (accountProfileLink) accountProfileLink.href = "/account/";
       closeMenu();
       renderMapMenu();
-      maybeShowMapOnboarding();
+      maybeStartCampusTour();
       return;
     }
 

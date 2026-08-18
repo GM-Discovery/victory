@@ -2196,6 +2196,26 @@
         }
 
         chairShell.hidden = false;
+
+        // Kernel 91: role has just been confirmed Producer/Director/Operator
+        // above, so this is the earliest safe point to offer the
+        // Director-toolbox role-overlay tour (S22/S42-43's acceptance
+        // proof). Targets are the Director Console, Director Queue, and
+        // Invite Below You sections, all already present in the DOM here.
+        if (window.VictoryTourEngine) {
+          window.VictoryTourEngine.registerTargets({
+            "control:director-console": () => document.querySelector(".shell #console-summary")?.closest("section") || consoleSummary,
+            "control:director-queue": () => incomingRequests?.closest("section") || incomingRequests,
+            "control:invite-below-you": () => inviteForm?.closest("section") || inviteForm,
+          });
+          const replayKey = new URLSearchParams(window.location.search).get("replay-tour");
+          if (replayKey === "directors_chair_director_toolbox") {
+            window.VictoryTourEngine.start(replayKey, { replay: true });
+          } else {
+            window.VictoryTourEngine.autostart({ venueSlug: "directors-chair" });
+          }
+        }
+
         await Promise.all([
           loadProductions(), loadIncomingRequests(), loadReviewShowings(), loadDirectorConsoleCurrent(),
           // FAIL-SOFT (Kernel 75). This bootstrap's shared catch calls
@@ -2263,6 +2283,7 @@
   </script>
   <script src="/lib/back-to-map.js" data-back-to-map="floating"></script>
   <script src="/lib/venue-account-badge.js?v=nav-1"></script>
+  <script src="/lib/tour-engine.js?v=kernel91-1"></script>
 </body>
 </html>
   <link rel="icon" type="image/png" href="/assets/favicon.png" />

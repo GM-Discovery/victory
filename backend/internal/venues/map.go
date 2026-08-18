@@ -522,6 +522,14 @@ func resolveVenueLocation(ctx context.Context, pool *pgxpool.Pool, venueSlug str
 	return loadVenueLocation(ctx, pool, venueSlug)
 }
 
+// ResolveVenueLocation is the exported form of resolveVenueLocation, for
+// packages outside venues that need a venue slug's location ID (e.g. Kernel
+// 91's tour package, which resolves a venue-scoped tour's role eligibility
+// via access.CurrentLocationRoleForLocation).
+func ResolveVenueLocation(ctx context.Context, pool *pgxpool.Pool, venueSlug string) (venueID string, locationID string, err error) {
+	return loadVenueLocation(ctx, pool, venueSlug)
+}
+
 func loadVenueMapState(ctx context.Context, pool *pgxpool.Pool, venueSlug string) (venueMapState, error) {
 	var state venueMapState
 	var asset venueMapAsset

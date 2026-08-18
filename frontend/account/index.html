@@ -366,6 +366,13 @@
           <p class="note" id="profile-note">Your profile summary will appear here.</p>
           <div class="meta" id="profile-meta"></div>
         </section>
+
+        <section class="panel" id="tours">
+          <p class="label">Guided Tours</p>
+          <h2 class="profile-name">Tours</h2>
+          <p class="note" id="tours-note">Checking tour history...</p>
+          <div id="tours-list" class="meta"></div>
+        </section>
       </div>
 
       <section id="recovery" class="recovery">
@@ -960,7 +967,72 @@
       }
     }
 
+    // Kernel 91: Replay entry point (S14/S45). Tour content only exists on
+    // its owning page, so Replay navigates there with ?replay-tour=<key>;
+    // that page's own tour wiring checks the param and calls
+    // VictoryTourEngine.start(key, {replay:true}) once its targets are
+    // registered.
+    const tourVenuePaths = {
+      campus_mandatory: "/",
+      campus_continuation: "/",
+      catharsis_cast: "/venues/catharsis/",
+      directors_chair_director_toolbox: "/venues/directors-chair/",
+    };
+    const tourLabels = {
+      campus_mandatory: "Campus Orientation",
+      campus_continuation: "Campus Continuation",
+      catharsis_cast: "Catharsis (Cast)",
+      directors_chair_director_toolbox: "Director's Chair (Director Toolbox)",
+    };
+
+    async function loadTours() {
+      const note = document.getElementById("tours-note");
+      const list = document.getElementById("tours-list");
+      if (!note || !list) return;
+      try {
+        const response = await fetch("/api/tours/history", { credentials: "include" });
+        if (!response.ok) {
+          note.textContent = "Sign in to see your tour history.";
+          return;
+        }
+        const payload = await response.json();
+        const completions = Array.isArray(payload?.data) ? payload.data : [];
+        if (completions.length === 0) {
+          note.textContent = "No tours completed or skipped yet.";
+          return;
+        }
+        note.textContent = "";
+        list.innerHTML = "";
+        for (const completion of completions) {
+          const row = document.createElement("div");
+          row.className = "meta-row";
+
+          const label = document.createElement("div");
+          label.className = "meta-label";
+          label.textContent = tourLabels[completion.tour_key] || completion.tour_key;
+
+          const value = document.createElement("div");
+          value.className = "meta-value";
+          value.textContent = completion.status === "skipped" ? "Skipped" : "Completed";
+
+          const replay = document.createElement("a");
+          replay.className = "chip";
+          replay.textContent = "Replay";
+          const path = tourVenuePaths[completion.tour_key] || "/";
+          replay.href = `${path}?replay-tour=${encodeURIComponent(completion.tour_key)}`;
+
+          row.appendChild(label);
+          row.appendChild(value);
+          row.appendChild(replay);
+          list.appendChild(row);
+        }
+      } catch (error) {
+        note.textContent = "Could not load tour history.";
+      }
+    }
+
     bootstrapAccount();
+    loadTours();
   </script>
 </body>
 </html>

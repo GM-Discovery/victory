@@ -56,6 +56,7 @@ import (
 	"victory/backend/internal/storyboards"
 	"victory/backend/internal/thirdplace"
 	"victory/backend/internal/tickets"
+	"victory/backend/internal/tour"
 	"victory/backend/internal/venuecoordination"
 	"victory/backend/internal/venues"
 	"victory/backend/internal/world"
@@ -693,6 +694,17 @@ func main() {
 			"data": venues,
 		})
 	})
+
+	// Kernel 91: campus/venue/role guided tours. GET routes read-only and
+	// bare (matching /api/map/visibility just above); POST routes carry an
+	// explicit method prefix plus actionLimiter, per Kernel 77's "no GET
+	// mutates" CSRF posture (kernel77_csrf_posture_test.go).
+	mux.HandleFunc("/api/tours/state", tour.HandleState(pool))
+	mux.HandleFunc("/api/tours/history", tour.HandleHistory(pool))
+	mux.HandleFunc("GET /api/tours/{tour_key}/replay", tour.HandleReplay(pool))
+	mux.HandleFunc("POST /api/tours/{tour_key}/complete", ratelimit.Middleware(actionLimiter, tour.HandleComplete(pool)))
+	mux.HandleFunc("POST /api/tours/{tour_key}/skip", ratelimit.Middleware(actionLimiter, tour.HandleSkip(pool)))
+	mux.HandleFunc("POST /api/tours/{tour_key}/progress", ratelimit.Middleware(actionLimiter, tour.HandleProgress(pool)))
 
 	// Kernel 85 §8.2: Audition Hall's venue picker used to be a hardcoded
 	// <select> of 15 slugs typed into markup, disconnected from the real
