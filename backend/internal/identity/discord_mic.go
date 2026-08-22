@@ -467,7 +467,7 @@ func HandleDiscordMicControl(pool *pgxpool.Pool, cfg DiscordServerLinkConfig) ht
 				break
 			}
 			if row == nil || strings.TrimSpace(row.ThreadID) == "" || !strings.EqualFold(strings.TrimSpace(row.Status), "active") {
-				message = "House Mic: Off"
+				message = "Chat Bridge: Off"
 				break
 			}
 			now := time.Now().UTC()
@@ -492,21 +492,21 @@ func HandleDiscordMicControl(pool *pgxpool.Pool, cfg DiscordServerLinkConfig) ht
 				writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "mic_update_failed"})
 				return
 			}
-			message = "House Mic: Off"
+			message = "Chat Bridge: Off"
 		case "status":
 			if hasDiscordConfig {
 				message, err = discordMicStatusText(ctx, pool, location.ID, linkRecord.DiscordGuildID, venueSlug, venueName)
 				break
 			}
 			if row == nil || strings.TrimSpace(row.ThreadID) == "" || !strings.EqualFold(strings.TrimSpace(row.Status), "active") {
-				message = "House Mic: Off"
+				message = "Chat Bridge: Off"
 				break
 			}
 			threadName := row.ThreadName
 			if threadName == "" {
 				threadName = discordMicThreadName(venueName, row.ShowtimeAt)
 			}
-			message = fmt.Sprintf("House Mic: On\nThread: %s", threadName)
+			message = fmt.Sprintf("Chat Bridge: On\nThread: %s", threadName)
 		default:
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "unsupported_mic_command"})
 			return
@@ -842,7 +842,7 @@ func discordMicStatusText(ctx context.Context, pool *pgxpool.Pool, locationID, g
 		return "", err
 	}
 	if row == nil || strings.TrimSpace(row.Status) != "active" {
-		return "House Mic: Off", nil
+		return "Chat Bridge: Off", nil
 	}
 
 	threadName := row.ThreadName
@@ -850,7 +850,7 @@ func discordMicStatusText(ctx context.Context, pool *pgxpool.Pool, locationID, g
 		threadName = discordMicThreadName(venueName, row.ShowtimeAt)
 	}
 
-	return fmt.Sprintf("House Mic: On\nThread: %s\nLink: %s", threadName, discordMicThreadURL(guildID, row.ThreadID)), nil
+	return fmt.Sprintf("Chat Bridge: On\nThread: %s\nLink: %s", threadName, discordMicThreadURL(guildID, row.ThreadID)), nil
 }
 
 func discordMicTurnOn(ctx context.Context, pool *pgxpool.Pool, cfg DiscordServerLinkConfig, locationID, guildID, venueSlug, venueName string, parentRow *DiscordChannelMappingItem, userID, discordUserID string) (string, error) {
@@ -946,7 +946,7 @@ func discordMicTurnOff(ctx context.Context, pool *pgxpool.Pool, venueSlug, locat
 		return "", err
 	}
 	if row == nil || strings.TrimSpace(row.ThreadID) == "" {
-		return fmt.Sprintf("House Mic: Off"), nil
+		return fmt.Sprintf("Chat Bridge: Off"), nil
 	}
 	now := time.Now().UTC()
 	if err := saveDiscordMicThread(ctx, pool, discordMicThreadRow{

@@ -23,7 +23,7 @@
 
     el.hidden = false;
     const parts = [
-      active ? "House Mic: Hot" : "House Mic: Off",
+      active ? "Chat Bridge: Hot" : "Chat Bridge: Off",
       status?.linked ? "Discord Bridge: On" : "Discord Bridge: Off",
       status?.command_registered ? "Discord Intake: Ready" : "Discord Intake: Check",
     ];
@@ -61,7 +61,7 @@
     } catch (error) {
       if (el.dataset.venueSlug) {
         el.hidden = false;
-        el.textContent = "House Mic unavailable";
+        el.textContent = "Chat Bridge unavailable";
       }
       console.warn("discord mic status failed", error);
     }
