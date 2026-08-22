@@ -471,6 +471,39 @@ func HandleRespondPermissionRequest(pool *pgxpool.Pool) http.HandlerFunc {
 					writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "membership_create_failed"})
 					return
 				}
+			case "audience":
+				// Audience is a per-Showing ticket, never a standing venue
+				// grant (unlike cast/crew/director membership above) --
+				// route through Kernel 93's audience_admissions instead of
+				// access_grants (see visibility.go's audience_admission_
+				// surface, which only reads audience_admissions, not
+				// access_grants). The approver's manage authority over this
+				// venue's location was already established above via
+				// resolveInviteAuthorityScope/authorityRole, so this only
+				// needs to resolve which Showing is currently live/
+				// rehearsal at the venue -- same "sessions row for this
+				// venue_id with status IN ('rehearsal','live')" definition
+				// of current-ness used everywhere else, not a new selector.
+				tag, err := tx.Exec(ctx, `
+					INSERT INTO audience_admissions (showing_id, user_id, issued_by_user_id)
+					SELECT sh.id, $2::uuid, $3::uuid
+					FROM sessions s
+					JOIN showings sh ON sh.session_id = s.id
+					WHERE s.venue_id = $1::uuid AND s.status IN ('rehearsal', 'live')
+					ORDER BY s.started_at DESC
+					LIMIT 1
+					ON CONFLICT (showing_id, user_id) DO UPDATE
+					SET issued_by_user_id = EXCLUDED.issued_by_user_id,
+					    issued_at = NOW()
+				`, venueID, requestUserID, userID)
+				if err != nil {
+					writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "admission_create_failed"})
+					return
+				}
+				if tag.RowsAffected() == 0 {
+					writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "error": "no_active_showing"})
+					return
+				}
 			default:
 				_, err = tx.Exec(ctx, `
 					INSERT INTO access_grants (location_id, user_id, grant_type, venue_id, granted_by_user_id, created_at)
