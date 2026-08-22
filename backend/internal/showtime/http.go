@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/access"
+	"victory/backend/internal/identity"
 )
 
 type response struct {
@@ -58,8 +59,8 @@ func writeError(w http.ResponseWriter, err error) {
 }
 
 // resultPayload formats a StartResult/Status result into the response
-// shape the frontend renders as spec §9.3's example block, plus structured
-// fields for the busy/needs-venue-choice branches.
+// shape the frontend renders, plus structured fields for the busy/needs-
+// venue-choice/already-live branches.
 func resultPayload(result StartResult) map[string]any {
 	if result.VenueBusyWithOtherShow != nil {
 		return map[string]any{
@@ -78,13 +79,22 @@ func resultPayload(result StartResult) map[string]any {
 		}
 	}
 
-	message := fmt.Sprintf("Showtime started: %s [%s]\nVenue: %s\nMic: off", result.ShowTitle, result.ShortCode, orDash(result.VenueName, result.VenueSlug))
-	if result.CurrentSceneName != "" {
-		message = fmt.Sprintf("Showtime started: %s [%s]\nVenue: %s\nCurrent Scene: %s\nPlayers: %d ready, %d still need%s to choose a Character\nMic: off",
-			result.ShowTitle, result.ShortCode, orDash(result.VenueName, result.VenueSlug),
-			result.CurrentSceneName, result.PlayersReady, result.PlayersNeedCharacter, pluralSuffix(result.PlayersNeedCharacter))
+	bridgeStatus := "not ready"
+	if result.ChatBridgeOn {
+		bridgeStatus = "connected"
 	}
-	message += "\n\nUse /mic hot to mirror or save live chat to the configured Discord channel."
+
+	var message string
+	if result.AlreadyLive {
+		message = fmt.Sprintf("You're already live. %s is running at %s.", result.ShowTitle, orDash(result.VenueName, result.VenueSlug))
+	} else {
+		message = fmt.Sprintf("Showtime! %s is live at %s. Chat Bridge: %s.", result.ShowTitle, orDash(result.VenueName, result.VenueSlug), bridgeStatus)
+		if result.CurrentSceneName != "" {
+			message = fmt.Sprintf("Showtime! %s is live at %s.\nScene: %s\nCast ready: %d · needs a Character: %d\nChat Bridge: %s.",
+				result.ShowTitle, orDash(result.VenueName, result.VenueSlug),
+				result.CurrentSceneName, result.PlayersReady, result.PlayersNeedCharacter, bridgeStatus)
+		}
+	}
 
 	return map[string]any{
 		"show_id":                result.ShowID,
@@ -95,9 +105,11 @@ func resultPayload(result StartResult) map[string]any {
 		"current_scene_name":     result.CurrentSceneName,
 		"players_ready":          result.PlayersReady,
 		"players_need_character": result.PlayersNeedCharacter,
-		"mic_on":                 result.MicOn,
+		"chat_bridge_on":         result.ChatBridgeOn,
+		"chat_bridge_message":    result.ChatBridgeMessage,
 		"session_id":             result.SessionID,
 		"was_resumed":            result.WasResumed,
+		"already_live":           result.AlreadyLive,
 		"message":                message,
 	}
 }
@@ -109,17 +121,11 @@ func orDash(name, fallback string) string {
 	return fallback
 }
 
-func pluralSuffix(n int) string {
-	if n == 1 {
-		return "s"
-	}
-	return ""
-}
-
 // HandleShowtimeControl handles POST /api/showtime/control, the bespoke
-// endpoint the in-app /showtime legacy command (commands/registry.go) is
-// bound to -- mirroring /api/session/control's existing shape exactly.
-func HandleShowtimeControl(pool *pgxpool.Pool) http.HandlerFunc {
+// endpoint the in-app /showtime legacy command (commands/registry.go) and
+// the Kernel 92 Showtime popup both call -- one domain operation per
+// action, multiple entry points (kernel doc §38).
+func HandleShowtimeControl(pool *pgxpool.Pool, discordCfg identity.DiscordServerLinkConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false})
@@ -136,6 +142,7 @@ func HandleShowtimeControl(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var body struct {
 			ShortCode     string `json:"short_code"`
+			ShowID        string `json:"show_id"`
 			Action        string `json:"action"`
 			ForceReattach bool   `json:"force_reattach"`
 			VenueSlug     string `json:"venue_slug"`
@@ -147,7 +154,7 @@ func HandleShowtimeControl(pool *pgxpool.Pool) http.HandlerFunc {
 
 		switch strings.ToLower(strings.TrimSpace(body.Action)) {
 		case "", "start":
-			result, err := Start(ctx, pool, userID, body.ShortCode, body.ForceReattach, body.VenueSlug)
+			result, err := Start(ctx, pool, discordCfg, userID, body.ShortCode, body.ShowID, body.ForceReattach, body.VenueSlug)
 			if err != nil {
 				writeError(w, err)
 				return
@@ -155,28 +162,64 @@ func HandleShowtimeControl(pool *pgxpool.Pool) http.HandlerFunc {
 			writeOK(w, resultPayload(result))
 
 		case "status":
-			result, err := Status(ctx, pool, userID, body.ShortCode)
+			result, err := Status(ctx, pool, userID, body.ShortCode, body.ShowID)
 			if err != nil {
 				writeError(w, err)
 				return
 			}
 			writeOK(w, resultPayload(result))
 
-		case "end":
-			result, err := End(ctx, pool, userID, body.ShortCode)
+		case "preflight":
+			result, err := Preflight(ctx, pool, userID, body.ShowID)
 			if err != nil {
 				writeError(w, err)
 				return
 			}
+			writeOK(w, preflightPayload(result))
+
+		case "end":
+			result, err := End(ctx, pool, discordCfg, userID, body.ShortCode, body.ShowID)
+			if err != nil {
+				writeError(w, err)
+				return
+			}
+			message := fmt.Sprintf("Showtime ended for %s. The Show may be resumed later.", result.ShowTitle)
+			if result.AlreadyEnded {
+				message = fmt.Sprintf("%s is already off stage.", result.ShowTitle)
+			}
 			writeOK(w, map[string]any{
-				"show_id":    result.ShowID,
-				"show_title": result.ShowTitle,
-				"session_id": result.SessionID,
-				"message":    fmt.Sprintf("Showtime ended for %s. The Show may be resumed later.", result.ShowTitle),
+				"show_id":                  result.ShowID,
+				"show_title":               result.ShowTitle,
+				"session_id":               result.SessionID,
+				"already_ended":            result.AlreadyEnded,
+				"aftercare_eligible_count": result.AftercareEligibleCount,
+				"message":                  message,
 			})
 
 		default:
 			writeError(w, errors.New("unknown_action"))
 		}
+	}
+}
+
+// preflightPayload formats a PreflightResult for the Kernel 92 Showtime
+// popup's "Ready for Showtime" summary (kernel doc §12/§39).
+func preflightPayload(result PreflightResult) map[string]any {
+	return map[string]any{
+		"show_id":                    result.ShowID,
+		"show_title":                 result.ShowTitle,
+		"nickname":                   result.Nickname,
+		"short_code":                 result.ShortCode,
+		"venue_slug":                 result.VenueSlug,
+		"venue_name":                 result.VenueName,
+		"current_scene_name":         result.CurrentSceneName,
+		"cast_admitted_count":        result.CastAdmittedCount,
+		"ticket_count":               result.TicketCount,
+		"ready_character_count":      result.ReadyCharacterCount,
+		"incomplete_character_count": result.IncompleteCharacterCount,
+		"chat_bridge_ready":          result.ChatBridgeReady,
+		"is_live":                    result.IsLive,
+		"blockers":                   result.Blockers,
+		"warnings":                   result.Warnings,
 	}
 }

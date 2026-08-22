@@ -70,11 +70,11 @@ func HandleBackupStatus(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": map[string]any{
-			"mode":                status.Mode,
-			"status":              status.Status,
-			"timestamp":           status.Timestamp,
-			"detail":              status.Detail,
-			"age_seconds":         ageSeconds,
+			"mode":        status.Mode,
+			"status":      status.Status,
+			"timestamp":   status.Timestamp,
+			"detail":      status.Detail,
+			"age_seconds": ageSeconds,
 		}})
 	}
 }

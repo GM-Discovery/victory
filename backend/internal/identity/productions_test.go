@@ -134,7 +134,9 @@ func TestHandleProductionsCollectionCreateSucceedsForProducer(t *testing.T) {
 	if payload.Data.LocationSlug != locationSlug {
 		t.Fatalf("expected location_slug %q (server-resolved), got %q", locationSlug, payload.Data.LocationSlug)
 	}
-	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM productions WHERE id = $1`, payload.Data.ID) })
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM productions WHERE id = $1`, payload.Data.ID)
+	})
 
 	// The newly created production must be usable: it appears in the
 	// caller's own list (Kernel 68 §5.2 "existing conventions" check --

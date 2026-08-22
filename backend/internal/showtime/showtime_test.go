@@ -9,11 +9,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/dbtest"
+	"victory/backend/internal/identity"
 	"victory/backend/internal/scenes"
 	"victory/backend/internal/showruns"
 	"victory/backend/internal/shows"
 	"victory/backend/internal/showtime"
 )
+
+var testDiscordCfg = identity.DiscordServerLinkConfig{}
 
 func showtimeTestSuffix(t *testing.T) string {
 	t.Helper()
@@ -157,7 +160,7 @@ func TestStartResolvesVenueFromSingleStagedPlacementAndLinksSession(t *testing.T
 		t.Fatalf("load show: %v", err)
 	}
 
-	result, err := showtime.Start(context.Background(), pool, producer, s.ShortCode, false, "")
+	result, err := showtime.Start(context.Background(), pool, testDiscordCfg, producer, s.ShortCode, "", false, "")
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -172,8 +175,8 @@ func TestStartResolvesVenueFromSingleStagedPlacementAndLinksSession(t *testing.T
 	if result.SessionID == "" {
 		t.Fatalf("expected a session to be started")
 	}
-	if result.MicOn {
-		t.Fatalf("expected mic to remain off")
+	if result.ChatBridgeOn {
+		t.Fatalf("expected chat bridge to remain off in test environment")
 	}
 
 	updated, err := shows.LoadShowByID(context.Background(), pool, f.showID)
@@ -198,7 +201,7 @@ func TestStartAsksWhenNoPlacementsExist(t *testing.T) {
 		t.Fatalf("load show: %v", err)
 	}
 
-	result, err := showtime.Start(context.Background(), pool, producer, s.ShortCode, false, "")
+	result, err := showtime.Start(context.Background(), pool, testDiscordCfg, producer, s.ShortCode, "", false, "")
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -232,7 +235,7 @@ func TestStartAsksWhenPlacementsResolveToMultipleVenues(t *testing.T) {
 		t.Fatalf("load show: %v", err)
 	}
 
-	result, err := showtime.Start(context.Background(), pool, producer, s.ShortCode, false, "")
+	result, err := showtime.Start(context.Background(), pool, testDiscordCfg, producer, s.ShortCode, "", false, "")
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -262,7 +265,7 @@ func TestEndPreservesCurrentSceneRosterAndCharacterSelection(t *testing.T) {
 		t.Fatalf("load show: %v", err)
 	}
 
-	startResult, err := showtime.Start(context.Background(), pool, producer, s.ShortCode, false, "")
+	startResult, err := showtime.Start(context.Background(), pool, testDiscordCfg, producer, s.ShortCode, "", false, "")
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -297,7 +300,7 @@ func TestEndPreservesCurrentSceneRosterAndCharacterSelection(t *testing.T) {
 		t.Fatalf("load character selection before end: %v", err)
 	}
 
-	if _, err := showtime.End(context.Background(), pool, producer, s.ShortCode); err != nil {
+	if _, err := showtime.End(context.Background(), pool, testDiscordCfg, producer, s.ShortCode, ""); err != nil {
 		t.Fatalf("End: %v", err)
 	}
 
@@ -337,4 +340,282 @@ func TestEndPreservesCurrentSceneRosterAndCharacterSelection(t *testing.T) {
 	if sessionStatus != "closed" {
 		t.Fatalf("expected session status closed after End, got %q", sessionStatus)
 	}
+}
+
+// TestStartByShowIDMatchesStartByShortCode proves the Kernel 92 GUI path
+// (show_id) and the /showtime <code> command path resolve the same Show and
+// converge on the same idempotent "already live" result on a repeat call.
+func TestStartByShowIDMatchesStartByShortCode(t *testing.T) {
+	pool := dbtest.OpenTestPool(t)
+	producer := showtimeTestUser(t, pool, "st_byid_producer")
+	f := buildShowtimeFixture(t, pool, producer)
+	productionID := showProductionID(t, pool, f.showRunID)
+	venueID := catharsisVenueID(t, pool)
+	addPlacement(t, pool, producer, f.locationID, productionID, f.showID, venueID, showtimeTestSuffix(t))
+
+	s, err := shows.LoadShowByID(context.Background(), pool, f.showID)
+	if err != nil {
+		t.Fatalf("load show: %v", err)
+	}
+
+	byCode, err := showtime.Start(context.Background(), pool, testDiscordCfg, producer, s.ShortCode, "", false, "")
+	if err != nil {
+		t.Fatalf("Start by short code: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM sessions WHERE id = $1`, byCode.SessionID) })
+	if byCode.SessionID == "" {
+		t.Fatalf("expected a session from the short-code Start")
+	}
+
+	byID, err := showtime.Start(context.Background(), pool, testDiscordCfg, producer, "", s.ID, false, "")
+	if err != nil {
+		t.Fatalf("Start by show_id: %v", err)
+	}
+	if !byID.AlreadyLive {
+		t.Fatalf("expected the second Start (by show_id) to report AlreadyLive, got %+v", byID)
+	}
+	if byID.SessionID != byCode.SessionID {
+		t.Fatalf("expected AlreadyLive to report the same session, got %q vs %q", byID.SessionID, byCode.SessionID)
+	}
+}
+
+// TestStartIsIdempotentReturnsAlreadyLive proves repeated Showtime never
+// starts a second session (kernel doc §21).
+func TestStartIsIdempotentReturnsAlreadyLive(t *testing.T) {
+	pool := dbtest.OpenTestPool(t)
+	producer := showtimeTestUser(t, pool, "st_idem_producer")
+	f := buildShowtimeFixture(t, pool, producer)
+	productionID := showProductionID(t, pool, f.showRunID)
+	venueID := catharsisVenueID(t, pool)
+	addPlacement(t, pool, producer, f.locationID, productionID, f.showID, venueID, showtimeTestSuffix(t))
+
+	s, err := shows.LoadShowByID(context.Background(), pool, f.showID)
+	if err != nil {
+		t.Fatalf("load show: %v", err)
+	}
+
+	first, err := showtime.Start(context.Background(), pool, testDiscordCfg, producer, s.ShortCode, "", false, "")
+	if err != nil {
+		t.Fatalf("first Start: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM sessions WHERE id = $1`, first.SessionID) })
+
+	second, err := showtime.Start(context.Background(), pool, testDiscordCfg, producer, s.ShortCode, "", false, "")
+	if err != nil {
+		t.Fatalf("second Start: %v", err)
+	}
+	if !second.AlreadyLive {
+		t.Fatalf("expected second Start to report AlreadyLive, got %+v", second)
+	}
+
+	var sessionCount int
+	if err := pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM sessions WHERE show_id = $1`, f.showID).Scan(&sessionCount); err != nil {
+		t.Fatalf("count sessions: %v", err)
+	}
+	if sessionCount != 1 {
+		t.Fatalf("expected exactly 1 session after two Start calls, got %d", sessionCount)
+	}
+}
+
+// TestEndIsIdempotentReportsAlreadyEnded proves repeated End Showtime never
+// errors once nothing is live (kernel doc §21).
+func TestEndIsIdempotentReportsAlreadyEnded(t *testing.T) {
+	pool := dbtest.OpenTestPool(t)
+	producer := showtimeTestUser(t, pool, "st_endidem_producer")
+	f := buildShowtimeFixture(t, pool, producer)
+	productionID := showProductionID(t, pool, f.showRunID)
+	venueID := catharsisVenueID(t, pool)
+	addPlacement(t, pool, producer, f.locationID, productionID, f.showID, venueID, showtimeTestSuffix(t))
+
+	s, err := shows.LoadShowByID(context.Background(), pool, f.showID)
+	if err != nil {
+		t.Fatalf("load show: %v", err)
+	}
+	startResult, err := showtime.Start(context.Background(), pool, testDiscordCfg, producer, s.ShortCode, "", false, "")
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM sessions WHERE id = $1`, startResult.SessionID) })
+
+	first, err := showtime.End(context.Background(), pool, testDiscordCfg, producer, s.ShortCode, "")
+	if err != nil {
+		t.Fatalf("first End: %v", err)
+	}
+	if first.AlreadyEnded {
+		t.Fatalf("expected the first End to actually close the session, not report AlreadyEnded")
+	}
+
+	second, err := showtime.End(context.Background(), pool, testDiscordCfg, producer, s.ShortCode, "")
+	if err != nil {
+		t.Fatalf("second End: %v", err)
+	}
+	if !second.AlreadyEnded {
+		t.Fatalf("expected the second End to report AlreadyEnded, got %+v", second)
+	}
+}
+
+// TestPreflightReportsBlockersForBusyVenue proves a venue already occupied
+// by a different live Show is a true blocker (kernel doc §14).
+func TestPreflightReportsBlockersForBusyVenue(t *testing.T) {
+	pool := dbtest.OpenTestPool(t)
+	producer := showtimeTestUser(t, pool, "st_busy_producer")
+	venueID := catharsisVenueID(t, pool)
+
+	fA := buildShowtimeFixture(t, pool, producer)
+	productionIDA := showProductionID(t, pool, fA.showRunID)
+	addPlacement(t, pool, producer, fA.locationID, productionIDA, fA.showID, venueID, showtimeTestSuffix(t)+"_a")
+	sA, err := shows.LoadShowByID(context.Background(), pool, fA.showID)
+	if err != nil {
+		t.Fatalf("load show A: %v", err)
+	}
+	startA, err := showtime.Start(context.Background(), pool, testDiscordCfg, producer, sA.ShortCode, "", false, "")
+	if err != nil {
+		t.Fatalf("Start show A: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM sessions WHERE id = $1`, startA.SessionID) })
+
+	fB := buildShowtimeFixture(t, pool, producer)
+	productionIDB := showProductionID(t, pool, fB.showRunID)
+	addPlacement(t, pool, producer, fB.locationID, productionIDB, fB.showID, venueID, showtimeTestSuffix(t)+"_b")
+	sB, err := shows.LoadShowByID(context.Background(), pool, fB.showID)
+	if err != nil {
+		t.Fatalf("load show B: %v", err)
+	}
+
+	preflight, err := showtime.Preflight(context.Background(), pool, producer, sB.ID)
+	if err != nil {
+		t.Fatalf("Preflight show B: %v", err)
+	}
+	if !containsString(preflight.Blockers, "venue_busy_with_other_show") {
+		t.Fatalf("expected venue_busy_with_other_show blocker, got %+v", preflight.Blockers)
+	}
+}
+
+// TestPreflightReportsWarningsNotBlockersForIncompleteCharacters proves
+// incomplete Character selection never blocks Showtime (kernel doc §13/§15).
+func TestPreflightReportsWarningsNotBlockersForIncompleteCharacters(t *testing.T) {
+	pool := dbtest.OpenTestPool(t)
+	producer := showtimeTestUser(t, pool, "st_incomplete_producer")
+	player := showtimeTestUser(t, pool, "st_incomplete_player")
+	f := buildShowtimeFixture(t, pool, producer)
+	productionID := showProductionID(t, pool, f.showRunID)
+	venueID := catharsisVenueID(t, pool)
+	addPlacement(t, pool, producer, f.locationID, productionID, f.showID, venueID, showtimeTestSuffix(t))
+
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO show_run_roster_members (show_run_id, user_id, role, added_by_user_id)
+		VALUES ($1, $2, 'player', $3)
+	`, f.showRunID, player, producer); err != nil {
+		t.Fatalf("insert player roster row without a character: %v", err)
+	}
+
+	s, err := shows.LoadShowByID(context.Background(), pool, f.showID)
+	if err != nil {
+		t.Fatalf("load show: %v", err)
+	}
+
+	preflight, err := showtime.Preflight(context.Background(), pool, producer, s.ID)
+	if err != nil {
+		t.Fatalf("Preflight: %v", err)
+	}
+	if containsString(preflight.Blockers, "characters_incomplete") {
+		t.Fatalf("expected incomplete Characters to never be a blocker, got %+v", preflight.Blockers)
+	}
+	if !containsString(preflight.Warnings, "characters_incomplete") {
+		t.Fatalf("expected incomplete Characters to be a warning, got %+v", preflight.Warnings)
+	}
+}
+
+// TestPreflightDoesNotMutateShowState proves Preflight's venue derivation
+// runs dry -- it must not persist a current-Scene placement the way an
+// actual Start does (kernel doc §13: preflight is informative, not action).
+func TestPreflightDoesNotMutateShowState(t *testing.T) {
+	pool := dbtest.OpenTestPool(t)
+	producer := showtimeTestUser(t, pool, "st_dryrun_producer")
+	f := buildShowtimeFixture(t, pool, producer)
+	productionID := showProductionID(t, pool, f.showRunID)
+	venueID := catharsisVenueID(t, pool)
+	addPlacement(t, pool, producer, f.locationID, productionID, f.showID, venueID, showtimeTestSuffix(t))
+
+	before, err := shows.LoadShowByID(context.Background(), pool, f.showID)
+	if err != nil {
+		t.Fatalf("load show before preflight: %v", err)
+	}
+	if before.CurrentShowScenePlacementID != nil {
+		t.Fatalf("expected no current scene placement before Preflight, got %v", before.CurrentShowScenePlacementID)
+	}
+
+	if _, err := showtime.Preflight(context.Background(), pool, producer, f.showID); err != nil {
+		t.Fatalf("Preflight: %v", err)
+	}
+
+	after, err := shows.LoadShowByID(context.Background(), pool, f.showID)
+	if err != nil {
+		t.Fatalf("load show after preflight: %v", err)
+	}
+	if after.CurrentShowScenePlacementID != nil {
+		t.Fatalf("expected Preflight not to set a current scene placement, got %v", after.CurrentShowScenePlacementID)
+	}
+}
+
+// TestEndReturnsAftercareEligibleCount proves End reports how many roster
+// members would receive an Aftercare offer, without sending anything
+// (kernel doc §23).
+func TestEndReturnsAftercareEligibleCount(t *testing.T) {
+	pool := dbtest.OpenTestPool(t)
+	producer := showtimeTestUser(t, pool, "st_aftercare_producer")
+	playerWithCharacter := showtimeTestUser(t, pool, "st_aftercare_player_with")
+	playerWithoutCharacter := showtimeTestUser(t, pool, "st_aftercare_player_without")
+	f := buildShowtimeFixture(t, pool, producer)
+	productionID := showProductionID(t, pool, f.showRunID)
+	venueID := catharsisVenueID(t, pool)
+	addPlacement(t, pool, producer, f.locationID, productionID, f.showID, venueID, showtimeTestSuffix(t))
+
+	var characterID string
+	if err := pool.QueryRow(context.Background(), `
+		INSERT INTO character_cards (owner_user_id, location_id, name) VALUES ($1, $2, $3) RETURNING id::text
+	`, playerWithCharacter, f.locationID, "Aftercare Count Character").Scan(&characterID); err != nil {
+		t.Fatalf("insert character card: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM character_cards WHERE id = $1`, characterID) })
+
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO show_run_roster_members (show_run_id, user_id, role, added_by_user_id, character_card_id)
+		VALUES ($1, $2, 'player', $3, $4)
+	`, f.showRunID, playerWithCharacter, producer, characterID); err != nil {
+		t.Fatalf("insert roster row with character: %v", err)
+	}
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO show_run_roster_members (show_run_id, user_id, role, added_by_user_id)
+		VALUES ($1, $2, 'player', $3)
+	`, f.showRunID, playerWithoutCharacter, producer); err != nil {
+		t.Fatalf("insert roster row without character: %v", err)
+	}
+
+	s, err := shows.LoadShowByID(context.Background(), pool, f.showID)
+	if err != nil {
+		t.Fatalf("load show: %v", err)
+	}
+	startResult, err := showtime.Start(context.Background(), pool, testDiscordCfg, producer, s.ShortCode, "", false, "")
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM sessions WHERE id = $1`, startResult.SessionID) })
+
+	end, err := showtime.End(context.Background(), pool, testDiscordCfg, producer, s.ShortCode, "")
+	if err != nil {
+		t.Fatalf("End: %v", err)
+	}
+	if end.AftercareEligibleCount != 1 {
+		t.Fatalf("expected AftercareEligibleCount 1, got %d", end.AftercareEligibleCount)
+	}
+}
+
+func containsString(haystack []string, needle string) bool {
+	for _, s := range haystack {
+		if s == needle {
+			return true
+		}
+	}
+	return false
 }

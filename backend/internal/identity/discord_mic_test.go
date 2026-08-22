@@ -292,7 +292,7 @@ func TestDiscordMicControlFallsBackWithoutDiscordBootstrap(t *testing.T) {
 	if statusRec.Code != http.StatusOK {
 		t.Fatalf("unexpected status control code %d body=%s", statusRec.Code, statusRec.Body.String())
 	}
-	if !strings.Contains(statusRec.Body.String(), "House Mic: On") {
+	if !strings.Contains(statusRec.Body.String(), "Chat Bridge: On") {
 		t.Fatalf("expected local mic status, got %s", statusRec.Body.String())
 	}
 

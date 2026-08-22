@@ -347,7 +347,14 @@ func main() {
 	mux.HandleFunc("POST /api/shows/{show_id}/current-scene", shows.HandleShowCurrentScene(pool, hub))
 	mux.HandleFunc("PATCH /api/shows/{show_id}/short-code", shows.HandleUpdateShortCode(pool))
 	mux.HandleFunc("GET /api/shows/by-code", shows.HandleResolveByShortCode(pool))
-	mux.HandleFunc("POST /api/showtime/control", showtime.HandleShowtimeControl(pool))
+	// Kernel 92's "Showing" (scheduled performance instance) is a distinct
+	// concept from Kernel 22's `showings` table/HTTP namespace (the live
+	// audience-visibility wrapper reviewed at GET /api/showings below) --
+	// mounted under /api/showtime/ to avoid colliding with that existing
+	// route, not because it isn't also a `shows` domain operation.
+	mux.HandleFunc("GET /api/showtime/showings", shows.HandleShowingsCollection(pool))
+	mux.HandleFunc("POST /api/showtime/showings", shows.HandleShowingsCollection(pool))
+	mux.HandleFunc("POST /api/showtime/control", showtime.HandleShowtimeControl(pool, discordServerLinkConfig))
 	mux.HandleFunc("GET /api/scenes", scenes.HandleScenesCollection(pool))
 	mux.HandleFunc("POST /api/scenes", scenes.HandleScenesCollection(pool))
 	mux.HandleFunc("GET /api/scenes/{scene_id}", scenes.HandleSceneByID(pool))

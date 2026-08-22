@@ -543,6 +543,78 @@ func HandleUpdateShortCode(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+// HandleShowingsCollection handles POST /api/showtime/showings (Kernel 92
+// "New Showing" creation) and GET /api/showtime/showings (bucketed Today/
+// Upcoming/Historical browsing, kernel doc §7-9). Mounted under
+// /api/showtime/ rather than /api/showings to avoid colliding with the
+// pre-existing Kernel 22 showings review routes (GET /api/showings et al,
+// backend/internal/showings) -- a different, unrelated "showing" concept
+// (the live audience-visibility wrapper, not a scheduled performance
+// instance). Both handlers call the same domain functions the GUI popup
+// and any future command path would share.
+func HandleShowingsCollection(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+
+		userID, err := requireAuthenticatedUser(ctx, pool, r)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+
+		switch r.Method {
+		case http.MethodGet:
+			result, err := ListShowingsForViewer(ctx, pool, userID, time.Now().UTC())
+			if err != nil {
+				writeError(w, err)
+				return
+			}
+			writeOK(w, result)
+
+		case http.MethodPost:
+			var body struct {
+				ShowRunID        string `json:"show_run_id"`
+				Nickname         string `json:"nickname"`
+				ScheduledStartAt string `json:"scheduled_start_at"`
+				ScheduledEndAt   string `json:"scheduled_end_at"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeError(w, errors.New("invalid_request_body"))
+				return
+			}
+			startAt, err := time.Parse(time.RFC3339, strings.TrimSpace(body.ScheduledStartAt))
+			if err != nil {
+				writeError(w, errors.New("scheduled_start_at_invalid"))
+				return
+			}
+			var endAt *time.Time
+			if raw := strings.TrimSpace(body.ScheduledEndAt); raw != "" {
+				parsed, err := time.Parse(time.RFC3339, raw)
+				if err != nil {
+					writeError(w, errors.New("scheduled_end_at_invalid"))
+					return
+				}
+				endAt = &parsed
+			}
+			s, err := CreateShowing(ctx, pool, userID, CreateShowingInput{
+				ShowRunID:        strings.TrimSpace(body.ShowRunID),
+				Nickname:         body.Nickname,
+				ScheduledStartAt: startAt,
+				ScheduledEndAt:   endAt,
+			})
+			if err != nil {
+				writeError(w, err)
+				return
+			}
+			writeOK(w, map[string]any{"show": s})
+
+		default:
+			methodNotAllowed(w)
+		}
+	}
+}
+
 // HandleResolveByShortCode handles GET /api/shows/by-code/{code} -- used by
 // both Audition Hall's "Join a Show" lookup and /showtime. The response is
 // deliberately narrow: show/show-run/location identifiers only, never

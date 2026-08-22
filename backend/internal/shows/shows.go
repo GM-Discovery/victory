@@ -14,7 +14,7 @@ import (
 )
 
 const showColumns = `
-	id::text, show_run_id::text, slug, COALESCE(short_code, ''), title, COALESCE(description, ''),
+	id::text, show_run_id::text, slug, COALESCE(short_code, ''), COALESCE(nickname, ''), title, COALESCE(description, ''),
 	COALESCE(audience_title, ''), COALESCE(audience_program_blurb, ''),
 	status, current_show_scene_placement_id::text, variables_json::text,
 	scheduled_start_at, scheduled_end_at, actual_start_at, actual_end_at,
@@ -26,7 +26,7 @@ func scanShow(row pgx.Row) (Show, error) {
 	var currentPlacementID *string
 	var variablesText string
 	if err := row.Scan(
-		&s.ID, &s.ShowRunID, &s.Slug, &s.ShortCode, &s.Title, &s.Description,
+		&s.ID, &s.ShowRunID, &s.Slug, &s.ShortCode, &s.Nickname, &s.Title, &s.Description,
 		&s.AudienceTitle, &s.AudienceProgramBlurb,
 		&s.Status, &currentPlacementID, &variablesText,
 		&s.ScheduledStartAt, &s.ScheduledEndAt, &s.ActualStartAt, &s.ActualEndAt,
@@ -79,11 +79,16 @@ func CreateShow(ctx context.Context, pool *pgxpool.Pool, actorUserID, showRunID 
 		return Show{}, err
 	}
 
+	status := "draft"
+	if in.Status != nil {
+		status = *in.Status
+	}
+
 	row := pool.QueryRow(ctx, `
-		INSERT INTO shows (show_run_id, slug, short_code, title, description, audience_title, audience_program_blurb, created_by_user_id)
-		VALUES ($1, $2, $3, $4, NULLIF($5, ''), NULLIF($6, ''), NULLIF($7, ''), $8)
+		INSERT INTO shows (show_run_id, slug, short_code, nickname, title, description, audience_title, audience_program_blurb, status, scheduled_start_at, scheduled_end_at, created_by_user_id)
+		VALUES ($1, $2, $3, NULLIF($4, ''), $5, NULLIF($6, ''), NULLIF($7, ''), NULLIF($8, ''), $9, $10, $11, $12)
 		RETURNING `+showColumns,
-		showRunID, in.Slug, shortCode, in.Title, in.Description, in.AudienceTitle, in.AudienceProgramBlurb, actorUserID)
+		showRunID, in.Slug, shortCode, in.Nickname, in.Title, in.Description, in.AudienceTitle, in.AudienceProgramBlurb, status, in.ScheduledStartAt, in.ScheduledEndAt, actorUserID)
 	return scanShow(row)
 }
 

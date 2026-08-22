@@ -35,6 +35,7 @@ type Show struct {
 	ShowRunID                   string          `json:"show_run_id"`
 	Slug                        string          `json:"slug"`
 	ShortCode                   string          `json:"short_code,omitempty"`
+	Nickname                    string          `json:"nickname,omitempty"`
 	Title                       string          `json:"title"`
 	Description                 string          `json:"description,omitempty"`
 	AudienceTitle               string          `json:"audience_title,omitempty"`
@@ -79,12 +80,22 @@ type ShowRunShowsSummary struct {
 // CreateShowInput is the caller-supplied subset of a new Show. ShowRunID is
 // a separate function argument, not a field here, matching CreateShowRun's
 // own convention in the showruns package.
+//
+// Nickname, ScheduledStartAt, ScheduledEndAt, and Status are additive
+// Kernel 92 fields: nil/empty leaves CreateShow's pre-Kernel-92 behavior
+// unchanged (no nickname, no schedule, status defaults to "draft") so
+// every existing caller keeps working untouched. shows.CreateShowing is
+// the only caller that populates all four.
 type CreateShowInput struct {
 	Title                string
 	Slug                 string
 	Description          string
 	AudienceTitle        string
 	AudienceProgramBlurb string
+	Nickname             string
+	ScheduledStartAt     *time.Time
+	ScheduledEndAt       *time.Time
+	Status               *string
 }
 
 // UpdateShowPatch carries only the fields being changed. A nil pointer means
