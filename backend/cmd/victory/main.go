@@ -28,6 +28,8 @@ import (
 
 	"victory/backend/internal/access"
 	"victory/backend/internal/assets"
+	"victory/backend/internal/audienceadmission"
+	"victory/backend/internal/audienceprojection"
 	"victory/backend/internal/characters"
 	"victory/backend/internal/cohorts"
 	"victory/backend/internal/cues"
@@ -348,6 +350,10 @@ func main() {
 	mux.HandleFunc("PATCH /api/shows/{show_id}/short-code", shows.HandleUpdateShortCode(pool))
 	mux.HandleFunc("GET /api/shows/by-code", shows.HandleResolveByShortCode(pool))
 	mux.HandleFunc("POST /api/showtime/control", showtime.HandleShowtimeControl(pool))
+	mux.HandleFunc("POST /api/audience-admissions", audienceadmission.HandleIssue(pool))
+	mux.HandleFunc("GET /api/audience-admissions", audienceadmission.HandleList(pool))
+	mux.HandleFunc("GET /api/audience-config", audienceprojection.HandleGet(pool))
+	mux.HandleFunc("PUT /api/audience-config", audienceprojection.HandleUpdate(pool))
 	mux.HandleFunc("GET /api/scenes", scenes.HandleScenesCollection(pool))
 	mux.HandleFunc("POST /api/scenes", scenes.HandleScenesCollection(pool))
 	mux.HandleFunc("GET /api/scenes/{scene_id}", scenes.HandleSceneByID(pool))

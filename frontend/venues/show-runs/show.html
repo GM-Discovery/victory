@@ -164,6 +164,24 @@
         </details>
       </section>
 
+      <section class="card" id="audience-card" hidden>
+        <h2 style="margin-top:0;">Audience</h2>
+        <p class="status-line" id="audience-config-status-line">Audience projection toggles.</p>
+        <p class="launchbar">
+          <button class="chip" type="button" id="audience-dice-toggle" aria-pressed="false">Dice Rolls</button>
+          <button class="chip" type="button" id="audience-presence-toggle" aria-pressed="false">Presence</button>
+          <button class="chip" type="button" id="audience-health-toggle" aria-pressed="false">Health Statuses</button>
+        </p>
+        <div class="form-grid">
+          <div class="field">
+            <label for="audience-admit-handle-input">Admit Audience member (handle)</label>
+            <input type="text" id="audience-admit-handle-input" placeholder="handle" />
+          </div>
+          <button class="chip" type="button" id="audience-admit-button">Admit</button>
+        </div>
+        <p class="status-line" id="audience-admit-status-line">Admits into the currently live Showing for this Show.</p>
+      </section>
+
       <section class="card" id="scenes-card" hidden>
         <h2 style="margin-top:0;">Scenes in this Show</h2>
         <p class="launchbar">
@@ -272,7 +290,9 @@
       document.getElementById("people-card").hidden = false;
       document.getElementById("manage-card").hidden = false;
       document.getElementById("session-card").hidden = false;
+      document.getElementById("audience-card").hidden = false;
       document.getElementById("scenes-card").hidden = false;
+      loadAudienceConfig();
 
       const locationId = payload.data.location_id;
       document.getElementById("scene-library-link").href = "/venues/show-runs/scenes.html?location_id=" + encodeURIComponent(locationId);
@@ -1492,7 +1512,108 @@
           line.textContent = "No live Session yet.";
           endButton.hidden = true;
         }
+        loadAudienceConfig();
       }
+
+      // Kernel 93: Director's Dice Rolls / Presence / Health Statuses
+      // Audience projection toggles, and the "admit an Audience member to
+      // this Show's currently live Showing" control. Mirrors
+      // showtimeControl's short_code-in-body/query convention -- Kernel 92
+      // Showtime's own Show selector, not a second live-event selector.
+      function currentShortCode() {
+        return document.getElementById("short-code-input").value.trim();
+      }
+
+      function renderAudienceConfig(cfg) {
+        const diceButton = document.getElementById("audience-dice-toggle");
+        const presenceButton = document.getElementById("audience-presence-toggle");
+        const healthButton = document.getElementById("audience-health-toggle");
+        diceButton.textContent = `Dice Rolls ${cfg.show_dice_rolls ? "On" : "Off"}`;
+        diceButton.setAttribute("aria-pressed", String(!!cfg.show_dice_rolls));
+        presenceButton.textContent = `Presence ${cfg.show_presence ? "On" : "Off"}`;
+        presenceButton.setAttribute("aria-pressed", String(!!cfg.show_presence));
+        healthButton.textContent = `Health Statuses ${cfg.show_health_statuses ? "On" : "Off"}`;
+        healthButton.setAttribute("aria-pressed", String(!!cfg.show_health_statuses));
+      }
+
+      async function loadAudienceConfig() {
+        const shortCode = currentShortCode();
+        const line = document.getElementById("audience-config-status-line");
+        if (!shortCode) return;
+        const res = await fetch(`/api/audience-config?short_code=${encodeURIComponent(shortCode)}`, { credentials: "include" });
+        const p = await res.json().catch(() => null);
+        if (!res.ok || !p?.ok) {
+          line.textContent = p?.data?.error === "no_active_showing"
+            ? "Start Showtime to configure Audience projection for this Showing."
+            : "Could not load Audience projection config.";
+          return;
+        }
+        line.textContent = "Audience projection toggles for the current Showing.";
+        renderAudienceConfig(p.data.config);
+      }
+
+      async function toggleAudienceConfig(key) {
+        const shortCode = currentShortCode();
+        const line = document.getElementById("audience-config-status-line");
+        if (!shortCode) return;
+        const current = await fetch(`/api/audience-config?short_code=${encodeURIComponent(shortCode)}`, { credentials: "include" });
+        const currentPayload = await current.json().catch(() => null);
+        if (!current.ok || !currentPayload?.ok) {
+          line.textContent = "Could not load current Audience projection config.";
+          return;
+        }
+        const cfg = currentPayload.data.config;
+        cfg[key] = !cfg[key];
+        const res = await fetch("/api/audience-config", {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            short_code: shortCode,
+            show_dice_rolls: cfg.show_dice_rolls,
+            show_presence: cfg.show_presence,
+            show_health_statuses: cfg.show_health_statuses,
+          }),
+        });
+        const p = await res.json().catch(() => null);
+        if (!res.ok || !p?.ok) {
+          line.textContent = "Could not update Audience projection config: " + (p?.data?.error || `HTTP ${res.status}`);
+          return;
+        }
+        line.textContent = "Audience projection updated.";
+        renderAudienceConfig(p.data.config);
+      }
+
+      document.getElementById("audience-dice-toggle").addEventListener("click", () => toggleAudienceConfig("show_dice_rolls"));
+      document.getElementById("audience-presence-toggle").addEventListener("click", () => toggleAudienceConfig("show_presence"));
+      document.getElementById("audience-health-toggle").addEventListener("click", () => toggleAudienceConfig("show_health_statuses"));
+
+      document.getElementById("audience-admit-button").addEventListener("click", async (event) => {
+        const shortCode = currentShortCode();
+        const handleInput = document.getElementById("audience-admit-handle-input");
+        const line = document.getElementById("audience-admit-status-line");
+        const handle = handleInput.value.trim();
+        if (!shortCode) { alert("Set a show code above first (Save Code)."); return; }
+        if (!handle) { line.textContent = "Enter a handle to admit."; return; }
+        event.target.disabled = true;
+        try {
+          const res = await fetch("/api/audience-admissions", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ short_code: shortCode, handle }),
+          });
+          const p = await res.json().catch(() => null);
+          if (!res.ok || !p?.ok) {
+            line.textContent = "Could not admit: " + (p?.data?.error || `HTTP ${res.status}`);
+            return;
+          }
+          line.textContent = `Admitted "${p.data.admission.user_handle}" to the current Showing as Audience.`;
+          handleInput.value = "";
+        } finally {
+          event.target.disabled = false;
+        }
+      });
 
       async function showtimeControl(action, extra) {
         const shortCode = document.getElementById("short-code-input").value.trim();

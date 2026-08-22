@@ -18,6 +18,7 @@ import (
 	"victory/backend/internal/identity"
 	"victory/backend/internal/ratelimit"
 	"victory/backend/internal/rollaudience"
+	"victory/backend/internal/showings"
 	"victory/backend/internal/stageeffects"
 	"victory/backend/internal/world"
 )
@@ -120,6 +121,59 @@ func resolvedStoredMode(raw string) string {
 	}
 }
 
+// audienceDiceRollsHidden reports whether sessionID's Showing has the
+// Kernel 93 Audience Dice Rolls toggle turned off. A local, deliberate
+// duplicate of audienceprojection.DiceRollsHiddenFromAudience's single-row
+// read (raw SQL against audience_projection_configs, not a package import)
+// -- network cannot import audienceprojection, since audienceprojection
+// imports shows, and shows already imports network (shows/http.go,
+// shows/sessions.go), which would be a cycle. A session with no Showing
+// (legacy/tutorial venue) is unaffected -- dice stays visible, matching
+// current public rollaudience.ModeShow behavior (spec §5).
+func audienceDiceRollsHidden(ctx context.Context, pool *pgxpool.Pool, sessionID string) bool {
+	showing, err := showings.LoadBySession(ctx, pool, sessionID)
+	if err != nil {
+		return false
+	}
+	var showDiceRolls bool
+	err = pool.QueryRow(ctx, `
+		SELECT show_dice_rolls FROM audience_projection_configs WHERE showing_id = $1
+	`, showing.ID).Scan(&showDiceRolls)
+	if err != nil {
+		// No row yet means the documented default (spec §5: dice ON,
+		// matching current public behavior) -- not hidden.
+		return false
+	}
+	return !showDiceRolls
+}
+
+// nonAudienceSessionRecipients returns every session participant whose role
+// is not "audience", plus actorID unconditionally (the roller always sees
+// their own roll -- rollaudience.VisibleToViewer's same rule). Used only
+// when Show-mode delivery would otherwise broadcast to the whole session but
+// the Showing's Audience Dice Rolls toggle is off.
+func nonAudienceSessionRecipients(ctx context.Context, pool *pgxpool.Pool, sessionID, actorID string) []string {
+	set := map[string]bool{actorID: true}
+	rows, err := pool.Query(ctx, `
+		SELECT user_id::text FROM session_participants
+		WHERE session_id = $1 AND role::text != 'audience'
+	`, sessionID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var id string
+			if scanErr := rows.Scan(&id); scanErr == nil && id != "" {
+				set[id] = true
+			}
+		}
+	}
+	out := make([]string, 0, len(set))
+	for id := range set {
+		out = append(out, id)
+	}
+	return out
+}
+
 // deliverStageMessage sends msg to exactly the audience Kernel 86 resolved
 // for a roll (backend/internal/rollaudience), reusing the same Decision
 // shape StoreDiceRoll already computed and stored on the Action's
@@ -135,6 +189,16 @@ func deliverStageMessage(ctx context.Context, hub *Hub, pool *pgxpool.Pool, sess
 		return
 	}
 	if useSessionBroadcast {
+		// Kernel 93 §18: Show-mode delivery is normally a full session
+		// broadcast (everyone already able to view this session). When the
+		// Showing's Director has turned Audience Dice Rolls off, narrow that
+		// to everyone except Audience-role sockets instead -- Director+/
+		// Cast/Crew are unaffected, and the roller always sees their own
+		// roll (nonAudienceSessionRecipients always includes actorID).
+		if decision.Mode == rollaudience.ModeShow && audienceDiceRollsHidden(ctx, pool, sessionID) {
+			hub.SendToUsers(sessionID, nonAudienceSessionRecipients(ctx, pool, sessionID, actorID), msg)
+			return
+		}
 		hub.BroadcastSession(sessionID, msg)
 		return
 	}
@@ -304,6 +368,15 @@ func ServeVenueWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordS
 			if err != nil {
 				log.Printf("ws pinned stage effect visibility check failed: %v", err)
 				continue
+			}
+			// Kernel 93 §18: same narrowing as deliverStageMessage's live
+			// path -- a reconnecting Audience viewer never receives a
+			// Show-mode pinned roll the Showing's Director has hidden from
+			// Audience, except their own.
+			if visible && decision.Mode == rollaudience.ModeShow && strings.EqualFold(strings.TrimSpace(sessionIdentity.Role), "audience") && e.ActorID != sessionIdentity.UserID {
+				if audienceDiceRollsHidden(ctx, pool, sessionIdentity.SessionID) {
+					visible = false
+				}
 			}
 			if visible {
 				visiblePinned = append(visiblePinned, e)

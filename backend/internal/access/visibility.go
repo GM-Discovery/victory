@@ -200,6 +200,49 @@ func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string
 
 			UNION
 
+			-- Kernel 93: pure Audience admission. A user holding a Kernel-93
+			-- Audience Showing admission (audience_admissions, distinct from
+			-- the two-punch show_run_tickets system) may see the Catharsis
+			-- tile even with zero location_memberships rows -- Kernel 90 had
+			-- found a pure Audience account could not open Catharsis at all.
+			-- Scoped to the admission's own Showing via its still-live
+			-- session, never a blanket venue grant: once that Showing's
+			-- session leaves rehearsal/live, or for any other concurrent
+			-- Showing at this venue, the join simply finds no row.
+			SELECT v.id, v.slug, v.name, v.kind, 2 AS reason_rank, 'audience_admission_surface'::text AS visible_because
+			FROM venues v
+			JOIN sessions s ON s.venue_id = v.id AND s.status IN ('rehearsal', 'live')
+			JOIN showings sh ON sh.session_id = s.id
+			JOIN audience_admissions aa ON aa.showing_id = sh.id
+			WHERE v.slug = 'catharsis'
+			  AND aa.user_id = $1
+
+			UNION
+
+			-- Kernel 93 follow-up (Grant, 2026-08-21): the Victory Theater
+			-- "coming soon" hub tile unlocks permanently, once a user has
+			-- ever had a durable session_participants row at Catharsis --
+			-- i.e. they have actually entered the venue at least once,
+			-- Audience or otherwise. session_participants rows are never
+			-- hard-deleted by application code (only left_at is set on
+			-- leave/disconnect -- identity.JoinVenue, network/session_
+			-- control.go), so this is a one-way, persistent-per-user
+			-- unlock: it survives logout/login and leaving Catharsis, and
+			-- needs no new tracking table.
+			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'catharsis_veteran_surface'::text AS visible_because
+			FROM venues v
+			WHERE v.slug = 'victory-theater'
+			  AND EXISTS (
+				SELECT 1
+				FROM session_participants sp
+				JOIN sessions cs ON cs.id = sp.session_id
+				JOIN venues cv ON cv.id = cs.venue_id
+				WHERE cv.slug = 'catharsis'
+				  AND sp.user_id = $1
+			  )
+
+			UNION
+
 			SELECT v.id, v.slug, v.name, v.kind, 4 AS reason_rank, 'owned_workbook_surface'::text AS visible_because
 			FROM venues v
 			WHERE v.slug = 'greenroom'

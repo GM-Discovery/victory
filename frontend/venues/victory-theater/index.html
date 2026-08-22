@@ -6,7 +6,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Victory Theater</title>
-  <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
   <style>
     body {
       margin: 0;
@@ -23,29 +22,56 @@
       padding: 24px;
       box-sizing: border-box;
     }
+
+    .coming-soon-card {
+      max-width: 480px;
+      text-align: center;
+    }
+
+    .coming-soon-card h1 {
+      font-size: 2rem;
+      margin: 0 0 12px;
+      letter-spacing: 0.02em;
+    }
+
+    .coming-soon-card p {
+      margin: 0 0 8px;
+      line-height: 1.5;
+      color: #d8c7a8;
+    }
+
+    .coming-soon-card a {
+      color: #f3e6cf;
+      text-decoration: underline;
+    }
+
+    .back-map-button {
+      display: inline-block;
+      margin-top: 24px;
+      color: #d8c7a8;
+      text-decoration: none;
+      border: 1px solid #4a3a26;
+      border-radius: 8px;
+      padding: 8px 16px;
+    }
+
+    .back-map-button:hover {
+      color: #f3e6cf;
+      border-color: #f3e6cf;
+    }
   </style>
 </head>
 <body>
-  <div id="forbidden-screen" class="forbidden-screen" hidden>
-    <div class="forbidden-card">
-      <img src="/assets/redirect.png" alt="Security redirect" />
-      <h1>Error: Forbidden Access Entry</h1>
-      <p>Security redirects you to the pathway.</p>
+  <main class="shell">
+    <div class="coming-soon-card">
+      <h1>Victory Theater</h1>
+      <p>Coming Soon! Imagine your game here.</p>
+      <p>Inquire with <a href="mailto:grant@amurray.family">grant@amurray.family</a>.</p>
       <a href="/" class="back-map-button">← Back to Map</a>
     </div>
-  </div>
-
-  <main class="shell">
-    <div id="connection-status" hidden>Checking access...</div>
   </main>
 
-  <script src="/lib/forbidden.js"></script>
   <script src="/lib/back-to-map.js"></script>
   <script src="/lib/venue-account-badge.js?v=nav-1"></script>
-  <script>
-    showForbiddenScreen();
-  </script>
 </body>
 </html>
-  <link rel="icon" type="image/png" href="/assets/favicon.png" />
-  <link rel="apple-touch-icon" href="/assets/favicon.png" />

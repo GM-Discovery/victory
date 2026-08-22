@@ -157,6 +157,25 @@ func ResolveParticipationContext(ctx context.Context, pool *pgxpool.Pool, userID
 		}
 	}
 
+	// Step 3.5 (Kernel 93): a pure Audience account with zero
+	// location_memberships rows -- the exact shape Kernel 90 found could not
+	// enter Catharsis at all -- resolves here via its Showing-scoped
+	// audience_admissions row, not the location-membership fallback below.
+	// Scoped to venueSlug's own currently live/rehearsal session, mirroring
+	// access.ResolveVisibleVenues's Catharsis branch exactly so the two
+	// checks can never disagree about which Showing admits this user.
+	if result.ViewerMode == ViewerModeNone && venueSlug != "" {
+		admitted, err := audienceAdmissionGrantsVenueEntry(ctx, pool, userID, venueSlug)
+		if err != nil {
+			return Context{}, err
+		}
+		if admitted {
+			result.ViewerMode = ViewerModeAudience
+			result.CanEnterVenue = true
+			result.Reason = "audience_admission"
+		}
+	}
+
 	// Step 4: fallback -- any active location_memberships row at all
 	// (including a plain "audience" role) means the user is a known
 	// audience member at this location, not a total stranger.
@@ -325,6 +344,30 @@ func legacyAccessGrantExists(ctx context.Context, pool *pgxpool.Pool, userID, ve
 			  AND v.slug = $2
 			  AND ag.revoked_at IS NULL
 			  AND (ag.expires_at IS NULL OR ag.expires_at > NOW())
+		)
+	`, userID, venueSlug).Scan(&exists)
+	return exists, err
+}
+
+// audienceAdmissionGrantsVenueEntry duplicates
+// access.ResolveVisibleVenues's Kernel 93 Catharsis UNION branch as a
+// single-venue boolean check (small, deliberate per-package duplication of
+// a three-line query, matching this codebase's established convention --
+// see activeRosterRole's comment above for the same rule applied
+// elsewhere) rather than importing access's map-tile query, which answers a
+// different question (every visible venue) than the one this resolver
+// needs (is this one venue enterable).
+func audienceAdmissionGrantsVenueEntry(ctx context.Context, pool *pgxpool.Pool, userID, venueSlug string) (bool, error) {
+	var exists bool
+	err := pool.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1
+			FROM venues v
+			JOIN sessions s ON s.venue_id = v.id AND s.status IN ('rehearsal', 'live')
+			JOIN showings sh ON sh.session_id = s.id
+			JOIN audience_admissions aa ON aa.showing_id = sh.id
+			WHERE v.slug = $2
+			  AND aa.user_id = $1
 		)
 	`, userID, venueSlug).Scan(&exists)
 	return exists, err

@@ -34,16 +34,53 @@ func resolveStoredRollAudienceMode(raw string) string {
 	}
 }
 
+// audienceDiceRollsHidden reports whether showingID's Audience Dice Rolls
+// toggle (Kernel 93) is off. A local, deliberate duplicate of
+// audienceprojection.DiceRollsHiddenFromAudience's single-row read (raw SQL,
+// not a package import) -- world cannot import audienceprojection, since
+// audienceprojection imports shows, and shows imports network, and network
+// imports world, which would be a cycle. A Showing with no persisted config
+// row (or no Showing at all -- showingID "") is unaffected: dice stays
+// visible, matching current public rollaudience.ModeShow behavior (spec §5).
+func audienceDiceRollsHidden(ctx context.Context, pool *pgxpool.Pool, showingID string) bool {
+	if strings.TrimSpace(showingID) == "" {
+		return false
+	}
+	var showDiceRolls bool
+	err := pool.QueryRow(ctx, `
+		SELECT show_dice_rolls FROM audience_projection_configs WHERE showing_id = $1
+	`, showingID).Scan(&showDiceRolls)
+	if err != nil {
+		return false
+	}
+	return !showDiceRolls
+}
+
 type Snapshot struct {
-	Location       string          `json:"location"`
-	Lot            string          `json:"lot"`
-	Venue          Venue           `json:"venue"`
-	Session        Session         `json:"session"`
-	Showing        Showing         `json:"showing"`
-	Elements       []PlacedElement `json:"elements"`
-	Overlay        *Overlay        `json:"overlay,omitempty"`
-	Actions        []Action        `json:"actions"`
-	TheaterContext TheaterContext  `json:"theater_context"`
+	Location       string                   `json:"location"`
+	Lot            string                   `json:"lot"`
+	Venue          Venue                    `json:"venue"`
+	Session        Session                  `json:"session"`
+	Showing        Showing                  `json:"showing"`
+	Elements       []PlacedElement          `json:"elements"`
+	Overlay        *Overlay                 `json:"overlay,omitempty"`
+	Actions        []Action                 `json:"actions"`
+	TheaterContext TheaterContext           `json:"theater_context"`
+	AudienceConfig AudienceProjectionConfig `json:"audience_config"`
+}
+
+// AudienceProjectionConfig is Kernel 93's Showing-level Audience projection
+// toggles, shaped for delivery inside the ordinary venue Snapshot every
+// viewer already fetches -- so an Audience client learns "is Presence/Health
+// on for this Showing" without a second, separately-authorized fetch.
+// Defaults match audienceprojection.defaultConfig (dice ON, matching
+// current public rollaudience.ModeShow behavior; presence/health OFF)
+// exactly -- this is a read-shaped duplicate of that package's Config for
+// the same import-cycle reason documented on audienceDiceRollsHidden above.
+type AudienceProjectionConfig struct {
+	ShowDiceRolls      bool `json:"show_dice_rolls"`
+	ShowPresence       bool `json:"show_presence"`
+	ShowHealthStatuses bool `json:"show_health_statuses"`
 }
 
 // TheaterContext is the Kernel 70A backend-computed answer to "what should
@@ -468,6 +505,18 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, view
 			if verr != nil {
 				return nil, verr
 			}
+			// Kernel 93 §18: an Audience viewer's own Show-mode rolls stay
+			// visible (VisibleToViewer already lets the roller see their own
+			// roll unconditionally); everyone else's Show-mode rolls are
+			// hidden from Audience specifically when the Showing's Director
+			// has turned the Audience Dice Rolls toggle off. Director+/Cast/
+			// Crew are unaffected -- this only ever narrows what Audience
+			// already saw, never anyone else's Cohort/Director visibility.
+			if visible && decision.Mode == rollaudience.ModeShow && strings.EqualFold(strings.TrimSpace(viewerRole), "audience") && a.ActorID != viewerUserID {
+				if audienceDiceRollsHidden(ctx, pool, snap.Showing.ID) {
+					visible = false
+				}
+			}
 			if !visible {
 				continue
 			}
@@ -700,8 +749,26 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, view
 		filtered = append(filtered, el)
 	}
 	snap.Elements = filtered
+	snap.AudienceConfig = loadAudienceProjectionConfig(ctx, pool, snap.Showing.ID)
 
 	return &snap, nil
+}
+
+// loadAudienceProjectionConfig loads showingID's Kernel 93 Audience
+// projection config, defaulting to dice ON / presence OFF / health OFF
+// (matching audienceprojection.defaultConfig) when showingID is empty or has
+// no persisted row yet. Same-cycle-avoiding raw SQL as
+// audienceDiceRollsHidden above -- see that function's comment.
+func loadAudienceProjectionConfig(ctx context.Context, pool *pgxpool.Pool, showingID string) AudienceProjectionConfig {
+	cfg := AudienceProjectionConfig{ShowDiceRolls: true, ShowPresence: false, ShowHealthStatuses: false}
+	if strings.TrimSpace(showingID) == "" {
+		return cfg
+	}
+	_ = pool.QueryRow(ctx, `
+		SELECT show_dice_rolls, show_presence, show_health_statuses
+		FROM audience_projection_configs WHERE showing_id = $1
+	`, showingID).Scan(&cfg.ShowDiceRolls, &cfg.ShowPresence, &cfg.ShowHealthStatuses)
+	return cfg
 }
 
 // canonicalRefForElement maps a snapshot element onto its canonical Kernel 90

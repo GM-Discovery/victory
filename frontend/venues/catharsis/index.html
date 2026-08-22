@@ -3919,6 +3919,38 @@
               <div id="left-drawer-edge-trigger" class="drawer-edge-trigger drawer-edge-trigger--left" aria-hidden="true"></div>
               <div id="right-drawer-edge-trigger" class="drawer-edge-trigger drawer-edge-trigger--right" aria-hidden="true"></div>
 
+              <!-- Kernel 93: the Audience seat's own left overlay. Same
+                   drawer/rail spatial language as left-drawer above, kept
+                   simpler and with no Director/Cast controls -- swapped in
+                   for left-drawer/right-drawer (never shown alongside them)
+                   by kernel93-audience-overlay.js once the server-resolved
+                   theater_context.kind for this viewer is "audience". -->
+              <aside id="audience-drawer" class="drawer drawer--collapsed" data-open-mode="hover" data-open="false" data-rail-label="Audience" hidden>
+                <div class="drawer-inner">
+                  <div class="drawer-head">
+                    <div class="drawer-head__copy">
+                      <strong>Audience</strong>
+                    </div>
+                  </div>
+                  <div class="drawer-body">
+                    <div class="drawer-item">
+                      <strong>Diagnostic</strong>
+                      <span id="audience-diagnostic-line">Connecting...</span>
+                    </div>
+                    <div id="audience-presence-item" class="drawer-item" hidden>
+                      <details id="audience-presence-details">
+                        <summary><strong>Presence</strong></summary>
+                        <div id="audience-presence-preview" class="presence-preview" aria-label="Current room presence"></div>
+                      </details>
+                    </div>
+                    <div id="audience-health-item" class="drawer-item" hidden>
+                      <strong>Character Health Status</strong>
+                      <div id="audience-health-list"></div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+
               <aside id="right-drawer" class="drawer drawer--collapsed" data-open-mode="hover" data-open="false" data-rail-label="Character / Notes">
                 <div class="drawer-inner">
                   <div class="drawer-head">
@@ -4316,6 +4348,7 @@
   <script src="/lib/stage-runtime/kernel89-announcements.js?v=kernel89-1"></script>
   <script src="/lib/stage-runtime/kernel89-director-tools.js?v=kernel89-1"></script>
   <script src="/lib/stage-runtime/kernel90-visibility-tools.js?v=kernel90-1"></script>
+  <script src="/lib/stage-runtime/kernel93-audience-overlay.js?v=kernel93-1"></script>
   <script src="/lib/stage-runtime/drawing.js?v=kernel87-1"></script>
   <script src="/lib/tour-engine.js?v=kernel91-1"></script>
   <script src="/venues/catharsis/tour.js?v=kernel91-1"></script>
