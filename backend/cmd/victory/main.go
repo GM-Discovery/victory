@@ -154,7 +154,7 @@ func main() {
 	// separate action/hook -- world.LoadVenueSnapshot (backend/internal/
 	// world/snapshot.go) now resolves the current placement's Base+Show
 	// composition fresh on every snapshot read, and both
-	// shows.HandleShowCurrentScene and cues.HandleCueGo already broadcast
+	// handleShowCurrentSceneWithLiveBridge and cues.HandleCueGo already broadcast
 	// network.BroadcastShowStageInvalidation on a successful current-Scene
 	// change, which every connected client already refetches on. No
 	// wiring needed here beyond those two existing broadcast call sites.
@@ -346,7 +346,7 @@ func main() {
 	mux.HandleFunc("POST /api/shows/{show_id}/sessions/{session_id}/link", shows.HandleShowSessionLink(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/sessions/{session_id}/unlink", shows.HandleShowSessionUnlink(pool))
 	mux.HandleFunc("POST /api/shows/{show_id}/sessions/start", shows.HandleShowSessionStart(pool))
-	mux.HandleFunc("POST /api/shows/{show_id}/current-scene", shows.HandleShowCurrentScene(pool, hub))
+	mux.HandleFunc("POST /api/shows/{show_id}/current-scene", handleShowCurrentSceneWithLiveBridge(pool, hub))
 	mux.HandleFunc("PATCH /api/shows/{show_id}/short-code", shows.HandleUpdateShortCode(pool))
 	mux.HandleFunc("GET /api/shows/by-code", shows.HandleResolveByShortCode(pool))
 	// Kernel 92's "Showing" (scheduled performance instance) is a distinct

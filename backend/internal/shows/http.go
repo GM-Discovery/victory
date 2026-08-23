@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"victory/backend/internal/access"
-	"victory/backend/internal/network"
 	"victory/backend/internal/showruns"
 )
 
@@ -349,63 +348,16 @@ func HandleShowProgram(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-// HandleShowCurrentScene handles POST /api/shows/{show_id}/current-scene --
-// sets (body: {"show_scene_placement_id": "..."}) or clears (body: {} or
-// null placement id) the Show's persistent current-Scene pointer (Kernel
-// 70 SS4.1). Director/Producer/Operator authority only -- Crew reaches
-// this indirectly via a Cue's go_to_scene action, which uses
-// shows.SetCurrentScenePlacementTrusted after its own authority check.
-//
-// Kernel 73A: also broadcasts network.BroadcastShowStageInvalidation on a
-// successful change, exactly like cues.HandleCueGo already does for a
-// Cue-triggered go_to_scene -- every connected Player/Audience client
-// whose session is linked to this Show refetches its snapshot, which now
-// includes the new current Scene's resolved composition (Base + Show
-// layer, backend/internal/world/snapshot.go). This is what makes a
-// Director's manual "Set as Current Scene" pick up Kessa's token (or any
-// other Scene composition) live, with no separate "load composition"
-// step and no client-side action-type interpretation required.
-func HandleShowCurrentScene(pool *pgxpool.Pool, hub *network.Hub) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			methodNotAllowed(w)
-			return
-		}
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-		defer cancel()
-		userID, err := requireAuthenticatedUser(ctx, pool, r)
-		if err != nil {
-			writeError(w, err)
-			return
-		}
-		showID := strings.TrimSpace(r.PathValue("show_id"))
-
-		var body struct {
-			ShowScenePlacementID string `json:"show_scene_placement_id"`
-		}
-		if r.ContentLength != 0 {
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				writeError(w, errors.New("invalid_request_body"))
-				return
-			}
-		}
-
-		var s Show
-		reason := "current_scene_cleared"
-		if strings.TrimSpace(body.ShowScenePlacementID) == "" {
-			s, err = ClearCurrentScenePlacement(ctx, pool, userID, showID)
-		} else {
-			s, err = SetCurrentScenePlacement(ctx, pool, userID, showID, body.ShowScenePlacementID)
-			reason = "current_scene_set"
-		}
-		if err != nil {
-			writeError(w, err)
-			return
-		}
-		network.BroadcastShowStageInvalidation(ctx, hub, pool, showID, reason)
-		writeOK(w, map[string]any{"show": s})
-	}
-}
+// HandleShowCurrentScene handled POST /api/shows/{show_id}/current-scene.
+// Superseded 2026-08-23 by cmd/victory/scene_live_bridge.go's
+// handleShowCurrentSceneWithLiveBridge, which does everything this did
+// (set/clear the Show's current-Scene pointer, Director/Producer/Operator
+// authority only, network.BroadcastShowStageInvalidation on change) plus
+// the Kernel 93 live-stage bridge: applying the Scene's captured
+// composition to the live venue, not just flipping which placement is
+// considered current. Lives in cmd/victory rather than here because scenes
+// already imports shows (for showRunForShow) -- shows importing scenes
+// back would cycle.
 
 // HandleShowSessionLink handles POST /api/shows/{show_id}/sessions/{session_id}/link.
 func HandleShowSessionLink(pool *pgxpool.Pool) http.HandlerFunc {

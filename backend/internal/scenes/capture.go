@@ -2,7 +2,6 @@ package scenes
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strings"
 
@@ -10,8 +9,6 @@ import (
 
 	"victory/backend/internal/showruns"
 )
-
-var defaultElementVisibility = json.RawMessage(`{"toRoles":["audience","cast","crew","director","producer"],"privateTo":[]}`)
 
 // requireDirectorPlus is Director+/Producer/Operator authority only,
 // deliberately narrower than canManageComposer's Crew non-destructive-edit
@@ -32,17 +29,24 @@ func requireDirectorPlus(ctx context.Context, pool *pgxpool.Pool, actorUserID, l
 	return nil
 }
 
-// UpdateCurrentScene folds a placement's Show-layer elements into its
-// Scene's own Base layer (kernel-85 S6.1, "Director+ can persist the
-// current supported arrangement back to the active Scene"). This is a
-// promotion, not a delete-and-recreate: each Show-layer row simply has its
-// show_scene_placement_id cleared, keeping its id (and any
-// stage_element_bindings row) intact. Base-layer elements that already
-// existed are untouched. After this call, LoadResolvedComposition for this
-// placement returns exactly what it did before -- the same elements, now
-// living in the Scene's reusable default instead of this one placement's
-// override, so every future Show that stages this Scene starts from this
-// arrangement too.
+// liveBridgeVenueSlug is the venue Scene Configuration's live bridge
+// (CaptureLiveVenueComposition / ApplySceneToLiveVenue) reads from and
+// writes to. Hardcoded rather than resolved per-Scene/Placement: every live
+// improv session this bridge exists for happens in Catharsis (Kernel 93),
+// and a real multi-venue resolution (placement.VenueID -> scene.
+// DefaultVenueID -> ???) isn't needed by anything yet. Revisit if Scene
+// Configuration ever needs to target a second live venue.
+const liveBridgeVenueSlug = "catharsis"
+
+// UpdateCurrentScene captures the live stage's current arrangement --
+// every stage-surface token and world-pinned index card, the active map,
+// and the grid config -- as the Scene's new Base layer (kernel-85 S6.1,
+// extended 2026-08-23 for the Kernel 93 live-stage bridge: "Director+ can
+// take a picture of what's live right now and have that become the Scene's
+// arrangement," not just promote whatever scene_stage_elements already
+// existed). This replaces the Scene's entire Base layer -- any previous
+// arrangement it held is gone, matching "save configuration" meaning "this
+// is what the Scene looks like now," not an incremental merge.
 func UpdateCurrentScene(ctx context.Context, pool *pgxpool.Pool, actorUserID, placementID string) (ResolvedComposition, error) {
 	p, err := LoadPlacementByID(ctx, pool, placementID)
 	if err != nil {
@@ -56,24 +60,20 @@ func UpdateCurrentScene(ctx context.Context, pool *pgxpool.Pool, actorUserID, pl
 		return ResolvedComposition{}, err
 	}
 
-	if _, err := pool.Exec(ctx, `
-		UPDATE scene_stage_elements SET show_scene_placement_id = NULL, updated_at = NOW()
-		WHERE show_scene_placement_id = $1
-	`, placementID); err != nil {
+	if err := CaptureLiveVenueComposition(ctx, pool, actorUserID, p.SceneID, liveBridgeVenueSlug); err != nil {
 		return ResolvedComposition{}, err
 	}
 
 	return LoadResolvedComposition(ctx, pool, placementID)
 }
 
-// SaveArrangementAsNewScene captures a placement's resolved (Base+Show)
-// composition as a distinct new Scene (kernel-85 S6.2). The original Scene
-// and placement are never modified -- every copied element gets a fresh id,
-// so this is a snapshot, the same "instance, not a live link" convention
-// Kernel 82's Storyboard templates already established. Bindings
-// (stage_element_bindings) are not copied: they reference the original
-// element ids, and re-binding an interaction on a freshly authored Scene is
-// the same authoring step as binding one on any newly created Scene.
+// SaveArrangementAsNewScene captures the live stage's current arrangement
+// as a distinct new Scene (kernel-85 S6.2, extended 2026-08-23 for the
+// Kernel 93 live-stage bridge). The original Scene and placement are never
+// modified. Bindings (stage_element_bindings) don't carry over: they
+// reference the original element ids, and re-binding an interaction on a
+// freshly authored Scene is the same authoring step as binding one on any
+// newly created Scene.
 func SaveArrangementAsNewScene(ctx context.Context, pool *pgxpool.Pool, actorUserID, placementID, newTitle, newSlug string) (Scene, error) {
 	p, err := LoadPlacementByID(ctx, pool, placementID)
 	if err != nil {
@@ -95,11 +95,6 @@ func SaveArrangementAsNewScene(ctx context.Context, pool *pgxpool.Pool, actorUse
 		return Scene{}, errors.New("slug_required")
 	}
 
-	resolved, err := LoadResolvedComposition(ctx, pool, placementID)
-	if err != nil {
-		return Scene{}, err
-	}
-
 	defaultVenueID := ""
 	if origScene.DefaultVenueID != nil {
 		defaultVenueID = *origScene.DefaultVenueID
@@ -117,37 +112,9 @@ func SaveArrangementAsNewScene(ctx context.Context, pool *pgxpool.Pool, actorUse
 		return Scene{}, err
 	}
 
-	tx, err := pool.Begin(ctx)
-	if err != nil {
+	if err := CaptureLiveVenueComposition(ctx, pool, actorUserID, newScene.ID, liveBridgeVenueSlug); err != nil {
 		return Scene{}, err
 	}
-	defer tx.Rollback(ctx)
 
-	for _, el := range resolved.Elements {
-		data := []byte(el.Data)
-		if len(data) == 0 {
-			data = []byte("{}")
-		}
-		position := []byte(el.Position)
-		if len(position) == 0 {
-			position = []byte("{}")
-		}
-		visibility := []byte(el.Visibility)
-		if len(visibility) == 0 {
-			visibility = defaultElementVisibility
-		}
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO scene_stage_elements (
-				scene_id, show_scene_placement_id, kind, label, data, position, visibility, sort_order, width, height, created_by_user_id
-			)
-			VALUES ($1, NULL, $2, NULLIF($3, ''), $4::jsonb, $5::jsonb, $6::jsonb, $7, $8, $9, $10::uuid)
-		`, newScene.ID, el.Kind, el.Label, data, position, visibility, el.SortOrder, el.Width, el.Height, actorUserID); err != nil {
-			return Scene{}, err
-		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return Scene{}, err
-	}
 	return newScene, nil
 }

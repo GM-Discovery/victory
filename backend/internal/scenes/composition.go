@@ -544,7 +544,8 @@ func DeleteStageElementBinding(ctx context.Context, pool *pgxpool.Pool, actorUse
 // loadSceneCompositionAsPlacedElements) -- composition is simply part of
 // what a snapshot *is*, the same way the actions-log replay above already
 // works, so there is nothing left to "project" or load as a separate step.
-// shows.HandleShowCurrentScene and cues.HandleCueGo both already broadcast
-// network.BroadcastShowStageInvalidation on a successful current-Scene
-// change, which is what every connected client already refetches its
-// snapshot on.
+// cmd/victory/scene_live_bridge.go's handleShowCurrentSceneWithLiveBridge
+// (formerly shows.HandleShowCurrentScene) and cues.HandleCueGo both already
+// broadcast network.BroadcastShowStageInvalidation on a successful
+// current-Scene change, which is what every connected client already
+// refetches its snapshot on.
