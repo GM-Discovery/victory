@@ -1605,6 +1605,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			backText, _ := payload["back_text"].(string)
 			color, _ := payload["color"].(string)
 			pinMode, _ := payload["pin_mode"].(string)
+			face, _ := payload["face"].(string)
 			worldX := 0.0
 			if raw, ok := payload["world_x"].(float64); ok {
 				worldX = raw
@@ -1632,6 +1633,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 				BackText:    backText,
 				Color:       color,
 				PinMode:     pinMode,
+				Face:        face,
 				WorldX:      worldX,
 				WorldY:      worldY,
 				ScreenX:     screenX,
