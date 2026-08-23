@@ -416,10 +416,34 @@
       if (!title) return;
       const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") + "-" + Date.now().toString(36);
       try {
-        await api(`/api/shows/${encodeURIComponent(showID)}/scenes/${encodeURIComponent(effectivePlacementId)}/save-as-new-scene`, {
+        // save-as-new-scene only creates a reusable Scene record -- it does
+        // NOT attach it to this Show, so on its own it would never appear
+        // in the list above or be reachable by Activate. Attach it as a
+        // placement (POST /shows/{id}/scenes) and immediately activate that
+        // placement too, since "save configuration" should mean "this is
+        // now loadable," not "this now exists somewhere unreachable."
+        const saved = await api(`/api/shows/${encodeURIComponent(showID)}/scenes/${encodeURIComponent(effectivePlacementId)}/save-as-new-scene`, {
           method: "POST", body: JSON.stringify({ title, slug }),
         });
-        status("Saved as a new Scene: " + title);
+        const newSceneId = saved?.scene?.id;
+        if (!newSceneId) { status("Saved, but couldn't read the new Scene's id to attach it."); return; }
+        const placement = await api(`/api/shows/${encodeURIComponent(showID)}/scenes`, {
+          method: "POST", body: JSON.stringify({ scene_id: newSceneId }),
+        });
+        const newPlacementId = placement?.placement?.id;
+        if (newPlacementId) {
+          if (selected) {
+            await api(`/api/shows/${encodeURIComponent(showID)}/cohorts/${encodeURIComponent(selected.id)}/current-scene`, {
+              method: "POST", body: JSON.stringify({ show_scene_placement_id: newPlacementId }),
+            });
+          } else {
+            await api(`/api/shows/${encodeURIComponent(showID)}/current-scene`, {
+              method: "POST", body: JSON.stringify({ show_scene_placement_id: newPlacementId }),
+            });
+          }
+        }
+        status("Saved as a new Scene and activated: " + title);
+        await renderSceneConfiguration(showID);
       } catch (err) { status("Save failed: " + err.message); }
     });
   }
