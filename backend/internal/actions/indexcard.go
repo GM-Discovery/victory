@@ -454,7 +454,7 @@ func createIndexCard(ctx context.Context, tx pgx.Tx, req IndexCardRequest) (inde
 		"context_class":           "card",
 		"front_text":              req.FrontText,
 		"back_text":               req.BackText,
-		"color":                   req.Color,
+		"color":                   normalizeIndexCardColor(req.Color),
 		"face":                    "front",
 		"pin_mode":                "overlay",
 		"screen_x":                0.5,
@@ -574,8 +574,9 @@ func updateIndexCard(ctx context.Context, tx pgx.Tx, req IndexCardRequest) (inde
 		backText = existingBackText
 	}
 	if color == "" {
-		color = normalizeIndexCardColor(existingColor)
+		color = existingColor
 	}
+	color = normalizeIndexCardColor(color)
 	if err := validateIndexCardLength(frontText, backText); err != nil {
 		return indexCardRecord{}, "", err
 	}
@@ -809,7 +810,16 @@ func sanitizeIndexCardRequest(req IndexCardRequest) IndexCardRequest {
 	req.ElementSlug = strings.TrimSpace(req.ElementSlug)
 	req.FrontText = truncateRunes(strings.TrimSpace(req.FrontText), 2000)
 	req.BackText = truncateRunes(strings.TrimSpace(req.BackText), 2000)
-	req.Color = normalizeIndexCardColor(req.Color)
+	// Deliberately NOT normalized here (unlike PinMode/coordinates below):
+	// normalizeIndexCardColor("") returns the hardcoded default, which would
+	// make updateIndexCard's "color == '' -> preserve existing" fallback
+	// (mirroring front_text/back_text's own empty-means-unchanged handling)
+	// permanently unreachable -- every update would silently reset color to
+	// default whenever the caller didn't explicitly resend it. createIndexCard
+	// and updateIndexCard each call normalizeIndexCardColor themselves, at
+	// the point where "no color given" has already been resolved to either a
+	// sensible new-card default or the existing persisted value.
+	req.Color = strings.TrimSpace(req.Color)
 	req.PinMode = normalizeIndexCardPinMode(req.PinMode)
 	req.WorldX = normalizeIndexCardCoordinate(req.WorldX)
 	req.WorldY = normalizeIndexCardCoordinate(req.WorldY)

@@ -310,10 +310,12 @@
     const panel = state.scenePanel;
     let roster;
     let scenesResp;
+    let show;
     try {
-      [roster, scenesResp] = await Promise.all([
+      [roster, scenesResp, show] = await Promise.all([
         api(`/api/shows/${encodeURIComponent(showID)}/cohorts`),
         api(`/api/shows/${encodeURIComponent(showID)}/scenes`),
+        api(`/api/shows/${encodeURIComponent(showID)}`),
       ]);
     } catch (err) {
       panel.innerHTML = `<div style="color:#e88;">Failed to load: ${escapeHtml(err.message)}</div>`;
@@ -323,6 +325,16 @@
     const placements = scenesResp?.placements || scenesResp || [];
     const cohortValue = resolveCohortSelection(cohorts);
     const selected = cohorts.find((c) => c.id === cohortValue) || null;
+    // Scenes are cohort-agnostic: with no real cohort selected ("Ungrouped"),
+    // fall back to the Show's own current_show_scene_placement_id (a plain
+    // shows table column, not tied to any cohort -- see
+    // backend/internal/shows/stage.go's SetCurrentScenePlacement) instead of
+    // disabling scene management entirely. A real cohort's own placement
+    // still takes priority when one is selected, so per-cohort overrides
+    // keep working exactly as before.
+    const effectivePlacementId = selected
+      ? selected.current_show_scene_placement_id
+      : show?.current_show_scene_placement_id;
 
     const cohortOptions = cohorts.map((c) =>
       `<option value="${c.id}" ${c.id === cohortValue ? "selected" : ""}>${escapeHtml(c.name)}</option>`
@@ -331,7 +343,7 @@
     const sceneRows = (Array.isArray(placements) ? placements : []).map((p) => {
       const title = p.scene?.title || p.title || "Untitled Scene";
       const placementID = p.placement?.id || p.id;
-      const isCurrent = selected?.current_show_scene_placement_id === placementID;
+      const isCurrent = effectivePlacementId === placementID;
       return `
         <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #2a2e37;">
           <span>${escapeHtml(title)}${isCurrent ? " <em>(current)</em>" : ""}</span>
@@ -347,13 +359,13 @@
         Cohort:
         <select data-select-cohort style="margin-left:6px; background:#20242c; color:#e8e8ec; border:1px solid #454b59; border-radius:4px;">
           ${cohortOptions}
-          <option value="ungrouped" ${cohortValue === "ungrouped" ? "selected" : ""}>Ungrouped (no per-cohort Scene)</option>
+          <option value="ungrouped" ${cohortValue === "ungrouped" ? "selected" : ""}>Ungrouped (Show default)</option>
         </select>
       </label>
       <div style="margin-bottom:10px;">${sceneRows}</div>
       <div style="display:flex; gap:8px; margin-top:10px;">
-        <button type="button" data-update-current style="${buttonStyle()}" ${selected ? "" : "disabled"}>Update Current Scene</button>
-        <button type="button" data-save-as-new style="${buttonStyle()}" ${selected ? "" : "disabled"}>Save as New Scene</button>
+        <button type="button" data-update-current style="${buttonStyle()}" ${effectivePlacementId ? "" : "disabled"}>Update Current Scene</button>
+        <button type="button" data-save-as-new style="${buttonStyle()}" ${effectivePlacementId ? "" : "disabled"}>Save as New Scene</button>
       </div>
       <div data-status style="margin-top:10px; font-size:11px; opacity:0.7;"></div>
     `;
@@ -369,32 +381,42 @@
 
     panel.querySelectorAll("[data-activate]").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        if (!selected) { status("Select a real cohort first -- Ungrouped has no per-cohort Scene."); return; }
         try {
-          await api(`/api/shows/${encodeURIComponent(showID)}/cohorts/${encodeURIComponent(selected.id)}/current-scene`, {
-            method: "POST", body: JSON.stringify({ show_scene_placement_id: btn.dataset.activate }),
-          });
-          status("Scene activated for " + selected.name + ".");
+          // Ungrouped activates the Show's own default current scene
+          // (POST /shows/{id}/current-scene); a real cohort activates its
+          // own per-cohort override instead. Same placement concept either
+          // way, just two different "whose current scene is this" scopes.
+          if (selected) {
+            await api(`/api/shows/${encodeURIComponent(showID)}/cohorts/${encodeURIComponent(selected.id)}/current-scene`, {
+              method: "POST", body: JSON.stringify({ show_scene_placement_id: btn.dataset.activate }),
+            });
+            status("Scene activated for " + selected.name + ".");
+          } else {
+            await api(`/api/shows/${encodeURIComponent(showID)}/current-scene`, {
+              method: "POST", body: JSON.stringify({ show_scene_placement_id: btn.dataset.activate }),
+            });
+            status("Scene activated as the Show default.");
+          }
           await renderSceneConfiguration(showID);
         } catch (err) { status("Activate failed: " + err.message); }
       });
     });
 
     panel.querySelector("[data-update-current]")?.addEventListener("click", async () => {
-      if (!selected?.current_show_scene_placement_id) { status("This cohort has no current Scene to update."); return; }
+      if (!effectivePlacementId) { status("No current Scene to update yet -- activate one first."); return; }
       try {
-        await api(`/api/shows/${encodeURIComponent(showID)}/scenes/${encodeURIComponent(selected.current_show_scene_placement_id)}/update-current-scene`, { method: "POST" });
+        await api(`/api/shows/${encodeURIComponent(showID)}/scenes/${encodeURIComponent(effectivePlacementId)}/update-current-scene`, { method: "POST" });
         status("Current Scene updated with the arranged placements.");
       } catch (err) { status("Update failed: " + err.message); }
     });
 
     panel.querySelector("[data-save-as-new]")?.addEventListener("click", async () => {
-      if (!selected?.current_show_scene_placement_id) { status("This cohort has no current Scene to save."); return; }
+      if (!effectivePlacementId) { status("No current Scene to save yet -- activate one first."); return; }
       const title = window.prompt("New Scene title:");
       if (!title) return;
       const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") + "-" + Date.now().toString(36);
       try {
-        await api(`/api/shows/${encodeURIComponent(showID)}/scenes/${encodeURIComponent(selected.current_show_scene_placement_id)}/save-as-new-scene`, {
+        await api(`/api/shows/${encodeURIComponent(showID)}/scenes/${encodeURIComponent(effectivePlacementId)}/save-as-new-scene`, {
           method: "POST", body: JSON.stringify({ title, slug }),
         });
         status("Saved as a new Scene: " + title);

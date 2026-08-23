@@ -17,9 +17,8 @@ import (
 )
 
 const (
-	firstTheaterSlug       = "first-theater"
-	catharsisSlug          = "catharsis"
-	builtInCourtyardMapURL = "/assets/courtyard.png"
+	firstTheaterSlug = "first-theater"
+	catharsisSlug    = "catharsis"
 )
 
 func isSupportedTheaterVenueSlug(slug string) bool {
@@ -146,13 +145,12 @@ func handleVenueMapGet(w http.ResponseWriter, r *http.Request, pool *pgxpool.Poo
 	state, err := loadVenueMapState(ctx, pool, venueSlug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			if venueSlug == catharsisSlug {
-				writeJSON(w, http.StatusOK, map[string]any{
-					"ok":   true,
-					"data": defaultCourtyardMapState(),
-				})
-				return
-			}
+			// No active map means blank, full stop -- Catharsis previously
+			// fell back to a packaged "Courtyard" default here, which meant
+			// removing the map never actually left it blank: the client's
+			// own correct blank-fill render would show for a moment, then
+			// get overwritten back to Courtyard on the next refetch. Every
+			// venue now behaves the same: no row means no map.
 			writeJSON(w, http.StatusOK, map[string]any{
 				"ok":   true,
 				"data": nil,
@@ -170,27 +168,6 @@ func handleVenueMapGet(w http.ResponseWriter, r *http.Request, pool *pgxpool.Poo
 		"ok":   true,
 		"data": state,
 	})
-}
-
-// defaultCourtyardMapState keeps the one packaged map available on a fresh
-// install, where no warehouse asset row exists yet. The frontend asset is
-// versioned with the application, so this cannot disappear during a backend
-// rebuild or a database restore.
-func defaultCourtyardMapState() venueMapState {
-	return venueMapState{
-		Fit:         "contain",
-		CropX:       0.5,
-		CropY:       0.5,
-		Scale:       1,
-		SafeMargin:  24,
-		DisplayMode: "theater",
-		Asset: &venueMapAsset{
-			AssetID:          "builtin-courtyard",
-			OriginalFilename: "courtyard.png",
-			AssetType:        "map",
-			ContentURL:       builtInCourtyardMapURL,
-		},
-	}
 }
 
 func handleVenueMapSave(w http.ResponseWriter, r *http.Request, hub *network.Hub, pool *pgxpool.Pool, venueSlug string) {
