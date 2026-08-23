@@ -127,6 +127,27 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 				allowed = venueMapVisible && venueAccessible
 			}
 			if !allowed {
+				tokenVenueSlug, tokenErr := publiclyPlacedTokenVenueSlug(ctx, pool, assetID)
+				if tokenErr != nil {
+					writeJSON(w, http.StatusInternalServerError, map[string]any{
+						"ok":    false,
+						"error": "asset_access_check_failed",
+					})
+					return
+				}
+				if tokenVenueSlug != "" {
+					venueAccessible, venueErr := access.UserCanAccessVenueSlug(ctx, pool, userID, tokenVenueSlug)
+					if venueErr != nil {
+						writeJSON(w, http.StatusInternalServerError, map[string]any{
+							"ok":    false,
+							"error": "asset_access_check_failed",
+						})
+						return
+					}
+					allowed = venueAccessible
+				}
+			}
+			if !allowed {
 				writeJSON(w, http.StatusForbidden, map[string]any{
 					"ok":    false,
 					"error": "forbidden",
@@ -197,7 +218,29 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 				})
 				return
 			}
-			if !(venueMapVisible && venueAccessible) {
+			allowed = venueMapVisible && venueAccessible
+			if !allowed {
+				tokenVenueSlug, tokenErr := publiclyPlacedTokenVenueSlug(ctx, pool, assetID)
+				if tokenErr != nil {
+					writeJSON(w, http.StatusInternalServerError, map[string]any{
+						"ok":    false,
+						"error": "asset_access_check_failed",
+					})
+					return
+				}
+				if tokenVenueSlug != "" {
+					venueAccessible, venueErr := access.UserCanAccessVenueSlug(ctx, pool, userID, tokenVenueSlug)
+					if venueErr != nil {
+						writeJSON(w, http.StatusInternalServerError, map[string]any{
+							"ok":    false,
+							"error": "asset_access_check_failed",
+						})
+						return
+					}
+					allowed = venueAccessible
+				}
+			}
+			if !allowed {
 				writeJSON(w, http.StatusForbidden, map[string]any{
 					"ok":    false,
 					"error": "forbidden",
@@ -284,6 +327,37 @@ func userCanAccessTheaterMapVenue(ctx context.Context, pool *pgxpool.Pool, userI
 		}
 	}
 	return false, nil
+}
+
+// publiclyPlacedTokenVenueSlug mirrors assetIsActiveTheaterMap's pattern for
+// the "map" asset type, but for tokens: an asset with no ownership/
+// membership access can still be a Warehouse token image placed as a
+// public-layer stage token (token_layer "public", visibility.visible true)
+// -- audience accounts legitimately viewing that venue have no
+// location_memberships row at all (Kernel 93 admission is showing-scoped,
+// not membership-based), so userCanReadAsset's role list can never include
+// them. Returns the venue slug to check venue access against, or "" if this
+// asset isn't currently such a placement.
+func publiclyPlacedTokenVenueSlug(ctx context.Context, pool *pgxpool.Pool, assetID string) (string, error) {
+	var slug string
+	err := pool.QueryRow(ctx, `
+		SELECT v.slug
+		FROM elements e
+		JOIN venue_layout_elements vle ON vle.element_id = e.id
+		JOIN venues v ON v.id = vle.venue_id
+		WHERE e.element_type = 'token'
+		  AND e.data->>'asset_id' = $1
+		  AND COALESCE(e.data->>'token_layer', '') = 'public'
+		  AND COALESCE((vle.visibility->>'visible')::boolean, TRUE) = TRUE
+		LIMIT 1
+	`, assetID).Scan(&slug)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	return slug, nil
 }
 
 type assetContentRecord struct {

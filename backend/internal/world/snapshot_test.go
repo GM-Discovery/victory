@@ -461,7 +461,7 @@ func TestLoadVenueSnapshotTheaterContextParticipantAndAudienceMessages(t *testin
 	if audienceSnap.TheaterContext.Kind != "audience" {
 		t.Fatalf("expected kind = audience for an unregistered viewer, got %+v", audienceSnap.TheaterContext)
 	}
-	if audienceSnap.TheaterContext.Message != "You are watching this Show. Player controls are not active." {
+	if audienceSnap.TheaterContext.Message != "You are part of the Audience." {
 		t.Fatalf("expected the exact required watching message, got %q", audienceSnap.TheaterContext.Message)
 	}
 }

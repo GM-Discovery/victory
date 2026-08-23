@@ -29,6 +29,7 @@ type IndexCardRequest struct {
 	WorldY      float64 `json:"world_y"`
 	ScreenX     float64 `json:"screen_x"`
 	ScreenY     float64 `json:"screen_y"`
+	Face        string  `json:"face"`
 }
 
 func StoreIndexCardCreate(ctx context.Context, pool *pgxpool.Pool, req IndexCardRequest) (*StoredAction, error) {
@@ -454,6 +455,7 @@ func createIndexCard(ctx context.Context, tx pgx.Tx, req IndexCardRequest) (inde
 		"front_text":              req.FrontText,
 		"back_text":               req.BackText,
 		"color":                   req.Color,
+		"face":                    "front",
 		"pin_mode":                "overlay",
 		"screen_x":                0.5,
 		"screen_y":                0.5,
@@ -608,6 +610,9 @@ func updateIndexCard(ctx context.Context, tx pgx.Tx, req IndexCardRequest) (inde
 	updatedData["session_id"] = req.SessionID
 	updatedData["venue_slug"] = venueSlug
 	applyIndexCardPinUpdate(updatedData, req)
+	if trimmedFace := strings.TrimSpace(req.Face); trimmedFace != "" {
+		updatedData["face"] = normalizeIndexCardFace(trimmedFace)
+	}
 
 	dataJSON, _ := json.Marshal(updatedData)
 
@@ -863,6 +868,13 @@ func normalizeIndexCardPinMode(mode string) string {
 	}
 }
 
+func normalizeIndexCardFace(face string) string {
+	if strings.ToLower(strings.TrimSpace(face)) == "back" {
+		return "back"
+	}
+	return "front"
+}
+
 func normalizeIndexCardCoordinate(value float64) float64 {
 	if math.IsNaN(value) {
 		return 0
@@ -911,6 +923,7 @@ func indexCardPayload(card indexCardRecord, productionID string) map[string]any 
 		"front_text":              card.FrontText,
 		"back_text":               card.BackText,
 		"color":                   card.Color,
+		"face":                    normalizeIndexCardFace(stringValue(card.Data["face"])),
 		"created_by":              card.CreatedBy,
 		"created_by_display_name": stringValue(card.Data["created_by_display_name"]),
 		"created_by_handle":       stringValue(card.Data["created_by_handle"]),

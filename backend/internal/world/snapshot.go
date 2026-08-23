@@ -1104,7 +1104,7 @@ func resolveTheaterContext(ctx context.Context, pool *pgxpool.Pool, viewerUserID
 		return TheaterContext{Kind: "backstage"}, nil
 	}
 
-	return TheaterContext{Kind: "audience", Message: "You are watching this Show. Player controls are not active."}, nil
+	return TheaterContext{Kind: "audience", Message: "You are part of the Audience."}, nil
 }
 
 func cloneMap(in map[string]any) map[string]any {

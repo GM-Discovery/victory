@@ -447,6 +447,27 @@
           next.assetContentURL = "/assets/construction.png";
           next.source.data.asset_content_url = next.assetContentURL;
         }
+        if (next && next.kind === "card") {
+          // normalizeElement has no frontText/backText/color fields at all
+          // (only nested under source.data) and falls back label to the
+          // literal string "Token" when payload carries no name -- fine for
+          // the actor's own tab, which editors.js/runtime.js's
+          // saveCardEditor patches model.frontText/backText directly on
+          // save, but a receiving client applying this same broadcast (e.g.
+          // Audience) only ever goes through this path and would otherwise
+          // render stale (or "Token"-labeled) card content forever despite
+          // source.data having the correct new text underneath.
+          next.frontText = readFirst(payload, ["front_text", "frontText"]) ?? next.source?.data?.front_text ?? next.frontText ?? "";
+          next.backText = readFirst(payload, ["back_text", "backText"]) ?? next.source?.data?.back_text ?? next.backText ?? "";
+          next.color = readFirst(payload, ["color"]) ?? next.source?.data?.color ?? next.color;
+          next.label = next.frontText || next.label;
+          next.source.name = next.label;
+          const nextFace = readFirst(payload, ["face"]);
+          if (nextFace) {
+            next.cardFace = String(nextFace).toLowerCase() === "back" ? "back" : "front";
+            next.source.data.face = next.cardFace;
+          }
+        }
         return next;
       }
       if (type === "set_nameplate_visibility" || type === "act/set_nameplate_visibility") {

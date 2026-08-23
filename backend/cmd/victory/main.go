@@ -1056,12 +1056,12 @@ func main() {
 	mux.HandleFunc("/api/warehouse/assets/", ratelimit.Middleware(actionLimiter, assets.HandleWarehouseAssetByID(pool, storageRoot)))
 	mux.HandleFunc("GET /api/venues/first-theater/map", venues.HandleVenueMap(hub, pool))
 	mux.HandleFunc("POST /api/venues/first-theater/map", venues.HandleVenueMap(hub, pool))
-	mux.HandleFunc("GET /api/venues/first-theater/grid", venues.HandleVenueGrid(pool))
-	mux.HandleFunc("PUT /api/venues/first-theater/grid", venues.HandleVenueGrid(pool))
+	mux.HandleFunc("GET /api/venues/first-theater/grid", venues.HandleVenueGrid(hub, pool))
+	mux.HandleFunc("PUT /api/venues/first-theater/grid", venues.HandleVenueGrid(hub, pool))
 	mux.HandleFunc("GET /api/venues/catharsis/map", venues.HandleVenueMap(hub, pool))
 	mux.HandleFunc("POST /api/venues/catharsis/map", venues.HandleVenueMap(hub, pool))
-	mux.HandleFunc("GET /api/venues/catharsis/grid", venues.HandleVenueGrid(pool))
-	mux.HandleFunc("PUT /api/venues/catharsis/grid", venues.HandleVenueGrid(pool))
+	mux.HandleFunc("GET /api/venues/catharsis/grid", venues.HandleVenueGrid(hub, pool))
+	mux.HandleFunc("PUT /api/venues/catharsis/grid", venues.HandleVenueGrid(hub, pool))
 	mux.HandleFunc("/api/venues/", venues.HandleVenueMap(hub, pool))
 
 	mux.HandleFunc("/api/session/the-cave/join", func(w http.ResponseWriter, r *http.Request) {

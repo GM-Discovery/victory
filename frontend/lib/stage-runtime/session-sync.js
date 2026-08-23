@@ -550,6 +550,10 @@
         const currentVenueSlug = String(getVenueSlug() || "").trim().toLowerCase();
         if (!venueSlug || venueSlug === currentVenueSlug) {
           await refreshVenueMapState();
+          // Grid saves broadcast this same venue/update message (no
+          // separate message type -- see grid.go's handleVenueGridSave)
+          // since neither refresh call needs to know which one changed.
+          await refreshVenueGridConfig();
         }
         return msg;
       }

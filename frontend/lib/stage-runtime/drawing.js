@@ -265,7 +265,7 @@
     mountHost.appendChild(panel);
 
     const header = el("div", { class: "cartograph-toolbar-header" }, [
-      el("strong", { text: "Cartograph" }),
+      el("strong", { text: "Cartography" }),
       el("span", { class: "cartograph-toolbar-grip", text: "drag" }),
     ]);
     const collapseBtn = el("button", {

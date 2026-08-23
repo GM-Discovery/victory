@@ -10,6 +10,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"victory/backend/internal/network"
 )
 
 type venueGridConfig struct {
@@ -51,7 +53,7 @@ func defaultVenueGridConfig() venueGridConfig {
 	}
 }
 
-func HandleVenueGrid(pool *pgxpool.Pool) http.HandlerFunc {
+func HandleVenueGrid(hub *network.Hub, pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		venueSlug := resolveVenueGridSlug(r)
 		if !isSupportedTheaterVenueSlug(venueSlug) {
@@ -66,7 +68,7 @@ func HandleVenueGrid(pool *pgxpool.Pool) http.HandlerFunc {
 		case http.MethodGet:
 			handleVenueGridGet(w, r, pool, venueSlug)
 		case http.MethodPut:
-			handleVenueGridSave(w, r, pool, venueSlug)
+			handleVenueGridSave(w, r, hub, pool, venueSlug)
 		default:
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
 				"ok":    false,
@@ -133,7 +135,7 @@ func handleVenueGridGet(w http.ResponseWriter, r *http.Request, pool *pgxpool.Po
 	})
 }
 
-func handleVenueGridSave(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, venueSlug string) {
+func handleVenueGridSave(w http.ResponseWriter, r *http.Request, hub *network.Hub, pool *pgxpool.Pool, venueSlug string) {
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 
@@ -237,6 +239,13 @@ func handleVenueGridSave(w http.ResponseWriter, r *http.Request, pool *pgxpool.P
 		})
 		return
 	}
+
+	// Grid changes previously only ever updated the saving client's own tab
+	// -- reuse the same venue/update broadcast map.go's save/delete already
+	// send (map_state is unused by the client's handler either way; it
+	// always refetches both map and grid state on receipt) so every other
+	// connected client, including Audience, picks up the change too.
+	broadcastVenueMapUpdate(hub, venueSlug, nil)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":   true,

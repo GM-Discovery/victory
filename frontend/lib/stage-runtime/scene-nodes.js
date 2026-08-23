@@ -12,6 +12,7 @@
     const canManageIndexCards = deps.canManageIndexCards;
     const currentRole = () => deps.currentRole?.() || "audience";
     const cardFaceForModel = deps.cardFaceForModel;
+    const sendAction = deps.sendAction;
     const cardStatusBadgeText = deps.cardStatusBadgeText;
     const viewerCanSeeHiddenCards = deps.viewerCanSeeHiddenCards;
     const tokenDisplayNameForModel = deps.tokenDisplayNameForModel;
@@ -150,7 +151,25 @@
           return;
         }
         if (!canEditLiveCard(model) && !canManageIndexCards(currentRole())) return;
-        deps.cardFaceState.set(cardKey, face === "back" ? "front" : "back");
+        // This flip must be networked (act §figure "flip the card, audience
+        // doesn't flip") -- a plain local deps.cardFaceState.set() here
+        // never leaves this tab. Mirror action-router.js's context-menu
+        // "flip" action: send update/index_card with the new face, and only
+        // update local state once the socket actually accepted it.
+        const nextFace = face === "back" ? "front" : "back";
+        const sent = sendAction?.("update/index_card", {
+          element_id: model.elementId || "",
+          element_slug: model.elementSlug || "",
+          front_text: model.frontText || "",
+          back_text: model.backText || "",
+          color: model.color || "#d9c7a6",
+          face: nextFace,
+        });
+        if (sent) {
+          model.cardFace = nextFace;
+          model.source.data = { ...(model.source.data || {}), face: nextFace };
+          deps.cardFaceState.set(cardKey, nextFace);
+        }
         renderPixiScene();
       });
       const statusBadgeTextValue = cardStatusBadgeText(model);

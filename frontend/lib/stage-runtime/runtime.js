@@ -2373,6 +2373,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       cardDisplayMode: (...args) => cardDisplayMode(...args),
       tokenSnapModeForModel: (...args) => tokenSnapModeForModel(...args),
       renderPixiScene: () => renderPixiScene(),
+      sendAction: (...args) => sendAction(...args),
       stageState: stageSceneState,
       cardFaceState,
       setDragState(value) {
@@ -2968,7 +2969,15 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
 
     const cardFaceForModel = (model) => {
       const cardKey = String(model?.elementId || model?.elementSlug || model?.key || "");
-      return String(cardFaceState.get(cardKey) || "front").toLowerCase() === "back" ? "back" : "front";
+      // model.cardFace / source.data.face is the networked face (see
+      // action-router.js's "flip" action and state.js's applyAction card
+      // branch) -- it's authoritative once present, since it's what
+      // reaches every connected client including Audience. cardFaceState
+      // is a legacy purely-local fallback for a card that hasn't gone
+      // through the networked flip yet.
+      const networked = model?.cardFace ?? model?.source?.data?.face;
+      const value = networked ?? cardFaceState.get(cardKey) ?? "front";
+      return String(value).toLowerCase() === "back" ? "back" : "front";
     };
     const cardPinData = stageEngineGeometryModule?.cardPinData || (() => ({ mode: "overlay", worldX: Number.NaN, worldY: Number.NaN, screenX: Number.NaN, screenY: Number.NaN }));
     const cardDisplayMode = stageEngineGeometryModule?.cardDisplayMode || (() => "overlay");
@@ -4466,7 +4475,10 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       // this call only hands it the shared PIXI world layer (so pan/zoom/
       // fullscreen carries drawings for free) and enough session context
       // to call the Kernel 87 backend.
-      if (window.VictoryStageDrawing && venueConfigFlag(currentSnapshot?.venue?.config, "cartograph_enabled", false)) {
+      // Cartography is a Cast+ tool -- Audience must never see it at all,
+      // not just have it dimmed (computeCanDraw's director_only mode only
+      // ever gated drawing *permission*, never the toolbar's visibility).
+      if (window.VictoryStageDrawing && currentRole !== "audience" && venueConfigFlag(currentSnapshot?.venue?.config, "cartograph_enabled", false)) {
         try {
           runtimeDrawing = window.VictoryStageDrawing.mount({
             hostElement: stageHost,
