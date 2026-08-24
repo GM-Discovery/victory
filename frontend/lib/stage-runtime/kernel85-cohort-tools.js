@@ -381,6 +381,7 @@
       </label>
       <div style="margin-bottom:10px;">${sceneRows}</div>
       <div style="display:flex; gap:8px; margin-top:10px;">
+        <button type="button" data-new-scene style="${buttonStyle()}" ${configuratorActive ? "disabled" : ""}>New Scene</button>
         <button type="button" data-update-current style="${buttonStyle()}" ${effectivePlacementId && !configuratorActive ? "" : "disabled"}>Update Current Scene</button>
         <button type="button" data-save-as-new style="${buttonStyle()}" ${effectivePlacementId && !configuratorActive ? "" : "disabled"}>Save as New Scene</button>
       </div>
@@ -423,6 +424,37 @@
           status("Couldn't enter Configurator Mode: " + err.message);
         }
       });
+    });
+
+    panel.querySelector("[data-new-scene]")?.addEventListener("click", async () => {
+      const title = window.prompt("New Scene title:");
+      if (!title) return;
+      const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") + "-" + Date.now().toString(36);
+      const locationID = show?.location_id;
+      if (!locationID) {
+        status("Couldn't resolve this Show's location to create a Scene under.");
+        return;
+      }
+      try {
+        // A brand-new Scene starts with an empty scene_stage_elements set --
+        // Configurator Mode opens on a blank canvas, exactly like Building
+        // an existing Scene, just with nothing captured yet.
+        const created = await api("/api/scenes", {
+          method: "POST", body: JSON.stringify({ location_id: locationID, slug, title }),
+        });
+        const newSceneID = created?.scene?.id;
+        if (!newSceneID) { status("Scene created, but couldn't read its id."); return; }
+        const placement = await api(`/api/shows/${encodeURIComponent(showID)}/scenes`, {
+          method: "POST", body: JSON.stringify({ scene_id: newSceneID }),
+        });
+        const newPlacementID = placement?.placement?.id;
+        if (!newPlacementID) { status("Scene created, but couldn't attach it to this Show."); return; }
+        await bridge()?.enterConfiguratorMode?.(showID, newSceneID, newPlacementID);
+        status(`Building "${title}" -- Audience does not see these changes until you Activate it.`);
+        await renderSceneConfiguration(showID);
+      } catch (err) {
+        status("Couldn't create a new Scene: " + err.message);
+      }
     });
 
     panel.querySelectorAll("[data-activate]").forEach((btn) => {
