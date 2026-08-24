@@ -560,6 +560,46 @@ func HandleCharacterCardByID(pool *pgxpool.Pool, notifiers ...ProjectionChangeNo
 		}
 
 		path := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/api/character-cards/"))
+		if strings.HasSuffix(path, "/name") {
+			if r.Method != http.MethodPatch {
+				writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
+				return
+			}
+			cardID := strings.TrimSpace(strings.TrimSuffix(path, "/name"))
+			if cardID == "" {
+				writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "character_card_id_required"}})
+				return
+			}
+
+			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+			defer cancel()
+
+			userID, err := requireUser(ctx, pool, r)
+			if err != nil {
+				writeAuthError(w, err)
+				return
+			}
+
+			var body struct {
+				Name string `json:"name"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeJSON(w, http.StatusBadRequest, response{Ok: false, Data: map[string]any{"error": "invalid_json"}})
+				return
+			}
+
+			card, err := RenameCard(ctx, pool, userID, cardID, body.Name)
+			if err != nil {
+				writeCharacterError(w, err)
+				return
+			}
+			if notify != nil {
+				notify(ctx, cardID, []string{"face", "identity"}, "")
+			}
+
+			writeJSON(w, http.StatusOK, response{Ok: true, Data: card})
+			return
+		}
 		if strings.HasSuffix(path, "/activate") {
 			if r.Method != http.MethodPost {
 				writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false, Data: map[string]any{"error": "method_not_allowed"}})
@@ -853,6 +893,72 @@ func CreateCard(ctx context.Context, pool *pgxpool.Pool, ownerUserID string, inp
 		return CharacterCard{}, err
 	}
 	if err := ensureWorkbookModule(ctx, pool, card.ID, card.WorkbookContext, workbookStatus); err != nil {
+		return CharacterCard{}, err
+	}
+	return card, nil
+}
+
+// RenameCard updates only a character card's display name, gated on
+// ownership alone -- deliberately NOT CanEditCard/CanDraftCharacter, which
+// UpdateCard's full-overwrite path requires for every field including this
+// one. CanDraftCharacter answers "can this account currently build/edit a
+// mechanical character sheet" (requires an active location_memberships/
+// memberships row with a staff-tier role: producer/director/cast/crew) --
+// an onboarding Player who created their character through the Catharsis
+// wizard and has no such row (the normal case for a Player, as opposed to
+// staff) could create their card but then never touch it again under that
+// gate, not even to fix its auto-generated Roman-numeral name. Renaming
+// your own character isn't a mechanical build action; an owner should
+// always be able to do it regardless of drafting-window state.
+func RenameCard(ctx context.Context, pool *pgxpool.Pool, actorUserID, cardID, name string) (CharacterCard, error) {
+	actorUserID = strings.TrimSpace(actorUserID)
+	cardID = strings.TrimSpace(cardID)
+	if actorUserID == "" {
+		return CharacterCard{}, errors.New("not_authenticated")
+	}
+	if cardID == "" {
+		return CharacterCard{}, errors.New("character_card_id_required")
+	}
+	name = truncate(strings.TrimSpace(name), 80)
+	if name == "" {
+		return CharacterCard{}, errors.New("character_name_required")
+	}
+
+	var ownerUserID string
+	if err := pool.QueryRow(ctx, `
+		SELECT owner_user_id::text FROM character_cards WHERE id = $1 AND is_deleted = FALSE
+	`, cardID).Scan(&ownerUserID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return CharacterCard{}, errors.New("character_card_not_found")
+		}
+		return CharacterCard{}, err
+	}
+	if actorUserID != ownerUserID {
+		return CharacterCard{}, errors.New("not_authorized")
+	}
+
+	var card CharacterCard
+	var createdAt, updatedAt time.Time
+	var sheetLinksRaw []byte
+	var workbookContextRaw []byte
+	err := pool.QueryRow(ctx, `
+		UPDATE character_cards
+		SET name = $2,
+		    updated_at = NOW()
+		WHERE id = $1
+		  AND is_deleted = FALSE
+		RETURNING id::text, owner_user_id::text, location_id::text, COALESCE(production_id::text, ''), workbook_status, workbook_context, name, pronouns, portrait_url, COALESCE(token_aura, ''), color, tagline, public_description, private_notes, sheet_links, created_at, updated_at
+	`, cardID, name).
+		Scan(&card.ID, &card.OwnerUserID, &card.LocationID, &card.ProductionID, &card.WorkbookStatus, &workbookContextRaw, &card.Name, &card.Pronouns, &card.PortraitURL, &card.TokenAura, &card.Color, &card.Tagline, &card.PublicDescription, &card.PrivateNotes, &sheetLinksRaw, &createdAt, &updatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return CharacterCard{}, errors.New("character_card_not_found")
+		}
+		return CharacterCard{}, err
+	}
+
+	card.WorkbookContext = decodeJSONMap(workbookContextRaw)
+	if err := finishCharacterCard(&card, sheetLinksRaw, createdAt, updatedAt); err != nil {
 		return CharacterCard{}, err
 	}
 	return card, nil

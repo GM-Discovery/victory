@@ -2719,9 +2719,33 @@
           private_notes: draft.private_notes || "",
         }),
       });
-      const payload = await response.json().catch(() => null);
+      let payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.ok) {
-        throw new Error(payload?.data?.error || payload?.error || `HTTP ${response.status}`);
+        const errorCode = payload?.data?.error || payload?.error || "";
+        // The full Face-page save is gated on CanDraftCharacter (an active
+        // staff-tier location membership), which an onboarding-only Player
+        // typically never has -- previously this meant the name could never
+        // be changed either, even though renaming your own character isn't
+        // a mechanical-build action. Fall back to the name-only endpoint
+        // (ownership-gated, nothing else) so the name still saves; other
+        // Face fields on this same page did NOT save in that case.
+        if (errorCode === "forbidden" || errorCode === "character_draft_permission_required") {
+          const nameResponse = await fetch(`/api/character-cards/${encodeURIComponent(state.selectedCharacterId)}/name`, {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: draft.name }),
+          });
+          payload = await nameResponse.json().catch(() => null);
+          if (!nameResponse.ok || !payload?.ok) {
+            throw new Error(payload?.data?.error || payload?.error || `HTTP ${nameResponse.status}`);
+          }
+          state.workbook.character = payload.data;
+          await loadWorkbook(state.selectedCharacterId, { retainPage: true });
+          setCharacterStatus("Name saved. The rest of this page needs drafting authority you don't currently have, so only the name updated.");
+          return;
+        }
+        throw new Error(errorCode || `HTTP ${response.status}`);
       }
       state.workbook.character = payload.data;
       await loadWorkbook(state.selectedCharacterId, { retainPage: true });

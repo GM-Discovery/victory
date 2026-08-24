@@ -272,6 +272,26 @@
         return;
       }
 
+      if (action === "rename") {
+        const nextLabel = window.prompt("New label:", objectModel.label || "");
+        if (nextLabel === null || nextLabel.trim() === "") {
+          deps.closeContextMenu();
+          return;
+        }
+        const sent = deps.sendAction("act/rename_element", {
+          element_id: objectModel.elementId || "",
+          label: nextLabel.trim(),
+        });
+        if (sent) {
+          deps.updateLocalObjectModel(objectModel, (model) => {
+            model.label = nextLabel.trim();
+          });
+        }
+        deps.setStageStatus(sent ? `Renamed to "${nextLabel.trim()}".` : "Socket unavailable.");
+        deps.closeContextMenu();
+        return;
+      }
+
       if (action === "flip" && kind === "card") {
         const nextFace = deps.cardFaceForModel(objectModel) === "back" ? "front" : "back";
         const sent = deps.sendAction("update/index_card", {

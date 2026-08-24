@@ -1249,6 +1249,33 @@
         groups.className = "composer-field-groups";
         row.appendChild(groups);
 
+        // Label could only ever be set once, at creation, in the Add form
+        // above -- there was no way to rename an element afterward, even
+        // though the backend (PATCH /api/stage-elements/{id} label field)
+        // already supported it.
+        const naming = fieldGroup("Name");
+        const nameInput = document.createElement("input");
+        nameInput.type = "text"; nameInput.style.cssText = "width:160px;";
+        nameInput.value = el.label || "";
+        nameInput.placeholder = "(untitled)";
+        naming.controls.appendChild(nameInput);
+        const renameButton = document.createElement("button");
+        renameButton.className = "chip small";
+        renameButton.type = "button";
+        renameButton.textContent = "Rename";
+        renameButton.addEventListener("click", async () => {
+          const res = await fetch(`/api/stage-elements/${encodeURIComponent(el.id)}`, {
+            method: "PATCH", credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ label: nameInput.value.trim() }),
+          });
+          const p = await res.json().catch(() => null);
+          if (!res.ok || !p?.ok) { alert("Could not rename: " + (p?.data?.error || `HTTP ${res.status}`)); return; }
+          await loadComposition(detail, surface, list);
+        });
+        naming.controls.appendChild(renameButton);
+        groups.appendChild(naming.group);
+
         if (el.kind === "token" || el.kind === "index_card" || el.kind === "interaction_hotspot") {
           const position = fieldGroup("Position");
           const xLabel = document.createElement("label");

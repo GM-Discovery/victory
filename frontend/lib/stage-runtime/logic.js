@@ -555,6 +555,16 @@
       push("flip", cardFace(objectModel) === "back" ? "Show Front" : "Flip", "face");
     }
 
+    // Configurator-Mode-only: a live token's display name is always
+    // derived from its underlying Warehouse asset (token.go's create path
+    // has no per-placement label field at all), but a draft
+    // scene_stage_elements row genuinely has its own independent `label`
+    // column -- so renaming only means something (and only ever reaches
+    // the server) while editing a draft, not on the real live stage.
+    if ((kind === "token" || kind === "card") && context.isConfiguratorActive && canManageIndexCards) {
+      push("rename", "Rename", "edit");
+    }
+
     if (kind === "card" && canTogglePinState(objectModel, canManageIndexCards)) {
       push(cardDisplay(objectModel) === "world" ? "unpin" : "pin", cardDisplay(objectModel) === "world" ? "Pin to Screen" : "Attach to Map", "pin");
     }

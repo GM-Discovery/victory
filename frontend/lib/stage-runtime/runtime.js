@@ -2859,6 +2859,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         canManageStageTokens: canManageStageTokens(currentRole),
         canActorRevealHideStageObjects: canActorRevealHideStageObjects(currentRole, currentSnapshot?.venue?.config || {}),
         hasSelection: Boolean(currentSelection),
+        isConfiguratorActive: isConfiguratorActive(),
         gridConfig: currentVenueGridConfig,
         cardFaceForModel,
         cardDisplayMode,
@@ -3122,6 +3123,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         canManageStageTokens: canManageStageTokens(currentRole),
         canActorRevealHideStageObjects: canActorRevealHideStageObjects(currentRole, currentSnapshot?.venue?.config || {}),
         hasSelection: Boolean(currentSelection),
+        isConfiguratorActive: isConfiguratorActive(),
         gridConfig: currentVenueGridConfig,
         cardFaceForModel,
         cardDisplayMode,
@@ -5000,6 +5002,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       "create/index_card", "update/index_card", "delete/index_card",
       "act/place_element", "act/remove_element",
       "act/set_element_lock", "act/set_nameplate_visibility",
+      "act/rename_element",
     ]);
 
     function isConfiguratorActive() {
@@ -5110,6 +5113,13 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
           await configuratorApi(`/api/stage-elements/${encodeURIComponent(elementId)}`, {
             method: "PATCH",
             body: JSON.stringify({ visibility: { nameplate_visible: Boolean(extra?.visible) } }),
+          });
+        } else if (type === "act/rename_element") {
+          const elementId = String(extra?.element_id || "");
+          if (!elementId) return;
+          await configuratorApi(`/api/stage-elements/${encodeURIComponent(elementId)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ label: String(extra?.label || "") }),
           });
         }
       } catch (error) {
