@@ -550,11 +550,29 @@
       gap: 10px;
     }
 
-    .face-hero-title h1 {
+    /* face-hero-name-input: the character's name used to be a plain <h1>
+       with no editable control anywhere on the page (heroKeys excluded it
+       from the normal editable field grid entirely) -- this is the fix,
+       styled to still read as the page's big title, with a visible border
+       only on hover/focus so it doesn't look like a form field at rest. */
+    .face-hero-name-input {
       margin: 0;
+      font: inherit;
       font-size: clamp(2.7rem, 5vw, 5rem);
       line-height: 0.9;
-      text-wrap: balance;
+      font-weight: 700;
+      color: inherit;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 2px 6px;
+      width: 100%;
+      max-width: 100%;
+    }
+    .face-hero-name-input:hover,
+    .face-hero-name-input:focus {
+      border-color: rgba(255, 255, 255, 0.25);
+      outline: none;
     }
 
     .face-hero-title .face-hero-subtitle {
@@ -2237,8 +2255,13 @@
 
       const title = document.createElement("div");
       title.className = "face-hero-title";
-      const nameEl = document.createElement("h1");
-      nameEl.textContent = name;
+      const nameEl = document.createElement("input");
+      nameEl.type = "text";
+      nameEl.className = "face-hero-name-input";
+      nameEl.value = name;
+      nameEl.maxLength = 80;
+      nameEl.dataset.key = "name";
+      nameEl.setAttribute("aria-label", "Character name");
       const sub = document.createElement("p");
       sub.className = "face-hero-subtitle";
       const subtitleParts = [pronouns, archetype, firstSkill].filter(Boolean);
