@@ -340,32 +340,49 @@
       `<option value="${c.id}" ${c.id === cohortValue ? "selected" : ""}>${escapeHtml(c.name)}</option>`
     ).join("");
 
+    const bridgeRef = bridge();
+    const configuratorActive = Boolean(bridgeRef?.isConfiguratorActive?.());
+    const configuratorSceneID = configuratorActive ? String(bridgeRef?.getConfiguratorSceneID?.() || "") : "";
+
     const sceneRows = (Array.isArray(placements) ? placements : []).map((p) => {
       const title = p.scene?.title || p.title || "Untitled Scene";
       const placementID = p.placement?.id || p.id;
+      const sceneID = p.scene?.id || p.scene_id || "";
       const isCurrent = effectivePlacementId === placementID;
+      const isBeingBuilt = configuratorActive && sceneID === configuratorSceneID;
       return `
         <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #2a2e37;">
-          <span>${escapeHtml(title)}${isCurrent ? " <em>(current)</em>" : ""}</span>
-          <button type="button" data-activate="${placementID}" style="${buttonStyle("padding:3px 8px; font-size:11px;")}" ${isCurrent ? "disabled" : ""}>Activate</button>
+          <span>${escapeHtml(title)}${isCurrent ? " <em>(current)</em>" : ""}${isBeingBuilt ? " <em>(building)</em>" : ""}</span>
+          <span style="display:flex; gap:6px;">
+            <button type="button" data-build="${sceneID}" style="${buttonStyle("padding:3px 8px; font-size:11px;")}" ${configuratorActive ? "disabled" : ""}>Build</button>
+            <button type="button" data-activate="${placementID}" style="${buttonStyle("padding:3px 8px; font-size:11px;")}" ${isCurrent ? "disabled" : ""}>Activate</button>
+          </span>
         </div>
       `;
     }).join("") || `<div style="opacity:0.6;">No Scenes attached to this Show yet.</div>`;
 
+    const configuratorBanner = configuratorActive
+      ? `<div style="background:#3a2f10; border:1px solid #8a6d1f; border-radius:4px; padding:6px 8px; margin-bottom:10px; font-size:12px;">
+          Configurator Mode: editing a draft. Audience and other viewers do not see this. Use Activate above to publish it.
+          <button type="button" data-exit-configurator style="${buttonStyle("margin-left:8px; padding:2px 8px; font-size:11px;")}">Exit Configurator</button>
+        </div>`
+      : "";
+
     panel.innerHTML = `
       <div></div>
       <h3 style="margin:0 0 10px 0; font-size:15px;">Scene Configuration</h3>
+      ${configuratorBanner}
       <label style="display:block; margin-bottom:10px;">
         Cohort:
-        <select data-select-cohort style="margin-left:6px; background:#20242c; color:#e8e8ec; border:1px solid #454b59; border-radius:4px;">
+        <select data-select-cohort style="margin-left:6px; background:#20242c; color:#e8e8ec; border:1px solid #454b59; border-radius:4px;" ${configuratorActive ? "disabled" : ""}>
           ${cohortOptions}
           <option value="ungrouped" ${cohortValue === "ungrouped" ? "selected" : ""}>Ungrouped (Show default)</option>
         </select>
       </label>
       <div style="margin-bottom:10px;">${sceneRows}</div>
       <div style="display:flex; gap:8px; margin-top:10px;">
-        <button type="button" data-update-current style="${buttonStyle()}" ${effectivePlacementId ? "" : "disabled"}>Update Current Scene</button>
-        <button type="button" data-save-as-new style="${buttonStyle()}" ${effectivePlacementId ? "" : "disabled"}>Save as New Scene</button>
+        <button type="button" data-update-current style="${buttonStyle()}" ${effectivePlacementId && !configuratorActive ? "" : "disabled"}>Update Current Scene</button>
+        <button type="button" data-save-as-new style="${buttonStyle()}" ${effectivePlacementId && !configuratorActive ? "" : "disabled"}>Save as New Scene</button>
       </div>
       <div data-status style="margin-top:10px; font-size:11px; opacity:0.7;"></div>
     `;
@@ -377,6 +394,35 @@
     panel.querySelector("[data-select-cohort]")?.addEventListener("change", (event) => {
       state.selectedCohortId = event.target.value;
       renderSceneConfiguration(showID);
+    });
+
+    panel.querySelector("[data-exit-configurator]")?.addEventListener("click", () => {
+      bridge()?.exitConfiguratorMode?.();
+      status("Configurator Mode closed.");
+      void renderSceneConfiguration(showID);
+    });
+
+    panel.querySelectorAll("[data-build]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const sceneID = btn.dataset.build;
+        // Building needs a real placement to read/write a draft composition
+        // through (scene_stage_elements is placement-scoped for the Show
+        // layer, base layer otherwise) -- reuse whichever placement this
+        // row already has rather than inventing a second lookup.
+        const row = (Array.isArray(placements) ? placements : []).find((p) => (p.scene?.id || p.scene_id) === sceneID);
+        const placementID = row?.placement?.id || row?.id;
+        if (!sceneID || !placementID) {
+          status("Couldn't find this Scene's placement to build against.");
+          return;
+        }
+        try {
+          await bridge()?.enterConfiguratorMode?.(showID, sceneID, placementID);
+          status("Building this Scene -- Audience does not see these changes until you Activate it.");
+          await renderSceneConfiguration(showID);
+        } catch (err) {
+          status("Couldn't enter Configurator Mode: " + err.message);
+        }
+      });
     });
 
     panel.querySelectorAll("[data-activate]").forEach((btn) => {

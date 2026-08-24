@@ -525,6 +525,14 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       getShowID: () => currentSnapshot?.session?.show_id || "",
       getViewerRole: () => currentRole,
       canManageStage: () => canManageIndexCards(currentRole),
+      // Configurator Mode (2026-08-23): build/switch stage arrangements
+      // against a Scene's draft composition instead of the live shared
+      // stage, using every existing token/card/map/grid tool unchanged.
+      // See sendAction/configuratorAwareFetch above for the interception.
+      isConfiguratorActive: () => isConfiguratorActive(),
+      getConfiguratorSceneID: () => configuratorSceneId(),
+      enterConfiguratorMode: (showID, sceneID, placementID) => enterConfiguratorMode(showID, sceneID, placementID),
+      exitConfiguratorMode: () => exitConfiguratorMode(),
     };
 
     // Kernel 88: same narrow-bridge convention as Kernel 85's above, adding
@@ -2640,6 +2648,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     }) || null;
 
     editors = stageEngineEditorsModule?.createEditorControllers?.({
+      fetch: (...args) => configuratorAwareFetch(...args),
       getStageShell: () => stageShell,
       getCurrentRole: () => currentRole,
       getCurrentSelection: () => currentSelection,
@@ -4955,7 +4964,261 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     }
 
     function sendAction(type, extra = {}) {
+      if (configuratorActive && CONFIGURATOR_ACTION_TYPES.has(type)) {
+        // Fire-and-forget, matching the live socket path's own contract:
+        // sendAction only ever promises "queued," never "confirmed" -- the
+        // caller's own optimistic local update already assumes success.
+        // dispatchConfiguratorAction reconciles the real state afterward by
+        // reloading the draft composition wholesale rather than trying to
+        // patch each caller's optimistic model precisely.
+        void dispatchConfiguratorAction(type, extra);
+        return true;
+      }
       return socketController?.sendAction?.(type, extra) || false;
+    }
+
+    // Kernel 93 sub-kernel (2026-08-23): Configurator Mode. A Director
+    // building/switching live-improv stage arrangements needs to do it
+    // without Audience (or anyone else) watching the work-in-progress, and
+    // without disturbing whatever the shared "Ungrouped" projection
+    // currently shows real viewers (see the live-stage bridge in
+    // backend/internal/scenes/live_bridge.go and cmd/victory/scene_live_
+    // bridge.go). This reuses every existing token/card/map/grid tool
+    // unchanged -- the interception happens at the two choke points every
+    // tool already funnels through (sendAction above, and editors.js's
+    // injected fetch below), not by touching each tool individually.
+    let configuratorActive = false;
+    let configuratorShowID = "";
+    let configuratorPlacementID = "";
+    let configuratorSceneID = "";
+    let configuratorElements = [];
+
+    const CONFIGURATOR_ACTION_TYPES = new Set([
+      "create/token", "update/token", "duplicate",
+      "create/index_card", "update/index_card", "delete/index_card",
+      "act/place_element", "act/remove_element",
+      "act/set_element_lock", "act/set_nameplate_visibility",
+    ]);
+
+    function isConfiguratorActive() {
+      return configuratorActive;
+    }
+
+    function configuratorSceneId() {
+      return configuratorSceneID;
+    }
+
+    async function enterConfiguratorMode(showID, sceneID, placementID) {
+      configuratorShowID = String(showID || "");
+      configuratorSceneID = String(sceneID || "");
+      configuratorPlacementID = String(placementID || "");
+      configuratorActive = Boolean(configuratorShowID && configuratorSceneID && configuratorPlacementID);
+      if (!configuratorActive) {
+        throw new Error("configurator_requires_show_scene_and_placement");
+      }
+      setStageStatus("Configurator Mode: editing a draft, not the live stage.");
+      await loadConfiguratorComposition();
+      return true;
+    }
+
+    function exitConfiguratorMode() {
+      configuratorActive = false;
+      configuratorShowID = "";
+      configuratorPlacementID = "";
+      configuratorSceneID = "";
+      configuratorElements = [];
+      setStageStatus("Configurator Mode closed.");
+      void refreshWorld();
+    }
+
+    function splitPositionFields(extra) {
+      const source = extra && typeof extra === "object" ? extra : {};
+      const { x, y, order, element_id, element_slug, ...rest } = source;
+      const hasPosition = x !== undefined || y !== undefined || order !== undefined;
+      return {
+        elementId: String(element_id || ""),
+        position: hasPosition ? { anchor: "stage", x: Number(x) || 0, y: Number(y) || 0, z: 0, order: Number(order) || 0 } : null,
+        data: rest,
+      };
+    }
+
+    function defaultVisibilityForKind(kind, data) {
+      const audienceVisible = kind === "token" ? String(data?.token_layer || "") !== "director" : true;
+      return {
+        toRoles: audienceVisible ? ["audience", "cast", "crew", "director", "producer"] : ["director", "producer"],
+        privateTo: [],
+        visible: true,
+        nameplate_visible: true,
+        locked: false,
+      };
+    }
+
+    async function configuratorApi(path, options = {}) {
+      const response = await fetch(path, {
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        ...options,
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok || !body?.ok) {
+        throw new Error(body?.error || `HTTP ${response.status}`);
+      }
+      return body.data;
+    }
+
+    async function dispatchConfiguratorAction(type, extra) {
+      try {
+        if (type === "create/token" || type === "create/index_card" || type === "duplicate") {
+          const kind = type === "create/index_card" ? "index_card" : "token";
+          const { position, data } = splitPositionFields(extra);
+          await configuratorApi(`/api/scenes/${encodeURIComponent(configuratorSceneID)}/stage-elements`, {
+            method: "POST",
+            body: JSON.stringify({
+              kind,
+              data,
+              position: position || { anchor: "stage", x: 0, y: 0, z: 0, order: 0 },
+              visibility: defaultVisibilityForKind(kind, data),
+            }),
+          });
+        } else if (type === "update/token" || type === "update/index_card" || type === "act/place_element") {
+          const { elementId, position, data } = splitPositionFields(extra);
+          if (!elementId) return;
+          const patch = {};
+          if (position) patch.position = position;
+          if (Object.keys(data).length) patch.data = data;
+          if (Object.keys(patch).length === 0) return;
+          await configuratorApi(`/api/stage-elements/${encodeURIComponent(elementId)}`, {
+            method: "PATCH",
+            body: JSON.stringify(patch),
+          });
+        } else if (type === "delete/index_card" || type === "act/remove_element") {
+          const elementId = String(extra?.element_id || "");
+          if (!elementId) return;
+          await configuratorApi(`/api/stage-elements/${encodeURIComponent(elementId)}`, { method: "DELETE" });
+        } else if (type === "act/set_element_lock") {
+          const elementId = String(extra?.element_id || "");
+          if (!elementId) return;
+          await configuratorApi(`/api/stage-elements/${encodeURIComponent(elementId)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ visibility: { locked: Boolean(extra?.locked) } }),
+          });
+        } else if (type === "act/set_nameplate_visibility") {
+          const elementId = String(extra?.element_id || "");
+          if (!elementId) return;
+          await configuratorApi(`/api/stage-elements/${encodeURIComponent(elementId)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ visibility: { nameplate_visible: Boolean(extra?.visible) } }),
+          });
+        }
+      } catch (error) {
+        console.warn("configurator action failed", type, error);
+        setStageStatus(`Configurator: ${type} failed -- ${error.message || error}`);
+      }
+      // Reload from server truth rather than trying to precisely reconcile
+      // each caller's own optimistic local update -- correctness over
+      // snappiness for a private draft-preview surface.
+      await loadConfiguratorComposition();
+    }
+
+    async function loadConfiguratorComposition() {
+      if (!configuratorActive) return;
+      const data = await configuratorApi(
+        `/api/shows/${encodeURIComponent(configuratorShowID)}/scenes/${encodeURIComponent(configuratorPlacementID)}/stage-composition`
+      );
+      const elements = Array.isArray(data?.composition?.elements) ? data.composition.elements : [];
+      configuratorElements = elements;
+
+      const models = [];
+      elements.forEach((el, index) => {
+        if (el.kind !== "token" && el.kind !== "index_card") return;
+        const model = objectFromSnapshotElement({
+          element_id: el.id,
+          slug: el.id,
+          element_type: el.kind,
+          context_class: el.kind === "token" ? "token" : "card",
+          name: el.label || el.data?.front_text || el.data?.asset_name || "",
+          data: el.data || {},
+          position: el.position || {},
+          visibility: el.visibility || {},
+          state: { locked: Boolean(el.visibility?.locked), nameplate_visible: el.visibility?.nameplate_visible !== false, visible: el.visibility?.visible !== false },
+        }, index);
+        if (model) models.push(model);
+      });
+      currentObjects = models;
+      renderPixiScene();
+
+      const mapEl = elements.find((el) => el.kind === "map_backdrop");
+      const mapData = mapEl?.data || null;
+      currentVenueMapState = mapData
+        ? { ...mapData, asset: mapData.asset_id ? { asset_id: mapData.asset_id, content_url: "/api/assets/" + mapData.asset_id + "/content" } : null }
+        : null;
+      updateMapPresentation();
+
+      const gridEl = elements.find((el) => el.kind === "grid_config");
+      currentVenueGridConfig = gridEl?.data || defaultGridConfig();
+    }
+
+    // Injected as editors.js's `fetch` -- the map/grid editor panels call
+    // fetchFn("/api/venues/.../map"|"/grid", ...) unchanged; this reroutes
+    // those two specific calls to the draft stage-elements API while
+    // Configurator Mode is active (checked fresh on every call, not baked
+    // in at construction time), and hands everything else through to the
+    // real fetch untouched.
+    async function configuratorAwareFetch(url, options = {}) {
+      if (!configuratorActive) return fetch(url, options);
+      const venueSlug = (globalThis.VictoryStageVenue || {}).slug || "";
+      const method = String(options.method || "GET").toUpperCase();
+      const mapPath = `/api/venues/${venueSlug}/map`;
+      const gridPath = `/api/venues/${venueSlug}/grid`;
+      const body = options.body ? JSON.parse(options.body) : {};
+
+      const fakeResponse = (payload, ok = true) => ({
+        ok,
+        status: ok ? 200 : 400,
+        json: async () => ({ ok, data: payload, error: ok ? undefined : String(payload) }),
+      });
+
+      try {
+        if (url === mapPath && method === "POST") {
+          const data = {
+            asset_id: body.asset_id, fit: body.fit || "contain",
+            crop_x: body.crop_x ?? 0.5, crop_y: body.crop_y ?? 0.5, scale: body.scale ?? 1,
+            safe_margin: body.safe_margin ?? 24, display_mode: body.display_mode || "theater",
+          };
+          const existing = configuratorElements.find((el) => el.kind === "map_backdrop");
+          if (existing) {
+            await configuratorApi(`/api/stage-elements/${encodeURIComponent(existing.id)}`, { method: "PATCH", body: JSON.stringify({ data }) });
+          } else {
+            await configuratorApi(`/api/scenes/${encodeURIComponent(configuratorSceneID)}/stage-elements`, { method: "POST", body: JSON.stringify({ kind: "map_backdrop", data }) });
+          }
+          await loadConfiguratorComposition();
+          return fakeResponse({ ...data, asset: { asset_id: data.asset_id, content_url: "/api/assets/" + data.asset_id + "/content" } });
+        }
+        if (url === mapPath && method === "DELETE") {
+          const existing = configuratorElements.find((el) => el.kind === "map_backdrop");
+          if (existing) await configuratorApi(`/api/stage-elements/${encodeURIComponent(existing.id)}`, { method: "DELETE" });
+          await loadConfiguratorComposition();
+          return fakeResponse(null);
+        }
+        if (url === gridPath && method === "PUT") {
+          const data = {
+            grid_type: body.grid_type, hex_orientation: body.hex_orientation, cell_size: body.cell_size,
+            offset_x: body.offset_x, offset_y: body.offset_y, line_width: body.line_width,
+            opacity: body.opacity, line_style: body.line_style, visible: body.visible,
+          };
+          const existing = configuratorElements.find((el) => el.kind === "grid_config");
+          if (existing) {
+            await configuratorApi(`/api/stage-elements/${encodeURIComponent(existing.id)}`, { method: "PATCH", body: JSON.stringify({ data }) });
+          } else {
+            await configuratorApi(`/api/scenes/${encodeURIComponent(configuratorSceneID)}/stage-elements`, { method: "POST", body: JSON.stringify({ kind: "grid_config", data }) });
+          }
+          await loadConfiguratorComposition();
+          return fakeResponse(data);
+        }
+      } catch (error) {
+        return fakeResponse(String(error.message || error), false);
+      }
+      return fetch(url, options);
     }
 
     // Kernel 88B: per-request error routing, so a module that sent an action
