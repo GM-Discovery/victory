@@ -363,8 +363,12 @@
 
     const configuratorBanner = configuratorActive
       ? `<div style="background:#3a2f10; border:1px solid #8a6d1f; border-radius:4px; padding:6px 8px; margin-bottom:10px; font-size:12px;">
-          Configurator Mode: editing a draft. Audience and other viewers do not see this. Use Activate above to publish it.
-          <button type="button" data-exit-configurator style="${buttonStyle("margin-left:8px; padding:2px 8px; font-size:11px;")}">Exit Configurator</button>
+          <div>Configurator Mode: editing a draft. Audience and other viewers do not see this. Use Activate above to publish it.</div>
+          <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
+            <button type="button" data-place-hotspot style="${buttonStyle("padding:2px 8px; font-size:11px;")}">Place Hotspot</button>
+            <button type="button" data-bind-interaction style="${buttonStyle("padding:2px 8px; font-size:11px;")}">Bind Selected to Interaction</button>
+            <button type="button" data-exit-configurator style="${buttonStyle("padding:2px 8px; font-size:11px;")}">Exit Configurator</button>
+          </div>
         </div>`
       : "";
 
@@ -401,6 +405,14 @@
       bridge()?.exitConfiguratorMode?.();
       status("Configurator Mode closed.");
       void renderSceneConfiguration(showID);
+    });
+
+    panel.querySelector("[data-place-hotspot]")?.addEventListener("click", () => {
+      bridge()?.placeConfiguratorHotspot?.();
+    });
+
+    panel.querySelector("[data-bind-interaction]")?.addEventListener("click", () => {
+      bridge()?.bindConfiguratorSelectionToInteraction?.();
     });
 
     panel.querySelectorAll("[data-build]").forEach((btn) => {

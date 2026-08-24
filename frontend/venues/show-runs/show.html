@@ -46,6 +46,20 @@
     .cue-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0; }
     .cue-row-title { font-weight: 700; }
     .cue-row-meta { color: var(--muted); font-size: 0.8rem; }
+    /* composer-element-row: every field a composition element exposes
+       (position, image, size, binding) used to be appended flat into one
+       flex-wrap row -- individual labels and inputs could wrap apart from
+       each other, and there was no visual separation between "this is
+       about position" and "this is about binding." Grouping each cluster
+       into its own bordered block with a caption fixes both: groups wrap
+       as whole units, and the caption reads before you're parsing inputs. */
+    .composer-element-row { display: flex; flex-direction: column; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+    .composer-element-row:last-child { border-bottom: none; }
+    .composer-field-groups { display: flex; flex-wrap: wrap; gap: 10px; }
+    .composer-field-group { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,0.02); }
+    .composer-field-group-caption { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+    .composer-field-group-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .composer-field-group-controls label { font-size: 0.78rem; color: var(--muted); }
     .cue-create-form { display: grid; gap: 8px; margin-top: 10px; grid-template-columns: repeat(2, minmax(0,1fr)); }
     .cue-create-form .field.span-2 { grid-column: span 2; }
     @media (max-width: 640px) { .cue-create-form { grid-template-columns: 1fr; } .cue-create-form .field.span-2 { grid-column: span 1; } }
@@ -1195,9 +1209,28 @@
         for (const el of elements) list.appendChild(renderCompositionElement(el, detail, availableInteractions, surface, list));
       }
 
+      // fieldGroup builds one visually-bordered, captioned cluster (e.g.
+      // "Position", "Binding") for renderCompositionElement below --
+      // replaces appending every label/input/button directly into one
+      // flex-wrap row, where individual controls (not whole groups) could
+      // wrap apart from each other and nothing marked where one concern
+      // ended and the next began.
+      function fieldGroup(caption) {
+        const group = document.createElement("div");
+        group.className = "composer-field-group";
+        const captionEl = document.createElement("div");
+        captionEl.className = "composer-field-group-caption";
+        captionEl.textContent = caption;
+        group.appendChild(captionEl);
+        const controls = document.createElement("div");
+        controls.className = "composer-field-group-controls";
+        group.appendChild(controls);
+        return { group, controls };
+      }
+
       function renderCompositionElement(el, detail, availableInteractions, surface, list) {
         const row = document.createElement("div");
-        row.className = "cue-row";
+        row.className = "composer-element-row";
         const left = document.createElement("div");
         const title = document.createElement("div");
         title.className = "cue-row-title";
@@ -1212,21 +1245,26 @@
         left.appendChild(meta);
         row.appendChild(left);
 
+        const groups = document.createElement("div");
+        groups.className = "composer-field-groups";
+        row.appendChild(groups);
+
         if (el.kind === "token" || el.kind === "index_card" || el.kind === "interaction_hotspot") {
+          const position = fieldGroup("Position");
           const xLabel = document.createElement("label");
-          xLabel.textContent = "X"; xLabel.style.cssText = "margin:0 4px 0 0;";
-          row.appendChild(xLabel);
+          xLabel.textContent = "X";
+          position.controls.appendChild(xLabel);
           const xInput = document.createElement("input");
           xInput.type = "text"; xInput.style.cssText = "width:64px;";
           xInput.value = Number.isFinite(el.position?.x) ? el.position.x : "";
-          row.appendChild(xInput);
+          position.controls.appendChild(xInput);
           const yLabel = document.createElement("label");
-          yLabel.textContent = "Y"; yLabel.style.cssText = "margin:0 4px 0 8px;";
-          row.appendChild(yLabel);
+          yLabel.textContent = "Y";
+          position.controls.appendChild(yLabel);
           const yInput = document.createElement("input");
           yInput.type = "text"; yInput.style.cssText = "width:64px;";
           yInput.value = Number.isFinite(el.position?.y) ? el.position.y : "";
-          row.appendChild(yInput);
+          position.controls.appendChild(yInput);
           const applyButton = document.createElement("button");
           applyButton.className = "chip small";
           applyButton.type = "button";
@@ -1237,16 +1275,18 @@
             const ok = await patchStageElementPosition(el.id, nx, ny);
             if (ok) await loadComposition(detail, surface, list);
           });
-          row.appendChild(applyButton);
+          position.controls.appendChild(applyButton);
+          groups.appendChild(position.group);
 
+          const image = fieldGroup("Image");
           const imageLabel = document.createElement("label");
-          imageLabel.textContent = "Image URL"; imageLabel.style.cssText = "margin:0 4px 0 8px;";
-          row.appendChild(imageLabel);
+          imageLabel.textContent = "URL";
+          image.controls.appendChild(imageLabel);
           const imageInput = document.createElement("input");
           imageInput.type = "text"; imageInput.style.cssText = "width:220px;";
           imageInput.placeholder = "/assets/your-file.png";
           imageInput.value = (el.data && el.data.asset_content_url) || "";
-          row.appendChild(imageInput);
+          image.controls.appendChild(imageInput);
           const imageButton = document.createElement("button");
           imageButton.className = "chip small";
           imageButton.type = "button";
@@ -1255,7 +1295,8 @@
             const ok = await patchStageElementImage(el.id, el.data, imageInput.value);
             if (ok) await loadComposition(detail, surface, list);
           });
-          row.appendChild(imageButton);
+          image.controls.appendChild(imageButton);
+          groups.appendChild(image.group);
         }
 
         // Kernel 74: normalized 0-1 size. Only interaction_hotspot exposes
@@ -1263,20 +1304,21 @@
         // size, and a width/height control there would imply a scaling
         // feature that does not exist.
         if (el.kind === "interaction_hotspot") {
+          const size = fieldGroup("Size");
           const wLabel = document.createElement("label");
-          wLabel.textContent = "W"; wLabel.style.cssText = "margin:0 4px 0 8px;";
-          row.appendChild(wLabel);
+          wLabel.textContent = "W";
+          size.controls.appendChild(wLabel);
           const wInput = document.createElement("input");
           wInput.type = "text"; wInput.style.cssText = "width:64px;";
           wInput.value = Number.isFinite(el.width) ? el.width : "";
-          row.appendChild(wInput);
+          size.controls.appendChild(wInput);
           const hLabel = document.createElement("label");
-          hLabel.textContent = "H"; hLabel.style.cssText = "margin:0 4px 0 8px;";
-          row.appendChild(hLabel);
+          hLabel.textContent = "H";
+          size.controls.appendChild(hLabel);
           const hInput = document.createElement("input");
           hInput.type = "text"; hInput.style.cssText = "width:64px;";
           hInput.value = Number.isFinite(el.height) ? el.height : "";
-          row.appendChild(hInput);
+          size.controls.appendChild(hInput);
           const sizeButton = document.createElement("button");
           sizeButton.className = "chip small";
           sizeButton.type = "button";
@@ -1287,13 +1329,15 @@
             const ok = await patchStageElementSize(el.id, nw, nh);
             if (ok) await loadComposition(detail, surface, list);
           });
-          row.appendChild(sizeButton);
+          size.controls.appendChild(sizeButton);
+          groups.appendChild(size.group);
         }
 
         // Authorized picker (item 6): only this placement's own
         // participant interactions are ever selectable -- there is no
         // free-text id field, so binding can never target a cross-Show or
         // cross-location interaction id, even a guessed valid one.
+        const binding = fieldGroup("Binding");
         const bindSelect = document.createElement("select");
         const noneOption = document.createElement("option");
         noneOption.value = ""; noneOption.textContent = "(unbound)";
@@ -1306,7 +1350,7 @@
           bindSelect.appendChild(opt);
         }
         if (!el.binding) noneOption.selected = true;
-        row.appendChild(bindSelect);
+        binding.controls.appendChild(bindSelect);
 
         // Kernel 74 reveal gate. An element bound with a milestone is
         // resolved out of a Player's snapshot entirely until that Player's
@@ -1322,7 +1366,7 @@
           if (el.binding && el.binding.requires_milestone === m) opt.selected = true;
           milestoneSelect.appendChild(opt);
         }
-        row.appendChild(milestoneSelect);
+        binding.controls.appendChild(milestoneSelect);
 
         const bindButton = document.createElement("button");
         bindButton.className = "chip small";
@@ -1348,7 +1392,8 @@
           }
           await loadComposition(detail, surface, list);
         });
-        row.appendChild(bindButton);
+        binding.controls.appendChild(bindButton);
+        groups.appendChild(binding.group);
 
         const deleteButton = document.createElement("button");
         deleteButton.className = "chip danger small";

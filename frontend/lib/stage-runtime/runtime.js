@@ -533,6 +533,8 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       getConfiguratorSceneID: () => configuratorSceneId(),
       enterConfiguratorMode: (showID, sceneID, placementID) => enterConfiguratorMode(showID, sceneID, placementID),
       exitConfiguratorMode: () => exitConfiguratorMode(),
+      placeConfiguratorHotspot: () => configuratorPlaceHotspot(),
+      bindConfiguratorSelectionToInteraction: () => configuratorBindSelectionToInteraction(),
     };
 
     // Kernel 88: same narrow-bridge convention as Kernel 85's above, adding
@@ -5156,6 +5158,86 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
 
       const gridEl = elements.find((el) => el.kind === "grid_config");
       currentVenueGridConfig = gridEl?.data || defaultGridConfig();
+    }
+
+    // interaction_hotspot (e.g. "the door") and stage_element_bindings (e.g.
+    // "Speak with Kessa") are Scene-Composer-only content -- never a real
+    // live token/card, so they have no place in the normal create/token
+    // create/index_card tool palette sendAction() already intercepts above.
+    // These two functions are Configurator-Mode-only, reached from a small
+    // control surface in the Scene Configuration panel (kernel85-cohort-
+    // tools.js) rather than the main stage toolbar.
+    async function configuratorPlaceHotspot() {
+      if (!configuratorActive) return;
+      const label = window.prompt("Hotspot label (e.g. \"The door\"):");
+      if (!label) return;
+      try {
+        await configuratorApi(`/api/scenes/${encodeURIComponent(configuratorSceneID)}/stage-elements`, {
+          method: "POST",
+          body: JSON.stringify({
+            kind: "interaction_hotspot",
+            label,
+            // Normalized 0-1 position/size, per composition_types.go --
+            // deliberately NOT the pixel {anchor,x,y,z,order} shape tokens
+            // use. Centered, modest default size; drag/resize afterward via
+            // Stage Management's own composer surface, which already knows
+            // how to edit this normalized coordinate space (this canvas's
+            // drag tools only ever produce pixel coordinates, so hotspot
+            // repositioning isn't wired into the Pixi canvas itself yet).
+            position: { x: 0.5, y: 0.5 },
+            width: 0.12,
+            height: 0.12,
+          }),
+        });
+        setStageStatus(`Placed hotspot "${label}". Reposition it precisely in Stage Management's composer.`);
+        await loadConfiguratorComposition();
+      } catch (error) {
+        setStageStatus(`Couldn't place hotspot -- ${error.message || error}`);
+      }
+    }
+
+    async function configuratorBindSelectionToInteraction() {
+      if (!configuratorActive) return;
+      const target = currentSelection;
+      const elementId = String(target?.elementId || "");
+      if (!elementId) {
+        setStageStatus("Select an element on the draft stage first, then bind it.");
+        return;
+      }
+      let interactions;
+      try {
+        const data = await configuratorApi(
+          `/api/shows/${encodeURIComponent(configuratorShowID)}/scenes/${encodeURIComponent(configuratorPlacementID)}/participant-interactions`
+        );
+        interactions = Array.isArray(data?.interactions) ? data.interactions : [];
+      } catch (error) {
+        setStageStatus(`Couldn't load interactions -- ${error.message || error}`);
+        return;
+      }
+      if (interactions.length === 0) {
+        setStageStatus("No interactions exist for this placement yet -- create one (e.g. a merchant) first.");
+        return;
+      }
+      const listText = interactions
+        .map((it, i) => `${i + 1}. ${it.internal_name || it.stage_button_label || it.id} (${it.interaction_type})`)
+        .join("\n");
+      const choice = window.prompt(`Bind "${target.label}" to which interaction?\n\n${listText}\n\nEnter a number:`);
+      const index = Number.parseInt(choice || "", 10) - 1;
+      const picked = interactions[index];
+      if (!picked) {
+        setStageStatus("No interaction selected -- binding cancelled.");
+        return;
+      }
+      try {
+        await configuratorApi(`/api/stage-elements/${encodeURIComponent(elementId)}/binding`, {
+          method: "POST",
+          body: JSON.stringify({ participant_interaction_id: picked.id }),
+        });
+        setStageStatus(`Bound "${target.label}" to "${picked.internal_name || picked.id}".`);
+        await loadConfiguratorComposition();
+      } catch (error) {
+        setStageStatus(`Couldn't bind interaction -- ${error.message || error}`);
+      }
     }
 
     // Injected as editors.js's `fetch` -- the map/grid editor panels call
