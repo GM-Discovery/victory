@@ -575,6 +575,19 @@
       outline: none;
     }
 
+    .face-hero-name-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .face-hero-name-row .face-hero-name-input {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .face-hero-name-save {
+      flex: 0 0 auto;
+    }
+
     .face-hero-title .face-hero-subtitle {
       margin: 0;
       color: #342618;
@@ -2262,11 +2275,56 @@
       nameEl.maxLength = 80;
       nameEl.dataset.key = "name";
       nameEl.setAttribute("aria-label", "Character name");
+
+      // The page-bottom "Save Face" button is too far from this input for
+      // a rename to feel like it did anything -- add an immediate,
+      // dedicated Save right next to where the typing happens, hitting the
+      // ownership-gated rename endpoint directly rather than the full
+      // Face-page save.
+      const nameRow = document.createElement("div");
+      nameRow.className = "face-hero-name-row";
+      const saveNameButton = document.createElement("button");
+      saveNameButton.type = "button";
+      saveNameButton.className = "text-button face-hero-name-save";
+      saveNameButton.textContent = "Save";
+      saveNameButton.hidden = true;
+      const persistName = async () => {
+        const newName = nameEl.value.trim();
+        if (!newName) { setCharacterStatus("Name is required."); return; }
+        try {
+          const res = await fetch(`/api/character-cards/${encodeURIComponent(state.selectedCharacterId)}/name`, {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: newName }),
+          });
+          const p = await res.json().catch(() => null);
+          if (!res.ok || !p?.ok) throw new Error(p?.data?.error || p?.error || `HTTP ${res.status}`);
+          state.workbook.character = p.data;
+          saveNameButton.hidden = true;
+          setCharacterStatus("Name saved.");
+        } catch (error) {
+          setCharacterStatus(error.message || String(error));
+        }
+      };
+      nameEl.addEventListener("input", () => {
+        saveNameButton.hidden = nameEl.value.trim() === name;
+      });
+      nameEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          void persistName();
+        }
+      });
+      saveNameButton.addEventListener("click", () => void persistName());
+      nameRow.appendChild(nameEl);
+      nameRow.appendChild(saveNameButton);
+
       const sub = document.createElement("p");
       sub.className = "face-hero-subtitle";
       const subtitleParts = [pronouns, archetype, firstSkill].filter(Boolean);
       sub.textContent = subtitleParts.length ? subtitleParts.join(" · ") : "Face details curated below";
-      title.appendChild(nameEl);
+      title.appendChild(nameRow);
       title.appendChild(sub);
       main.appendChild(title);
 
