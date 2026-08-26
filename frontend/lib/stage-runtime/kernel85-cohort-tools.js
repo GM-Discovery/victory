@@ -494,6 +494,23 @@
 
     panel.querySelector("[data-update-current]")?.addEventListener("click", async () => {
       if (!effectivePlacementId) { status("No current Scene to update yet -- activate one first."); return; }
+      // This captures whatever is on the LIVE stage right now and REPLACES
+      // the current Scene's entire saved arrangement with it (see backend
+      // UpdateCurrentScene in internal/scenes/capture.go) -- the opposite of
+      // "save my Configurator edits." A Director who just finished Building
+      // a Scene and clicks this expecting to persist that work instead loses
+      // it, silently, to whatever the untouched live stage still shows. This
+      // was a real incident (2026-08-25): a bound hotspot and a replaced
+      // token both vanished this way. Configurator edits are already saved
+      // the moment they're made (each tool call is its own REST write) --
+      // this button is for a different job entirely: pulling an ad-hoc live
+      // arrangement into a Scene for the first time.
+      const ok = window.confirm(
+        "This replaces the current Scene's saved arrangement with whatever is on the LIVE stage right now.\n\n" +
+        "If you just finished Building this Scene in Configurator Mode, your edits are already saved -- you do NOT need this button, and clicking it will discard them in favor of the live stage's current (unrelated) state.\n\n" +
+        "Continue?"
+      );
+      if (!ok) { status("Update Current Scene cancelled."); return; }
       try {
         await api(`/api/shows/${encodeURIComponent(showID)}/scenes/${encodeURIComponent(effectivePlacementId)}/update-current-scene`, { method: "POST" });
         status("Current Scene updated with the arranged placements.");

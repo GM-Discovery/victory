@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"victory/backend/internal/actions"
 	"victory/backend/internal/showruns"
 	"victory/backend/internal/tutorial"
 )
@@ -149,6 +150,31 @@ func CreatePlacementStageElement(ctx context.Context, pool *pgxpool.Pool, actorU
 	return createStageElement(ctx, pool, actorUserID, p.SceneID, &placementID, in)
 }
 
+// resolveTokenAssetData fills in the authoritative asset_name/shape/
+// content_url/thumbnail_url/etc fields from the Warehouse asset row,
+// mirroring what the live create/token and update/token actions compute
+// server-side (internal/actions.ResolveTokenAssetFields). The Configurator
+// draft path builds a token element straight from client JSON with no
+// action-stream round trip, so this is its only chance to do that lookup --
+// without it, a client that only ever sends asset_id renders with no
+// content URL at all. A no-op when the caller didn't set asset_id (a
+// not-yet-assigned token slot).
+func resolveTokenAssetData(ctx context.Context, pool *pgxpool.Pool, data map[string]any) error {
+	assetID, _ := data["asset_id"].(string)
+	assetID = strings.TrimSpace(assetID)
+	if assetID == "" {
+		return nil
+	}
+	fields, err := actions.ResolveTokenAssetFields(ctx, pool, assetID)
+	if err != nil {
+		return err
+	}
+	for k, v := range fields {
+		data[k] = v
+	}
+	return nil
+}
+
 func createStageElement(ctx context.Context, pool *pgxpool.Pool, actorUserID, sceneID string, placementID *string, in CreateStageElementInput) (StageElement, error) {
 	actorUserID = strings.TrimSpace(actorUserID)
 	if actorUserID == "" {
@@ -191,6 +217,11 @@ func createStageElement(ctx context.Context, pool *pgxpool.Pool, actorUserID, sc
 	data := in.Data
 	if data == nil {
 		data = map[string]any{}
+	}
+	if kind == "token" {
+		if err := resolveTokenAssetData(ctx, pool, data); err != nil {
+			return StageElement{}, err
+		}
 	}
 	position := in.Position
 	if position == nil {
@@ -263,7 +294,13 @@ func UpdateStageElement(ctx context.Context, pool *pgxpool.Pool, actorUserID, el
 		dataJSON = []byte("{}")
 	}
 	if patch.Data != nil {
-		dataJSON, _ = json.Marshal(*patch.Data)
+		newData := *patch.Data
+		if e.Kind == "token" {
+			if err := resolveTokenAssetData(ctx, pool, newData); err != nil {
+				return StageElement{}, err
+			}
+		}
+		dataJSON, _ = json.Marshal(newData)
 	}
 	positionJSON := []byte(e.Position)
 	if len(positionJSON) == 0 {

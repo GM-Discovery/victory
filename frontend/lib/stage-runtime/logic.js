@@ -563,6 +563,12 @@
     // the server) while editing a draft, not on the real live stage.
     if ((kind === "token" || kind === "card") && context.isConfiguratorActive && canManageIndexCards) {
       push("rename", "Rename", "edit");
+      // Kernel 93 (2026-08-24): the Scene Configuration panel already had a
+      // "Bind Selected to Interaction" button, but a Director naturally
+      // right-clicks the token itself looking for this -- same reasoning as
+      // Rename just above. Both reach the same
+      // configuratorBindElementToInteraction (runtime.js).
+      push("bind-interaction", "Bind to Interaction", "interact");
     }
 
     if (kind === "card" && canTogglePinState(objectModel, canManageIndexCards)) {

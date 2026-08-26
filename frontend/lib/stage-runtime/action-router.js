@@ -292,6 +292,12 @@
         return;
       }
 
+      if (action === "bind-interaction") {
+        window.VictoryStageKernel85Bridge?.bindConfiguratorElementToInteraction?.(objectModel.elementId || "", objectModel.label || "");
+        deps.closeContextMenu();
+        return;
+      }
+
       if (action === "flip" && kind === "card") {
         const nextFace = deps.cardFaceForModel(objectModel) === "back" ? "front" : "back";
         const sent = deps.sendAction("update/index_card", {

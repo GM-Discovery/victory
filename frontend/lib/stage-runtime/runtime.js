@@ -535,6 +535,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       exitConfiguratorMode: () => exitConfiguratorMode(),
       placeConfiguratorHotspot: () => configuratorPlaceHotspot(),
       bindConfiguratorSelectionToInteraction: () => configuratorBindSelectionToInteraction(),
+      bindConfiguratorElementToInteraction: (elementId, label) => configuratorBindElementToInteraction(elementId, label),
     };
 
     // Kernel 88: same narrow-bridge convention as Kernel 85's above, adding
@@ -5142,6 +5143,37 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
 
       const models = [];
       elements.forEach((el, index) => {
+        if (el.kind === "interaction_hotspot") {
+          // objectFromSnapshotElement below has no "hotspot" branch (its
+          // inferredKind only ever comes out "token" or "card"), which is
+          // why a placed hotspot never appeared here at all -- Place
+          // Hotspot looked like a no-op even though the row was created
+          // fine. Built by hand rather than routed through
+          // objectFromSnapshotElement, since a hotspot's field set doesn't
+          // overlap that function's token/card-shaped return value.
+          const data = el.data || {};
+          const binding = el.binding?.participant_interaction_id
+            ? { participant_interaction_id: el.binding.participant_interaction_id, enabled: true }
+            : undefined;
+          models.push({
+            key: `live:${el.id}`,
+            kind: "hotspot",
+            live: true,
+            elementId: String(el.id || ""),
+            elementSlug: String(el.id || ""),
+            elementType: "interaction_hotspot",
+            contextClass: "hotspot",
+            label: el.label || "Hotspot",
+            position: el.position || {},
+            state: { locked: Boolean(el.visibility?.locked), nameplate_visible: el.visibility?.nameplate_visible !== false, visible: el.visibility?.visible !== false },
+            visibility: el.visibility || {},
+            hotspotWidth: Number(el.width ?? data.width ?? 0.1),
+            hotspotHeight: Number(el.height ?? data.height ?? 0.1),
+            nameplateVisible: data.nameplate_visible !== false,
+            source: { ...el, data: binding ? { ...data, binding } : data },
+          });
+          return;
+        }
         if (el.kind !== "token" && el.kind !== "index_card") return;
         const model = objectFromSnapshotElement({
           element_id: el.id,
@@ -5206,10 +5238,17 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       }
     }
 
-    async function configuratorBindSelectionToInteraction() {
+    // Takes an explicit elementId/label rather than reading currentSelection
+    // itself, so the context menu's "Bind to Interaction" item (logic.js,
+    // action-router.js) can bind whatever was right-clicked -- opening a
+    // context menu only calls deps.setContextMenuTarget, never
+    // selectObject/currentSelection (see action-router.js's
+    // openContextMenu), so a version that trusted currentSelection could
+    // silently bind the wrong element whenever the right-clicked token
+    // wasn't also the last-left-clicked one.
+    async function configuratorBindElementToInteraction(elementId, label) {
       if (!configuratorActive) return;
-      const target = currentSelection;
-      const elementId = String(target?.elementId || "");
+      elementId = String(elementId || "");
       if (!elementId) {
         setStageStatus("Select an element on the draft stage first, then bind it.");
         return;
@@ -5231,7 +5270,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       const listText = interactions
         .map((it, i) => `${i + 1}. ${it.internal_name || it.stage_button_label || it.id} (${it.interaction_type})`)
         .join("\n");
-      const choice = window.prompt(`Bind "${target.label}" to which interaction?\n\n${listText}\n\nEnter a number:`);
+      const choice = window.prompt(`Bind "${label}" to which interaction?\n\n${listText}\n\nEnter a number:`);
       const index = Number.parseInt(choice || "", 10) - 1;
       const picked = interactions[index];
       if (!picked) {
@@ -5243,11 +5282,15 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
           method: "POST",
           body: JSON.stringify({ participant_interaction_id: picked.id }),
         });
-        setStageStatus(`Bound "${target.label}" to "${picked.internal_name || picked.id}".`);
+        setStageStatus(`Bound "${label}" to "${picked.internal_name || picked.id}".`);
         await loadConfiguratorComposition();
       } catch (error) {
         setStageStatus(`Couldn't bind interaction -- ${error.message || error}`);
       }
+    }
+
+    async function configuratorBindSelectionToInteraction() {
+      await configuratorBindElementToInteraction(currentSelection?.elementId, currentSelection?.label);
     }
 
     // Injected as editors.js's `fetch` -- the map/grid editor panels call

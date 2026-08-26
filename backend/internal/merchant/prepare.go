@@ -244,9 +244,21 @@ func PrepareLockedCourtyardOpening(ctx context.Context, pool *pgxpool.Pool, acto
 		// warehouse upload. Repair older scene rows that predate her packaged
 		// artwork so container rebuilds and warehouse cleanup cannot send her
 		// back through the generic construction fallback.
+		//
+		// Also strips any asset_id (and the warehouse-only fields that ride
+		// alongside it) a stray "Replace Asset" context-menu click may have
+		// left behind: internal/scenes.resolveTokenAssetData re-resolves and
+		// overwrites asset_content_url/asset_name/etc from asset_id on every
+		// subsequent token PATCH (position, scale, layer -- anything that
+		// touches data), so a leftover asset_id would silently drag Kessa
+		// back to that warehouse asset the next time a Director so much as
+		// moved her stall, even after this repair had just fixed her.
 		if _, err := pool.Exec(ctx, `
 			UPDATE scene_stage_elements
-			SET data = COALESCE(data, '{}'::jsonb) || jsonb_build_object(
+			SET data = (COALESCE(data, '{}'::jsonb)
+				- 'asset_id' - 'asset_name' - 'asset_shape' - 'asset_type' - 'asset_status'
+				- 'default_grid_width' - 'default_grid_height' - 'retain_original'
+			) || jsonb_build_object(
 				'asset_content_url', $2::text,
 				'asset_thumbnail_url', $2::text
 			), updated_at = NOW()

@@ -577,6 +577,40 @@ func StoreUpdateToken(ctx context.Context, pool *pgxpool.Pool, req TokenUpdateRe
 	return &out, nil
 }
 
+// ResolveTokenAssetFields looks up a Warehouse token asset by ID and returns
+// the same asset_* stage-element data fields the live create/token and
+// update/token actions derive server-side (see StoreCreateToken above) --
+// callers must never trust client-supplied asset_content_url/asset_name/etc,
+// since those are meant to be computed authoritatively from asset_id alone.
+// Used by the Scene Composer's draft stage-elements path (internal/scenes),
+// which creates/updates token elements outside the live action stream and
+// so has no other opportunity to fill these fields in.
+func ResolveTokenAssetFields(ctx context.Context, q actionQuerier, assetID string) (map[string]any, error) {
+	asset, err := loadWarehouseTokenAsset(ctx, q, assetID)
+	if err != nil {
+		return nil, err
+	}
+	tokenName := strings.TrimSpace(asset.Name)
+	if tokenName == "" {
+		tokenName = asset.OriginalFilename
+	}
+	if tokenName == "" {
+		tokenName = asset.ID
+	}
+	return map[string]any{
+		"asset_id":            asset.ID,
+		"asset_name":          tokenName,
+		"asset_shape":         asset.Shape,
+		"asset_type":          asset.AssetType,
+		"asset_status":        asset.Status,
+		"asset_content_url":   "/api/assets/" + asset.ID + "/content?variant=stage",
+		"asset_thumbnail_url": "/api/assets/" + asset.ID + "/content?variant=thumbnail",
+		"default_grid_width":  maxIntLocal(asset.DefaultGridWidth, 1),
+		"default_grid_height": maxIntLocal(asset.DefaultGridHeight, 1),
+		"retain_original":     asset.RetainOriginal,
+	}, nil
+}
+
 func loadWarehouseTokenAsset(ctx context.Context, q actionQuerier, assetID string) (warehouseTokenAssetRef, error) {
 	assetID = strings.TrimSpace(assetID)
 	if assetID == "" {
