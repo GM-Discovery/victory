@@ -5170,7 +5170,17 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
             hotspotWidth: Number(el.width ?? data.width ?? 0.1),
             hotspotHeight: Number(el.height ?? data.height ?? 0.1),
             nameplateVisible: data.nameplate_visible !== false,
-            source: { ...el, data: binding ? { ...data, binding } : data },
+            // geometry.js's currentDisplayedPointForModel only reads a
+            // hotspot's position as a 0-1 fraction of the playable bounds
+            // when source.context_class === "scene_composition" (matching
+            // how the live snapshot wraps these); anything else falls
+            // through to raw-pixel passthrough (correct for ordinary
+            // tokens, whose x/y really are pixels). Without this, a
+            // freshly placed hotspot's {x:0.5, y:0.5} was read as pixel
+            // (0.5, 0.5) -- one pixel from the stage's top-left corner,
+            // effectively invisible -- which is why Place Hotspot looked
+            // like a no-op even after the element was created successfully.
+            source: { ...el, context_class: "scene_composition", data: binding ? { ...data, binding } : data },
           });
           return;
         }

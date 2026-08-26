@@ -294,13 +294,32 @@ func UpdateStageElement(ctx context.Context, pool *pgxpool.Pool, actorUserID, el
 		dataJSON = []byte("{}")
 	}
 	if patch.Data != nil {
-		newData := *patch.Data
+		// Merge onto the existing stored data rather than replacing it
+		// wholesale -- this function's own contract above is "applies only
+		// the fields present in the patch," but every real caller
+		// (dispatchConfiguratorAction in runtime.js) sends a genuinely
+		// partial fragment: a drag-move's patch is only
+		// {venue_slug, layer, snap_mode, token_layer, scale}, a card flip's
+		// is only {front_text, back_text, color, face}. A plain replace
+		// silently dropped every other stored field on the very next edit --
+		// a token lost its own asset_id/asset_content_url/asset_name the
+		// first time it was dragged, immediately falling back to the
+		// generic placeholder art with its raw element id as a label (this
+		// was a real, very confusing bug: it looked like dragging spawned a
+		// brand new token with a "random string" name and a broken asset).
+		existing := map[string]any{}
+		if len(e.Data) > 0 {
+			_ = json.Unmarshal(e.Data, &existing)
+		}
+		for k, v := range *patch.Data {
+			existing[k] = v
+		}
 		if e.Kind == "token" {
-			if err := resolveTokenAssetData(ctx, pool, newData); err != nil {
+			if err := resolveTokenAssetData(ctx, pool, existing); err != nil {
 				return StageElement{}, err
 			}
 		}
-		dataJSON, _ = json.Marshal(newData)
+		dataJSON, _ = json.Marshal(existing)
 	}
 	positionJSON := []byte(e.Position)
 	if len(positionJSON) == 0 {
