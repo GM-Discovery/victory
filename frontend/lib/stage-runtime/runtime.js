@@ -265,6 +265,11 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     // announcements simply fall through to the dice path and are ignored --
     // never a thrown error that takes the stage down.
     const announcementProjection = window.VictoryKernel89Announcements || null;
+    // Kernel 1 §8 / Kernel 93 ledger A18: same standalone-DOM-module
+    // convention as the announcement renderer above -- absent means
+    // reactions are silently unavailable on a venue that doesn't load
+    // reactions.js, never a thrown error.
+    const reactionsProjection = window.VictoryReactions || null;
     let diceWorldLayer = null;
     let mapEditorDragState = null;
     let mapEditorPreviewURL = "";
@@ -576,6 +581,14 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       // instead of adding a second status surface per module.
       setStageStatus: (text) => setStageStatus(text),
     };
+
+    // Kernel 1 §8 / Kernel 93 ledger A18: mounted unconditionally for every
+    // role, not gated to Audience -- the backend already broadcasts
+    // react/emote to every role (react.go's visibility.toRoles), and the
+    // Director wanting to *see* reactions (Kernel 1 §4/§9) doesn't
+    // preclude Cast/Crew/Director sending them too. Revisit if live use
+    // shows that was the wrong call.
+    reactionsProjection?.mount?.((type, extra) => sendAction(type, extra));
 
     function loadPixiLibrary() {
       if (window.PIXI) {
@@ -1728,6 +1741,10 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       character_skill_advance_failed: (detail) => `Tried to advance ${detail.skill_name || "a skill"} (rolled ${detail.total} on ${detail.expression}) — no improvement.`,
     };
 
+    function presentReaction(action) {
+      reactionsProjection?.present?.(action);
+    }
+
     function appendGameEventLine(action) {
       if (!chatGameEventsLog) return;
       const eventKind = String(action?.payload?.event_kind || "").trim();
@@ -2624,6 +2641,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       handleCharacterProjectionInvalidation: (...args) => handleCharacterProjectionInvalidation(...args),
       appendChatActionLine: (...args) => appendChatActionLine(...args),
       appendGameEventLine: (...args) => appendGameEventLine(...args),
+      presentReaction: (...args) => presentReaction(...args),
       chatClosedMessage: () => chatClosedMessage(),
       getCurrentVenueMapState: () => currentVenueMapState,
       getCurrentVenueMapAssetID: () => currentVenueMapAssetID,

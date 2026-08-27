@@ -445,6 +445,10 @@
           deps.appendGameEventLine?.(msg.action);
           return msg;
         }
+        if (actionType === "react/emote") {
+          deps.presentReaction?.(msg.action);
+          return msg;
+        }
         if (
           actionType === "act/place_element" ||
           actionType === "act/remove_element" ||
