@@ -26,6 +26,18 @@
   const STYLE_ID = "k1-reactions-css";
   const FLIGHT_MS = 2200;
   const MAX_CONCURRENT = 24;
+  const PREFS_KEY = "k1ReactionsPrefs";
+  // Grant, 2026-08-27 live testing: the bar's original fixed bottom:14px
+  // sat inside the chat panel's collapsed rail (catharsis/index.html's
+  // --chat-rail-height: 64px), hiding its handle. COLLAPSED_BOTTOM is the
+  // bar's own resting spot when collapsed (kept low and out of the way);
+  // DEFAULT_LIFT (24px = 1/4in @96dpi) is how far it rises above that when
+  // expanded, per Grant's literal instruction -- both the collapse and the
+  // lift are also independently adjustable below (data-collapsed persists
+  // like the opacity/lift sliders' values).
+  const COLLAPSED_BOTTOM = 8;
+  const DEFAULT_LIFT = 24;
+  const DEFAULT_OPACITY = 0.45;
 
   // Glyph AND label together, always -- never emoji alone. clap/cheer/
   // standing_clap and thumbs_up/thumbs_down/boo are each other's obvious
@@ -51,7 +63,36 @@
     host: null,
     live: 0,
     lastSendAt: 0,
+    prefs: { collapsed: false, opacity: DEFAULT_OPACITY, lift: DEFAULT_LIFT },
   };
+
+  function clampNum(value, min, max, fallback) {
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+  }
+
+  function loadPrefs() {
+    try {
+      const raw = window.localStorage?.getItem(PREFS_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return {
+        collapsed: Boolean(parsed.collapsed),
+        opacity: clampNum(parsed.opacity, 0.15, 0.95, DEFAULT_OPACITY),
+        lift: clampNum(parsed.lift, 12, 140, DEFAULT_LIFT),
+      };
+    } catch {
+      return { collapsed: false, opacity: DEFAULT_OPACITY, lift: DEFAULT_LIFT };
+    }
+  }
+
+  function savePrefs() {
+    try {
+      window.localStorage?.setItem(PREFS_KEY, JSON.stringify(state.prefs));
+    } catch {
+      // Private-browsing / storage-disabled: settings just don't persist
+      // across reloads. Not worth surfacing as an error for a cosmetic pref.
+    }
+  }
 
   function escapeHtml(value) {
     return String(value == null ? "" : value)
@@ -65,13 +106,37 @@
     el.id = STYLE_ID;
     el.textContent = `
       #${BAR_ID} {
-        position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
-        z-index: 8500; display: flex; gap: 4px; align-items: flex-end;
+        position: fixed; left: 50%; bottom: ${COLLAPSED_BOTTOM}px; transform: translateX(-50%);
+        z-index: 8500; display: flex; gap: 4px; align-items: center;
         padding: 6px 8px; border-radius: 999px;
-        background: rgba(16, 17, 20, 0.72); border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(16, 17, 20, ${DEFAULT_OPACITY});
+        background: rgba(16 17 20 / var(--k1-react-opacity, ${DEFAULT_OPACITY}));
+        border: 1px solid rgba(255,255,255,0.14);
         backdrop-filter: blur(6px);
-        max-width: min(94vw, 640px); overflow-x: auto;
+        max-width: min(94vw, 680px);
+        transition: bottom 180ms ease, background-color 180ms ease;
       }
+      #${BAR_ID}[data-collapsed="false"] {
+        bottom: calc(${COLLAPSED_BOTTOM}px + var(--k1-react-lift, ${DEFAULT_LIFT}px));
+      }
+      #${BAR_ID}[data-collapsed="true"] .k1-react-buttons,
+      #${BAR_ID}[data-collapsed="true"] .k1-react-gear,
+      #${BAR_ID}[data-collapsed="true"] .k1-react-settings {
+        display: none;
+      }
+      .k1-react-buttons {
+        display: flex; gap: 4px; align-items: flex-end;
+        max-width: min(88vw, 600px); overflow-x: auto;
+      }
+      .k1-react-toggle, .k1-react-gear {
+        flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+        width: 26px; height: 26px; border-radius: 50%;
+        background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16);
+        color: #e8e8ec; cursor: pointer; font-size: 12px; line-height: 1;
+      }
+      .k1-react-toggle:hover, .k1-react-gear:hover { background: rgba(255,255,255,0.14); }
+      #${BAR_ID}[data-collapsed="true"] .k1-react-toggle::before { content: "🙂"; font-size: 14px; }
+      #${BAR_ID}[data-collapsed="false"] .k1-react-toggle::before { content: "▾"; }
       .k1-react-btn {
         flex: 0 0 auto; display: flex; flex-direction: column; align-items: center;
         gap: 1px; width: 44px; padding: 5px 2px 4px;
@@ -85,9 +150,23 @@
       .k1-react-label { font-size: 8px; letter-spacing: 0.01em; opacity: 0.72; white-space: nowrap; }
       .k1-react-btn.is-sending { opacity: 0.5; pointer-events: none; }
 
+      .k1-react-settings {
+        position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+        display: flex; flex-direction: column; gap: 8px;
+        padding: 10px 14px; border-radius: 12px; width: 200px;
+        background: rgba(16, 17, 20, 0.94); border: 1px solid rgba(255,255,255,0.16);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #e8e8ec; font-size: 11px;
+      }
+      .k1-react-settings[hidden] { display: none; }
+      .k1-react-settings label { display: flex; flex-direction: column; gap: 3px; }
+      .k1-react-settings input[type="range"] { width: 100%; accent-color: #f0d49b; }
+
       #${HOST_ID} {
         position: fixed; left: 0; right: 0; bottom: 64px; height: 40vh;
         z-index: 8400; pointer-events: none; overflow: hidden;
+        transition: bottom 180ms ease;
       }
       .k1-react-fly {
         position: absolute; bottom: 0; display: flex; flex-direction: column; align-items: center;
@@ -120,6 +199,26 @@
     document.body.appendChild(el);
     state.host = el;
     return el;
+  }
+
+  // Keeps the floating-reaction layer's origin just above wherever the bar
+  // currently sits, so an expanded (raised) bar never has reactions rising
+  // up through/behind it, and a collapsed bar doesn't leave a large empty
+  // gap underneath.
+  function syncHostPosition() {
+    if (!state.bar) return;
+    const host = ensureHost();
+    const barBottom = state.prefs.collapsed ? COLLAPSED_BOTTOM : COLLAPSED_BOTTOM + state.prefs.lift;
+    const barHeight = state.bar.offsetHeight || (state.prefs.collapsed ? 38 : 64);
+    host.style.bottom = `${barBottom + barHeight + 8}px`;
+  }
+
+  function applyPrefs() {
+    if (!state.bar) return;
+    state.bar.dataset.collapsed = state.prefs.collapsed ? "true" : "false";
+    state.bar.style.setProperty("--k1-react-opacity", String(state.prefs.opacity));
+    state.bar.style.setProperty("--k1-react-lift", `${state.prefs.lift}px`);
+    syncHostPosition();
   }
 
   // present() renders every incoming react/emote action, including the
@@ -160,16 +259,33 @@
   function mount(sendFn) {
     if (state.bar && document.body.contains(state.bar)) return state.bar;
     ensureStylesheet();
+    state.prefs = loadPrefs();
+
     const bar = document.createElement("div");
     bar.id = BAR_ID;
     bar.setAttribute("role", "group");
-    bar.setAttribute("aria-label", "Send a reaction");
-    bar.innerHTML = REACTIONS.map((r) => `
-      <button type="button" class="k1-react-btn" data-kind="${r.kind}" data-accent="${r.accent ? "1" : "0"}" title="${escapeHtml(r.label)}">
-        <span class="k1-react-glyph" aria-hidden="true">${r.glyph}</span>
-        <span class="k1-react-label">${escapeHtml(r.label)}</span>
-      </button>
-    `).join("");
+    bar.setAttribute("aria-label", "Reactions");
+    bar.innerHTML = `
+      <button type="button" class="k1-react-toggle" aria-label="Collapse or expand reactions"></button>
+      <div class="k1-react-buttons">
+        ${REACTIONS.map((r) => `
+          <button type="button" class="k1-react-btn" data-kind="${r.kind}" data-accent="${r.accent ? "1" : "0"}" title="${escapeHtml(r.label)}">
+            <span class="k1-react-glyph" aria-hidden="true">${r.glyph}</span>
+            <span class="k1-react-label">${escapeHtml(r.label)}</span>
+          </button>
+        `).join("")}
+      </div>
+      <button type="button" class="k1-react-gear" aria-label="Reaction bar display settings">⚙</button>
+      <div class="k1-react-settings" hidden>
+        <label>Transparency
+          <input type="range" class="k1-react-opacity-slider" min="0.15" max="0.95" step="0.05">
+        </label>
+        <label>Height above chat bar
+          <input type="range" class="k1-react-lift-slider" min="12" max="140" step="4">
+        </label>
+      </div>
+    `;
+
     bar.querySelectorAll("[data-kind]").forEach((btn) => {
       btn.addEventListener("click", () => {
         if (typeof sendFn !== "function") return;
@@ -184,8 +300,42 @@
         sendFn("react/emote", { kind: btn.dataset.kind });
       });
     });
+
+    bar.querySelector(".k1-react-toggle").addEventListener("click", () => {
+      state.prefs.collapsed = !state.prefs.collapsed;
+      applyPrefs();
+      savePrefs();
+      if (state.prefs.collapsed) bar.querySelector(".k1-react-settings").hidden = true;
+    });
+
+    const settingsPanel = bar.querySelector(".k1-react-settings");
+    bar.querySelector(".k1-react-gear").addEventListener("click", (event) => {
+      event.stopPropagation();
+      settingsPanel.hidden = !settingsPanel.hidden;
+    });
+    document.addEventListener("click", (event) => {
+      if (!settingsPanel.hidden && !bar.contains(event.target)) settingsPanel.hidden = true;
+    });
+
+    const opacitySlider = bar.querySelector(".k1-react-opacity-slider");
+    opacitySlider.value = String(state.prefs.opacity);
+    opacitySlider.addEventListener("input", () => {
+      state.prefs.opacity = clampNum(opacitySlider.value, 0.15, 0.95, DEFAULT_OPACITY);
+      applyPrefs();
+    });
+    opacitySlider.addEventListener("change", savePrefs);
+
+    const liftSlider = bar.querySelector(".k1-react-lift-slider");
+    liftSlider.value = String(state.prefs.lift);
+    liftSlider.addEventListener("input", () => {
+      state.prefs.lift = clampNum(liftSlider.value, 12, 140, DEFAULT_LIFT);
+      applyPrefs();
+    });
+    liftSlider.addEventListener("change", savePrefs);
+
     document.body.appendChild(bar);
     state.bar = bar;
+    applyPrefs();
     return bar;
   }
 
