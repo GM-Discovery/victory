@@ -106,17 +106,25 @@
     el.id = STYLE_ID;
     el.textContent = `
       #${BAR_ID} {
-        position: fixed; left: 50%; bottom: ${COLLAPSED_BOTTOM}px; transform: translateX(-50%);
-        z-index: 8500; display: flex; gap: 4px; align-items: center;
+        position: fixed; z-index: 8500; display: flex; gap: 4px; align-items: center;
         padding: 6px 8px; border-radius: 999px;
         background: rgba(16, 17, 20, ${DEFAULT_OPACITY});
         background: rgba(16 17 20 / var(--k1-react-opacity, ${DEFAULT_OPACITY}));
         border: 1px solid rgba(255,255,255,0.14);
         backdrop-filter: blur(6px);
         max-width: min(94vw, 680px);
-        transition: bottom 180ms ease, background-color 180ms ease;
+        transition: bottom 180ms ease, left 180ms ease, right 180ms ease, transform 180ms ease, background-color 180ms ease;
+      }
+      /* Collapsed: tucked into the bottom-right corner, out of the way of
+         the centered chat rail -- same corner for every role, Audience
+         included; this bar was never role-gated (see the top of this
+         file). Expanded: centered above the chat rail, raised by the
+         adjustable lift amount. */
+      #${BAR_ID}[data-collapsed="true"] {
+        left: auto; right: 14px; bottom: ${COLLAPSED_BOTTOM}px; transform: none;
       }
       #${BAR_ID}[data-collapsed="false"] {
+        left: 50%; right: auto; transform: translateX(-50%);
         bottom: calc(${COLLAPSED_BOTTOM}px + var(--k1-react-lift, ${DEFAULT_LIFT}px));
       }
       #${BAR_ID}[data-collapsed="true"] .k1-react-buttons,
