@@ -53,6 +53,7 @@
     if (leftEdge) leftEdge.style.display = "none";
     if (rightEdge) rightEdge.style.display = "none";
     drawer.hidden = false;
+    bindNoteSend();
 
     const diagnosticLine = document.getElementById("audience-diagnostic-line");
     if (diagnosticLine) {
@@ -91,6 +92,44 @@
         }
       }
     }
+  }
+
+  // A19: sending never depends on the drawer having a fresh snapshot --
+  // the backend (audiencenotes.Submit) resolves the live session itself,
+  // so this is a plain, independent fetch, same posture as the rest of
+  // this module.
+  let noteSendBound = false;
+  function bindNoteSend() {
+    if (noteSendBound) return;
+    const button = document.getElementById("audience-note-send");
+    const textarea = document.getElementById("audience-note-body");
+    const status = document.getElementById("audience-note-status");
+    if (!button || !textarea) return;
+    noteSendBound = true;
+    button.addEventListener("click", async () => {
+      const body = textarea.value.trim();
+      if (!body) return;
+      button.disabled = true;
+      if (status) status.textContent = "Sending...";
+      try {
+        const response = await fetch("/api/session/catharsis/notes", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.data?.error || `HTTP ${response.status}`);
+        }
+        textarea.value = "";
+        if (status) status.textContent = "Sent to the Director.";
+      } catch (error) {
+        if (status) status.textContent = `Couldn't send: ${error.message || error}`;
+      } finally {
+        button.disabled = false;
+      }
+    });
   }
 
   async function refresh() {

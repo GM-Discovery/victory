@@ -29,6 +29,7 @@ import (
 	"victory/backend/internal/access"
 	"victory/backend/internal/assets"
 	"victory/backend/internal/audienceadmission"
+	"victory/backend/internal/audiencenotes"
 	"victory/backend/internal/audienceprojection"
 	"victory/backend/internal/characters"
 	"victory/backend/internal/cohorts"
@@ -576,6 +577,12 @@ func main() {
 	mux.HandleFunc("POST /api/messages", ratelimit.Middleware(actionLimiter, messages.HandleMessages(pool)))
 	mux.HandleFunc("GET /api/messages/{id}", messages.HandleMessageByID(pool))
 	mux.HandleFunc("POST /api/note-cards", ratelimit.Middleware(actionLimiter, messages.HandleNoteCards(pool)))
+	// Kernel 93 A19: Audience -> Director notes, Catharsis-scoped (see
+	// audiencenotes' doc comment for why this isn't just a wider note-cards
+	// route). Local mailbox delivery always works; Discord export is a
+	// separate, best-effort batch action a Director triggers by hand.
+	mux.HandleFunc("POST /api/session/catharsis/notes", ratelimit.Middleware(actionLimiter, audiencenotes.HandleSubmit(pool)))
+	mux.HandleFunc("POST /api/session/catharsis/notes/export", ratelimit.Middleware(actionLimiter, network.HandleExportAudienceNotesToDiscord(pool, discordServerLinkConfig)))
 	// Kernel 74 S8.1: Directors+ read the door-intention note inside
 	// Catharsis, without opening Stage Management or the mailbox.
 	mux.HandleFunc("GET /api/backstage-notes", messages.HandleBackstageNotes(pool))

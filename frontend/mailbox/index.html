@@ -246,6 +246,14 @@
         <div class="messages-list" id="message-list"></div>
       </section>
 
+      <section class="card" id="audience-notes-card" hidden>
+        <h2>Audience Notes</h2>
+        <p class="note">
+          Notes Audience members sent during a Showing, batched by session. Delivery here never depends on Discord -- export is an optional extra copy.
+        </p>
+        <div id="audience-notes-batches"></div>
+      </section>
+
       <section class="card">
         <div class="badge" id="read-badge">Message</div>
         <h2 class="detail-title" id="message-subject">Select a message</h2>
@@ -313,12 +321,12 @@
 
       const type = document.createElement("div");
       type.className = "message-type";
-      type.textContent = message.message_type === "note_card" ? "Note Card" : "Message";
+      type.textContent = message.message_type === "note_card" ? "Note Card" : (message.message_type === "audience_note" ? "Audience Note" : "Message");
 
       const meta = document.createElement("p");
       meta.className = "message-meta";
       const contextBits = [];
-      if (message.message_type === "note_card") {
+      if (message.message_type === "note_card" || message.message_type === "audience_note") {
         if (message.venue_slug) contextBits.push(message.venue_slug);
         if (message.session_id) contextBits.push(message.session_id.slice(0, 8));
       }
@@ -329,6 +337,95 @@
       button.appendChild(meta);
       button.addEventListener("click", () => openMessage(message.id));
       list.appendChild(button);
+      }
+    }
+
+    // A19: notes are still plain messages in the same list above (so
+    // nothing about the generic mailbox needs to know they exist), but a
+    // Director asked for these grouped as "per session batches" rather than
+    // read one at a time in chronological order with everything else.
+    function renderAudienceNoteBatches() {
+      const card = document.getElementById("audience-notes-card");
+      const container = document.getElementById("audience-notes-batches");
+      if (!card || !container) return;
+
+      const notes = state.messages.filter((m) => m.message_type === "audience_note");
+      if (!notes.length) {
+        card.hidden = true;
+        container.innerHTML = "";
+        return;
+      }
+      card.hidden = false;
+
+      const bySession = new Map();
+      for (const note of notes) {
+        const key = note.session_id || "unknown";
+        if (!bySession.has(key)) bySession.set(key, []);
+        bySession.get(key).push(note);
+      }
+
+      container.innerHTML = "";
+      for (const [sessionId, sessionNotes] of bySession) {
+        const group = document.createElement("div");
+        group.style.marginBottom = "10px";
+        group.style.padding = "10px";
+        group.style.border = "1px solid var(--line)";
+        group.style.borderRadius = "8px";
+
+        const heading = document.createElement("p");
+        heading.className = "note";
+        heading.textContent = `Session ${sessionId === "unknown" ? "unknown" : sessionId.slice(0, 8)} -- ${sessionNotes.length} note${sessionNotes.length === 1 ? "" : "s"}`;
+        group.appendChild(heading);
+
+        const list = document.createElement("ul");
+        list.style.margin = "0 0 8px 0";
+        list.style.paddingLeft = "18px";
+        for (const note of sessionNotes) {
+          const item = document.createElement("li");
+          item.textContent = `${note.sender_label || "Audience"}: ${note.body}`;
+          list.appendChild(item);
+        }
+        group.appendChild(list);
+
+        const exportButton = document.createElement("button");
+        exportButton.type = "button";
+        exportButton.className = "chip";
+        exportButton.textContent = "Export batch to Discord";
+        const exportStatus = document.createElement("span");
+        exportStatus.style.marginLeft = "8px";
+        exportStatus.style.fontSize = "12px";
+        exportStatus.style.opacity = "0.8";
+        exportButton.addEventListener("click", async () => {
+          exportButton.disabled = true;
+          exportStatus.textContent = "Exporting...";
+          try {
+            const response = await fetch("/api/session/catharsis/notes/export", {
+              method: "POST",
+              credentials: "include",
+            });
+            const payload = await response.json().catch(() => null);
+            if (!response.ok || !payload?.ok) {
+              throw new Error(payload?.data?.error || `HTTP ${response.status}`);
+            }
+            const data = payload.data || {};
+            if (data.exported > 0) {
+              exportStatus.textContent = `Sent ${data.exported} note${data.exported === 1 ? "" : "s"} to Discord.`;
+            } else if (data.reason === "chat_bridge_not_connected") {
+              exportStatus.textContent = "No active Discord Chat Bridge -- notes stayed local only.";
+            } else if (data.reason === "no_notes") {
+              exportStatus.textContent = "Nothing to export for the current live Showing.";
+            } else {
+              exportStatus.textContent = "Export attempted -- nothing sent.";
+            }
+          } catch (error) {
+            exportStatus.textContent = `Export failed: ${error.message}`;
+          } finally {
+            exportButton.disabled = false;
+          }
+        });
+        group.appendChild(exportButton);
+        group.appendChild(exportStatus);
+        container.appendChild(group);
       }
     }
 
@@ -346,14 +443,14 @@
         return;
       }
 
-      if (badge) badge.textContent = message.message_type === "note_card" ? "Note Card" : (message.read ? "Read" : "Unread");
+      if (badge) badge.textContent = message.message_type === "note_card" ? "Note Card" : (message.message_type === "audience_note" ? "Audience Note" : (message.read ? "Read" : "Unread"));
       if (subject) subject.textContent = message.subject || "No subject";
       if (meta) {
         meta.innerHTML = "";
         const entries = [
           `From ${message.sender_label || "System"}`,
           `Sent ${humanTime(message.created_at)}`,
-          message.message_type === "note_card" ? "Backstage note card" : (message.read ? "Opened" : "Waiting"),
+          message.message_type === "note_card" ? "Backstage note card" : (message.message_type === "audience_note" ? "Audience note" : (message.read ? "Opened" : "Waiting")),
         ];
         if (message.venue_slug) entries.push(`Venue ${message.venue_slug}`);
         if (message.session_id) entries.push(`Session ${message.session_id.slice(0, 8)}`);
@@ -443,6 +540,7 @@
         state.messages = Array.isArray(payload?.data?.messages) ? payload.data.messages : [];
         state.selectedId = state.messages[0]?.id || "";
         renderList();
+        renderAudienceNoteBatches();
         renderDetail(state.messages[0] || null);
         if (status) status.textContent = `${state.messages.length} message${state.messages.length === 1 ? "" : "s"} ready.`;
       } catch (error) {

@@ -157,6 +157,17 @@
     return isLiveStageObject(model) && !objectState(model).locked && Boolean(canManageIndexCards);
   }
 
+  // A15 (Kernel 93 Pass A): scene_composition-sourced elements (Kessa's
+  // stall, hotspots, etc.) are deliberately marked `live: false` by state.js
+  // regardless of whether they have a real venue_layout_elements row, so
+  // isLiveStageObject/canRemoveLiveStageObject always reject them -- the
+  // context menu never offered "remove" at all. act/remove_element's
+  // backend already deletes generically by element_id with no context_class
+  // check, so the only gap was this capability + menu entry.
+  function canRemoveSceneCompositionObject(model, canManageIndexCards) {
+    return !model?.live && !objectState(model).locked && Boolean(canManageIndexCards);
+  }
+
   function canDeleteLiveCard(model, canManageIndexCards) {
     return isCardObject(model) && model?.live && !objectState(model).locked && Boolean(canManageIndexCards);
   }
@@ -526,6 +537,9 @@
       // Cohort without editing the Scene, which is exactly the Scene-as-
       // visibility-container confusion §2 forbids.
       pushStageObjectStateFamilies(push, objectModel, canManageIndexCards, canReveal);
+      if (canRemoveSceneCompositionObject(objectModel, canManageIndexCards)) {
+        push("remove", "Remove from Stage", "remove");
+      }
       if (hasSelection) {
         push("clear", "Clear selection", "clear");
       }
@@ -641,6 +655,7 @@
     canMoveLiveStageObject,
     canDuplicateLiveStageObject,
     canRemoveLiveStageObject,
+    canRemoveSceneCompositionObject,
     canDeleteLiveCard,
     cardFaceForModel,
     cardPinData,
