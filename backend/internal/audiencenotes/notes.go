@@ -138,13 +138,24 @@ func Submit(ctx context.Context, pool *pgxpool.Pool, senderUserID, body string) 
 		return Note{}, errors.New("not_session_participant")
 	}
 
+	// Producer outranks Director everywhere else this hierarchy shows up
+	// (e.g. the sender-role tiebreak in loadMessages/getMessage) -- a
+	// live-testing report surfaced that a Producer running the show alone,
+	// with no separate 'director' participant present, got "no director
+	// available" even though they're the senior authority in the room.
+	// Prefer whichever outranks if both are present, rather than adding a
+	// separate shared per-show mailbox (real overhead: either duplicating
+	// each note per backstage recipient, or a second query path that lists
+	// by session instead of by user).
 	var directorUserID string
 	if err := pool.QueryRow(ctx, `
 		SELECT sp.user_id::text
 		FROM session_participants sp
 		WHERE sp.session_id = $1
-		  AND sp.role = 'director'
-		ORDER BY sp.joined_at ASC
+		  AND sp.role IN ('producer', 'director')
+		ORDER BY
+		  CASE sp.role WHEN 'producer' THEN 1 WHEN 'director' THEN 2 END,
+		  sp.joined_at ASC
 		LIMIT 1
 	`, sessionID).Scan(&directorUserID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
