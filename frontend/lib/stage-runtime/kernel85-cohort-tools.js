@@ -143,13 +143,20 @@
   // leave a dangling id: the <select> fell back to displaying the first
   // option while every fetch still asked for the archived cohort). Resolve
   // it against the live list on every render.
+  // A11 made "Ungrouped" a fully legitimate default (falls back to the
+  // Show's own current_show_scene_placement_id) rather than a disabled
+  // state -- but this function still silently defaulted a fresh panel open
+  // to cohorts[0], an arbitrary real cohort, whenever any cohort existed.
+  // Live testing (2026-08-28) confirmed that's exactly how "wrong Scene/
+  // cohort gets activated" happens: Activate targets whichever cohort
+  // happened to load first unless the Director notices and manually
+  // switches the dropdown to Ungrouped first. No more auto-selecting a
+  // cohort -- only an explicit dropdown choice (state.selectedCohortId set
+  // in the change handler below) should ever move off Ungrouped.
   function resolveCohortSelection(cohorts) {
     const known = new Set(cohorts.map((c) => c.id));
     if (state.selectedCohortId && state.selectedCohortId !== "ungrouped" && !known.has(state.selectedCohortId)) {
       state.selectedCohortId = "";
-    }
-    if (!state.selectedCohortId && cohorts.length) {
-      state.selectedCohortId = cohorts[0].id;
     }
     return state.selectedCohortId || "ungrouped";
   }
