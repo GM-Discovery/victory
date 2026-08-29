@@ -461,7 +461,7 @@
         option.textContent = text;
         visibilitySelect.appendChild(option);
       });
-      visibilitySelect.value = "cohort";
+      visibilitySelect.value = "show";
       visibilityLabel.appendChild(visibilitySelect);
 
       controls.append(countLabel, sidesLabel, explodeLabel, modifierLabel, label, visibilityLabel);
@@ -563,7 +563,7 @@
     async function submitRoll() {
       const expression = getControlsExpression();
       const label = String(elements.label?.value || "").trim();
-      const visibility = String(elements.visibility?.value || "cohort").trim().toLowerCase() || "cohort";
+      const visibility = String(elements.visibility?.value || "show").trim().toLowerCase() || "show";
       try {
         const result = await roll({ expression, visibility, label });
         setStageStatus(formatRollSummary(result));
@@ -592,13 +592,13 @@
       }
     }
 
-    function roll({ expression, visibility = "cohort", label = "", skillId = "" } = {}) {
+    function roll({ expression, visibility = "show", label = "", skillId = "" } = {}) {
       const normalizedExpression = String(expression || "").trim();
       const normalizedLabel = String(label || "").trim();
-      // Kernel 86 default is Cohort, with a safe Show fallback the server
-      // resolves for an Ungrouped roller (backend/internal/rollaudience) --
-      // this client never needs to know the roller's own grouping status.
-      const normalizedVisibility = String(visibility || "cohort").trim().toLowerCase() || "cohort";
+      // Default is Show (visible to everyone), per live-testing feedback
+      // (2026-08-28) -- Cohort was the Kernel 86 default, but the common
+      // case is a roll everyone watching should see.
+      const normalizedVisibility = String(visibility || "show").trim().toLowerCase() || "show";
       const normalizedSkillId = String(skillId || "").trim();
       if (!normalizedExpression) {
         return Promise.reject(new Error("expression_required"));
@@ -757,7 +757,7 @@
       },
       setVisibility: (value) => {
         if (elements.visibility) {
-          elements.visibility.value = String(value || "cohort");
+          elements.visibility.value = String(value || "show");
         }
       },
       setManualExpressionOverride: (value) => {

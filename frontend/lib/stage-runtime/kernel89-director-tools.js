@@ -32,7 +32,7 @@
     lastShowID: "",
     recalledTargetComplexity: null,
     recalledLabel: "",
-    audienceMode: "cohort",
+    audienceMode: "show",
   };
 
   function bridge() {
