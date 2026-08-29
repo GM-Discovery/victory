@@ -27,7 +27,7 @@
   root.VictoryStageDiceProjection = factory();
 })(typeof globalThis !== "undefined" ? globalThis : window, function () {
   const DEFAULT_TOKEN_SIZE = 64;
-  const DEFAULT_DURATION_MS = 3500;
+  const DEFAULT_DURATION_MS = 8500; // matches network.stageEffectDefaultDurationMs
   const ROLL_PHASE_MS = 650;
   const ROLL_TICK_MS = 70;
   const STAGGER_MS = 90;

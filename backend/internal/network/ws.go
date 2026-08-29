@@ -91,18 +91,21 @@ var discordBridgeConfig identity.DiscordServerLinkConfig
 var stageEffectRegistry = stageeffects.NewRegistry()
 
 // stageEffectDefaultDurationMs / stageEffectMaxDurationMs bound the
-// transient hold Kernel 86 §1.4 asks for (~3-4s default) while still
-// letting a caller request a longer hold within reason -- never unbounded,
-// per §16's "queue must not enable unbounded client memory growth."
-const stageEffectDefaultDurationMs = 3500
+// transient hold Kernel 86 §1.4 asks for, while still letting a caller
+// request a longer hold within reason -- never unbounded, per §16's "queue
+// must not enable unbounded client memory growth." Raised from the
+// original ~3.5s per live-testing feedback (2026-08-28): dice cleared too
+// fast to actually read before fading. A viewer can still Pin a settled
+// roll from dice-projection.js's announcement node to hold it indefinitely
+// past this.
+const stageEffectDefaultDurationMs = 8500
 const stageEffectMaxDurationMs = 15000
 
-// announcementDefaultDurationMs holds a Kernel 89 announcement longer than
-// a dice roll: a roll's own dice are the thing being read and the caption
-// only labels them, whereas an announcement IS the whole message and needs
-// long enough for a table mid-conversation to look up and take it in.
-// Still bounded by stageEffectMaxDurationMs like everything else on the
-// registry.
+// announcementDefaultDurationMs holds a Kernel 89 announcement its own
+// bounded duration, independent of stageEffectDefaultDurationMs -- an
+// announcement IS the whole message and needs long enough for a table
+// mid-conversation to look up and take it in. Still bounded by
+// stageEffectMaxDurationMs like everything else on the registry.
 const announcementDefaultDurationMs = 5000
 
 // resolvedStoredMode defaults an already-stored (or absent/malformed)
