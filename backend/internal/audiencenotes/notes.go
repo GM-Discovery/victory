@@ -144,7 +144,7 @@ func Submit(ctx context.Context, pool *pgxpool.Pool, senderUserID, body string) 
 		FROM session_participants sp
 		WHERE sp.session_id = $1
 		  AND sp.role = 'director'
-		ORDER BY sp.created_at ASC
+		ORDER BY sp.joined_at ASC
 		LIMIT 1
 	`, sessionID).Scan(&directorUserID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

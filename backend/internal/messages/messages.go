@@ -360,7 +360,7 @@ func resolveNoteCardRecipient(ctx context.Context, pool *pgxpool.Pool, sessionID
 		WHERE sp.session_id = $1
 		  AND sp.role = 'director'
 		ORDER BY
-		  sp.created_at ASC
+		  sp.joined_at ASC
 		LIMIT 1
 	`, sessionID).Scan(&recipientUserID, &handle, &displayName, &role)
 	if err != nil {
