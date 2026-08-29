@@ -51,13 +51,21 @@
     // Controls and Character-authoring tools that are not Audience's to see.
     // 2026-08-28 live testing: chat also goes away for Audience -- the
     // Note to the Director box + reactions bar are the intended
-    // replacement (ledger A19), not a third channel alongside them.
+    // replacement (ledger A19), not a third channel alongside them. Same
+    // pass: #top-bar's brand/status chips, camera/target controls, and
+    // most header-right buttons are stage-tooling Audience has no use for
+    // -- the only thing kept is the "Back to map" link. The theater-
+    // context message ("You are part of the Audience") is a separate
+    // floating banner (runtime.js's #kernel70a-theater-context-banner),
+    // untouched by any of this.
     if (leftDrawer) leftDrawer.style.display = "none";
     if (rightDrawer) rightDrawer.style.display = "none";
     if (leftEdge) leftEdge.style.display = "none";
     if (rightEdge) rightEdge.style.display = "none";
     if (chatPanel) chatPanel.style.display = "none";
+    hideTopBarChromeExceptBackToMap();
     drawer.hidden = false;
+    bindDrawerToggle();
     bindNoteSend();
 
     const cfg = snapshot?.audience_config || {};
@@ -88,6 +96,44 @@
         }
       }
     }
+  }
+
+  let topBarChromeHidden = false;
+  function hideTopBarChromeExceptBackToMap() {
+    if (topBarChromeHidden) return;
+    const headerLeft = document.querySelector("#top-bar .header-left");
+    const headerCenter = document.querySelector("#top-bar .header-center");
+    const headerPin = document.getElementById("header-pin-button");
+    const headerSettings = document.getElementById("header-settings-button");
+    const bootLiveTools = document.getElementById("boot-live-tools");
+    const characterTrayButton = document.getElementById("character-tray-button");
+    const accountMenuWrap = document.querySelector("#top-bar .account-menu-wrap");
+    if (!headerLeft && !headerCenter && !headerPin && !headerSettings && !bootLiveTools && !characterTrayButton && !accountMenuWrap) return;
+    topBarChromeHidden = true;
+    [headerLeft, headerCenter, headerPin, headerSettings, bootLiveTools, characterTrayButton, accountMenuWrap].forEach((el) => {
+      if (el) el.style.display = "none";
+    });
+  }
+
+  let drawerToggleBound = false;
+  function bindDrawerToggle() {
+    if (drawerToggleBound) return;
+    const head = document.getElementById("audience-drawer-head");
+    const drawer = document.getElementById("audience-drawer");
+    if (!head || !drawer) return;
+    drawerToggleBound = true;
+    const toggle = () => {
+      const open = drawer.dataset.open === "true";
+      drawer.dataset.open = open ? "false" : "true";
+      head.setAttribute("aria-expanded", open ? "false" : "true");
+    };
+    head.addEventListener("click", toggle);
+    head.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        toggle();
+      }
+    });
   }
 
   // A19: sending never depends on the drawer having a fresh snapshot --

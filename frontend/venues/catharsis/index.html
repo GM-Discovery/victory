@@ -1925,22 +1925,58 @@
     }
 
     /* Audience has exactly one drawer, not two competing for space like
-       Cast/Director -- always-open avoids depending on the hover-to-expand
-       wiring in runtime.js, which only ever targets #left-drawer/#right-
-       drawer by ID and was never extended to this element.
-       2026-08-28 live testing: docked by the reactions bar
-       (bottom-right, see reactions.js's own COLLAPSED_BOTTOM/right:14px)
-       instead of the left edge, sized to its actual content instead of
-       stretching the full drawer height. */
+       Cast/Director. Docked by the reactions bar (bottom-right, see
+       reactions.js's own COLLAPSED_BOTTOM/right:14px) instead of the left
+       edge. data-open-mode="click" is this element's own thing, toggled by
+       kernel93-audience-overlay.js's click handler on .drawer-head -- the
+       hover-to-expand wiring in runtime.js is hardcoded to #left-drawer/
+       #right-drawer by ID and was never (and doesn't need to be) extended
+       here. Starts collapsed (data-open="false"). */
     #audience-drawer {
       top: auto;
       bottom: 56px;
       left: auto;
       right: 14px;
-      width: min(260px, 88vw);
       max-height: min(50vh, 420px);
       overflow-y: auto;
       z-index: 86;
+      transition: width 180ms ease;
+    }
+
+    #audience-drawer[data-open="true"] {
+      width: min(260px, 88vw);
+    }
+
+    #audience-drawer[data-open="false"] {
+      width: 132px;
+    }
+
+    /* The generic .drawer[data-open="false"] rules (shared with left/right
+       drawer) zero out .drawer-head__copy's width/opacity for a bare
+       hover-rail look -- this drawer has no hover-rail wiring, so its own
+       label+arrow need to stay visibly clickable in the collapsed state
+       instead of disappearing into an unlabeled sliver. */
+    #audience-drawer.drawer[data-open="false"] .drawer-head__copy {
+      opacity: 1;
+      transform: none;
+      pointer-events: auto;
+      width: auto;
+      overflow: visible;
+    }
+
+    #audience-drawer .drawer-head {
+      cursor: pointer;
+      justify-content: flex-start;
+      gap: 8px;
+    }
+
+    #audience-drawer-arrow {
+      transition: transform 180ms ease;
+      color: #b5c5de;
+    }
+
+    #audience-drawer[data-open="true"] #audience-drawer-arrow {
+      transform: rotate(90deg);
     }
 
     .drawer[data-open-mode="always-open"] {
@@ -3945,11 +3981,12 @@
                    theater_context.kind for this viewer is "audience".
                    Docked by the reactions bar (bottom-right, #audience-
                    drawer's own CSS rule), not the left edge. -->
-              <aside id="audience-drawer" class="drawer" data-open-mode="always-open" data-open="true" hidden>
+              <aside id="audience-drawer" class="drawer" data-open-mode="click" data-open="false" hidden>
                 <div class="drawer-inner">
-                  <div class="drawer-head">
+                  <div class="drawer-head" id="audience-drawer-head" role="button" tabindex="0" aria-expanded="false">
                     <div class="drawer-head__copy">
                       <strong>Audience</strong>
+                      <span id="audience-drawer-arrow" aria-hidden="true">▸</span>
                     </div>
                   </div>
                   <div class="drawer-body">
