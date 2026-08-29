@@ -78,14 +78,26 @@ func CaptureLiveVenueComposition(ctx context.Context, pool *pgxpool.Pool, actorU
 	}
 	defer tx.Rollback(ctx)
 
+	// Kernel 93 live-testing bug (2026-08-29): this used to delete every
+	// Base-layer row for the scene with no kind filter, including
+	// interaction_hotspot elements (e.g. Kessa's door) -- which the
+	// re-population loop below never recreates, since hotspots aren't part
+	// of the live venue_layout_elements/elements tables it reads from in
+	// the first place (they render straight from scene_stage_elements,
+	// see world/snapshot.go's loadCompositionRows). Any Capture on a scene
+	// with a hotspot permanently destroyed it. Now scoped to only the
+	// kinds this function actually knows how to re-populate, so a hotspot
+	// (and its stage_element_bindings row) survives a Capture untouched.
 	if _, err := tx.Exec(ctx, `
-		DELETE FROM scene_stage_elements WHERE scene_id = $1 AND show_scene_placement_id IS NULL
+		DELETE FROM scene_stage_elements
+		WHERE scene_id = $1 AND show_scene_placement_id IS NULL
+		  AND kind IN ('token', 'index_card', 'map_backdrop', 'grid_config')
 	`, sceneID); err != nil {
 		return err
 	}
 
 	rows, err := tx.Query(ctx, `
-		SELECT e.element_type, e.data, vle.position, vle.visibility
+		SELECT e.element_type, e.name, e.data, vle.position, vle.visibility
 		FROM venue_layout_elements vle
 		JOIN elements e ON e.id = vle.element_id
 		WHERE vle.venue_id = $1
@@ -100,6 +112,7 @@ func CaptureLiveVenueComposition(ctx context.Context, pool *pgxpool.Pool, actorU
 	}
 	type liveElement struct {
 		elementType string
+		name        string
 		data        []byte
 		position    []byte
 		visibility  []byte
@@ -107,7 +120,7 @@ func CaptureLiveVenueComposition(ctx context.Context, pool *pgxpool.Pool, actorU
 	var liveElements []liveElement
 	for rows.Next() {
 		var le liveElement
-		if err := rows.Scan(&le.elementType, &le.data, &le.position, &le.visibility); err != nil {
+		if err := rows.Scan(&le.elementType, &le.name, &le.data, &le.position, &le.visibility); err != nil {
 			rows.Close()
 			return err
 		}
@@ -120,10 +133,18 @@ func CaptureLiveVenueComposition(ctx context.Context, pool *pgxpool.Pool, actorU
 
 	sortOrder := 0
 	for _, le := range liveElements {
+		// label round-trips the live element's own display name (Kernel
+		// 93 live-testing bug, 2026-08-29): ApplySceneToLiveVenue names a
+		// recreated token from data["asset_name"], which Kessa's data
+		// deliberately never has (backend/internal/merchant/prepare.go
+		// strips it on every repair -- her real name lives in this label
+		// column). Capturing it here is what makes that round-trip work
+		// for any token, not just ones whose data happens to include
+		// asset_name.
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO scene_stage_elements (scene_id, kind, data, position, visibility, sort_order, created_by_user_id)
-			VALUES ($1, $2, $3::jsonb, $4::jsonb, $5::jsonb, $6, $7)
-		`, sceneID, le.elementType, le.data, le.position, le.visibility, sortOrder, actorUserID); err != nil {
+			INSERT INTO scene_stage_elements (scene_id, kind, label, data, position, visibility, sort_order, created_by_user_id)
+			VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $8)
+		`, sceneID, le.elementType, le.name, le.data, le.position, le.visibility, sortOrder, actorUserID); err != nil {
 			return err
 		}
 		sortOrder++
@@ -241,12 +262,22 @@ func ApplySceneToLiveVenue(ctx context.Context, pool *pgxpool.Pool, actorUserID,
 
 		switch el.Kind {
 		case StageElementKindToken:
+			// el.Label (the scene_stage_elements row's own label column,
+			// now round-tripped by CaptureLiveVenueComposition above) wins
+			// over data["asset_name"] -- a captured element may have a
+			// label but no asset_name at all (Kessa's data deliberately
+			// never has one; see prepare.go's repair), and unconditionally
+			// falling back to literal "Token" lost her name entirely.
+			name := el.Label
+			if name == "" {
+				name = stringFromAny(data["asset_name"], "Token")
+			}
 			var elementID string
 			if err := tx.QueryRow(ctx, `
 				INSERT INTO elements (library_id, name, slug, element_type, context_class, state, data)
 				VALUES ($1, $2, $3, 'token', 'token', 'library', $4::jsonb)
 				RETURNING id::text
-			`, libraryID, stringFromAny(data["asset_name"], "Token"), uniqueLiveSlug("token"), el.Data).Scan(&elementID); err != nil {
+			`, libraryID, name, uniqueLiveSlug("token"), el.Data).Scan(&elementID); err != nil {
 				return err
 			}
 			position := el.Position
