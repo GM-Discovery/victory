@@ -45,24 +45,20 @@
     const rightDrawer = document.getElementById("right-drawer");
     const leftEdge = document.getElementById("left-drawer-edge-trigger");
     const rightEdge = document.getElementById("right-drawer-edge-trigger");
+    const chatPanel = document.getElementById("chat-panel");
     // Kernel 93 §6: Audience gets this simpler overlay INSTEAD of the
     // Cast/Director drawers, never alongside them -- those carry Stage
     // Controls and Character-authoring tools that are not Audience's to see.
+    // Grant, 2026-08-28 live testing: chat also goes away for Audience --
+    // the Note to the Director box + reactions bar are the intended
+    // replacement (ledger A19), not a third channel alongside them.
     if (leftDrawer) leftDrawer.style.display = "none";
     if (rightDrawer) rightDrawer.style.display = "none";
     if (leftEdge) leftEdge.style.display = "none";
     if (rightEdge) rightEdge.style.display = "none";
+    if (chatPanel) chatPanel.style.display = "none";
     drawer.hidden = false;
     bindNoteSend();
-
-    const diagnosticLine = document.getElementById("audience-diagnostic-line");
-    if (diagnosticLine) {
-      const showingStatus = String(snapshot?.showing?.status || "").trim();
-      const venueName = String(snapshot?.venue?.name || venueSlug()).trim();
-      diagnosticLine.textContent = showingStatus
-        ? `Watching ${venueName} -- Showing is ${showingStatus}.`
-        : `Watching ${venueName}.`;
-    }
 
     const cfg = snapshot?.audience_config || {};
 

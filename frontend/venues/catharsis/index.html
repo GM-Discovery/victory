@@ -1927,10 +1927,19 @@
     /* Audience has exactly one drawer, not two competing for space like
        Cast/Director -- always-open avoids depending on the hover-to-expand
        wiring in runtime.js, which only ever targets #left-drawer/#right-
-       drawer by ID and was never extended to this element. */
+       drawer by ID and was never extended to this element.
+       Grant, 2026-08-28 live testing: docked by the reactions bar
+       (bottom-right, see reactions.js's own COLLAPSED_BOTTOM/right:14px)
+       instead of the left edge, sized to its actual content instead of
+       stretching the full drawer height. */
     #audience-drawer {
-      left: 16px;
-      width: min(24vw, 420px);
+      top: auto;
+      bottom: 56px;
+      left: auto;
+      right: 14px;
+      width: min(260px, 88vw);
+      max-height: min(50vh, 420px);
+      overflow-y: auto;
       z-index: 86;
     }
 
@@ -3929,12 +3938,13 @@
               <div id="left-drawer-edge-trigger" class="drawer-edge-trigger drawer-edge-trigger--left" aria-hidden="true"></div>
               <div id="right-drawer-edge-trigger" class="drawer-edge-trigger drawer-edge-trigger--right" aria-hidden="true"></div>
 
-              <!-- Kernel 93: the Audience seat's own left overlay. Same
-                   drawer/rail spatial language as left-drawer above, kept
-                   simpler and with no Director/Cast controls -- swapped in
-                   for left-drawer/right-drawer (never shown alongside them)
-                   by kernel93-audience-overlay.js once the server-resolved
-                   theater_context.kind for this viewer is "audience". -->
+              <!-- Kernel 93: the Audience seat's own overlay -- no
+                   Director/Cast controls, swapped in for left-drawer/
+                   right-drawer/chat (never shown alongside them) by
+                   kernel93-audience-overlay.js once the server-resolved
+                   theater_context.kind for this viewer is "audience".
+                   Docked by the reactions bar (bottom-right, #audience-
+                   drawer's own CSS rule), not the left edge. -->
               <aside id="audience-drawer" class="drawer" data-open-mode="always-open" data-open="true" hidden>
                 <div class="drawer-inner">
                   <div class="drawer-head">
@@ -3943,10 +3953,6 @@
                     </div>
                   </div>
                   <div class="drawer-body">
-                    <div class="drawer-item">
-                      <strong>Diagnostic</strong>
-                      <span id="audience-diagnostic-line">Connecting...</span>
-                    </div>
                     <div id="audience-presence-item" class="drawer-item" hidden>
                       <details id="audience-presence-details">
                         <summary><strong>Presence</strong></summary>
