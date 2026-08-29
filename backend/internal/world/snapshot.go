@@ -1039,6 +1039,20 @@ func isBackstageRole(role string) bool {
 	}
 }
 
+// isShowManagementRole is the subset of isBackstageRole that can actually
+// manage a Show Run (showruns.CanManageShowRun's own authority tier).
+// Crew is deliberately excluded -- see resolveTheaterContext's 2026-08-29
+// comment on why Crew keeps the lower-priority, participant-while-playing
+// behavior while Producer/Director/Operator must not.
+func isShowManagementRole(role string) bool {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "producer", "director", "operator":
+		return true
+	default:
+		return false
+	}
+}
+
 // resolveTheaterContext computes the Kernel 70A theater-context priority
 // order (kernel §4): a registered Show Run player in the current Show
 // outranks a plain Audience viewer, which outranks the generic "venue is
@@ -1046,6 +1060,19 @@ func isBackstageRole(role string) bool {
 // view. sessionID/showID being "" means there's no active session at this
 // venue right now -- the only two reachable kinds are then "venue_open" or
 // "backstage", split purely on viewerRole.
+//
+// Live-testing correction (2026-08-29): "registered player outranks
+// backstage" is deliberate for Crew -- a Cast member who is also Crew
+// should get their own Character's participant view while actively
+// playing, not a generic backstage idle screen. But it silently downgraded
+// a Producer/Director/Operator (showruns.CanManageShowRun's own authority
+// tier -- someone who can manage this exact Show Run, not merely hold some
+// backstage-flavored role elsewhere) to "just a participant" whenever they
+// had any stale or incidental show_run_roster_members row -- e.g. leftover
+// test data from earlier live-testing on their own Show. Show-management
+// authority must never be silently overridden that way, so it's now
+// checked first and wins unconditionally; Crew's existing participant-
+// while-playing behavior is unchanged.
 func resolveTheaterContext(ctx context.Context, pool *pgxpool.Pool, viewerUserID, viewerRole, sessionID, showID string) (TheaterContext, error) {
 	backstageTier := isBackstageRole(viewerRole)
 
@@ -1054,6 +1081,10 @@ func resolveTheaterContext(ctx context.Context, pool *pgxpool.Pool, viewerUserID
 			return TheaterContext{Kind: "backstage"}, nil
 		}
 		return TheaterContext{Kind: "venue_open", Message: "No Show is currently on stage here."}, nil
+	}
+
+	if isShowManagementRole(viewerRole) {
+		return TheaterContext{Kind: "backstage"}, nil
 	}
 
 	viewerUserID = strings.TrimSpace(viewerUserID)
