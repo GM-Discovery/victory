@@ -295,6 +295,9 @@
       return `= ${effect.total}${modifierText ? ` (mod${modifierText})` : ""}`;
     }
 
+    const ACTION_BUTTON_FILL = 0x8fb3ff; // offered action (Pin), not yet taken
+    const ACTION_BUTTON_ACTIVE_FILL = 0xd9c46a; // confirmed state (pinned), same gold as the roll total
+
     // buildActionButton creates a small interactive label (Pin / Dismiss).
     // Kernel 86 authority note (still true under 86A): the server is the
     // actual authority (stageEffectAuthorized), so this button is offered
@@ -302,7 +305,7 @@
     // duplicating that role/cohort logic client-side; an unauthorized
     // click is simply rejected server-side with no visible effect.
     function buildActionButton() {
-      const text = makeText("", { fill: 0x8fb3ff, fontSize: 13, fontWeight: "600" });
+      const text = makeText("", { fill: ACTION_BUTTON_FILL, fontSize: 13, fontWeight: "600" });
       text.anchor.set(0.5, 0);
       text.alpha = 0;
       text.eventMode = "none";
@@ -310,7 +313,12 @@
       return text;
     }
 
-    function setActionButton(button, label, onClick) {
+    // active marks a CONFIRMED state (currently pinned) rather than an
+    // offered action (Pin) -- distinct color/glyph, not just different
+    // text, per live-testing feedback (2026-08-28): clicking Pin gave no
+    // clear confirmation it took, so it read as maybe-a-toggle and got
+    // clicked repeatedly.
+    function setActionButton(button, label, onClick, { active = false } = {}) {
       if (!button) return;
       button.removeAllListeners?.("pointertap");
       if (!label) {
@@ -318,7 +326,8 @@
         button.eventMode = "none";
         return;
       }
-      button.text = label;
+      button.text = active ? `\u{1F4CC} ${label}` : label;
+      button.style.fill = active ? ACTION_BUTTON_ACTIVE_FILL : ACTION_BUTTON_FILL;
       button.alpha = 1;
       button.eventMode = "static";
       button.on("pointertap", onClick);
@@ -492,7 +501,7 @@
       if (current === entry) current = null;
 
       if (entry.legacy) {
-        setActionButton(entry.legacyNode.__actionButton, "Dismiss", () => dismiss(entry.effect.id));
+        setActionButton(entry.legacyNode.__actionButton, "Dismiss", () => dismiss(entry.effect.id), { active: true });
         pinned.set(entry.effect.id, { effect: { ...entry.effect, pinned: true }, clusterNode: entry.legacyNode });
         onEffectChange({ kind: "pinned", effect: { ...entry.effect, pinned: true } });
         startNext();
@@ -500,7 +509,7 @@
       }
 
       if (entry.announcementNode) {
-        setActionButton(entry.announcementNode.__pinButton, "Dismiss", () => dismiss(entry.effect.id));
+        setActionButton(entry.announcementNode.__pinButton, "Dismiss", () => dismiss(entry.effect.id), { active: true });
       }
       pinned.set(entry.effect.id, {
         effect: { ...entry.effect, pinned: true },
@@ -737,7 +746,7 @@
         // loading, it upgrades to real spatial placement once bounds exist.
         const node = buildLegacyGroupedNode(effect, tokenSize, true);
         placeAtTransientSlot(node, node.__poolWidth || 200);
-        setActionButton(node.__actionButton, "Dismiss", () => dismiss(effect.id));
+        setActionButton(node.__actionButton, "Dismiss", () => dismiss(effect.id), { active: true });
         hudContainer.addChild(node);
         pinned.set(effect.id, { effect, clusterNode: node, needsSpatialUpgrade: true });
         onEffectChange({ kind: "pinned", effect });
@@ -758,7 +767,7 @@
       const dismissButton = buildActionButton();
       const center = centroid(positions);
       dismissButton.position.set(center.x, center.y + tokenSize / 2 + 26);
-      setActionButton(dismissButton, "Dismiss", () => dismiss(effect.id));
+      setActionButton(dismissButton, "Dismiss", () => dismiss(effect.id), { active: true });
       clusterNode.addChild(dismissButton);
       clusterNode.__dismissButton = dismissButton;
       worldContainer.addChild(clusterNode);
