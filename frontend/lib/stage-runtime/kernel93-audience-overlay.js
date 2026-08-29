@@ -49,21 +49,25 @@
     // Kernel 93 §6: Audience gets this simpler overlay INSTEAD of the
     // Cast/Director drawers, never alongside them -- those carry Stage
     // Controls and Character-authoring tools that are not Audience's to see.
+    const topBar = document.getElementById("top-bar");
     // 2026-08-28 live testing: chat also goes away for Audience -- the
     // Note to the Director box + reactions bar are the intended
     // replacement (ledger A19), not a third channel alongside them. Same
-    // pass: #top-bar's brand/status chips, camera/target controls, and
-    // most header-right buttons are stage-tooling Audience has no use for
-    // -- the only thing kept is the "Back to map" link. The theater-
-    // context message ("You are part of the Audience") is a separate
-    // floating banner (runtime.js's #kernel70a-theater-context-banner),
-    // untouched by any of this.
+    // pass: #top-bar (brand/status chips, camera/target controls, header-
+    // right buttons -- all stage tooling Audience has no use for) is
+    // hidden outright, not trimmed down -- catharsis/index.html separately
+    // loads /lib/back-to-map.js with data-back-to-map="floating", which
+    // mounts its own independent, always-visible "Back to Map" pill fixed
+    // to the page (not inside #top-bar), so nothing here needs to survive
+    // for that. The theater-context message ("You are part of the
+    // Audience") is a separate floating banner (runtime.js's
+    // #kernel70a-theater-context-banner), untouched by any of this.
     if (leftDrawer) leftDrawer.style.display = "none";
     if (rightDrawer) rightDrawer.style.display = "none";
     if (leftEdge) leftEdge.style.display = "none";
     if (rightEdge) rightEdge.style.display = "none";
     if (chatPanel) chatPanel.style.display = "none";
-    hideTopBarChromeExceptBackToMap();
+    if (topBar) topBar.style.display = "none";
     drawer.hidden = false;
     bindDrawerToggle();
     bindNoteSend();
@@ -96,23 +100,6 @@
         }
       }
     }
-  }
-
-  let topBarChromeHidden = false;
-  function hideTopBarChromeExceptBackToMap() {
-    if (topBarChromeHidden) return;
-    const headerLeft = document.querySelector("#top-bar .header-left");
-    const headerCenter = document.querySelector("#top-bar .header-center");
-    const headerPin = document.getElementById("header-pin-button");
-    const headerSettings = document.getElementById("header-settings-button");
-    const bootLiveTools = document.getElementById("boot-live-tools");
-    const characterTrayButton = document.getElementById("character-tray-button");
-    const accountMenuWrap = document.querySelector("#top-bar .account-menu-wrap");
-    if (!headerLeft && !headerCenter && !headerPin && !headerSettings && !bootLiveTools && !characterTrayButton && !accountMenuWrap) return;
-    topBarChromeHidden = true;
-    [headerLeft, headerCenter, headerPin, headerSettings, bootLiveTools, characterTrayButton, accountMenuWrap].forEach((el) => {
-      if (el) el.style.display = "none";
-    });
   }
 
   let drawerToggleBound = false;
