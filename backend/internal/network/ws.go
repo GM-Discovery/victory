@@ -180,7 +180,17 @@ func nonAudienceSessionRecipients(ctx context.Context, pool *pgxpool.Pool, sessi
 // visibility. Show mode is delivered via Hub.BroadcastSession (every
 // socket on this session, not the entire server -- the audit's global-leak
 // fix) rather than enumerating a recipient set.
-func deliverStageMessage(ctx context.Context, hub *Hub, pool *pgxpool.Pool, sessionID, actorID, audienceMode, cohortID string, msg []byte) {
+//
+// effectType distinguishes what's actually being delivered ("dice_roll",
+// "announcement", or a stage_effect/pin-dismiss's own effect.Type) --
+// deliverStageMessage is the one shared dispatch point for every Kernel 86
+// Stage Effect, not just dice rolls, so the Director's "Audience Dice
+// Rolls" toggle must only narrow delivery when a roll is what's actually
+// being sent. Live testing (2026-08-28) found announcements silently
+// stopped reaching Audience too whenever that toggle was off, because the
+// gate below used to apply unconditionally to every Show-mode message
+// this function ever sends.
+func deliverStageMessage(ctx context.Context, hub *Hub, pool *pgxpool.Pool, sessionID, actorID, audienceMode, cohortID, effectType string, msg []byte) {
 	decision := rollaudience.Decision{Mode: resolvedStoredMode(audienceMode), CohortID: strings.TrimSpace(cohortID)}
 
 	recipients, useSessionBroadcast, err := rollaudience.LiveRecipients(ctx, pool, decision, actorID, sessionID)
@@ -192,10 +202,11 @@ func deliverStageMessage(ctx context.Context, hub *Hub, pool *pgxpool.Pool, sess
 		// Kernel 93 §18: Show-mode delivery is normally a full session
 		// broadcast (everyone already able to view this session). When the
 		// Showing's Director has turned Audience Dice Rolls off, narrow that
-		// to everyone except Audience-role sockets instead -- Director+/
-		// Cast/Crew are unaffected, and the roller always sees their own
-		// roll (nonAudienceSessionRecipients always includes actorID).
-		if decision.Mode == rollaudience.ModeShow && audienceDiceRollsHidden(ctx, pool, sessionID) {
+		// to everyone except Audience-role sockets instead, and only for an
+		// actual dice roll -- Director+/Cast/Crew are unaffected, and the
+		// roller always sees their own roll (nonAudienceSessionRecipients
+		// always includes actorID).
+		if decision.Mode == rollaudience.ModeShow && effectType == "dice_roll" && audienceDiceRollsHidden(ctx, pool, sessionID) {
 			hub.SendToUsers(sessionID, nonAudienceSessionRecipients(ctx, pool, sessionID, actorID), msg)
 			return
 		}
@@ -750,7 +761,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 				"data": storedAction,
 			})
 			deliverCtx, deliverCancel := context.WithTimeout(context.Background(), 5*time.Second)
-			deliverStageMessage(deliverCtx, hub, pool, sessionID, actorID, audienceMode, cohortID, msgOut)
+			deliverStageMessage(deliverCtx, hub, pool, sessionID, actorID, audienceMode, cohortID, "dice_roll", msgOut)
 
 			durationMs := stageEffectDefaultDurationMs
 			if raw, ok := payload["duration_ms"].(float64); ok && raw > 0 {
@@ -782,7 +793,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 				"type": "stage_effect",
 				"data": effect,
 			})
-			deliverStageMessage(deliverCtx, hub, pool, sessionID, actorID, audienceMode, cohortID, effectMsg)
+			deliverStageMessage(deliverCtx, hub, pool, sessionID, actorID, audienceMode, cohortID, "dice_roll", effectMsg)
 			deliverCancel()
 		}
 
@@ -852,7 +863,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 				"data": storedAction,
 			})
 			deliverCtx, deliverCancel := context.WithTimeout(context.Background(), 5*time.Second)
-			deliverStageMessage(deliverCtx, hub, pool, sessionID, actorID, audienceMode, cohortID, msgOut)
+			deliverStageMessage(deliverCtx, hub, pool, sessionID, actorID, audienceMode, cohortID, "dice_roll", msgOut)
 
 			durationMs := stageEffectDefaultDurationMs
 			if raw, ok := payload["duration_ms"].(float64); ok && raw > 0 {
@@ -884,7 +895,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 				"type": "stage_effect",
 				"data": effect,
 			})
-			deliverStageMessage(deliverCtx, hub, pool, sessionID, actorID, audienceMode, cohortID, effectMsg)
+			deliverStageMessage(deliverCtx, hub, pool, sessionID, actorID, audienceMode, cohortID, "dice_roll", effectMsg)
 			deliverCancel()
 		}
 
@@ -980,7 +991,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 				"type": "stage_effect",
 				"data": effect,
 			})
-			deliverStageMessage(ctx, hub, pool, sessionID, actorID, decision.Mode, decision.CohortID, effectMsg)
+			deliverStageMessage(ctx, hub, pool, sessionID, actorID, decision.Mode, decision.CohortID, "announcement", effectMsg)
 		}
 
 	case "stage_effect/pin", "stage_effect/dismiss":
@@ -1019,11 +1030,11 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 					return
 				}
 				msgOut, _ := json.Marshal(map[string]any{"type": "stage_effect_pinned", "data": pinned})
-				deliverStageMessage(ctx, hub, pool, sessionID, effect.ActorID, effect.Audience, effect.CohortID, msgOut)
+				deliverStageMessage(ctx, hub, pool, sessionID, effect.ActorID, effect.Audience, effect.CohortID, effect.Type, msgOut)
 			} else {
 				stageEffectRegistry.Dismiss(sessionID, effectID)
 				msgOut, _ := json.Marshal(map[string]any{"type": "stage_effect_dismissed", "effect_id": effectID})
-				deliverStageMessage(ctx, hub, pool, sessionID, effect.ActorID, effect.Audience, effect.CohortID, msgOut)
+				deliverStageMessage(ctx, hub, pool, sessionID, effect.ActorID, effect.Audience, effect.CohortID, effect.Type, msgOut)
 			}
 			cancel()
 		}
