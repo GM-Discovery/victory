@@ -477,11 +477,16 @@
 
     // settleIntoPinned keeps the dice cluster in place permanently (spec
     // 1.9: static dice remain, exact map-relative coordinates, until
-    // explicitly cleared) while the announcement fades on its own normal
-    // timer regardless (spec 1.10) -- pin authority moves from the
-    // announcement's "Pin" button to a small "Dismiss" control that lives
-    // on the dice cluster itself, so it survives long after the
-    // announcement is gone.
+    // explicitly cleared). Live testing (2026-08-28): the original design
+    // faded the announcement's "Pin" button away and handed dismiss
+    // authority to a separate control down on the dice cluster -- clicking
+    // Pin and having its replacement appear somewhere else on screen read
+    // as broken, not intentional. The same banner node now stays put and
+    // its own button just relabels Pin -> Dismiss in place. Known
+    // limitation, not solved here: every transient banner shares one fixed
+    // HUD slot (placeAtTransientSlot), so pinning more than one roll at a
+    // time will stack their banners on top of each other -- narrower
+    // problem than the one reported, left for if it actually comes up.
     function settleIntoPinned(entry) {
       clearTimers(entry);
       if (current === entry) current = null;
@@ -495,12 +500,13 @@
       }
 
       if (entry.announcementNode) {
-        const node = entry.announcementNode;
-        entry.announcementNode = null;
-        fadeNode(node, Math.max(1, Math.round(FADE_MS / 30)), () => {});
+        setActionButton(entry.announcementNode.__pinButton, "Dismiss", () => dismiss(entry.effect.id));
       }
-      setActionButton(entry.dismissButton, "Dismiss", () => dismiss(entry.effect.id));
-      pinned.set(entry.effect.id, { effect: { ...entry.effect, pinned: true }, clusterNode: entry.clusterNode });
+      pinned.set(entry.effect.id, {
+        effect: { ...entry.effect, pinned: true },
+        clusterNode: entry.clusterNode,
+        announcementNode: entry.announcementNode,
+      });
       onEffectChange({ kind: "pinned", effect: { ...entry.effect, pinned: true } });
       startNext();
     }
@@ -785,6 +791,7 @@
       if (!entry) return;
       pinned.delete(id);
       entry.clusterNode?.destroy?.({ children: true });
+      entry.announcementNode?.destroy?.({ children: true });
       onEffectChange({ kind: "dismissed", effectId: id });
     }
 
