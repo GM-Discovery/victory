@@ -251,6 +251,47 @@
     // class does the heavy styling (see .cartograph-toolbar in the venue
     // stylesheet); inline style here only sets initial position/z-index/
     // display so the module still degrades gracefully with no stylesheet.
+    // Position/collapse memory (live-testing feedback, 2026-08-28): the
+    // panel used to always reopen at the same top:16px/right:16px slot,
+    // uncollapsed, regardless of anything the user did last session.
+    // localStorage, matching this app's existing convention for this class
+    // of cosmetic per-browser preference (reactions.js's own prefs).
+    const CARTOGRAPH_PREFS_KEY = "cartographToolbarPrefs";
+
+    function parsePx(value) {
+      const n = Number.parseFloat(value);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function loadCartographPrefs() {
+      try {
+        const raw = window.localStorage?.getItem(CARTOGRAPH_PREFS_KEY);
+        if (!raw) return { collapsed: true, left: null, top: null };
+        const parsed = JSON.parse(raw);
+        return {
+          // Only ever defaults to collapsed=true when nothing was saved yet
+          // (first-ever use, spec: "start compacted as its initial default
+          // state") -- once saved, an explicit false is honored same as true.
+          collapsed: typeof parsed.collapsed === "boolean" ? parsed.collapsed : true,
+          left: Number.isFinite(parsed.left) ? parsed.left : null,
+          top: Number.isFinite(parsed.top) ? parsed.top : null,
+        };
+      } catch {
+        return { collapsed: true, left: null, top: null };
+      }
+    }
+
+    function saveCartographPrefs(prefs) {
+      try {
+        window.localStorage?.setItem(CARTOGRAPH_PREFS_KEY, JSON.stringify(prefs));
+      } catch {
+        // Private-browsing / storage-disabled: position/collapse just don't
+        // persist across reloads -- not worth surfacing as an error.
+      }
+    }
+
+    const cartographPrefs = loadCartographPrefs();
+
     const mountHost = panelHost || hostElement;
     const panel = el("div", {
       class: "cartograph-toolbar",
@@ -263,6 +304,12 @@
       hostElement.style.position = hostElement.style.position || "relative";
     }
     mountHost.appendChild(panel);
+
+    if (cartographPrefs.left != null && cartographPrefs.top != null) {
+      panel.style.left = `${cartographPrefs.left}px`;
+      panel.style.top = `${cartographPrefs.top}px`;
+      panel.style.right = "auto";
+    }
 
     const header = el("div", { class: "cartograph-toolbar-header" }, [
       el("strong", { text: "Cartography" }),
@@ -278,12 +325,42 @@
     const body = el("div", { class: "cartograph-toolbar-body" });
     panel.appendChild(body);
 
-    let collapsed = false;
+    let collapsed = cartographPrefs.collapsed;
+    body.style.display = collapsed ? "none" : "";
+    collapseBtn.textContent = collapsed ? "□" : "−";
     collapseBtn.addEventListener("click", () => {
       collapsed = !collapsed;
       body.style.display = collapsed ? "none" : "";
       collapseBtn.textContent = collapsed ? "□" : "−";
+      saveCartographPrefs({ collapsed, left: parsePx(panel.style.left), top: parsePx(panel.style.top) });
     });
+
+    // Default position (only when nothing was ever dragged/saved before):
+    // sit immediately left of the Director Tools/Aftercare row
+    // (#kernel89-director-toolbar, itself fixed at top:12px/right:12px)
+    // instead of the old top:16px/right:16px slot, which sat almost
+    // exactly on top of it. Computed lazily on first real show (from
+    // renderAll below), not at module-init, so the Director toolbar's own
+    // role-gated visibility has had a chance to resolve. Falls back to
+    // that same top:12px/right:12px slot itself if Director Tools isn't
+    // visible for this viewer at all (e.g. Cast, who can use Cartography
+    // without Director Tools existing on their screen).
+    let defaultPositionResolved = cartographPrefs.left != null;
+    function applyDefaultPositionIfNeeded() {
+      if (defaultPositionResolved) return;
+      defaultPositionResolved = true;
+      const directorToolbar = document.getElementById("kernel89-director-toolbar");
+      const visible = directorToolbar && directorToolbar.offsetParent !== null;
+      panel.style.left = "auto";
+      if (visible) {
+        const rect = directorToolbar.getBoundingClientRect();
+        panel.style.top = `${Math.round(rect.top)}px`;
+        panel.style.right = `${Math.round(window.innerWidth - rect.left + 8)}px`;
+      } else {
+        panel.style.top = "12px";
+        panel.style.right = "12px";
+      }
+    }
 
     // Drag-by-header, matching the offsetX/offsetY pointer-capture pattern
     // runtime.js already uses for the Map/Grid/Card/Token editor panels
@@ -307,6 +384,9 @@
       panel.style.right = "auto";
     });
     ["pointerup", "pointercancel"].forEach((type) => header.addEventListener(type, () => {
+      if (panelDrag) {
+        saveCartographPrefs({ collapsed, left: parsePx(panel.style.left), top: parsePx(panel.style.top) });
+      }
       panelDrag = null;
       header.style.cursor = "move";
     }));
@@ -453,6 +533,7 @@
 
     function renderAll() {
       panel.style.display = "block";
+      applyDefaultPositionIfNeeded();
       const seen = new Set();
       state.objects
         .slice()
