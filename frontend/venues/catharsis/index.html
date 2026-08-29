@@ -1924,6 +1924,16 @@
       z-index: 86;
     }
 
+    /* Audience has exactly one drawer, not two competing for space like
+       Cast/Director -- always-open avoids depending on the hover-to-expand
+       wiring in runtime.js, which only ever targets #left-drawer/#right-
+       drawer by ID and was never extended to this element. */
+    #audience-drawer {
+      left: 16px;
+      width: min(24vw, 420px);
+      z-index: 86;
+    }
+
     .drawer[data-open-mode="always-open"] {
       width: auto;
       min-width: 0;
@@ -3925,7 +3935,7 @@
                    for left-drawer/right-drawer (never shown alongside them)
                    by kernel93-audience-overlay.js once the server-resolved
                    theater_context.kind for this viewer is "audience". -->
-              <aside id="audience-drawer" class="drawer drawer--collapsed" data-open-mode="hover" data-open="false" data-rail-label="Audience" hidden>
+              <aside id="audience-drawer" class="drawer" data-open-mode="always-open" data-open="true" hidden>
                 <div class="drawer-inner">
                   <div class="drawer-head">
                     <div class="drawer-head__copy">
