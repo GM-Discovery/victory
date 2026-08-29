@@ -49,8 +49,8 @@
     // Kernel 93 §6: Audience gets this simpler overlay INSTEAD of the
     // Cast/Director drawers, never alongside them -- those carry Stage
     // Controls and Character-authoring tools that are not Audience's to see.
-    // Grant, 2026-08-28 live testing: chat also goes away for Audience --
-    // the Note to the Director box + reactions bar are the intended
+    // 2026-08-28 live testing: chat also goes away for Audience -- the
+    // Note to the Director box + reactions bar are the intended
     // replacement (ledger A19), not a third channel alongside them.
     if (leftDrawer) leftDrawer.style.display = "none";
     if (rightDrawer) rightDrawer.style.display = "none";
