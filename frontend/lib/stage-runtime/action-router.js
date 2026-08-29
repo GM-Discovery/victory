@@ -457,6 +457,53 @@
       }
 
       if (action === "remove") {
+        // A15 (Kernel 93, 2026-08-29 correction): a scene_composition
+        // element (e.g. Kessa) has no venue_layout_elements row at all --
+        // world/snapshot.go's loadCompositionRows gives it a synthetic
+        // "scene:<uuid>" elementId specifically so a client can tell it
+        // apart from a real one, and that string isn't even a valid UUID
+        // for act/remove_element's element_id to match against. Sending it
+        // there failed silently (frontend optimistically hid the object,
+        // then it reappeared on the next refresh since nothing was
+        // actually deleted). Non-live elements must go through scenes' own
+        // stage-element endpoint instead, using the bare
+        // scene_stage_element_id, regardless of whether Configurator Mode
+        // is active -- Configurator's own dispatch already does exactly
+        // this same call when it intercepts act/remove_element.
+        if (!objectModel.live) {
+          const sceneStageElementId = objectModel.source?.data?.scene_stage_element_id || "";
+          if (!sceneStageElementId) {
+            deps.setStageStatus("Couldn't remove -- missing scene element id.");
+            deps.closeContextMenu();
+            return;
+          }
+          deps.setStageStatus(`Removing ${objectModel.label} from the stage...`);
+          deps.closeContextMenu();
+          fetch(`/api/stage-elements/${encodeURIComponent(sceneStageElementId)}`, {
+            method: "DELETE",
+            credentials: "include",
+          })
+            .then((response) => response.json().catch(() => null))
+            .then((payload) => {
+              if (!payload?.ok) {
+                deps.setStageStatus(`Couldn't remove ${objectModel.label}: ${payload?.data?.error || "request failed"}`);
+                return;
+              }
+              deps.removeLocalObject(objectModel);
+              deps.selectObject(null, "Selection cleared.");
+              deps.renderPixiScene?.();
+              deps.syncSelectedActions?.();
+              deps.syncTokenEditorWithSelection?.();
+              if (!syncCurrentObjectsFromProjectedState()) {
+                deps.refreshWorld?.();
+              }
+            })
+            .catch((error) => {
+              deps.setStageStatus(`Couldn't remove ${objectModel.label}: ${error.message || error}`);
+            });
+          return;
+        }
+
         const sent = deps.sendAction("act/remove_element", {
           element_id: objectModel.elementId || "",
           element_slug: objectModel.elementSlug || "",
