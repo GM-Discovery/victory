@@ -67,6 +67,17 @@ var Definitions = map[string]Definition{
 				Title:  "Catharsis",
 				Body:   "Catharsis is where live play happens -- character build and the stage itself. This is where a Show is actually run.",
 			},
+		},
+	},
+	// Kernel 93 Pass C: split out of campus_continuation (see migration 112).
+	// The Greenroom is only actually relevant once a Character workbook
+	// exists to go look at -- eligibility.go gates this on an in-progress
+	// character_cards row at Catharsis, not merely on having seen the
+	// Catharsis pin.
+	KeyGreenroomIntro: {
+		Key:       KeyGreenroomIntro,
+		Mandatory: false,
+		Steps: []Step{
 			{
 				Key:    "greenroom-pin",
 				Target: "venue:greenroom",

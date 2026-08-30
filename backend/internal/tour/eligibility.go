@@ -94,6 +94,41 @@ func EligibleTours(ctx context.Context, pool *pgxpool.Pool, subj Subject, venueS
 			if !done {
 				continue
 			}
+			// Kernel 93 Pass C: finishing the mandatory tour says nothing
+			// about whether Catharsis is actually enterable yet -- pointing
+			// at a venue the user has no admission/access to is exactly the
+			// "force-routed to Catharsis with no permission" bug this
+			// closes. Reuse the same access_grants-or-audience_admissions
+			// check the map itself uses to decide tile visibility (see
+			// access.ResolveVisibleVenues), not location_memberships' role
+			// lookup -- that one defaults every user to "audience" and would
+			// never actually gate anything here.
+			canAccess, err := access.UserCanAccessVenueSlug(ctx, pool, subj.UserID, "catharsis")
+			if err != nil {
+				return nil, err
+			}
+			if !canAccess {
+				continue
+			}
+		}
+		if key == KeyGreenroomIntro {
+			// Kernel 93 Pass C: the Greenroom pin ("your Character workbooks
+			// live here") is only relevant once there is a workbook to point
+			// at -- reuse the exact condition that already makes the
+			// Greenroom map tile itself visible (access.ResolveVisibleVenues'
+			// owned_workbook_surface branch: any non-deleted character_cards
+			// row, not scoped to a particular venue's location since
+			// character creation only happens at Catharsis today anyway)
+			// rather than a second hand-rolled copy of the same check that
+			// could drift out of sync with it. See migration 112's split of
+			// this out of campus_continuation.
+			hasCharacter, err := access.UserCanAccessVenueSlug(ctx, pool, subj.UserID, "greenroom")
+			if err != nil {
+				return nil, err
+			}
+			if !hasCharacter {
+				continue
+			}
 		}
 		roleKey := roleKeyForDefinition(def, role, isOperator)
 		done, err := HasCompletion(ctx, pool, subj, key, def.VenueSlug, roleKey)

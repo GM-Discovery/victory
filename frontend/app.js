@@ -459,7 +459,7 @@ function maybeStartCampusTour() {
   registerCampusTourTargets();
 
   const replayKey = new URLSearchParams(window.location.search).get("replay-tour");
-  if (replayKey === "campus_mandatory" || replayKey === "campus_continuation") {
+  if (replayKey === "campus_mandatory" || replayKey === "campus_continuation" || replayKey === "greenroom_intro") {
     window.VictoryTourEngine.start(replayKey, { replay: true });
     return;
   }

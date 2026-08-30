@@ -63,6 +63,31 @@ func loadCatharsisLocationID(t *testing.T, pool *pgxpool.Pool) string {
 	return locationID
 }
 
+// grantCatharsisVenueAccess satisfies access.ResolveVisibleVenues'
+// approved_performer_surface branch (location_memberships role AND a live
+// access_grants row -- both, not either), the same condition
+// KeyGreenroomIntro's own map-visibility gate re-derives. A bare
+// location_memberships row alone (grantTourLocationRole) is not enough for
+// Catharsis specifically.
+func grantCatharsisVenueAccess(t *testing.T, pool *pgxpool.Pool, locationID, userID string) {
+	t.Helper()
+	ctx := context.Background()
+	grantTourLocationRole(t, pool, locationID, userID, "cast")
+	var venueID string
+	if err := pool.QueryRow(ctx, `SELECT id::text FROM venues WHERE slug = 'catharsis'`).Scan(&venueID); err != nil {
+		t.Fatalf("resolve catharsis venue id: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO access_grants (location_id, user_id, grant_type, venue_id)
+		VALUES ($1, $2, 'venue_access', $3)
+	`, locationID, userID, venueID); err != nil {
+		t.Fatalf("insert access_grants: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM access_grants WHERE user_id = $1`, userID)
+	})
+}
+
 func TestRecordCompletionIdempotent(t *testing.T) {
 	pool := openTourTestPool(t)
 	userID := insertTourTestUser(t, pool, "tour_idem")
@@ -253,9 +278,27 @@ func TestCampusContinuationRequiresMandatoryFirst(t *testing.T) {
 		t.Fatalf("RecordCompletion: %v", err)
 	}
 
+	// Kernel 93 Pass C: completing campus_mandatory alone is no longer
+	// sufficient -- campus_continuation's Catharsis pin also requires real
+	// Catharsis access (the same check the map itself uses to decide tile
+	// visibility), so a user with no admission is correctly still not
+	// offered it.
+	stillGated, err := EligibleTours(context.Background(), pool, subj, "")
+	if err != nil {
+		t.Fatalf("EligibleTours (mandatory done, no catharsis access): %v", err)
+	}
+	for _, def := range stillGated {
+		if def.Key == KeyCampusContinuation {
+			t.Fatalf("campus_continuation must not be eligible before the user has real Catharsis access")
+		}
+	}
+
+	locationID := loadCatharsisLocationID(t, pool)
+	grantCatharsisVenueAccess(t, pool, locationID, userID)
+
 	after, err := EligibleTours(context.Background(), pool, subj, "")
 	if err != nil {
-		t.Fatalf("EligibleTours (after mandatory): %v", err)
+		t.Fatalf("EligibleTours (after mandatory + catharsis access): %v", err)
 	}
 	found := false
 	for _, def := range after {
@@ -264,6 +307,51 @@ func TestCampusContinuationRequiresMandatoryFirst(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatalf("campus_continuation must become eligible once campus_mandatory is completed, got %+v", after)
+		t.Fatalf("campus_continuation must become eligible once campus_mandatory is completed and Catharsis is accessible, got %+v", after)
+	}
+}
+
+func TestGreenroomIntroRequiresStartedCharacter(t *testing.T) {
+	pool := openTourTestPool(t)
+	userID := insertTourTestUser(t, pool, "tour_greenroom")
+	subj := Subject{UserID: userID}
+
+	if err := RecordCompletion(context.Background(), pool, subj, KeyCampusMandatory, "", "", StatusCompleted, ""); err != nil {
+		t.Fatalf("RecordCompletion: %v", err)
+	}
+
+	before, err := EligibleTours(context.Background(), pool, subj, "")
+	if err != nil {
+		t.Fatalf("EligibleTours (before character): %v", err)
+	}
+	for _, def := range before {
+		if def.Key == KeyGreenroomIntro {
+			t.Fatalf("greenroom_intro must not be eligible before any character exists")
+		}
+	}
+
+	locationID := loadCatharsisLocationID(t, pool)
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO character_cards (owner_user_id, location_id, name)
+		VALUES ($1, $2, 'Tour Test Character')
+	`, userID, locationID); err != nil {
+		t.Fatalf("insert character_cards: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM character_cards WHERE owner_user_id = $1`, userID)
+	})
+
+	after, err := EligibleTours(context.Background(), pool, subj, "")
+	if err != nil {
+		t.Fatalf("EligibleTours (after character): %v", err)
+	}
+	found := false
+	for _, def := range after {
+		if def.Key == KeyGreenroomIntro {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("greenroom_intro must become eligible once a character exists, got %+v", after)
 	}
 }

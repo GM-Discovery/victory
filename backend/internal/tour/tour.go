@@ -28,6 +28,7 @@ import (
 const (
 	KeyCampusMandatory               = "campus_mandatory"
 	KeyCampusContinuation            = "campus_continuation"
+	KeyGreenroomIntro                = "greenroom_intro"
 	KeyCatharsisCast                 = "catharsis_cast"
 	KeyDirectorsChairDirectorToolbox = "directors_chair_director_toolbox"
 
@@ -38,6 +39,7 @@ const (
 var allTourKeys = []string{
 	KeyCampusMandatory,
 	KeyCampusContinuation,
+	KeyGreenroomIntro,
 	KeyCatharsisCast,
 	KeyDirectorsChairDirectorToolbox,
 }
