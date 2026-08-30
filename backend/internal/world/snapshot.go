@@ -600,17 +600,26 @@ func LoadVenueSnapshot(ctx context.Context, pool *pgxpool.Pool, viewerRole, view
 	// shared one -- the group-scale sibling of Kernel 74's individual
 	// localProjection immediately above. Checked only when there is no
 	// active local projection (an individual tutorial-handoff override
-	// always wins) and only by cohort ASSIGNMENT, never by role or tutorial
-	// state -- which is what keeps an Ungrouped participant on the
-	// unchanged Show-global path with no separate boundary check needed
-	// (kernel-85 S5.6): Ungrouped participants have no assignment row, so
-	// this lookup always returns "", and nothing here can ever move them
-	// past the tutorial-finish Scene. snap.Session.CurrentShowScenePlacementID
-	// still reports the Show's own unchanged shared Scene either way, the
-	// same "what moved is only which Scene's elements load" guarantee
-	// documented on localProjection above.
+	// always wins), only by cohort ASSIGNMENT (not tutorial state) -- which
+	// is what keeps an Ungrouped participant on the unchanged Show-global
+	// path with no separate boundary check needed (kernel-85 S5.6):
+	// Ungrouped participants have no assignment row, so this lookup always
+	// returns "", and nothing here can ever move them past the
+	// tutorial-finish Scene. snap.Session.CurrentShowScenePlacementID still
+	// reports the Show's own unchanged shared Scene either way, the same
+	// "what moved is only which Scene's elements load" guarantee documented
+	// on localProjection above.
+	//
+	// Backstage roles (isBackstageRole) are exempted regardless of cohort
+	// assignment: a Producer/Director/Operator's own stage view must always
+	// reflect the Show's actual current scene, never get silently swapped
+	// out by a cohort assignment they happen to carry (found live -- a
+	// Producer account with a stray Cohort assignment saw that cohort's
+	// scene instead of the one they had just activated, with every gate and
+	// visibility check downstream behaving correctly against the wrong
+	// input).
 	cohortPlacementID := ""
-	if localProjection == nil && showID != "" && viewerUserID != "" {
+	if localProjection == nil && showID != "" && viewerUserID != "" && !isBackstageRole(viewerRole) {
 		cohortPlacementID, err = resolveCohortPlacementForViewer(ctx, pool, showID, viewerUserID)
 		if err != nil {
 			return nil, err
