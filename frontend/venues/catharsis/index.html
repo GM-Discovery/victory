@@ -1964,6 +1964,20 @@
       overflow: visible;
     }
 
+    /* The generic .drawer[data-open="false"] rule (above) also drops the
+       whole element to opacity:0.34 with a blurred radial-gradient
+       background, meant to read as a barely-visible hover-rail sliver. That
+       fights with keeping the label legible (immediately above): the
+       circular gradient bled through the low-opacity "Send Fanmail" text,
+       looking like a dark curve cutting through the S. This drawer is
+       collapsed-but-labeled, not a rail, so give it a solid, fully opaque
+       background instead. */
+    #audience-drawer.drawer[data-open="false"] {
+      opacity: 1;
+      backdrop-filter: none;
+      background: linear-gradient(180deg, rgba(15, 18, 25, 0.9), rgba(8, 10, 15, 0.84));
+    }
+
     #audience-drawer .drawer-head {
       cursor: pointer;
       justify-content: flex-start;
