@@ -79,19 +79,31 @@ func CaptureLiveVenueComposition(ctx context.Context, pool *pgxpool.Pool, actorU
 	defer tx.Rollback(ctx)
 
 	// Kernel 93 live-testing bug (2026-08-29): this used to delete every
-	// Base-layer row for the scene with no kind filter, including
+	// Base-layer row for the scene with no filter at all, including
 	// interaction_hotspot elements (e.g. Kessa's door) -- which the
 	// re-population loop below never recreates, since hotspots aren't part
 	// of the live venue_layout_elements/elements tables it reads from in
-	// the first place (they render straight from scene_stage_elements,
-	// see world/snapshot.go's loadCompositionRows). Any Capture on a scene
-	// with a hotspot permanently destroyed it. Now scoped to only the
-	// kinds this function actually knows how to re-populate, so a hotspot
-	// (and its stage_element_bindings row) survives a Capture untouched.
+	// the first place (they render straight from scene_stage_elements, see
+	// world/snapshot.go's loadCompositionRows). A first fix scoped the
+	// delete to kind IN ('token', 'index_card', 'map_backdrop',
+	// 'grid_config') -- which stopped hotspots from being eaten, but Kessa
+	// herself is ALSO kind='token' and was still deleted by the very next
+	// Capture, with nothing in the live tables to restore her from (she was
+	// never a genuine live-table element to begin with -- see
+	// merchant/prepare.go's direct CreateSceneStageElement). The real
+	// distinction isn't kind at all: Kessa and the door are authored,
+	// bound fixtures (stage_element_bindings), not ad-hoc live placements,
+	// and Capture -- a completely separate system from whatever created
+	// them -- must never delete anything bound like that, regardless of
+	// its kind.
 	if _, err := tx.Exec(ctx, `
-		DELETE FROM scene_stage_elements
-		WHERE scene_id = $1 AND show_scene_placement_id IS NULL
-		  AND kind IN ('token', 'index_card', 'map_backdrop', 'grid_config')
+		DELETE FROM scene_stage_elements sse
+		WHERE sse.scene_id = $1 AND sse.show_scene_placement_id IS NULL
+		  AND sse.kind IN ('token', 'index_card', 'map_backdrop', 'grid_config')
+		  AND NOT EXISTS (
+		    SELECT 1 FROM stage_element_bindings seb
+		    WHERE seb.scene_stage_element_id = sse.id
+		  )
 	`, sceneID); err != nil {
 		return err
 	}
@@ -257,6 +269,19 @@ func ApplySceneToLiveVenue(ctx context.Context, pool *pgxpool.Pool, actorUserID,
 
 	sawMapBackdrop := false
 	for _, el := range resolved.Elements {
+		if el.Binding != nil {
+			// A bound element (Kessa, the door) is already rendered directly
+			// from scene_stage_elements by world/snapshot.go's
+			// loadCompositionRows, entirely independent of this live-table
+			// bridge -- it never needed a live-table mirror. Blindly copying
+			// el.Position here also actively broke it: Position is Kessa's
+			// normalized 0-1 composition coordinate ({0.503, 0.55}), but a
+			// live token's position is read as raw pixels, so the copy
+			// rendered one pixel from the stage's top-left corner --
+			// present, but invisible to everyone. Skipping bound elements
+			// here fixes both the duplicate and the mispositioning at once.
+			continue
+		}
 		var data map[string]any
 		_ = json.Unmarshal(el.Data, &data)
 
