@@ -1967,13 +1967,34 @@
     /* The generic .drawer[data-open="false"] rule (above) keeps its low
        opacity/blur/transparent-border blend so the collapsed drawer still
        sits quietly on the stage (that part is fine and worth keeping) --
-       but its background's radial-gradient(circle at top, ...) layer bled
-       through the label text this drawer alone keeps visible while
-       collapsed, looking like a dark curve cutting through the S. Drop just
-       that radial layer here; keep the linear-gradient underneath it
-       unchanged. */
+       only the background's radial-gradient(circle at top, ...) layer is
+       dropped here; the linear-gradient underneath it is unchanged. */
     #audience-drawer.drawer[data-open="false"] {
       background: linear-gradient(180deg, rgba(15, 18, 25, 0.06), rgba(8, 10, 15, 0.03));
+    }
+
+    /* The actual source of the "curve through the S": .drawer's shared
+       18px border-radius on a box this short (the collapsed drawer-head has
+       zero padding from the generic collapsed rule) reads as a pill/stadium
+       shape, and the label sits with no padding right up against that
+       rounded end -- the corner's own curve visually cuts through the
+       letter. Use a small, regular-button radius instead, give the label
+       real breathing room, and center it on both axes with nothing else
+       showing (the arrow only makes sense once there's room to read it
+       next to the label, i.e. once open). */
+    #audience-drawer.drawer[data-open="false"] {
+      border-radius: 10px;
+    }
+
+    #audience-drawer.drawer[data-open="false"] .drawer-head {
+      justify-content: center;
+      align-items: center;
+      padding: 10px 16px;
+      min-height: 0;
+    }
+
+    #audience-drawer.drawer[data-open="false"] #audience-drawer-arrow {
+      display: none;
     }
 
     #audience-drawer .drawer-head {
