@@ -5016,8 +5016,16 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     let configuratorSceneID = "";
     let configuratorElements = [];
 
+    // Kernel 93 live-testing correction (2026-08-29): this listed
+    // "duplicate", but action-router.js's actual duplicate handler sends
+    // "act/duplicate_element" -- the two strings never matched, so
+    // duplicating a token or card while building in Configurator Mode was
+    // never intercepted at all. It fell straight through to the real live
+    // socket action instead, leaking the duplicate onto the live stage
+    // (visible to Audience) rather than staying in the private draft --
+    // defeating Configurator Mode's entire point for that one action.
     const CONFIGURATOR_ACTION_TYPES = new Set([
-      "create/token", "update/token", "duplicate",
+      "create/token", "update/token", "act/duplicate_element",
       "create/index_card", "update/index_card", "delete/index_card",
       "act/place_element", "act/remove_element",
       "act/set_element_lock", "act/set_nameplate_visibility",
@@ -5092,7 +5100,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
 
     async function dispatchConfiguratorAction(type, extra) {
       try {
-        if (type === "create/token" || type === "create/index_card" || type === "duplicate") {
+        if (type === "create/token" || type === "create/index_card") {
           const kind = type === "create/index_card" ? "index_card" : "token";
           const { position, data } = splitPositionFields(extra);
           await configuratorApi(`/api/scenes/${encodeURIComponent(configuratorSceneID)}/stage-elements`, {
@@ -5102,6 +5110,28 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
               data,
               position: position || { anchor: "stage", x: 0, y: 0, z: 0, order: 0 },
               visibility: defaultVisibilityForKind(kind, data),
+            }),
+          });
+        } else if (type === "act/duplicate_element") {
+          // The duplicate action's own payload only ever carries the SOURCE
+          // element_id plus the new copy's placement (action-router.js's
+          // duplicate handler) -- never the source's actual data. Treating
+          // it like create/token (as this branch used to, back when the
+          // type string here didn't even match what gets sent) produced a
+          // blank gravestone copy with none of the original's asset/text.
+          // The real source data has to come from the already-loaded draft
+          // composition instead.
+          const { elementId, position } = splitPositionFields(extra);
+          const source = configuratorElements.find((el) => String(el?.id || "") === elementId);
+          if (!source) return;
+          await configuratorApi(`/api/scenes/${encodeURIComponent(configuratorSceneID)}/stage-elements`, {
+            method: "POST",
+            body: JSON.stringify({
+              kind: source.kind,
+              label: source.label || "",
+              data: source.data || {},
+              position: position || source.position || { anchor: "stage", x: 0, y: 0, z: 0, order: 0 },
+              visibility: source.visibility || defaultVisibilityForKind(source.kind, source.data || {}),
             }),
           });
         } else if (type === "update/token" || type === "update/index_card" || type === "act/place_element") {

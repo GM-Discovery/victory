@@ -333,7 +333,21 @@ func UpdateStageElement(ctx context.Context, pool *pgxpool.Pool, actorUserID, el
 		visibilityJSON = []byte(`{"toRoles":["audience","cast","crew","director","producer"],"privateTo":[]}`)
 	}
 	if patch.Visibility != nil {
-		visibilityJSON, _ = json.Marshal(*patch.Visibility)
+		// Same fix as data above, same reason: act/set_element_lock's
+		// Configurator dispatch sends visibility: {locked: bool} and
+		// act/set_nameplate_visibility sends visibility:
+		// {nameplate_visible: bool} -- each a genuinely partial fragment,
+		// never the whole shape. A plain replace silently wiped
+		// toRoles/privateTo (who can even see the element at all) every
+		// time either toggle was used.
+		existingVisibility := map[string]any{}
+		if len(visibilityJSON) > 0 {
+			_ = json.Unmarshal(visibilityJSON, &existingVisibility)
+		}
+		for k, v := range *patch.Visibility {
+			existingVisibility[k] = v
+		}
+		visibilityJSON, _ = json.Marshal(existingVisibility)
 	}
 	sortOrder := e.SortOrder
 	if patch.SortOrder != nil {

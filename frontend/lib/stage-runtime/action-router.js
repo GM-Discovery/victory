@@ -9,6 +9,49 @@
       ? deps.syncCurrentObjectsFromProjectedState
       : () => false;
 
+    // Scene-composition elements (e.g. Kessa) have no venue_layout_elements
+    // row at all -- world/snapshot.go's loadCompositionRows gives them a
+    // synthetic "scene:<uuid>" elementId specifically so a client can tell
+    // them apart from a real one, and that string isn't a valid UUID for
+    // any live socket action's element_id to match against. They must go
+    // through scenes' own stage-element DELETE endpoint instead, using the
+    // bare scene_stage_element_id -- regardless of whether Configurator
+    // Mode is active (Configurator's own dispatch already does exactly
+    // this same call when it intercepts act/remove_element). verb is
+    // just the status-message wording ("remove"/"delete").
+    function deleteNonLiveElement(objectModel, verb) {
+      const sceneStageElementId = objectModel.source?.data?.scene_stage_element_id || "";
+      if (!sceneStageElementId) {
+        deps.setStageStatus(`Couldn't ${verb} -- missing scene element id.`);
+        deps.closeContextMenu();
+        return;
+      }
+      deps.setStageStatus(`${verb === "remove" ? "Removing" : "Deleting"} ${objectModel.label}...`);
+      deps.closeContextMenu();
+      fetch(`/api/stage-elements/${encodeURIComponent(sceneStageElementId)}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+        .then((response) => response.json().catch(() => null))
+        .then((payload) => {
+          if (!payload?.ok) {
+            deps.setStageStatus(`Couldn't ${verb} ${objectModel.label}: ${payload?.data?.error || "request failed"}`);
+            return;
+          }
+          deps.removeLocalObject(objectModel);
+          deps.selectObject(null, "Selection cleared.");
+          deps.renderPixiScene?.();
+          deps.syncSelectedActions?.();
+          deps.syncTokenEditorWithSelection?.();
+          if (!syncCurrentObjectsFromProjectedState()) {
+            deps.refreshWorld?.();
+          }
+        })
+        .catch((error) => {
+          deps.setStageStatus(`Couldn't ${verb} ${objectModel.label}: ${error.message || error}`);
+        });
+    }
+
     function performStageObjectAction(action, objectModel) {
       if (!objectModel || !action) return;
       const state = deps.objectState(objectModel);
@@ -457,50 +500,8 @@
       }
 
       if (action === "remove") {
-        // A15 (Kernel 93, 2026-08-29 correction): a scene_composition
-        // element (e.g. Kessa) has no venue_layout_elements row at all --
-        // world/snapshot.go's loadCompositionRows gives it a synthetic
-        // "scene:<uuid>" elementId specifically so a client can tell it
-        // apart from a real one, and that string isn't even a valid UUID
-        // for act/remove_element's element_id to match against. Sending it
-        // there failed silently (frontend optimistically hid the object,
-        // then it reappeared on the next refresh since nothing was
-        // actually deleted). Non-live elements must go through scenes' own
-        // stage-element endpoint instead, using the bare
-        // scene_stage_element_id, regardless of whether Configurator Mode
-        // is active -- Configurator's own dispatch already does exactly
-        // this same call when it intercepts act/remove_element.
         if (!objectModel.live) {
-          const sceneStageElementId = objectModel.source?.data?.scene_stage_element_id || "";
-          if (!sceneStageElementId) {
-            deps.setStageStatus("Couldn't remove -- missing scene element id.");
-            deps.closeContextMenu();
-            return;
-          }
-          deps.setStageStatus(`Removing ${objectModel.label} from the stage...`);
-          deps.closeContextMenu();
-          fetch(`/api/stage-elements/${encodeURIComponent(sceneStageElementId)}`, {
-            method: "DELETE",
-            credentials: "include",
-          })
-            .then((response) => response.json().catch(() => null))
-            .then((payload) => {
-              if (!payload?.ok) {
-                deps.setStageStatus(`Couldn't remove ${objectModel.label}: ${payload?.data?.error || "request failed"}`);
-                return;
-              }
-              deps.removeLocalObject(objectModel);
-              deps.selectObject(null, "Selection cleared.");
-              deps.renderPixiScene?.();
-              deps.syncSelectedActions?.();
-              deps.syncTokenEditorWithSelection?.();
-              if (!syncCurrentObjectsFromProjectedState()) {
-                deps.refreshWorld?.();
-              }
-            })
-            .catch((error) => {
-              deps.setStageStatus(`Couldn't remove ${objectModel.label}: ${error.message || error}`);
-            });
+          deleteNonLiveElement(objectModel, "remove");
           return;
         }
 
@@ -521,6 +522,39 @@
           }
         }
         deps.setStageStatus(sent ? `Removing ${objectModel.label} from the stage...` : "Socket unavailable.");
+        deps.closeContextMenu();
+      }
+
+      if (action === "delete-card") {
+        // logic.js has offered this menu item (canDeleteLiveCard) since
+        // before this session, but nothing ever handled it here -- "Delete
+        // Card" was a dead button, live or in Configurator. delete/index_card
+        // is a real, already-wired live action (network/ws.go); it was just
+        // never actually sent from the shared runtime/Catharsis UI.
+        if (!window.confirm(`Permanently delete "${objectModel.label}"? This destroys the card, not just removes it from the stage.`)) {
+          deps.closeContextMenu();
+          return;
+        }
+        if (!objectModel.live) {
+          deleteNonLiveElement(objectModel, "delete");
+          return;
+        }
+
+        const sent = deps.sendAction("delete/index_card", {
+          element_id: objectModel.elementId || "",
+          element_slug: objectModel.elementSlug || "",
+        });
+        if (sent) {
+          deps.removeLocalObject(objectModel);
+          deps.selectObject(null, "Selection cleared.");
+          deps.renderPixiScene?.();
+          deps.syncSelectedActions?.();
+          deps.syncTokenEditorWithSelection?.();
+          if (!syncCurrentObjectsFromProjectedState()) {
+            deps.refreshWorld?.();
+          }
+        }
+        deps.setStageStatus(sent ? `Deleting ${objectModel.label}...` : "Socket unavailable.");
         deps.closeContextMenu();
       }
     }
