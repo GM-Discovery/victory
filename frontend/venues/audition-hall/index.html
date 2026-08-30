@@ -183,20 +183,6 @@
       width: auto;
     }
 
-    .distinction-note {
-      border: 1px solid rgba(241, 206, 137, 0.16);
-      border-radius: 10px;
-      padding: 12px 14px;
-      background:
-        radial-gradient(circle at top right, rgba(241, 206, 137, 0.08), transparent 38%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.012));
-      font-size: 0.92rem;
-    }
-
-    .distinction-note strong {
-      color: var(--gold-strong);
-    }
-
     .panel p a {
       color: var(--gold-strong);
     }
@@ -235,22 +221,13 @@
   <div class="shell">
     <div class="panel">
       <h1>Audition Hall</h1>
-      <p class="muted">
-        Ticketing for events happens in ticket booth back on the main map. This space is for requesting access to participate in events as cast, crew, or director. If you're here, you likely already have an account and are signed in. If not, please create an account and sign in before requesting access.
-      </p>
       <p><a href="/">Back to map</a></p>
-    </div>
-
-    <div class="panel">
-      <p class="distinction-note">
-        <strong>Venue access</strong> (like Catharsis, below) lets you enter a venue to create Characters. A <strong>Show ticket</strong> is a separate, mutual agreement to participate in a specific Show Run — see "Join a Show" further down.
-      </p>
     </div>
 
     <div class="panel">
       <h2>Request Access</h2>
       <p class="muted">
-        The default here is auto-access for Catharsis. Submit the request once, and the approval will land in your mailbox with the venue unlock. You'll be taken directly to your mailbox after selecting this option. You can skip the tutorial if you have a director approve your request to join a different venue.
+        Great news! You're pre-approved for access to Catharsis, just click "Submit Request" below and you'll be taken to your message inbox to see the approval. Other requests require human approval, so please be patient.
       </p>
       <form id="request-form">
         <label for="requested-venue">Requested Venue</label>
@@ -266,7 +243,7 @@
           <option value="director">Director</option>
         </select>
 
-        <label for="request-note">Note</label>
+        <label for="request-note">Note (Optional)</label>
         <textarea id="request-note" placeholder="Why are you requesting access?"></textarea>
 
         <button type="submit">Submit Request</button>
