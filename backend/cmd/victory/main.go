@@ -576,6 +576,8 @@ func main() {
 	mux.HandleFunc("GET /api/messages", messages.HandleMessages(pool))
 	mux.HandleFunc("POST /api/messages", ratelimit.Middleware(actionLimiter, messages.HandleMessages(pool)))
 	mux.HandleFunc("GET /api/messages/{id}", messages.HandleMessageByID(pool))
+	mux.HandleFunc("PATCH /api/messages/{id}", messages.HandleMessageByID(pool))
+	mux.HandleFunc("DELETE /api/messages/{id}", messages.HandleMessageByID(pool))
 	mux.HandleFunc("POST /api/note-cards", ratelimit.Middleware(actionLimiter, messages.HandleNoteCards(pool)))
 	// Kernel 93 A19: Audience -> Director notes, Catharsis-scoped (see
 	// audiencenotes' doc comment for why this isn't just a wider note-cards

@@ -98,8 +98,12 @@
       box-sizing: border-box;
       display: grid;
       gap: 18px;
-      grid-template-columns: minmax(280px, 1.15fr) minmax(340px, 1.35fr) minmax(240px, 0.8fr);
+      grid-template-columns: minmax(300px, 0.85fr) minmax(420px, 1.7fr);
       align-items: start;
+    }
+
+    .stage-full {
+      grid-column: 1 / -1;
     }
 
     .card {
@@ -117,20 +121,67 @@
     }
 
     .message-item {
-      display: block;
-      width: 100%;
-      text-align: left;
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 14px;
       background: rgba(255, 255, 255, 0.03);
       color: #fff6eb;
       padding: 12px 14px;
-      cursor: pointer;
     }
 
     .message-item--unread {
       border-color: rgba(242, 209, 155, 0.26);
       background: rgba(242, 209, 155, 0.06);
+    }
+
+    .message-item--pinned {
+      border-color: rgba(242, 209, 155, 0.45);
+    }
+
+    .message-item--selected {
+      outline: 2px solid var(--accent);
+      outline-offset: -1px;
+    }
+
+    .message-open-button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: none;
+      color: inherit;
+      padding: 0;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .message-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .message-action-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--muted);
+      font-size: 0.78rem;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+
+    .message-action-button:hover {
+      color: var(--accent-strong);
+      border-color: rgba(242, 209, 155, 0.3);
+    }
+
+    .message-action-button--active {
+      color: var(--accent);
+      border-color: rgba(242, 209, 155, 0.4);
+      background: rgba(242, 209, 155, 0.08);
     }
 
     .message-subject {
@@ -172,10 +223,18 @@
       margin-bottom: 14px;
     }
 
+    .reading-card {
+      min-height: 520px;
+      display: flex;
+      flex-direction: column;
+    }
+
     .detail-body {
       white-space: pre-wrap;
-      line-height: 1.6;
+      line-height: 1.7;
       color: #f5ecdd;
+      font-size: 1.05rem;
+      flex: 1;
     }
 
     .empty-state {
@@ -244,30 +303,22 @@
         <h2>Inbox</h2>
         <p class="note" id="session-label">Checking access...</p>
         <div class="messages-list" id="message-list"></div>
+        <p class="note" id="status" style="margin-top:14px;font-size:0.85rem;">Loading mailbox...</p>
       </section>
 
-      <section class="card" id="audience-notes-card" hidden>
-        <h2>Audience Notes</h2>
-        <p class="note">
-          Notes Audience members sent during a Showing, batched by session. Delivery here never depends on Discord -- export is an optional extra copy.
-        </p>
-        <div id="audience-notes-batches"></div>
-      </section>
-
-      <section class="card">
+      <section class="card reading-card">
         <div class="badge" id="read-badge">Message</div>
         <h2 class="detail-title" id="message-subject">Select a message</h2>
         <div class="detail-meta" id="message-meta"></div>
         <div class="detail-body" id="message-body">Your selected message will appear here.</div>
       </section>
 
-      <section class="card">
-        <h3>Status</h3>
-        <p class="note" id="status">Loading mailbox...</p>
-        <h3 style="margin-top:18px;">Why It Matters</h3>
+      <section class="card stage-full" id="audience-notes-card" hidden>
+        <h2>Audience Notes</h2>
         <p class="note">
-          When a show, rehearsal, or private note deserves to outlast the moment, it lands here. Mailbox gives Victory a memory you can come back to between scenes, between sessions, and between productions.
+          Notes Audience members sent during a Showing, batched by session. Delivery here never depends on Discord -- export is an optional extra copy.
         </p>
+        <div id="audience-notes-batches"></div>
       </section>
     </main>
   </div>
@@ -309,34 +360,59 @@
       }
 
       for (const message of state.messages) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "message-item";
-        if (!message.read) button.classList.add("message-item--unread");
-        if (message.id === state.selectedId) button.setAttribute("aria-pressed", "true");
+        const item = document.createElement("div");
+        item.className = "message-item";
+        if (!message.read) item.classList.add("message-item--unread");
+        if (message.pinned) item.classList.add("message-item--pinned");
+        if (message.id === state.selectedId) item.classList.add("message-item--selected");
 
-      const subject = document.createElement("p");
-      subject.className = "message-subject";
-      subject.textContent = message.subject || "No subject";
+        const openButton = document.createElement("button");
+        openButton.type = "button";
+        openButton.className = "message-open-button";
 
-      const type = document.createElement("div");
-      type.className = "message-type";
-      type.textContent = message.message_type === "note_card" ? "Note Card" : (message.message_type === "audience_note" ? "Audience Note" : "Message");
+        const type = document.createElement("div");
+        type.className = "message-type";
+        type.textContent = message.message_type === "note_card" ? "Note Card" : (message.message_type === "audience_note" ? "Audience Note" : "Message");
 
-      const meta = document.createElement("p");
-      meta.className = "message-meta";
-      const contextBits = [];
-      if (message.message_type === "note_card" || message.message_type === "audience_note") {
-        if (message.venue_slug) contextBits.push(message.venue_slug);
-        if (message.session_id) contextBits.push(message.session_id.slice(0, 8));
-      }
-      meta.textContent = `${message.sender_label || "System"} · ${humanTime(message.created_at)}${contextBits.length ? ` · ${contextBits.join(" / ")}` : ""}`;
+        const subject = document.createElement("p");
+        subject.className = "message-subject";
+        subject.textContent = `${message.pinned ? "📌 " : ""}${message.subject || "No subject"}`;
 
-      button.appendChild(type);
-      button.appendChild(subject);
-      button.appendChild(meta);
-      button.addEventListener("click", () => openMessage(message.id));
-      list.appendChild(button);
+        const meta = document.createElement("p");
+        meta.className = "message-meta";
+        const contextBits = [];
+        if (message.message_type === "note_card" || message.message_type === "audience_note") {
+          if (message.venue_slug) contextBits.push(message.venue_slug);
+          if (message.session_id) contextBits.push(message.session_id.slice(0, 8));
+        }
+        meta.textContent = `${message.sender_label || "System"} · ${humanTime(message.created_at)}${contextBits.length ? ` · ${contextBits.join(" / ")}` : ""}`;
+
+        openButton.appendChild(type);
+        openButton.appendChild(subject);
+        openButton.appendChild(meta);
+        openButton.addEventListener("click", () => openMessage(message.id));
+        item.appendChild(openButton);
+
+        const actions = document.createElement("div");
+        actions.className = "message-actions";
+
+        const pinButton = document.createElement("button");
+        pinButton.type = "button";
+        pinButton.className = "message-action-button";
+        if (message.pinned) pinButton.classList.add("message-action-button--active");
+        pinButton.textContent = message.pinned ? "Unpin" : "Pin";
+        pinButton.addEventListener("click", () => togglePinMessage(message.id, !message.pinned));
+        actions.appendChild(pinButton);
+
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.className = "message-action-button";
+        deleteButton.textContent = "Delete";
+        deleteButton.addEventListener("click", () => deleteMessageById(message.id));
+        actions.appendChild(deleteButton);
+
+        item.appendChild(actions);
+        list.appendChild(item);
       }
     }
 
@@ -495,6 +571,63 @@
         if (status) status.textContent = "Message loaded.";
       } catch (error) {
         if (status) status.textContent = `Failed to load message: ${error.message}`;
+      }
+    }
+
+    function resortMessages() {
+      state.messages = [...state.messages].sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
+    }
+
+    async function togglePinMessage(messageId, pinned) {
+      const status = document.getElementById("status");
+      try {
+        const response = await fetch(`/api/messages/${encodeURIComponent(messageId)}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pinned }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.data?.error || `HTTP ${response.status}`);
+        }
+
+        const updated = payload.data;
+        state.messages = state.messages.map((item) => (item.id === updated.id ? updated : item));
+        resortMessages();
+        renderList();
+        if (state.selectedId === updated.id) renderDetail(updated);
+        if (status) status.textContent = pinned ? "Message pinned." : "Message unpinned.";
+      } catch (error) {
+        if (status) status.textContent = `Failed to update message: ${error.message}`;
+      }
+    }
+
+    async function deleteMessageById(messageId) {
+      if (!window.confirm("Delete this message? This cannot be undone.")) return;
+
+      const status = document.getElementById("status");
+      try {
+        const response = await fetch(`/api/messages/${encodeURIComponent(messageId)}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.data?.error || `HTTP ${response.status}`);
+        }
+
+        state.messages = state.messages.filter((item) => item.id !== messageId);
+        if (state.selectedId === messageId) state.selectedId = state.messages[0]?.id || "";
+        renderList();
+        renderAudienceNoteBatches();
+        renderDetail(state.messages.find((item) => item.id === state.selectedId) || null);
+        if (status) status.textContent = "Message deleted.";
+      } catch (error) {
+        if (status) status.textContent = `Failed to delete message: ${error.message}`;
       }
     }
 

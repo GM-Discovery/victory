@@ -36,6 +36,11 @@ type Message struct {
 	SessionID       string `json:"session_id,omitempty"`
 	CreatedAt       string `json:"created_at"`
 	Read            bool   `json:"read"`
+	Pinned          bool   `json:"pinned"`
+}
+
+type patchMessageRequest struct {
+	Pinned *bool `json:"pinned"`
 }
 
 type response struct {
@@ -251,6 +256,31 @@ func HandleMessageByID(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 
 			writeJSON(w, http.StatusOK, response{Ok: true, Data: row})
+		case http.MethodPatch:
+			var req patchMessageRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				writeErrorJSON(w, errInvalidJSON)
+				return
+			}
+			if req.Pinned == nil {
+				writeErrorJSON(w, errors.New("pinned_required"))
+				return
+			}
+
+			row, err := setMessagePinned(ctx, pool, userID, id, *req.Pinned)
+			if err != nil {
+				writeErrorJSON(w, err)
+				return
+			}
+
+			writeJSON(w, http.StatusOK, response{Ok: true, Data: row})
+		case http.MethodDelete:
+			if err := deleteMessage(ctx, pool, userID, id); err != nil {
+				writeErrorJSON(w, err)
+				return
+			}
+
+			writeJSON(w, http.StatusOK, response{Ok: true})
 		default:
 			writeJSON(w, http.StatusMethodNotAllowed, response{Ok: false})
 		}
@@ -511,7 +541,8 @@ func loadMessages(ctx context.Context, pool *pgxpool.Pool, userID string) ([]Mes
 		  COALESCE(NULLIF(m.venue_slug, ''), ''),
 		  COALESCE(m.session_id::text, ''),
 		  m.created_at,
-		  COALESCE(m.is_read, FALSE)
+		  COALESCE(m.is_read, FALSE),
+		  COALESCE(m.is_pinned, FALSE)
 		FROM messages m
 		LEFT JOIN users sender ON sender.id = m.from_user_id
 		LEFT JOIN LATERAL (
@@ -532,7 +563,7 @@ func loadMessages(ctx context.Context, pool *pgxpool.Pool, userID string) ([]Mes
 		  LIMIT 1
 		) sender_role ON TRUE
 		WHERE m.to_user_id = $1
-		ORDER BY m.created_at DESC, m.id DESC
+		ORDER BY m.is_pinned DESC, m.created_at DESC, m.id DESC
 	`, userID)
 	if err != nil {
 		return nil, err
@@ -558,6 +589,7 @@ func loadMessages(ctx context.Context, pool *pgxpool.Pool, userID string) ([]Mes
 			&msg.SessionID,
 			&createdAt,
 			&msg.Read,
+			&msg.Pinned,
 		); err != nil {
 			return nil, err
 		}
@@ -567,6 +599,42 @@ func loadMessages(ctx context.Context, pool *pgxpool.Pool, userID string) ([]Mes
 	}
 
 	return out, rows.Err()
+}
+
+func setMessagePinned(ctx context.Context, pool *pgxpool.Pool, userID, messageID string, pinned bool) (Message, error) {
+	tag, err := pool.Exec(ctx, `
+		UPDATE messages
+		SET is_pinned = $1
+		WHERE id = $2
+		  AND to_user_id = $3
+	`, pinned, messageID, userID)
+	if err != nil {
+		return Message{}, err
+	}
+	if tag.RowsAffected() == 0 {
+		return Message{}, errMessageNotFound
+	}
+
+	msg, err := loadMessageByID(ctx, pool, userID, messageID)
+	if err != nil {
+		return Message{}, err
+	}
+	return finalizeMessage(msg), nil
+}
+
+func deleteMessage(ctx context.Context, pool *pgxpool.Pool, userID, messageID string) error {
+	tag, err := pool.Exec(ctx, `
+		DELETE FROM messages
+		WHERE id = $1
+		  AND to_user_id = $2
+	`, messageID, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return errMessageNotFound
+	}
+	return nil
 }
 
 func getMessage(ctx context.Context, pool *pgxpool.Pool, userID, messageID string) (Message, error) {
@@ -622,7 +690,8 @@ func loadMessageByID(ctx context.Context, q interface {
 		  COALESCE(NULLIF(m.venue_slug, ''), ''),
 		  COALESCE(m.session_id::text, ''),
 		  m.created_at,
-		  COALESCE(m.is_read, FALSE)
+		  COALESCE(m.is_read, FALSE),
+		  COALESCE(m.is_pinned, FALSE)
 		FROM messages m
 		LEFT JOIN users sender ON sender.id = m.from_user_id
 		LEFT JOIN LATERAL (
@@ -660,6 +729,7 @@ func loadMessageByID(ctx context.Context, q interface {
 		&msg.SessionID,
 		&createdAt,
 		&msg.Read,
+		&msg.Pinned,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
