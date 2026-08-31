@@ -1,6 +1,6 @@
 # Kernel 93 — Audience Seat Dress Rehearsal
 
-**Status:** READY FOR LIVE DESIGN / IMPLEMENTATION  
+**Status:** PASSED — Kernel 93 closed 2026-08-30, per Grant ("I just finished End, everything is green, 93 passes."). See `Construction/OperatorLogs/kernel-93-audience-dress-rehearsal-ledger.md` §6 for the closing summary.  
 **Type:** Audience admission + live experience audit + bounded polish  
 **Sequence position:** After Kernel 92  
 **Primary proof:** Grant can enter one Showing as a real Audience member and watch Victory start-to-finish, with the coding agent fixing only bounded issues discovered during the run  
