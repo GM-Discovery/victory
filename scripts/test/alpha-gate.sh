@@ -81,11 +81,11 @@ else
 fi
 echo
 
-# --- Step 4: Node test suites (shared stage engine + contract + ewrite) ----
-echo "--- Step 4/7: node --test tests/stage-runtime tests/contract tests/ewrite ---"
+# --- Step 4: Node test suites (shared stage engine + contract + ewrite + storyboards) ----
+echo "--- Step 4/7: node --test tests/stage-runtime tests/contract tests/ewrite tests/storyboards ---"
 NODE_TEST_LOG="$(mktemp)"
 trap 'rm -f "$NODE_TEST_LOG"' EXIT
-node --test "$ROOT"/tests/stage-runtime/*.test.js "$ROOT"/tests/contract/*.test.js "$ROOT"/tests/ewrite/*.test.js >"$NODE_TEST_LOG" 2>&1
+node --test "$ROOT"/tests/stage-runtime/*.test.js "$ROOT"/tests/contract/*.test.js "$ROOT"/tests/ewrite/*.test.js "$ROOT"/tests/storyboards/*.test.js >"$NODE_TEST_LOG" 2>&1
 node_test_exit=$?
 
 # Every failing test's title, one per line, from the TAP "not ok N - <title>" lines.
