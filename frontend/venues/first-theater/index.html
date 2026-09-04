@@ -22,12 +22,47 @@
       --utility: #8fb7da;
       --stage-top: #531017;
       --stage-bottom: #050403;
+      --font-body: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      /* Pass 3 (K95): same identity as Catharsis -- Cinzel for the
+         single biggest heading per screen, Playfair Display for
+         everything under it, Avenir Next for body/UI text. Fonts are
+         vendored once in frontend/assets/fonts/ and shared across
+         venues via this @font-face block. */
+      --font-title: "Cinzel", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+      --font-subtitle: "Playfair Display", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    }
+
+    @font-face {
+      font-family: "Playfair Display";
+      font-style: normal;
+      font-weight: 600 700;
+      font-display: swap;
+      src: url("/assets/fonts/playfair-display-variable.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Cinzel";
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+      src: url("/assets/fonts/cinzel-700.woff2") format("woff2");
+    }
+
+    h1 {
+      font-family: var(--font-title);
+      letter-spacing: 0.02em;
+    }
+
+    h2,
+    h3 {
+      font-family: var(--font-subtitle);
+      font-weight: 600;
+      letter-spacing: 0.01em;
     }
 
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-family: var(--font-body);
       background:
         radial-gradient(circle at 50% 0%, rgba(228, 185, 108, 0.08), transparent 26%),
         radial-gradient(circle at 50% 14%, rgba(168, 62, 78, 0.2), transparent 32%),
@@ -216,9 +251,11 @@
     }
 
     .stage-empty-card strong {
-      font-size: 0.94rem;
+      font-family: var(--font-subtitle);
+      font-weight: 600;
+      font-size: 1.02rem;
       color: var(--accent-strong);
-      letter-spacing: 0.03em;
+      letter-spacing: 0.02em;
     }
 
     .stage-empty-card span {
@@ -449,17 +486,26 @@
     }
 
     .overlay-actions button {
-      padding: 8px 11px;
+      padding: 8px 14px;
       border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(240, 208, 155, 0.22);
+      background: rgba(240, 208, 155, 0.1);
       color: #f6efe2;
       cursor: pointer;
       font: inherit;
+      transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
     }
 
     .overlay-actions button:hover {
-      background: rgba(255, 255, 255, 0.11);
+      background: rgba(240, 208, 155, 0.18);
+      border-color: rgba(240, 208, 155, 0.34);
+      transform: translateY(-1px);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .overlay-actions button {
+        transition: none;
+      }
     }
 
     .overlay-actions button.overlay-action-danger {
@@ -801,7 +847,9 @@
     }
 
     .drawer-head strong {
-      font-size: 0.95rem;
+      font-family: var(--font-subtitle);
+      font-weight: 600;
+      font-size: 1rem;
       letter-spacing: 0.02em;
       color: #f0c96b;
     }
@@ -1067,17 +1115,32 @@
     }
 
     .drawer-item {
-      border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.04);
-      padding: 12px;
+      padding: 14px 2px 4px;
       display: grid;
-      gap: 4px;
+      gap: 8px;
+      border-top: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+    }
+
+    /* Chip-on-hairline (Kernel 94's grouping pattern, carried into K95
+       via Catharsis's Pass 3): structure comes from the hairline above
+       each item plus the label's own pill, not a bordered box. */
+    .drawer-body > .drawer-item:first-child {
+      border-top: 0;
+      padding-top: 2px;
     }
 
     .drawer-item strong {
-      color: #f0c96b;
-      font-size: 0.92rem;
+      justify-self: start;
+      display: inline-block;
+      color: var(--accent-strong);
+      background: rgba(240, 201, 107, 0.1);
+      border: 1px solid rgba(240, 201, 107, 0.18);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
 
     .drawer-item span {
@@ -1156,8 +1219,16 @@
     }
 
     .dice-tray__history-title {
-      color: #f4e3c1;
-      font-size: 0.88rem;
+      display: inline-block;
+      color: var(--accent-strong);
+      background: rgba(240, 201, 107, 0.1);
+      border: 1px solid rgba(240, 201, 107, 0.18);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.66rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
     }
 
     .dice-tray__controls {
@@ -1516,21 +1587,29 @@
     }
 
     .venue-sheet__name {
+      font-family: var(--font-subtitle);
       font-weight: 600;
-      color: #eef4ff;
+      font-size: 1.02rem;
+      color: var(--text);
     }
 
     .venue-sheet__pronouns {
       font-size: 12px;
-      color: rgba(238,244,255,0.6);
+      color: rgba(245, 234, 215, 0.6);
     }
 
     .venue-sheet__section-title {
-      font-size: 11px;
+      display: inline-block;
+      color: var(--accent-strong);
+      background: rgba(240, 201, 107, 0.1);
+      border: 1px solid rgba(240, 201, 107, 0.18);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.66rem;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: rgba(238,244,255,0.5);
-      margin-bottom: 6px;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
     }
 
     .venue-sheet__tabs {
@@ -1543,7 +1622,7 @@
       border: 1px solid rgba(255,255,255,0.12);
       border-radius: 7px;
       background: rgba(255,255,255,0.04);
-      color: rgba(238,244,255,0.72);
+      color: rgba(245, 234, 215, 0.72);
       font-size: 12px;
       padding: 6px 8px;
       cursor: pointer;
@@ -1552,7 +1631,7 @@
     .venue-sheet__tab.is-active {
       background: rgba(133, 201, 121, 0.16);
       border-color: rgba(133, 201, 121, 0.38);
-      color: #eef4ff;
+      color: var(--text);
     }
 
     .venue-sheet__tab:focus-visible {
@@ -1563,7 +1642,7 @@
     .venue-sheet__status {
       min-height: 14px;
       font-size: 11px;
-      color: rgba(238,244,255,0.52);
+      color: rgba(245, 234, 215, 0.52);
     }
 
     .venue-sheet__facts {
@@ -1577,19 +1656,20 @@
       gap: 2px;
       padding: 7px 8px;
       border-radius: 7px;
-      background: rgba(255,255,255,0.04);
-      color: #eef4ff;
+      background: rgba(240, 201, 107, 0.05);
+      color: var(--text);
     }
 
     .venue-sheet__fact span {
-      color: rgba(238,244,255,0.58);
+      color: rgba(245, 234, 215, 0.58);
       font-size: 11px;
     }
 
     .venue-sheet__fact.is-quote blockquote {
       margin: 0;
       color: #fff8df;
-      font-family: Georgia, "Times New Roman", serif;
+      font-family: var(--font-subtitle);
+      font-style: italic;
       font-size: 13px;
       line-height: 1.35;
     }
@@ -1606,8 +1686,8 @@
       justify-content: space-between;
       padding: 4px 8px;
       border-radius: 6px;
-      background: rgba(255,255,255,0.04);
-      color: #eef4ff;
+      background: rgba(240, 201, 107, 0.05);
+      color: var(--text);
     }
 
     .venue-sheet__skills {
@@ -1622,9 +1702,9 @@
       gap: 8px;
       padding: 6px 8px;
       border-radius: 6px;
-      border: 1px solid rgba(255,255,255,0.08);
-      background: rgba(255,255,255,0.03);
-      color: #eef4ff;
+      border: 1px solid rgba(240, 201, 107, 0.1);
+      background: rgba(240, 201, 107, 0.04);
+      color: var(--text);
       font-size: 12px;
       cursor: pointer;
       text-align: left;
@@ -1640,13 +1720,13 @@
     }
 
     .venue-sheet__skill-dice {
-      color: rgba(238,244,255,0.6);
+      color: rgba(245, 234, 215, 0.6);
       font-variant-numeric: tabular-nums;
     }
 
     .venue-sheet__empty {
       font-size: 12px;
-      color: rgba(238,244,255,0.5);
+      color: rgba(245, 234, 215, 0.5);
     }
 
     .chat-sidebar-copy {
