@@ -15,7 +15,7 @@
 // call sites elsewhere in this file that read e.g. uiPreferences.left.
 // portraitSize -- they keep working completely unchanged. See the
 // watchEffect registrations near applyDrawerState() below.
-import { reactive, watchEffect } from "/lib/vue.esm-browser.prod.js";
+import { reactive, ref, watchEffect } from "/lib/vue.esm-browser.prod.js";
 
 const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     const stageShell = document.getElementById("stage-shell");
@@ -325,7 +325,10 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     let chatDismissedUntilPointerLeavesRail = false;
     let chatHoverTransitionTimer = null;
     let lastChatPointerY = Number.NaN;
-    let headerHoverOpen = false;
+    // Kernel 95 Pass 2 (subpass e): a single boolean, so ref() rather than
+    // reactive() (which only wraps objects/arrays) -- every read/write
+    // below uses .value accordingly.
+    const headerHoverOpen = ref(false);
     let lastHeaderPointerY = Number.NaN;
     const drawerHoverOpen = reactive({ left: false, right: false });
     let drawerHoverCloseTimers = { left: null, right: null };
@@ -1406,8 +1409,8 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
 
       const prefs = uiPreferences?.header || shellDefaults.header;
       if (prefs.pinned || isHeaderDetailsVisible()) {
-        if (!headerHoverOpen) {
-          headerHoverOpen = true;
+        if (!headerHoverOpen.value) {
+          headerHoverOpen.value = true;
           updateHeaderPresentation();
         }
         return;
@@ -1419,19 +1422,19 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       const headerRect = topBar.getBoundingClientRect();
       const triggerLine = 20;
       const releaseLine = headerRect.bottom + 6;
-      const nextOpen = headerHoverOpen ? pointerY <= releaseLine : pointerY <= triggerLine;
+      const nextOpen = headerHoverOpen.value ? pointerY <= releaseLine : pointerY <= triggerLine;
 
-      if (nextOpen !== headerHoverOpen) {
-        headerHoverOpen = nextOpen;
+      if (nextOpen !== headerHoverOpen.value) {
+        headerHoverOpen.value = nextOpen;
         updateHeaderPresentation();
       }
     }
 
     function closeHeaderHoverState() {
-      if (!headerHoverOpen) return;
+      if (!headerHoverOpen.value) return;
       const prefs = uiPreferences?.header || shellDefaults.header;
       if (prefs.pinned || isHeaderDetailsVisible()) return;
-      headerHoverOpen = false;
+      headerHoverOpen.value = false;
       updateHeaderPresentation();
     }
 
@@ -1598,7 +1601,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       if (!topBar) return;
       const prefs = uiPreferences?.header || shellDefaults.header;
       const open = prefs.pinned
-        || headerHoverOpen
+        || headerHoverOpen.value
         || isHeaderDetailsVisible();
       topBar.dataset.open = open ? "true" : "false";
       topBar.dataset.pinned = prefs.pinned ? "true" : "false";
@@ -1614,6 +1617,14 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       updateShellTargetPresentation();
       updateConnectionPresentation();
     }
+
+    // Kernel 95 Pass 2 (subpass e): same additive pattern as the drawers
+    // above. updateHeaderPresentation is also called directly from many
+    // unrelated places in this file (network/connection status changes,
+    // not just hover/pin) -- none of those existing calls were removed,
+    // this is only a safety net for the header-specific reactive state
+    // (headerHoverOpen, uiPreferences.header).
+    watchEffect(() => updateHeaderPresentation(), { flush: "sync" });
 
     function isChatActive() {
       const active = document.activeElement;
@@ -5497,7 +5508,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     async function bootstrapStage() {
       try {
         initializeShellChrome(null);
-        headerHoverOpen = true;
+        headerHoverOpen.value = true;
         chatHoverOpen = false;
         drawerHoverOpen.left = true;
         drawerHoverOpen.right = true;
