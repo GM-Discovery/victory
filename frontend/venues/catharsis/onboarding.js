@@ -76,6 +76,13 @@
   const buildRerollButton = document.getElementById("catharsis-build-reroll");
   const characterTrayButton = document.getElementById("character-tray-button");
   const characterTrayLabel = document.getElementById("character-tray-label");
+  // Note: the pre-existing fallback chain a few lines below this
+  // (closeOverlay's `characterTrayButton || rightCardEditorButton ||
+  // introButton`) references an undeclared `rightCardEditorButton` --
+  // dead code, never actually evaluated since characterTrayButton is
+  // truthy first, left alone here since it's out of scope for this
+  // change. Declared properly for this new use.
+  const rightCardEditorButton = document.getElementById("right-card-editor-button");
 
   if (
     !overlay ||
@@ -269,6 +276,9 @@
   const closeOverlay = () => {
     overlay.hidden = true;
     document.body.classList.remove("modal-open");
+    // Safe to call unconditionally -- a no-op revert if this particular
+    // close wasn't the intro panel forcing it open in the first place.
+    window.VictoryStage?.setRightTrayForcedOpen?.(false);
     const fallback = characterTrayButton || rightCardEditorButton || introButton;
     const target = introReturnFocus && typeof introReturnFocus.focus === "function" ? introReturnFocus : fallback;
     introReturnFocus = null;
@@ -2004,7 +2014,15 @@
     }
     setSocioStatus("");
     document.body.classList.add("modal-open");
-    introButton.focus();
+    // Grant, 2026-08-31: show the actual right (character tools) tray
+    // while this panel is up, instead of just describing it in prose --
+    // reverted in closeOverlay().
+    window.VictoryStage?.setRightTrayForcedOpen?.(true);
+    // Was introButton.focus() -- correct while it was the primary action,
+    // but it's a passive close-hint now (2026-08-31), not something to
+    // land keyboard focus on by default. Focus the panel itself instead,
+    // same as any other dialog with no obvious first control.
+    introPanel.focus();
   };
 
   const showSocioPrompt = () => {
@@ -2484,6 +2502,34 @@
   });
 
   introButton.addEventListener("click", async () => {
+    localStorage.setItem(introKey, "1");
+    closeOverlay();
+  });
+
+  // Grant, 2026-08-31: the welcome/tray-tour panel closes on an outside
+  // click -- scoped to this one panel (event.target === overlay only
+  // fires for the backdrop itself, never a click that lands on the sheet
+  // or its contents) and only while the intro panel specifically is the
+  // one showing, so the character-creation wizard steps underneath this
+  // same overlay element keep their existing must-use-a-button behavior.
+  overlay.addEventListener("click", (event) => {
+    if (event.target !== overlay) return;
+    if (introPanel.hidden) return;
+    localStorage.setItem(introKey, "1");
+    closeOverlay();
+  });
+
+  // Grant, 2026-08-31: "what if clicking 'create a character' is what
+  // triggers closing the tour and engaging the character maker" -- the
+  // real Make a Character button (now visible in the forced-open right
+  // tray while this panel is showing) closes the welcome panel first;
+  // runtime.js's own listener on this same button (registered before
+  // this script loads) still runs and does the actual navigation
+  // afterward, unchanged -- this only ever runs while the intro panel is
+  // the one open, so it's inert during the character-creation wizard's
+  // own later steps.
+  rightCardEditorButton?.addEventListener("click", () => {
+    if (introPanel.hidden) return;
     localStorage.setItem(introKey, "1");
     closeOverlay();
   });

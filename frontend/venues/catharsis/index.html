@@ -8,6 +8,47 @@
   <link rel="apple-touch-icon" href="/assets/favicon.png" />
   <link rel="stylesheet" href="/lib/forbidden.css?v=hidden-fix-1" />
   <style>
+    /* Pass 3 (K95): Playfair Display, vendored locally (frontend/assets/fonts/)
+       rather than pulled from Google Fonts' CDN -- matches how Vue and Pixi
+       are already vendored in this repo, and doesn't depend on a
+       third-party request that ad blockers/privacy extensions commonly
+       block, which silently falls back to a generic system serif with no
+       error either app or user can see. Variable font: one file serves
+       both 600 and 700 via the weight axis, same as Google's own CSS. */
+    @font-face {
+      font-family: "Playfair Display";
+      font-style: normal;
+      font-weight: 600 700;
+      font-display: swap;
+      src: url("/assets/fonts/playfair-display-variable.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Playfair Display";
+      font-style: italic;
+      font-weight: 600;
+      font-display: swap;
+      src: url("/assets/fonts/playfair-display-italic-600.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Cinzel";
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+      src: url("/assets/fonts/cinzel-700.woff2") format("woff2");
+    }
+    /* Ornate swash variant, for the one or two moments per screen that
+       should read as genuinely theatrical rather than merely serif --
+       plain Cinzel/Playfair read too quiet for Grant's taste at hero
+       scale (2026-08-31). Used sparingly: this is a flourish, not a
+       running headline face. */
+    @font-face {
+      font-family: "Cinzel Decorative";
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+      src: url("/assets/fonts/cinzel-decorative-700.woff2") format("woff2");
+    }
+
     :root {
       color-scheme: dark;
       --bg: #090807;
@@ -23,7 +64,16 @@
       --stage-top: #531017;
       --stage-bottom: #050403;
       --font-body: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-      --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+      /* Pass 3 (K95, per Grant 2026-08-31): "timelessly theatrical" -- two
+         display faces, not one. Cinzel (engraved gold-plaque capitals) for
+         the single biggest identity moment per screen (the venue name,
+         h1); Playfair Display (a calmer dramatic serif, holds up better
+         repeated many times at smaller sizes) for the section/panel
+         headings under it (h2/h3). Avenir Next stays for body/UI text.
+         Old system-serif fallback chains kept for before the webfonts
+         load. */
+      --font-title: "Cinzel", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+      --font-subtitle: "Playfair Display", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
     }
 
     body {
@@ -39,12 +89,17 @@
     }
 
     h1,
+    .hero-copy h1 {
+      font-family: var(--font-title);
+      letter-spacing: 0.02em;
+    }
+
     h2,
     h3,
-    .hero-copy h1,
     .catharsis-onboarding__panel h2,
     .catharsis-build-card h3 {
-      font-family: var(--font-display);
+      font-family: var(--font-subtitle);
+      font-weight: 600;
       letter-spacing: 0.01em;
     }
 
@@ -262,9 +317,11 @@
     }
 
     .stage-empty-card strong {
-      font-size: 0.94rem;
+      font-family: var(--font-subtitle);
+      font-weight: 600;
+      font-size: 1.02rem;
       color: var(--accent-strong);
-      letter-spacing: 0.03em;
+      letter-spacing: 0.02em;
     }
 
     .stage-empty-card span {
@@ -307,7 +364,18 @@
 
     .catharsis-onboarding {
       position: fixed;
-      inset: 0;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      /* Grant, 2026-08-31: the backdrop deliberately does not reach the
+         right edge -- that's where the (now forced-open) character tray
+         lives, and a full-viewport backdrop sits above everything and
+         swallows clicks before they reach it, no matter how visible the
+         tray looks underneath. Width matches applyDrawerState's own
+         right-drawer open width (runtime.js) plus a little breathing
+         room, so the gap always actually lines up with the real drawer
+         instead of guessing a fixed number. */
+      right: min(24vw + 40px, 460px);
       z-index: 120;
       display: flex;
       align-items: flex-start;
@@ -317,6 +385,16 @@
       backdrop-filter: blur(14px);
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
+    }
+
+    @media (max-width: 720px) {
+      /* The drawer collapses to a much narrower rail at this width
+         (stage-runtime/runtime.js's own applyDrawerState breakpoint) --
+         reserving 460px for it here would eat most of the screen, so
+         fall back to covering the full viewport like before. */
+      .catharsis-onboarding {
+        right: 0;
+      }
     }
 
     .catharsis-onboarding__sheet {
@@ -372,6 +450,83 @@
 
     #catharsis-onboarding-intro .eyebrow {
       color: #f1ce89;
+    }
+
+    /* Grant, 2026-08-31: "Catharsis should be the biggest element here."
+       The venue name gets its own hero moment inside the welcome panel --
+       not just the small header brand elsewhere on the page -- in the
+       ornate face, with the practical subtitle underneath it in the
+       quieter one. */
+    /* Programmatic-focus target only (tabindex="-1", not Tab-reachable) --
+       real keyboard users land on an actual interactive element instead,
+       which keeps its own visible focus ring. */
+    #catharsis-onboarding-intro:focus-visible {
+      outline: none;
+    }
+
+    .catharsis-hero {
+      text-align: center;
+      padding: 4px 0 6px;
+    }
+
+    .catharsis-hero .eyebrow {
+      margin: 0 0 2px;
+    }
+
+    .catharsis-hero-title {
+      margin: 0;
+      font-family: "Cinzel Decorative", "Cinzel", "Iowan Old Style", Georgia, serif;
+      font-size: clamp(2.6rem, 6vw, 4.2rem);
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      color: var(--accent-strong);
+      text-shadow: 0 0 28px rgba(243, 215, 159, 0.32), 0 0 4px rgba(243, 215, 159, 0.2);
+      line-height: 1.08;
+    }
+
+    .catharsis-hero-subtitle {
+      margin: 10px 0 0;
+      font-family: var(--font-subtitle);
+      font-weight: 600;
+      font-size: clamp(1.2rem, 2.2vw, 1.6rem);
+      color: var(--accent);
+      opacity: 0.92;
+    }
+
+    /* The copy explicitly tells the reader to push toward the right edge
+       of the screen -- the callout leans that direction too instead of
+       just describing it from dead center. */
+    .catharsis-onboarding__callout {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-left: auto;
+      max-width: 70%;
+      padding: 14px 18px;
+      border-radius: 14px;
+      background: linear-gradient(90deg, transparent, rgba(240, 208, 155, 0.1));
+      border: 1px solid rgba(240, 208, 155, 0.22);
+      border-right-width: 3px;
+      border-right-color: rgba(243, 215, 159, 0.55);
+    }
+
+    .catharsis-onboarding__callout p {
+      margin: 0;
+      max-width: none;
+    }
+
+    .catharsis-onboarding__callout-arrow {
+      flex: 0 0 auto;
+      font-size: 1.4rem;
+      color: var(--accent-strong);
+      opacity: 0.85;
+    }
+
+    @media (max-width: 640px) {
+      .catharsis-onboarding__callout {
+        max-width: 100%;
+        margin-left: 0;
+      }
     }
 
     .catharsis-onboarding__chapter,
@@ -630,6 +785,33 @@
       box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2);
     }
 
+    /* Grant, 2026-09-01: back to a real, clickable action (the panel also
+       still closes on an outside click, wired in onboarding.js) -- styled
+       as a plain text hyperlink instead of the pill-button treatment the
+       rest of .catharsis-onboarding__actions button uses, since "End
+       Tour" is a quieter, secondary action next to the actual tray
+       button, not a primary call-to-action. */
+    #catharsis-onboarding-continue {
+      background: none;
+      border: none;
+      padding: 4px 0;
+      color: var(--accent);
+      font-size: 0.85rem;
+      font-weight: 400;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+      text-align: left;
+    }
+    #catharsis-onboarding-continue:hover,
+    #catharsis-onboarding-continue:focus-visible {
+      background: none;
+      border: none;
+      transform: none;
+      box-shadow: none;
+      color: var(--accent-strong);
+    }
+
     .catharsis-onboarding__actions button:focus-visible {
       outline: 2px solid rgba(241, 206, 137, 0.8);
       outline-offset: 2px;
@@ -868,7 +1050,8 @@
       .stage-empty-card button,
       .catharsis-onboarding__actions button,
       .catharsis-chapter2-bonus-choices button,
-      .catharsis-chapter2-traits button {
+      .catharsis-chapter2-traits button,
+      .overlay-actions button {
         transition: none;
       }
     }
@@ -1296,17 +1479,20 @@
     }
 
     .overlay-actions button {
-      padding: 8px 11px;
+      padding: 8px 14px;
       border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(240, 208, 155, 0.22);
+      background: rgba(240, 208, 155, 0.1);
       color: #f6efe2;
       cursor: pointer;
       font: inherit;
+      transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
     }
 
     .overlay-actions button:hover {
-      background: rgba(255, 255, 255, 0.11);
+      background: rgba(240, 208, 155, 0.18);
+      border-color: rgba(240, 208, 155, 0.34);
+      transform: translateY(-1px);
     }
 
     .overlay-actions button.overlay-action-danger {
@@ -1524,6 +1710,11 @@
       background: rgba(240, 201, 107, 0.14);
     }
 
+    .header-pill:focus-visible {
+      outline: 2px solid var(--accent-strong);
+      outline-offset: 2px;
+    }
+
     .header-pill.is-active {
       background: rgba(140, 199, 255, 0.16);
       border-color: rgba(140, 199, 255, 0.36);
@@ -1666,7 +1857,9 @@
     }
 
     .drawer-head strong {
-      font-size: 0.95rem;
+      font-family: var(--font-subtitle);
+      font-weight: 600;
+      font-size: 1rem;
       letter-spacing: 0.02em;
       color: #f0c96b;
     }
@@ -2022,17 +2215,34 @@
     }
 
     .drawer-item {
-      border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.04);
-      padding: 12px;
+      padding: 14px 2px 4px;
       display: grid;
-      gap: 4px;
+      gap: 8px;
+      border-top: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+    }
+
+    /* Chip-on-hairline (Kernel 94's grouping pattern, carried into K95):
+       structure comes from the hairline above each item plus the label's
+       own pill, not a bordered box around the whole item -- matches
+       Storyboards' Band treatment instead of the flat bordered-card look
+       every drawer-item used before. */
+    .drawer-body > .drawer-item:first-child {
+      border-top: 0;
+      padding-top: 2px;
     }
 
     .drawer-item strong {
-      color: #f0c96b;
-      font-size: 0.92rem;
+      justify-self: start;
+      display: inline-block;
+      color: var(--accent-strong);
+      background: rgba(240, 201, 107, 0.1);
+      border: 1px solid rgba(240, 201, 107, 0.18);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
 
     .drawer-item span {
@@ -2111,8 +2321,16 @@
     }
 
     .dice-tray__history-title {
-      color: #f4e3c1;
-      font-size: 0.88rem;
+      display: inline-block;
+      color: var(--accent-strong);
+      background: rgba(240, 201, 107, 0.1);
+      border: 1px solid rgba(240, 201, 107, 0.18);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.66rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
     }
 
     .dice-tray__controls {
@@ -2475,21 +2693,33 @@
     }
 
     .venue-sheet__name {
+      font-family: var(--font-subtitle);
       font-weight: 600;
-      color: #eef4ff;
+      font-size: 1.02rem;
+      color: var(--text);
     }
 
     .venue-sheet__pronouns {
       font-size: 12px;
-      color: rgba(238,244,255,0.6);
+      color: rgba(245, 234, 215, 0.6);
     }
 
+    /* Same chip-on-hairline label as .drawer-item strong -- this sheet
+       lives inside the right drawer, so its own subheadings (Attributes,
+       Skills) should read as part of the same system, not a separate
+       component that happens to share a border. */
     .venue-sheet__section-title {
-      font-size: 11px;
+      display: inline-block;
+      color: var(--accent-strong);
+      background: rgba(240, 201, 107, 0.1);
+      border: 1px solid rgba(240, 201, 107, 0.18);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.66rem;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: rgba(238,244,255,0.5);
-      margin-bottom: 6px;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
     }
 
     .venue-sheet__tabs {
@@ -2502,7 +2732,7 @@
       border: 1px solid rgba(255,255,255,0.12);
       border-radius: 7px;
       background: rgba(255,255,255,0.04);
-      color: rgba(238,244,255,0.72);
+      color: rgba(245, 234, 215, 0.72);
       font-size: 12px;
       padding: 6px 8px;
       cursor: pointer;
@@ -2511,7 +2741,7 @@
     .venue-sheet__tab.is-active {
       background: rgba(133, 201, 121, 0.16);
       border-color: rgba(133, 201, 121, 0.38);
-      color: #eef4ff;
+      color: var(--text);
     }
 
     .venue-sheet__tab:focus-visible {
@@ -2522,7 +2752,7 @@
     .venue-sheet__status {
       min-height: 14px;
       font-size: 11px;
-      color: rgba(238,244,255,0.52);
+      color: rgba(245, 234, 215, 0.52);
     }
 
     .venue-sheet__facts {
@@ -2536,19 +2766,20 @@
       gap: 2px;
       padding: 7px 8px;
       border-radius: 7px;
-      background: rgba(255,255,255,0.04);
-      color: #eef4ff;
+      background: rgba(240, 201, 107, 0.05);
+      color: var(--text);
     }
 
     .venue-sheet__fact span {
-      color: rgba(238,244,255,0.58);
+      color: rgba(245, 234, 215, 0.58);
       font-size: 11px;
     }
 
     .venue-sheet__fact.is-quote blockquote {
       margin: 0;
       color: #fff8df;
-      font-family: Georgia, "Times New Roman", serif;
+      font-family: var(--font-subtitle);
+      font-style: italic;
       font-size: 13px;
       line-height: 1.35;
     }
@@ -2565,8 +2796,8 @@
       justify-content: space-between;
       padding: 4px 8px;
       border-radius: 6px;
-      background: rgba(255,255,255,0.04);
-      color: #eef4ff;
+      background: rgba(240, 201, 107, 0.05);
+      color: var(--text);
     }
 
     .venue-sheet__skills {
@@ -2581,9 +2812,9 @@
       gap: 8px;
       padding: 6px 8px;
       border-radius: 6px;
-      border: 1px solid rgba(255,255,255,0.08);
-      background: rgba(255,255,255,0.03);
-      color: #eef4ff;
+      border: 1px solid rgba(240, 201, 107, 0.1);
+      background: rgba(240, 201, 107, 0.04);
+      color: var(--text);
       font-size: 12px;
       cursor: pointer;
       text-align: left;
@@ -2599,13 +2830,13 @@
     }
 
     .venue-sheet__skill-dice {
-      color: rgba(238,244,255,0.6);
+      color: rgba(245, 234, 215, 0.6);
       font-variant-numeric: tabular-nums;
     }
 
     .venue-sheet__empty {
       font-size: 12px;
-      color: rgba(238,244,255,0.5);
+      color: rgba(245, 234, 215, 0.5);
     }
 
     .chat-sidebar-copy {
@@ -4172,20 +4403,26 @@
 
   <div id="catharsis-onboarding" class="catharsis-onboarding" hidden role="dialog" aria-modal="true" aria-labelledby="catharsis-onboarding-title">
     <div class="catharsis-onboarding__sheet">
-      <div id="catharsis-onboarding-intro" class="catharsis-onboarding__panel">
-        <p class="eyebrow">Catharsis Welcome</p>
-        <h2 id="catharsis-onboarding-title">This venue has four trays.</h2>
+      <div id="catharsis-onboarding-intro" class="catharsis-onboarding__panel" tabindex="-1">
+        <div class="catharsis-hero">
+          <p class="eyebrow">Welcome to</p>
+          <h1 id="catharsis-onboarding-title" class="catharsis-hero-title">Catharsis</h1>
+          <p class="catharsis-hero-subtitle">This venue has four trays.</p>
+        </div>
         <p>
           The top tray holds the header. The left tray holds presence and diagnostics. The chat tray lives along the bottom.
         </p>
         <p>
           The right tray holds your character tools. Open it whenever you want to begin building a character.
         </p>
-        <p>
-          New here? Push your mouse to the right edge of the screen and use the <strong>Make a Character</strong> button when you are ready.
-        </p>
+        <div class="catharsis-onboarding__callout catharsis-onboarding__callout--right">
+          <p>
+            New here? Push your mouse to the right edge of the screen and use the <strong>Make a Character</strong> button when you are ready.
+          </p>
+          <span class="catharsis-onboarding__callout-arrow" aria-hidden="true">&#10230;</span>
+        </div>
         <div class="catharsis-onboarding__actions">
-          <button id="catharsis-onboarding-continue" type="button">Continue</button>
+          <button id="catharsis-onboarding-continue" type="button">End Tour</button>
         </div>
       </div>
 

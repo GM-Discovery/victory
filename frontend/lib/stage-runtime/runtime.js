@@ -318,6 +318,13 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     let lastHeaderPointerY = Number.NaN;
     let drawerHoverOpen = { left: false, right: false };
     let drawerHoverCloseTimers = { left: null, right: null };
+    // Grant, 2026-08-31: lets an external caller (Catharsis's own
+    // onboarding.js -- see window.VictoryStage.setRightTrayForcedOpen
+    // below) hold the right drawer visibly open regardless of the user's
+    // own hover/pin/opacity preference, without touching that saved
+    // preference at all -- purely an additive override on top of the
+    // normal open computation in applyDrawerState.
+    let drawerForcedOpen = { left: false, right: false };
     let latestFocusEventStamp = 0;
     const stageSceneState = {
       get currentNodeMap() {
@@ -1526,13 +1533,15 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       const state = side === "left" ? leftDrawer : rightDrawer;
       if (!state) return;
       const prefs = uiPreferences?.[side] || drawerDefaults[side];
-      const open = prefs.mode === "always-open"
+      const open = drawerForcedOpen[side]
         ? true
-        : prefs.mode === "always-closed"
-          ? false
-          : hoverOverride === null
-            ? (drawerHoverOpen[side] || state.contains(document.activeElement) || isDrawerDetailsVisible(side))
-            : Boolean(hoverOverride);
+        : prefs.mode === "always-open"
+          ? true
+          : prefs.mode === "always-closed"
+            ? false
+            : hoverOverride === null
+              ? (drawerHoverOpen[side] || state.contains(document.activeElement) || isDrawerDetailsVisible(side))
+              : Boolean(hoverOverride);
 
       state.dataset.openMode = prefs.mode;
       state.dataset.open = open ? "true" : "false";
@@ -5517,6 +5526,16 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       // not just inspect state.
       getStageCamera: () => stageCamera,
       getWorldLayer: () => worldLayer,
+      // Grant, 2026-08-31: lets Catharsis's onboarding.js hold the right
+      // (character tools) drawer open while the welcome/tray-tour panel
+      // is showing, so "the right tray holds your character tools" is
+      // something the reader can actually see, not just a sentence. Pure
+      // override on top of applyDrawerState -- never touches the user's
+      // own saved drawer preference.
+      setRightTrayForcedOpen: (open) => {
+        drawerForcedOpen.right = Boolean(open);
+        applyDrawerState("right");
+      },
     };
     runtimeLifecycle.listen(window, "beforeunload", () => runtimeLifecycle.dispose());
     window.VictoryStageCleanup = () => runtimeLifecycle.dispose();
