@@ -3202,7 +3202,8 @@
       window.__firstTheaterBootWiring = true;
 
       const script = document.createElement("script");
-      script.src = "/lib/stage-runtime/runtime.js?v=kernel93-fix3";
+      script.type = "module";
+      script.src = "/lib/stage-runtime/runtime.js?v=k95-pass2a";
       script.dataset.victoryRuntime = "first-theater";
       script.addEventListener("load", () => {
         window.VictoryStage?.start?.();

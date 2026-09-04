@@ -6,6 +6,17 @@
 //     onHelp }                      // optional: right-tray help button (hidden if the page lacks it)
 // Formerly two 5,000-line per-venue runtime copies (Kernel 72 de-fork).
 // Game-specific behavior belongs in the venue config, not in here.
+//
+// Kernel 95 Pass 2 (subpass a): loaded as a module (both venues now create
+// this script with type="module") so the shared tray primitive's
+// open/pinned/opacity/forced-open state can be genuine Vue reactive()
+// state instead of a plain object with scattered "don't forget to
+// re-render" call sites. reactive() is transparent to the ~30 unrelated
+// call sites elsewhere in this file that read e.g. uiPreferences.left.
+// portraitSize -- they keep working completely unchanged. See the
+// watchEffect registrations near applyDrawerState() below.
+import { reactive, watchEffect } from "/lib/vue.esm-browser.prod.js";
+
 const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     const stageShell = document.getElementById("stage-shell");
     const stageHost = document.getElementById("pixi-stage-host");
@@ -316,15 +327,15 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     let lastChatPointerY = Number.NaN;
     let headerHoverOpen = false;
     let lastHeaderPointerY = Number.NaN;
-    let drawerHoverOpen = { left: false, right: false };
+    const drawerHoverOpen = reactive({ left: false, right: false });
     let drawerHoverCloseTimers = { left: null, right: null };
-    // Grant, 2026-08-31: lets an external caller (Catharsis's own
-    // onboarding.js -- see window.VictoryStage.setRightTrayForcedOpen
-    // below) hold the right drawer visibly open regardless of the user's
-    // own hover/pin/opacity preference, without touching that saved
-    // preference at all -- purely an additive override on top of the
-    // normal open computation in applyDrawerState.
-    let drawerForcedOpen = { left: false, right: false };
+    // lets an external caller (Catharsis's own onboarding.js -- see
+    // window.VictoryStage.setRightTrayForcedOpen below) hold the right
+    // drawer visibly open regardless of the user's own hover/pin/opacity
+    // preference, without touching that saved preference at all --
+    // purely an additive override on top of the normal open computation
+    // in applyDrawerState.
+    const drawerForcedOpen = reactive({ left: false, right: false });
     let latestFocusEventStamp = 0;
     const stageSceneState = {
       get currentNodeMap() {
@@ -1492,7 +1503,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
           return;
         }
         drawerHoverOpen[side] = false;
-        applyDrawerState(side, false);
+        applyDrawerState(side);
       }, 120);
     }
 
@@ -1523,13 +1534,13 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
           drawerHoverCloseTimers[side] = null;
         }
         drawerHoverOpen[side] = true;
-        applyDrawerState(side, true);
+        applyDrawerState(side);
         return;
       }
       scheduleDrawerHoverClose(side);
     }
 
-    function applyDrawerState(side, hoverOverride = null) {
+    function applyDrawerState(side) {
       const state = side === "left" ? leftDrawer : rightDrawer;
       if (!state) return;
       const prefs = uiPreferences?.[side] || drawerDefaults[side];
@@ -1539,9 +1550,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
           ? true
           : prefs.mode === "always-closed"
             ? false
-            : hoverOverride === null
-              ? (drawerHoverOpen[side] || state.contains(document.activeElement) || isDrawerDetailsVisible(side))
-              : Boolean(hoverOverride);
+            : (drawerHoverOpen[side] || state.contains(document.activeElement) || isDrawerDetailsVisible(side));
 
       state.dataset.openMode = prefs.mode;
       state.dataset.open = open ? "true" : "false";
@@ -1572,6 +1581,18 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         if (rightOpacityValue) rightOpacityValue.textContent = `${clampNumber(prefs.opacity, 0, 100, 96)}%`;
       }
     }
+
+    // Kernel 95 Pass 2: every existing call site above that mutates
+    // uiPreferences.left/right, drawerHoverOpen, or drawerForcedOpen also
+    // still calls applyDrawerState(side) explicitly, exactly as before --
+    // this is purely additive, not a replacement. flush: "sync" means it
+    // runs synchronously on the same tick a tracked property changes
+    // (not batched to a microtask), so it never introduces a visible
+    // frame of stale DOM the way default-flush watchEffect could. Net
+    // effect: a future mutation site that forgets to call
+    // applyDrawerState no longer silently does nothing.
+    watchEffect(() => applyDrawerState("left"), { flush: "sync" });
+    watchEffect(() => applyDrawerState("right"), { flush: "sync" });
 
     function updateHeaderPresentation() {
       if (!topBar) return;
@@ -2180,7 +2201,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     function initializeShellChrome(identity) {
       currentIdentity = identity || null;
       uiPreferenceKey = String(identity?.user_id || identity?.handle || identity?.display_name || "unknown-user");
-      uiPreferences = loadUiPreferencesForKey(uiPreferenceKey);
+      uiPreferences = reactive(loadUiPreferencesForKey(uiPreferenceKey));
       uiPreferences.header = {
         ...shellDefaults.header,
         ...(uiPreferences.header || {}),
@@ -2205,7 +2226,8 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         chatHoverTransitionTimer = null;
       }
       lastChatPointerY = Number.NaN;
-      drawerHoverOpen = { left: true, right: true };
+      drawerHoverOpen.left = true;
+      drawerHoverOpen.right = true;
       if (drawerHoverCloseTimers.left) {
         window.clearTimeout(drawerHoverCloseTimers.left);
       }
@@ -5477,12 +5499,13 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         initializeShellChrome(null);
         headerHoverOpen = true;
         chatHoverOpen = false;
-        drawerHoverOpen = { left: true, right: true };
+        drawerHoverOpen.left = true;
+        drawerHoverOpen.right = true;
         if (stageStatus) {
           stageStatus.hidden = false;
         }
-        applyDrawerState("left", true);
-        applyDrawerState("right", true);
+        applyDrawerState("left");
+        applyDrawerState("right");
         updateShellMetaPresentation();
         updateShellTargetPresentation();
         updateHeaderPresentation();

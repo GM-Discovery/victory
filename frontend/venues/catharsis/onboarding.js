@@ -1,6 +1,25 @@
 (function () {
   const introKey = "victory:catharsis:venue-intro:v1";
 
+  // runtime.js loads as its own dynamically-injected script (a module as
+  // of Kernel 95 Pass 2, fetching Vue as a dependency first) and this
+  // file's own auto-open check runs concurrently, racing it -- a plain
+  // `window.VictoryStage?.setRightTrayForcedOpen?.()` silently no-ops if
+  // this file wins that race, which the added Vue fetch hop made likely
+  // enough to actually happen rather than a theoretical edge case. Poll
+  // briefly instead of assuming readiness; give up silently past the
+  // timeout exactly like the old optional-chained call did, so a venue
+  // page that never loads runtime.js for some other reason still degrades
+  // the same way it always did.
+  const callWhenStageReady = (fn, attemptsLeft = 100) => {
+    if (window.VictoryStage?.setRightTrayForcedOpen) {
+      fn(window.VictoryStage);
+      return;
+    }
+    if (attemptsLeft <= 0) return;
+    window.setTimeout(() => callWhenStageReady(fn, attemptsLeft - 1), 30);
+  };
+
   const overlay = document.getElementById("catharsis-onboarding");
   const introPanel = document.getElementById("catharsis-onboarding-intro");
   const socioPanel = document.getElementById("catharsis-onboarding-socio");
@@ -278,7 +297,7 @@
     document.body.classList.remove("modal-open");
     // Safe to call unconditionally -- a no-op revert if this particular
     // close wasn't the intro panel forcing it open in the first place.
-    window.VictoryStage?.setRightTrayForcedOpen?.(false);
+    callWhenStageReady((stage) => stage.setRightTrayForcedOpen(false));
     const fallback = characterTrayButton || rightCardEditorButton || introButton;
     const target = introReturnFocus && typeof introReturnFocus.focus === "function" ? introReturnFocus : fallback;
     introReturnFocus = null;
@@ -2014,10 +2033,13 @@
     }
     setSocioStatus("");
     document.body.classList.add("modal-open");
-    // Grant, 2026-08-31: show the actual right (character tools) tray
-    // while this panel is up, instead of just describing it in prose --
-    // reverted in closeOverlay().
-    window.VictoryStage?.setRightTrayForcedOpen?.(true);
+    // Show the actual right (character tools) tray while this panel is
+    // up, instead of just describing it in prose -- reverted in
+    // closeOverlay(). Polls briefly for readiness (see
+    // callWhenStageReady) since this can fire before runtime.js has
+    // finished loading, especially on a first visit right after a
+    // fresh page load.
+    callWhenStageReady((stage) => stage.setRightTrayForcedOpen(true));
     // Was introButton.focus() -- correct while it was the primary action,
     // but it's a passive close-hint now (2026-08-31), not something to
     // land keyboard focus on by default. Focus the panel itself instead,
