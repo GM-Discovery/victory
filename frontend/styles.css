@@ -11,6 +11,41 @@
   --accent: #e0bf86;
   --accent-strong: #f4ddaf;
   --shadow: 0 22px 48px rgba(0, 0, 0, 0.28);
+  --font-body: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  /* Kernel 95 Pass 3 (broad normalization, K95 doc §10): same identity
+     as Catharsis/First Theater, extended to the campus/main shell --
+     this is the first screen anyone sees, logged in or not, so it
+     should read as the same product from the very first pixel. Fonts
+     vendored once, shared across venues + campus via this path. */
+  --font-title: "Cinzel", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --font-subtitle: "Playfair Display", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+
+@font-face {
+  font-family: "Playfair Display";
+  font-style: normal;
+  font-weight: 600 700;
+  font-display: swap;
+  src: url("/assets/fonts/playfair-display-variable.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Cinzel";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/assets/fonts/cinzel-700.woff2") format("woff2");
+}
+
+h1 {
+  font-family: var(--font-title);
+  letter-spacing: 0.02em;
+}
+
+h2,
+h3 {
+  font-family: var(--font-subtitle);
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 html,
@@ -27,7 +62,7 @@ body {
 
 body {
   min-height: 100vh;
-  font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-body);
   background:
     radial-gradient(circle at 12% 10%, rgba(142, 94, 54, 0.12), transparent 24%),
     radial-gradient(circle at 88% 0%, rgba(122, 92, 49, 0.1), transparent 22%),
@@ -813,12 +848,23 @@ body {
   cursor: pointer;
 }
 
+/* Same chip-on-hairline label as the venues' drawer/tray section
+   titles (Kernel 94 grouping pattern, carried through K95 Pass 3) --
+   was a plain uppercase text line, now a small gold pill so the
+   campus shell reads as the same product as the venues it leads
+   into. */
 .booth-eyebrow {
-  margin: 0 0 8px;
-  letter-spacing: 0.18em;
+  display: inline-block;
+  margin: 0 0 10px;
+  color: var(--accent-strong);
+  background: rgba(224, 191, 134, 0.1);
+  border: 1px solid rgba(224, 191, 134, 0.2);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #d9b36d;
-  font-size: 0.76rem;
 }
 
 .booth-title {
@@ -981,11 +1027,17 @@ body {
 
 .map-menu-eyebrow,
 .soil-experts-eyebrow {
-  margin: 0 0 6px;
-  letter-spacing: 0.18em;
+  display: inline-block;
+  margin: 0 0 8px;
+  color: var(--accent-strong);
+  background: rgba(224, 191, 134, 0.1);
+  border: 1px solid rgba(224, 191, 134, 0.2);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #d9b36d;
-  font-size: 0.76rem;
 }
 
 .map-menu-header h2,
