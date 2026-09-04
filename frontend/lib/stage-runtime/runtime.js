@@ -316,12 +316,17 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     let uiPreferenceKey = "";
     let uiPreferences = null;
     let presenceRefreshTimer = null;
-    let unreadChatCount = 0;
+    // Kernel 95 Pass 2 (subpass c): same ref()/reactive() treatment as
+    // the drawers (subpass a) and header (subpass e). unreadChatCount
+    // and the two open-state booleans all feed updateChatPresentation's
+    // DOM output, so all three need to be reactive for the watchEffect
+    // below to actually track them.
+    const unreadChatCount = ref(0);
     let lastPingMs = null;
     let pendingPingStartedAt = null;
     let currentPresenceUsers = [];
-    let chatHoverOpen = false;
-    let chatPinnedOpen = false;
+    const chatHoverOpen = ref(false);
+    const chatPinnedOpen = ref(false);
     let chatDismissedUntilPointerLeavesRail = false;
     let chatHoverTransitionTimer = null;
     let lastChatPointerY = Number.NaN;
@@ -1665,7 +1670,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
 
     function appendSystemChatNotice(text) {
       appendChatEntry("System", text);
-      unreadChatCount = 0;
+      unreadChatCount.value = 0;
       updateChatPresentation();
     }
 
@@ -1676,7 +1681,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       if (chatOpacity) chatOpacity.value = String(clampNumber(prefs.opacity, 0, 100, 96));
       if (chatOpacityValue) chatOpacityValue.textContent = `${clampNumber(prefs.opacity, 0, 100, 96)}%`;
       const active = isChatActive();
-      const open = chatPinnedOpen || chatHoverOpen || active;
+      const open = chatPinnedOpen.value || chatHoverOpen.value || active;
       const chatOpen = currentShowingIsOpen();
       chatPanel.dataset.open = open ? "true" : "false";
       chatPanel.classList.toggle("is-open", open);
@@ -1690,21 +1695,31 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         chatSend.disabled = false;
       }
       if (chatBadge) {
-        chatBadge.hidden = open || unreadChatCount === 0;
-        chatBadge.textContent = String(unreadChatCount);
+        chatBadge.hidden = open || unreadChatCount.value === 0;
+        chatBadge.textContent = String(unreadChatCount.value);
       }
       if (sessionStatus) {
         sessionStatus.textContent = currentSessionStatusLabel();
       }
     }
 
+    // Kernel 95 Pass 2 (subpass c): same additive safety net as subpasses
+    // a and e -- every existing call site that mutates chatHoverOpen,
+    // chatPinnedOpen, unreadChatCount, or uiPreferences.chat still calls
+    // updateChatPresentation() explicitly too. isChatActive() and
+    // currentShowingIsOpen() read plain (non-reactive) state, same as
+    // today -- calling them fresh on every tracked-dependency change is
+    // exactly what the explicit calls already did, not a change in when
+    // they're evaluated.
+    watchEffect(() => updateChatPresentation(), { flush: "sync" });
+
     function setChatHoverOpen(open) {
       if (chatHoverTransitionTimer) {
         window.clearTimeout(chatHoverTransitionTimer);
         chatHoverTransitionTimer = null;
       }
-      chatHoverOpen = Boolean(open);
-      if (!chatHoverOpen && !chatPinnedOpen && !isChatActive()) {
+      chatHoverOpen.value = Boolean(open);
+      if (!chatHoverOpen.value && !chatPinnedOpen.value && !isChatActive()) {
         lastChatPointerY = Number.NaN;
       }
       updateChatPresentation();
@@ -1715,9 +1730,9 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         window.clearTimeout(chatHoverTransitionTimer);
         chatHoverTransitionTimer = null;
       }
-      chatPinnedOpen = Boolean(open);
-      if (!chatPinnedOpen && !isChatActive()) {
-        chatHoverOpen = false;
+      chatPinnedOpen.value = Boolean(open);
+      if (!chatPinnedOpen.value && !isChatActive()) {
+        chatHoverOpen.value = false;
         lastChatPointerY = Number.NaN;
       }
       updateChatPresentation();
@@ -1732,8 +1747,8 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         document.activeElement?.blur?.();
       }
       chatHead?.blur?.();
-      chatPinnedOpen = false;
-      chatHoverOpen = false;
+      chatPinnedOpen.value = false;
+      chatHoverOpen.value = false;
       chatDismissedUntilPointerLeavesRail = true;
       lastChatPointerY = Number.NaN;
       updateChatPresentation();
@@ -1750,7 +1765,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       entry.append(title, body);
       targetLog.appendChild(entry);
       targetLog.scrollTop = targetLog.scrollHeight;
-      unreadChatCount += 1;
+      unreadChatCount.value += 1;
       updateChatPresentation();
     }
 
@@ -2137,10 +2152,10 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         lastChatPointerY = clientY;
       }
 
-      if (chatPinnedOpen || isChatActive()) {
+      if (chatPinnedOpen.value || isChatActive()) {
         chatDismissedUntilPointerLeavesRail = false;
-        if (!chatHoverOpen) {
-          chatHoverOpen = true;
+        if (!chatHoverOpen.value) {
+          chatHoverOpen.value = true;
           updateChatPresentation();
         }
         return;
@@ -2157,8 +2172,8 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
 
       if (chatDismissedUntilPointerLeavesRail) {
         if (nextOpen) {
-          if (chatHoverOpen) {
-            chatHoverOpen = false;
+          if (chatHoverOpen.value) {
+            chatHoverOpen.value = false;
             updateChatPresentation();
           }
           return;
@@ -2175,11 +2190,11 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       }
       chatHoverTransitionTimer = window.setTimeout(() => {
         chatHoverTransitionTimer = null;
-        if (chatPinnedOpen || isChatActive()) {
+        if (chatPinnedOpen.value || isChatActive()) {
           return;
         }
-        if (chatHoverOpen !== nextOpen) {
-          chatHoverOpen = nextOpen;
+        if (chatHoverOpen.value !== nextOpen) {
+          chatHoverOpen.value = nextOpen;
           updateChatPresentation();
         }
       }, nextOpen ? 70 : 180);
@@ -2229,8 +2244,8 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         ...drawerDefaults.right,
         ...(uiPreferences.right || {}),
       };
-      chatHoverOpen = true;
-      chatPinnedOpen = false;
+      chatHoverOpen.value = true;
+      chatPinnedOpen.value = false;
       chatDismissedUntilPointerLeavesRail = false;
       if (chatHoverTransitionTimer) {
         window.clearTimeout(chatHoverTransitionTimer);
@@ -5509,7 +5524,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       try {
         initializeShellChrome(null);
         headerHoverOpen.value = true;
-        chatHoverOpen = false;
+        chatHoverOpen.value = false;
         drawerHoverOpen.left = true;
         drawerHoverOpen.right = true;
         if (stageStatus) {
@@ -5747,7 +5762,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     chatPanel?.addEventListener("focusin", syncChatOpenState);
     chatPanel?.addEventListener("focusout", (event) => {
       if (!chatPanel?.contains(event.relatedTarget)) {
-        chatHoverOpen = false;
+        chatHoverOpen.value = false;
         updateChatPresentation();
       }
     });
@@ -5756,23 +5771,23 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     });
     chatHead?.addEventListener("click", (event) => {
       event.preventDefault();
-      if (chatPinnedOpen) {
+      if (chatPinnedOpen.value) {
         closeChatPanel();
         return;
       }
       setChatPinnedOpen(true);
-      chatHoverOpen = true;
+      chatHoverOpen.value = true;
       chatInput?.focus({ preventScroll: true });
     });
     chatHead?.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        if (chatPinnedOpen) {
+        if (chatPinnedOpen.value) {
           closeChatPanel();
           return;
         }
         setChatPinnedOpen(true);
-        chatHoverOpen = true;
+        chatHoverOpen.value = true;
         chatInput?.focus({ preventScroll: true });
       }
     });
@@ -6161,7 +6176,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         closeContextMenu();
       }
       const clickTarget = event.target instanceof Element ? event.target : null;
-      if (chatPanel && clickTarget && !clickTarget.closest("#chat-panel") && (chatPinnedOpen || isChatActive() || chatHoverOpen)) {
+      if (chatPanel && clickTarget && !clickTarget.closest("#chat-panel") && (chatPinnedOpen.value || isChatActive() || chatHoverOpen.value)) {
         closeChatPanel();
       }
       if (accountMenu && !accountMenu.hidden && !event.target.closest("#account-menu") && !event.target.closest("#account-menu-toggle")) {
