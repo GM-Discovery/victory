@@ -1416,7 +1416,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       if (prefs.pinned || isHeaderDetailsVisible()) {
         if (!headerHoverOpen.value) {
           headerHoverOpen.value = true;
-          updateHeaderPresentation();
         }
         return;
       }
@@ -1431,7 +1430,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
 
       if (nextOpen !== headerHoverOpen.value) {
         headerHoverOpen.value = nextOpen;
-        updateHeaderPresentation();
       }
     }
 
@@ -1440,7 +1438,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       const prefs = uiPreferences?.header || shellDefaults.header;
       if (prefs.pinned || isHeaderDetailsVisible()) return;
       headerHoverOpen.value = false;
-      updateHeaderPresentation();
     }
 
     function setHeaderPinned(pinned) {
@@ -1452,7 +1449,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       if (!pinned) {
         closeHeaderHoverState();
       }
-      updateHeaderPresentation();
     }
 
     function closeHeaderSettings() {
@@ -1494,7 +1490,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         [key]: value,
       };
       saveUiPreferences();
-      applyDrawerState(side);
     }
 
     function scheduleDrawerHoverClose(side) {
@@ -1511,7 +1506,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
           return;
         }
         drawerHoverOpen[side] = false;
-        applyDrawerState(side);
       }, 120);
     }
 
@@ -1524,7 +1518,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
           window.clearTimeout(drawerHoverCloseTimers[side]);
           drawerHoverCloseTimers[side] = null;
         }
-        applyDrawerState(side);
         return;
       }
       if (prefs.mode === "always-closed") {
@@ -1533,7 +1526,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
           window.clearTimeout(drawerHoverCloseTimers[side]);
           drawerHoverCloseTimers[side] = null;
         }
-        applyDrawerState(side);
         return;
       }
       if (open) {
@@ -1542,7 +1534,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
           drawerHoverCloseTimers[side] = null;
         }
         drawerHoverOpen[side] = true;
-        applyDrawerState(side);
         return;
       }
       scheduleDrawerHoverClose(side);
@@ -1590,15 +1581,25 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       }
     }
 
-    // Kernel 95 Pass 2: every existing call site above that mutates
-    // uiPreferences.left/right, drawerHoverOpen, or drawerForcedOpen also
-    // still calls applyDrawerState(side) explicitly, exactly as before --
-    // this is purely additive, not a replacement. flush: "sync" means it
-    // runs synchronously on the same tick a tracked property changes
-    // (not batched to a microtask), so it never introduces a visible
-    // frame of stale DOM the way default-flush watchEffect could. Net
-    // effect: a future mutation site that forgets to call
-    // applyDrawerState no longer silently does nothing.
+    // Kernel 95 Pass 2: this is the only thing that calls applyDrawerState
+    // now -- the manual calls that used to follow every mutation site
+    // were removed once this was verified safe (Pass 2 cleanup).
+    // flush: "sync" means it runs synchronously on the same tick a
+    // tracked property changes (not batched to a microtask), so there's
+    // no visible frame of stale DOM the way default-flush watchEffect
+    // could produce.
+    //
+    // Watch out if editing initializeShellChrome: uiPreferences gets
+    // *reassigned* there (a brand new reactive() object via
+    // loadUiPreferencesForKey, not a mutation of the existing one), and
+    // a plain reassignment isn't itself trackable -- this effect stays
+    // subscribed to whatever object uiPreferences pointed to on its last
+    // run. What actually re-syncs it is that initializeShellChrome also
+    // mutates drawerHoverOpen.left/right (a stable ref this effect
+    // already depends on) in the same synchronous pass, which forces a
+    // fresh run that re-reads the new uiPreferences and re-subscribes to
+    // it. Removing that mutation (or reordering it after any code that
+    // reads the drawer's rendered state) would silently break this.
     watchEffect(() => applyDrawerState("left"), { flush: "sync" });
     watchEffect(() => applyDrawerState("right"), { flush: "sync" });
 
@@ -1623,12 +1624,18 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       updateConnectionPresentation();
     }
 
-    // Kernel 95 Pass 2 (subpass e): same additive pattern as the drawers
-    // above. updateHeaderPresentation is also called directly from many
-    // unrelated places in this file (network/connection status changes,
-    // not just hover/pin) -- none of those existing calls were removed,
-    // this is only a safety net for the header-specific reactive state
-    // (headerHoverOpen, uiPreferences.header).
+    // Kernel 95 Pass 2 (subpass e): same pattern as the drawers above --
+    // this is now the only thing driving a re-render for headerHoverOpen/
+    // uiPreferences.header changes; the manual calls that used to follow
+    // every such mutation were removed once verified safe. Two call
+    // sites remain deliberately: the one inside initializeShellChrome (it
+    // reassigns uiPreferences to a new object, and nothing else in that
+    // function touches headerHoverOpen to force a re-subscribe the way
+    // the drawers' code does -- see the comment above the drawer
+    // watchEffects), and the one in the account-menu toggle handler,
+    // which reacts to accountMenu.hidden -- a plain DOM property
+    // isHeaderDetailsVisible() reads, not a reactive dependency this
+    // effect can see change on its own.
     watchEffect(() => updateHeaderPresentation(), { flush: "sync" });
 
     function isChatActive() {
@@ -1671,7 +1678,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     function appendSystemChatNotice(text) {
       appendChatEntry("System", text);
       unreadChatCount.value = 0;
-      updateChatPresentation();
     }
 
     function updateChatPresentation() {
@@ -1703,14 +1709,14 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       }
     }
 
-    // Kernel 95 Pass 2 (subpass c): same additive safety net as subpasses
-    // a and e -- every existing call site that mutates chatHoverOpen,
-    // chatPinnedOpen, unreadChatCount, or uiPreferences.chat still calls
-    // updateChatPresentation() explicitly too. isChatActive() and
-    // currentShowingIsOpen() read plain (non-reactive) state, same as
-    // today -- calling them fresh on every tracked-dependency change is
-    // exactly what the explicit calls already did, not a change in when
-    // they're evaluated.
+    // Kernel 95 Pass 2 (subpass c): same pattern as subpasses a and e --
+    // every mutation of chatHoverOpen, chatPinnedOpen, unreadChatCount,
+    // or uiPreferences.chat now goes through this instead of an explicit
+    // call. The two call sites that remain (syncChatOpenState, wired to
+    // chat-panel focusin; the dice tray's onAction callback) both react
+    // to state this effect has no way to see change on its own --
+    // document.activeElement and dice-roll history respectively, neither
+    // of which is a reactive dependency.
     watchEffect(() => updateChatPresentation(), { flush: "sync" });
 
     function setChatHoverOpen(open) {
@@ -1722,7 +1728,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       if (!chatHoverOpen.value && !chatPinnedOpen.value && !isChatActive()) {
         lastChatPointerY = Number.NaN;
       }
-      updateChatPresentation();
     }
 
     function setChatPinnedOpen(open) {
@@ -1735,7 +1740,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         chatHoverOpen.value = false;
         lastChatPointerY = Number.NaN;
       }
-      updateChatPresentation();
     }
 
     function closeChatPanel() {
@@ -1751,7 +1755,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       chatHoverOpen.value = false;
       chatDismissedUntilPointerLeavesRail = true;
       lastChatPointerY = Number.NaN;
-      updateChatPresentation();
     }
 
     function appendChatEntry(author, text, targetLog = chatLog) {
@@ -1766,7 +1769,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       targetLog.appendChild(entry);
       targetLog.scrollTop = targetLog.scrollHeight;
       unreadChatCount.value += 1;
-      updateChatPresentation();
     }
 
     function appendChatActionLine(action) {
@@ -2156,7 +2158,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         chatDismissedUntilPointerLeavesRail = false;
         if (!chatHoverOpen.value) {
           chatHoverOpen.value = true;
-          updateChatPresentation();
         }
         return;
       }
@@ -2174,7 +2175,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         if (nextOpen) {
           if (chatHoverOpen.value) {
             chatHoverOpen.value = false;
-            updateChatPresentation();
           }
           return;
         }
@@ -2195,7 +2195,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         }
         if (chatHoverOpen.value !== nextOpen) {
           chatHoverOpen.value = nextOpen;
-          updateChatPresentation();
         }
       }, nextOpen ? 70 : 180);
       if (nextOpen) {
@@ -2265,9 +2264,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       updateShellTargetPresentation();
       updateHeaderPresentation();
       updateStatusSummary();
-      applyDrawerState("left");
-      applyDrawerState("right");
-      updateChatPresentation();
       if (presenceRefreshTimer) {
         window.clearInterval(presenceRefreshTimer);
       }
@@ -5530,12 +5526,8 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         if (stageStatus) {
           stageStatus.hidden = false;
         }
-        applyDrawerState("left");
-        applyDrawerState("right");
         updateShellMetaPresentation();
         updateShellTargetPresentation();
-        updateHeaderPresentation();
-        updateChatPresentation();
         setStageStatus(`${VENUE.name} shell ready. Load live tools when you want the full stage.`);
         window.__stageRuntimeBootstrapped = true;
       } catch (error) {
@@ -5583,7 +5575,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       // own saved drawer preference.
       setRightTrayForcedOpen: (open) => {
         drawerForcedOpen.right = Boolean(open);
-        applyDrawerState("right");
       },
     };
     runtimeLifecycle.listen(window, "beforeunload", () => runtimeLifecycle.dispose());
@@ -5632,8 +5623,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         initializeShellChrome(currentIdentity);
         updateShellMetaPresentation();
         updateShellTargetPresentation();
-        updateHeaderPresentation();
-        updateChatPresentation();
         // A venue with no rehearsal/live Session (post Kernel 70A, Sessions
         // start from Stage Management) is a normal idle state, not a boot
         // failure: skip the socket, keep the stage read-only, and let the
@@ -5702,7 +5691,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         opacity: clampNumber(headerOpacity.value, 0, 100, 100),
       };
       saveUiPreferences();
-      updateHeaderPresentation();
     });
 
     chatOpacity?.addEventListener("input", () => {
@@ -5711,7 +5699,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         opacity: clampNumber(chatOpacity.value, 0, 100, 96),
       };
       saveUiPreferences();
-      updateChatPresentation();
     });
 
     leftDrawer?.addEventListener("pointerenter", () => setDrawerHoverState("left", true));
@@ -5763,7 +5750,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     chatPanel?.addEventListener("focusout", (event) => {
       if (!chatPanel?.contains(event.relatedTarget)) {
         chatHoverOpen.value = false;
-        updateChatPresentation();
       }
     });
     chatPanel?.addEventListener("pointerdown", (event) => {
