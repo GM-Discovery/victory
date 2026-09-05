@@ -33,14 +33,39 @@
         background: rgba(255, 255, 255, 0.12);
       }
 
+      /* Kernel 95 Pass 4: this used to be a permanently bold, fully
+         opaque banner (heavy blur, near-black background, full-white
+         text) regardless of anything else on screen -- the one piece of
+         chrome that never receded. Quiet at rest, full presence on
+         hover/focus, same "present on demand" language as the tray
+         settings buttons and the header itself. */
       .back-to-map-link--floating {
         position: fixed;
-        top: 14px;
-        left: 14px;
+        top: 12px;
+        left: 12px;
         z-index: 95;
+        padding: 8px 14px;
+        min-height: 34px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.82);
+        background: rgba(12, 14, 18, 0.32);
+        backdrop-filter: blur(3px);
+        opacity: 0.55;
+        transition: opacity 180ms ease, background 180ms ease, color 180ms ease;
+      }
+
+      .back-to-map-link--floating:hover,
+      .back-to-map-link--floating:focus-visible {
+        opacity: 1;
         color: #fff;
         background: rgba(12, 14, 18, 0.72);
         backdrop-filter: blur(10px);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .back-to-map-link--floating {
+          transition-duration: 1ms;
+        }
       }
     `;
     document.head.appendChild(style);

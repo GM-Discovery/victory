@@ -1552,13 +1552,18 @@
     }
 
     .top-bar[data-open="false"] {
+      /* Collapsed means collapsed: no visible bar, no blur, nothing
+         claiming screen real estate above the stage -- min-height stays
+         just large enough to remain a hoverable hit-region for the
+         reveal-on-approach trigger (syncHeaderHoverState's triggerLine),
+         not to render anything. */
       min-height: 12px;
       padding: 0 14px;
-      border-radius: 0 0 18px 18px;
-      background: linear-gradient(180deg, rgba(15, 18, 25, 0.06), rgba(8, 10, 15, 0.03));
+      border-radius: 0;
+      background: transparent;
       border-color: transparent;
       box-shadow: none;
-      backdrop-filter: blur(2px);
+      backdrop-filter: none;
       overflow: hidden;
     }
 
