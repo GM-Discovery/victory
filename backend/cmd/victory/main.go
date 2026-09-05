@@ -309,7 +309,13 @@ func main() {
 	mux.HandleFunc("/api/player-profile/events/", playerprofile.HandleDeleteEvent(pool, playerProfileNotify))
 	mux.HandleFunc("/api/player-profile/", playerprofile.HandleSocialFace(pool))
 	mux.HandleFunc("/api/player-relationships/catalogue", playerrelationships.HandleCatalogue(pool))
-	mux.HandleFunc("/api/player-relationships", playerrelationships.HandleCollection(pool))
+	// Kernel 95 §13: split so the POST (create -- one new row per distinct
+	// pair, but nothing stopped one account from creating many rows fast)
+	// picks up the same actionLimiter already applied to other
+	// creates-a-thing endpoints (messages, note-cards, audience notes);
+	// GET (listing your own relationships) stays unthrottled.
+	mux.HandleFunc("GET /api/player-relationships", playerrelationships.HandleCollection(pool))
+	mux.HandleFunc("POST /api/player-relationships", ratelimit.Middleware(actionLimiter, playerrelationships.HandleCollection(pool)))
 	mux.HandleFunc("/api/player-relationships/", playerrelationships.HandleByID(pool))
 	mux.HandleFunc("/api/third-place/headshots", thirdplace.HandleCollection(pool))
 	mux.HandleFunc("/api/third-place/headshots/me", thirdplace.HandleMe(pool))
