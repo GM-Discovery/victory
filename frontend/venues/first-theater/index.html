@@ -555,7 +555,9 @@
       padding: 8px 14px;
       min-height: 54px;
       overflow: visible;
-      transition: padding 180ms ease, transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+      transition-property: padding, transform, box-shadow, background, min-height;
+      transition-timing-function: ease;
+      transition-duration: 180ms;
       --header-surface-opacity: 0.95;
       background: linear-gradient(180deg, rgba(15, 18, 25, var(--header-surface-opacity)), rgba(8, 10, 15, calc(var(--header-surface-opacity) - 0.06)));
     }
@@ -575,18 +577,68 @@
       padding: 10px 14px;
       min-height: 58px;
       transform: translateY(0);
+      transition-duration: 140ms;
+    }
+
+    .top-bar[data-open="false"] {
+      transition-duration: 420ms;
+      transition-timing-function: ease-out;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .top-bar,
+      .top-bar[data-open="true"],
+      .top-bar[data-open="false"] {
+        transition-duration: 1ms;
+      }
+    }
+
+    .header-left,
+    .header-center,
+    .header-right,
+    .camera-controls {
+      /* display: none used to sit alongside opacity/transform here,
+         which meant this content could never actually fade -- display
+         can't be transitioned, so it just vanished the instant the
+         header collapsed. Visibility is now delayed until the fade
+         finishes (reversed instantly on the way back in) so it's still
+         out of the tab order once hidden, without blocking the fade
+         itself. */
+      transition-property: opacity, transform, visibility;
+      transition-timing-function: ease-out;
+      /* visibility itself must flip instantly (0s) the moment its own
+         delay elapses -- giving it the same 380ms duration as
+         opacity/transform would add a second 380ms on top of the delay
+         before it actually becomes hidden (760ms total instead of
+         380ms), since visibility's start-or-end-of-transition flip
+         still respects a nonzero duration. */
+      transition-duration: 380ms, 380ms, 0s;
+      transition-delay: 0s, 0s, 0s;
     }
 
     .top-bar[data-open="false"] .header-left,
     .top-bar[data-open="false"] .header-center,
     .top-bar[data-open="false"] .header-right,
-    .top-bar[data-open="false"] .camera-controls,
-    .top-bar[data-open="false"] .header-settings-panel {
+    .top-bar[data-open="false"] .camera-controls {
       opacity: 0;
       transform: translateY(-8px);
       pointer-events: none;
       visibility: hidden;
+      transition-delay: 0s, 0s, 380ms;
+    }
+
+    .top-bar[data-open="false"] .header-settings-panel {
       display: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .header-left,
+      .header-center,
+      .header-right,
+      .camera-controls {
+        transition-duration: 1ms;
+        transition-delay: 0s;
+      }
     }
 
     .brand {
@@ -601,8 +653,7 @@
     }
 
     .brand p,
-    .status-strip,
-    .header-center {
+    .status-strip {
       transition: opacity 160ms ease, transform 160ms ease;
     }
 
@@ -815,9 +866,34 @@
       bottom: 60px;
       width: var(--left-drawer-width, 20px);
       overflow: visible;
-      transition: width 180ms ease, transform 180ms ease, background 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+      /* Kernel 95 Pass 4: EQ2-style presence -- quick and certain when
+         summoned, unhurried and graceful when stepping back. Opacity is
+         now part of this list (it wasn't before, so the 1 -> 0.34 quiet
+         state used to snap instead of fade); the actual duration is set
+         per open/closed state below since a single shared duration
+         can't be both "instant on demand" and "gently recedes". */
+      transition-property: width, transform, background, box-shadow, border-color, opacity;
+      transition-timing-function: ease;
+      transition-duration: 180ms;
       --drawer-surface-opacity: 0.9;
       background: linear-gradient(180deg, rgba(15, 18, 25, var(--drawer-surface-opacity)), rgba(8, 10, 15, calc(var(--drawer-surface-opacity) - 0.06)));
+    }
+
+    .drawer[data-open="true"] {
+      transition-duration: 140ms;
+    }
+
+    .drawer[data-open="false"] {
+      transition-duration: 420ms;
+      transition-timing-function: ease-out;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .drawer,
+      .drawer[data-open="true"],
+      .drawer[data-open="false"] {
+        transition-duration: 1ms;
+      }
     }
 
     .drawer-inner {
@@ -878,6 +954,25 @@
       justify-content: center;
       cursor: pointer;
       flex-shrink: 0;
+      /* Kernel 95 Pass 4: present on demand rather than always fully
+         lit -- dimmed (not hidden -- still there to find, per K94's
+         caution about controls with no alternate discovery path) until
+         the tray itself is actually being used. */
+      opacity: 0.55;
+      transition: opacity 180ms ease;
+    }
+
+    .drawer:hover .drawer-settings-button,
+    .drawer:focus-within .drawer-settings-button,
+    .drawer-settings-button:focus-visible,
+    .drawer-settings-button[aria-expanded="true"] {
+      opacity: 1;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .drawer-settings-button {
+        transition-duration: 1ms;
+      }
     }
 
     .drawer-settings-button:hover {
@@ -916,8 +1011,35 @@
       pointer-events: none;
     }
 
+    /* Kernel 95 Pass 4: this used to be display: none, which (like the
+       header fix above) meant the drawer's own 420ms graceful-fade
+       transition on the container was pure theater -- the content
+       inside it still vanished instantly, so it read as the container
+       slowly dimming around an already-empty box. Same delayed-
+       visibility technique: opacity/pointer-events go first, visibility
+       flips to hidden only once the fade has actually finished. */
     .drawer[data-open="false"] .drawer-body {
-      display: none;
+      opacity: 0;
+      pointer-events: none;
+      visibility: hidden;
+      transition-property: opacity, visibility;
+      transition-timing-function: ease-out;
+      transition-duration: 380ms, 0s;
+      transition-delay: 0s, 380ms;
+    }
+
+    .drawer[data-open="true"] .drawer-body {
+      opacity: 1;
+      visibility: visible;
+      transition-duration: 140ms;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .drawer[data-open="false"] .drawer-body,
+      .drawer[data-open="true"] .drawer-body {
+        transition-duration: 1ms;
+        transition-delay: 0s;
+      }
     }
 
     .drawer[data-open="true"] .drawer-item,
@@ -1395,7 +1517,13 @@
       bottom: -4px;
       z-index: 87;
       overflow: hidden;
-      transition: opacity 180ms ease, transform 180ms ease, box-shadow 180ms ease, background 180ms ease, border-color 180ms ease;
+      /* Kernel 95 Pass 4: same asymmetric presence as the drawers/header
+         -- width wasn't in this list before, so the collapsed-rail ->
+         full-width jump snapped even though opacity/transform already
+         animated. */
+      transition-property: opacity, transform, box-shadow, background, border-color, width;
+      transition-timing-function: ease;
+      transition-duration: 180ms;
       transform: translateX(-50%) translateY(calc(100% - var(--chat-rail-height, 64px)));
       border-radius: 18px;
       box-shadow: 0 16px 42px rgba(0, 0, 0, 0.34);
@@ -1416,11 +1544,22 @@
       box-shadow: none;
       background: linear-gradient(180deg, rgba(15, 18, 25, 0.05), rgba(8, 10, 15, 0.02));
       backdrop-filter: blur(2px);
+      transition-duration: 420ms;
+      transition-timing-function: ease-out;
     }
 
     .chat-panel[data-open="true"] {
       --chat-panel-width: min(75vw, 1080px);
       opacity: 1;
+      transition-duration: 140ms;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .chat-panel,
+      .chat-panel[data-open="true"],
+      .chat-panel[data-open="false"] {
+        transition-duration: 1ms;
+      }
     }
 
     .chat-panel:hover,
