@@ -1833,18 +1833,52 @@
       right: 0;
       top: calc(100% + 10px);
       min-width: 180px;
-      border: 1px solid rgba(186, 208, 239, 0.14);
+      border: 1px solid rgba(240, 208, 155, 0.16);
       border-radius: 16px;
-      background: rgba(11, 18, 29, 0.98);
+      background: rgba(15, 18, 25, 0.96);
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
       padding: 8px;
       display: grid;
       gap: 6px;
       z-index: 9;
+      /* Kernel 95 Pass 5: K94's modal/popup entrance pattern (opacity +
+         scale, no translate for a small contextual menu) -- was an
+         instant on/off via [hidden]'s display: none, which can't
+         animate. Same delayed-visibility technique as the header/drawer
+         fades: opacity/transform/pointer-events flip immediately,
+         visibility (and thus removal from the a11y tree) waits for the
+         transition to actually finish. */
+      transform-origin: top right;
+      opacity: 1;
+      transform: scale(1);
+      visibility: visible;
+      pointer-events: auto;
+      transition: opacity 120ms ease, transform 120ms ease, visibility 0s linear 0s;
     }
 
     .account-menu[hidden] {
-      display: none;
+      /* !important is load-bearing here: /lib/forbidden.css ships a
+         global [hidden] { display: none !important; } (its own
+         "hidden-fix-1" -- unrelated to this menu, presumably added for
+         some other component), which otherwise wins over this
+         non-important override regardless of specificity and silently
+         defeats the whole animation -- found by checking getAnimations()
+         and computed display after the plain override produced zero
+         transition events. */
+      display: grid !important;
+      opacity: 0;
+      transform: scale(0.96);
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 140ms ease, transform 140ms ease, visibility 0s linear 140ms;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .account-menu,
+      .account-menu[hidden] {
+        transition-duration: 1ms;
+        transition-delay: 0s;
+      }
     }
 
     .account-menu a,
@@ -1861,7 +1895,7 @@
       border: 0;
       border-radius: 12px;
       background: rgba(255, 255, 255, 0.04);
-      color: #eef4ff;
+      color: var(--text);
       text-decoration: none;
       text-align: left;
       padding: 10px 12px;
@@ -2172,7 +2206,7 @@
       border-radius: 10px;
       border: 1px solid rgba(255, 255, 255, 0.14);
       background: rgba(8, 13, 20, 0.86);
-      color: #eef4ff;
+      color: var(--text);
       padding: 9px 10px;
     }
 
@@ -2492,6 +2526,58 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
+    }
+
+    /* Kernel 95 Pass 5: the Audience "Send Fanmail" note field had no
+       CSS at all -- inline layout styles only, so it rendered as an
+       unthemed white browser-default textarea/button sitting in an
+       otherwise dark UI. */
+    .audience-note-input {
+      width: 100%;
+      resize: vertical;
+      box-sizing: border-box;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(8, 7, 6, 0.78);
+      color: var(--text);
+      padding: 9px 10px;
+      font: inherit;
+    }
+
+    .audience-note-input:focus-visible {
+      outline: 2px solid rgba(240, 201, 107, 0.85);
+      outline-offset: 1px;
+    }
+
+    .audience-note-send {
+      margin-top: 6px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(240, 208, 155, 0.22);
+      background: rgba(240, 208, 155, 0.1);
+      color: var(--text);
+      cursor: pointer;
+      font: inherit;
+      transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+    }
+
+    .audience-note-send:hover {
+      background: rgba(240, 208, 155, 0.18);
+      border-color: rgba(240, 208, 155, 0.34);
+      transform: translateY(-1px);
+    }
+
+    .audience-note-status {
+      margin-top: 4px;
+      font-size: 11px;
+      opacity: 0.8;
+      color: var(--text);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .audience-note-send {
+        transition-duration: 1ms;
+      }
     }
 
     .dice-tray__preview {
@@ -3694,10 +3780,33 @@
       box-shadow: 0 18px 50px rgba(0, 0, 0, 0.36);
       padding: 8px;
       pointer-events: auto;
+      /* Kernel 95 Pass 5: same popup entrance as the account menu --
+         grows from the cursor position it was opened at instead of
+         snapping in via [hidden]'s display: none. */
+      transform-origin: top left;
+      opacity: 1;
+      transform: scale(1);
+      visibility: visible;
+      transition: opacity 120ms ease, transform 120ms ease, visibility 0s linear 0s;
     }
 
     .context-menu[hidden] {
-      display: none;
+      /* !important required -- see the account-menu[hidden] comment
+         above; same global forbidden.css rule applies here. */
+      display: block !important;
+      opacity: 0;
+      transform: scale(0.96);
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 140ms ease, transform 140ms ease, visibility 0s linear 140ms;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .context-menu,
+      .context-menu[hidden] {
+        transition-duration: 1ms;
+        transition-delay: 0s;
+      }
     }
 
     .context-menu button {
@@ -4412,9 +4521,9 @@
                       <div id="audience-health-list"></div>
                     </div>
                     <div class="drawer-item">
-                      <textarea id="audience-note-body" rows="2" maxlength="250" placeholder="Message" style="width:100%; resize:vertical; box-sizing:border-box;"></textarea>
-                      <button id="audience-note-send" type="button" style="margin-top:6px;">Send Note</button>
-                      <div id="audience-note-status" style="margin-top:4px; font-size:11px; opacity:0.8;"></div>
+                      <textarea id="audience-note-body" class="audience-note-input" rows="2" maxlength="250" placeholder="Message"></textarea>
+                      <button id="audience-note-send" class="audience-note-send" type="button">Send Note</button>
+                      <div id="audience-note-status" class="audience-note-status"></div>
                     </div>
                   </div>
                 </div>
