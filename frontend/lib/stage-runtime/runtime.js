@@ -2313,6 +2313,12 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       }
       presenceRefreshTimer = window.setInterval(refreshPresencePreview, 15000);
       refreshPresencePreview();
+      // Kernel 95 Pass 6: only worth checking once a real identity has
+      // resolved (the first initializeShellChrome(null) call at boot
+      // hasn't confirmed a session yet) -- the account-menu-toggle chip
+      // itself carries data-mailbox-pip-target, so this is visible
+      // without the user needing to open the dropdown at all.
+      if (identity) window.VictoryMailboxBadge?.refreshPips?.();
     }
 
     function closeContextMenu() {
@@ -5898,6 +5904,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         accountMenuToggle.setAttribute("aria-expanded", String(!accountMenu.hidden));
         syncHeaderHoverState();
         updateHeaderPresentation();
+        if (!accountMenu.hidden) window.VictoryMailboxBadge?.refreshPips?.();
       }
     });
 
