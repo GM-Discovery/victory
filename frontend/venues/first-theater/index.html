@@ -1915,8 +1915,64 @@
       border-radius: 14px;
       border: 1px solid rgba(255,255,255,0.08);
       background: rgba(255,255,255,0.04);
-      color: #d5e0d3;
+      color: var(--text);
       line-height: 1.5;
+    }
+
+    /* Kernel 95 Pass 7: the Guide tab's command list, grouped by purpose
+       instead of the flat stack of identical boxes this used to be --
+       same chip-on-hairline + hierarchy-through-spacing language as
+       everywhere else, not a bordered card per command. */
+    .chat-command-guide {
+      display: grid;
+      gap: 4px;
+    }
+
+    .chat-command-guide__section + .chat-command-guide__section {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+    }
+
+    .chat-command-guide__heading {
+      display: inline-block;
+      justify-self: start;
+      color: var(--accent-strong);
+      background: rgba(240, 201, 107, 0.1);
+      border: 1px solid rgba(240, 201, 107, 0.18);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.66rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+
+    .chat-command-guide__item {
+      padding: 8px 2px;
+    }
+
+    .chat-command-guide__title {
+      font-weight: 700;
+      color: var(--text);
+      font-size: 0.92rem;
+    }
+
+    .chat-command-guide__usage {
+      display: block;
+      margin: 2px 0 4px;
+      color: var(--accent);
+      font-size: 0.8rem;
+      font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+      opacity: 0.85;
+    }
+
+    .chat-command-guide__desc {
+      margin: 0;
+      color: #b5c5de;
+      font-size: 0.86rem;
+      line-height: 1.4;
     }
 
     .chat-log {

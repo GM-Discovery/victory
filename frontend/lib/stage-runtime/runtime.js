@@ -1973,25 +1973,69 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       }
     }
 
+    // Kernel 95 Pass 7: which raw backend Category maps to which
+    // human-purpose section, and the order those sections render in. The
+    // backend's Category strings ("ooc"/"ic"/"system") are implementation
+    // namespaces, not something a player is trying to *do* -- the K95 doc
+    // is explicit that the Guide should organize by purpose instead. ooc
+    // and ic intentionally collapse into one "Chat" section: from a
+    // player's side these are both "how do I say something," not two
+    // separate concerns.
+    const COMMAND_GUIDE_GROUPS = {
+      character: { label: "Character", order: 1 },
+      dice: { label: "Dice", order: 2 },
+      ooc: { label: "Chat", order: 3 },
+      ic: { label: "Chat", order: 3 },
+      system: { label: "Session & Venue", order: 4 },
+    };
+
     async function renderCommandGuide() {
       if (!chatHelpPanel) return;
       const catalogue = await window.VictoryCommandPalette?.fetchCatalogue?.(VENUE.slug, currentSessionId);
       const commands = catalogue?.commands;
       if (!Array.isArray(commands) || commands.length === 0) return;
-      chatHelpPanel.innerHTML = "";
-      const list = document.createElement("div");
-      list.className = "chat-command-guide";
+
+      const sections = new Map();
       for (const cmd of commands) {
-        const row = document.createElement("p");
-        row.className = "chat-sidebar-copy";
-        const usage = document.createElement("strong");
-        usage.textContent = cmd.usage || `/${cmd.path}`;
-        const desc = document.createElement("span");
-        desc.textContent = ` — ${cmd.description || ""}`;
-        row.append(usage, desc);
-        list.appendChild(row);
+        const group = COMMAND_GUIDE_GROUPS[cmd.category] || { label: "Other", order: 99 };
+        if (!sections.has(group.label)) sections.set(group.label, { order: group.order, items: [] });
+        sections.get(group.label).items.push(cmd);
       }
-      chatHelpPanel.appendChild(list);
+      const orderedSections = [...sections.entries()].sort((a, b) => a[1].order - b[1].order);
+
+      chatHelpPanel.innerHTML = "";
+      const guide = document.createElement("div");
+      guide.className = "chat-command-guide";
+      for (const [label, { items }] of orderedSections) {
+        const section = document.createElement("div");
+        section.className = "chat-command-guide__section";
+        const heading = document.createElement("div");
+        heading.className = "chat-command-guide__heading";
+        heading.textContent = label;
+        section.appendChild(heading);
+        for (const cmd of items) {
+          const row = document.createElement("div");
+          row.className = "chat-command-guide__item";
+          // Human title leads, syntax follows as a secondary detail --
+          // the old rendering put the raw usage string (e.g. "/char set
+          // name|pronouns|aura <value> | add skill <name> | skills |
+          // advance <skill>") first and biggest, which read as syntax to
+          // decode rather than guidance.
+          const title = document.createElement("div");
+          title.className = "chat-command-guide__title";
+          title.textContent = cmd.title || `/${cmd.path}`;
+          const usage = document.createElement("code");
+          usage.className = "chat-command-guide__usage";
+          usage.textContent = cmd.usage || `/${cmd.path}`;
+          const desc = document.createElement("p");
+          desc.className = "chat-command-guide__desc";
+          desc.textContent = cmd.description || "";
+          row.append(title, usage, desc);
+          section.appendChild(row);
+        }
+        guide.appendChild(section);
+      }
+      chatHelpPanel.appendChild(guide);
     }
 
     async function sendChatDraft() {
