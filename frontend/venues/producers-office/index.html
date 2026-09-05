@@ -232,6 +232,22 @@
       box-shadow: 0 16px 34px rgba(0, 0, 0, 0.24);
     }
 
+    /* Kernel 95 Pass 5: this venue already independently built the same
+       hover-to-reveal header pattern as Catharsis/First Theater's tray
+       system, plus its own button hover-lift -- neither had a
+       reduced-motion accommodation anywhere in the file. Not a visual
+       change; this venue's own palette/card/button design is
+       intentionally left alone (K95 doc: unify interaction grammar, not
+       every venue's decoration). */
+    @media (prefers-reduced-motion: reduce) {
+      .venue-shell--signed-in .header::before,
+      .venue-shell--signed-in .header > *,
+      .button,
+      .chip {
+        transition-duration: 1ms;
+      }
+    }
+
     .grid {
       display: grid;
       gap: 20px;

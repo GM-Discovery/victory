@@ -175,10 +175,33 @@
       color: var(--accent-strong);
       background: rgba(255, 255, 255, 0.03);
       font-weight: 700;
+      /* Kernel 95 Pass 5: this button/chip had zero hover feedback at
+         all, unlike its counterpart in every other venue touched this
+         kernel (including Producer's Office, which shares this same
+         boilerplate) -- added using this venue's own ice-blue --accent
+         rather than importing another venue's color. */
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
     }
 
     .button {
       background: linear-gradient(180deg, #2f4f6b 0%, #21374a 100%);
+    }
+
+    .button:hover,
+    .chip:hover {
+      transform: translateY(-1px);
+      border-color: var(--accent);
+      box-shadow: 0 16px 34px rgba(0, 0, 0, 0.24);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .venue-shell--signed-in .header::before,
+      .venue-shell--signed-in .header > *,
+      .button,
+      .chip,
+      .console-element-actions button {
+        transition-duration: 1ms;
+      }
     }
 
     .grid {
@@ -508,6 +531,7 @@
       cursor: pointer;
       font: inherit;
       font-weight: 700;
+      transition: background 160ms ease;
     }
 
     .console-element-actions button:hover {
