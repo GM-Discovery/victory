@@ -4444,12 +4444,13 @@
                     <span id="character-tray-label">New Character</span>
                   </button>
                   <div class="account-menu-wrap">
-                    <button id="account-menu-toggle" class="chip account-chip" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Open account menu">
+                    <button id="account-menu-toggle" class="chip account-chip" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Open account menu" data-mailbox-pip-target>
                       <span class="account-avatar" aria-hidden="true">CS</span>
                       <span id="account-label">Account</span>
                     </button>
                     <div id="account-menu" class="account-menu" hidden>
                       <a href="/account/">Account</a>
+                      <a href="/mailbox/" data-mailbox-pip-target>Mailbox</a>
                       <button id="account-logout-button" type="button">Log Out</button>
                     </div>
                   </div>
@@ -4953,6 +4954,7 @@
   </div>
 
   <script src="/lib/forbidden.js"></script>
+  <script src="/lib/mailbox-badge.js"></script>
   <script src="/lib/back-to-map.js" data-back-to-map="floating"></script>
   <script src="/lib/pixi.min.js"></script>
   <script src="/lib/victory-pixi-stage.js"></script>

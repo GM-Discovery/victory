@@ -163,6 +163,53 @@ function venueDisplayName(venue) {
   return venueDisplayNameOverrides[venue.slug] || venue.name || venue.slug || "Unknown Venue";
 }
 
+// Kernel 95 Pass 6: this was called (loadAccountLink, below) but never
+// defined -- a ReferenceError thrown on every single signed-in campus page
+// load, silently caught by loadAccountLink's try/catch and papered over by
+// resetting the whole account UI back to its signed-out state. Nobody
+// visiting the campus map while signed in has ever seen their real name,
+// a working account menu, or (as of this kernel) the Mailbox pip -- same
+// "generic account name falls back to handle" convention already used in
+// stage-runtime/runtime.js's updateShellMetaPresentation, for consistency.
+function identityDisplayName(user) {
+  const displayName = String(user?.display_name || "").trim();
+  const handle = String(user?.handle || "").trim();
+  const genericDisplayNames = new Set(["web user", "webuser", "browser user", "browser", "account", "user"]);
+  if (displayName && !genericDisplayNames.has(displayName.toLowerCase())) return displayName;
+  return handle || "Account";
+}
+
+// Kernel 95 Pass 6: roleLabel was also called (loadAccountLink, below) but
+// never defined -- the same copy-the-call-without-the-helper gap as
+// identityDisplayName above, and the same normalizeRole/roleLabel pair
+// already used in stage-runtime/runtime.js, ported here for the exact same
+// role vocabulary.
+function normalizeRole(role) {
+  const value = String(role || "audience").trim().toLowerCase();
+  if (["producer", "director", "operator", "cast", "crew", "audience", "actor"].includes(value)) {
+    return value;
+  }
+  return "audience";
+}
+
+function roleLabel(role) {
+  switch (normalizeRole(role)) {
+    case "producer":
+      return "Producer";
+    case "director":
+      return "Director";
+    case "operator":
+      return "Operator";
+    case "cast":
+    case "actor":
+      return "Cast";
+    case "crew":
+      return "Crew";
+    default:
+      return "Audience";
+  }
+}
+
 function venueHref(slug) {
   switch (slug) {
     case "library":
@@ -250,6 +297,15 @@ function createVenuePin(venue, assetURL, fallbackPositions) {
   }
   if (venue.slug === "first-theater") {
     pin.classList.add("venue-pin--first-theater");
+  }
+  if (venue.slug === "trailers") {
+    // Kernel 95 Pass 6: Mailbox has no map icon of its own -- this pin is
+    // the closest thing to a discoverable "you have new messages" surface
+    // on the map itself, even though Mailbox is technically a separate
+    // feature from the Trailers profile/showcase venue this pin actually
+    // opens. Pip state resolved after all pins are in the DOM (see the
+    // refreshPips() call in loadVenues below).
+    pin.dataset.mailboxPipTarget = "";
   }
   pin.type = "button";
   pin.dataset.venueSlug = venue.slug;
@@ -742,6 +798,11 @@ async function loadVenues() {
     );
     venueIconsEl.appendChild(infoBoothPin);
 
+    // Kernel 95 Pass 6: harmless no-op for a signed-out visitor (the
+    // shared helper's fetch fails closed against an unauthenticated
+    // /api/messages and just leaves the pip off).
+    window.VictoryMailboxBadge?.refreshPips?.(venueIconsEl);
+
     renderMapFog(venues, fallbackPositions);
     renderMapMenu();
     mapState.pinsReady = true;
@@ -770,6 +831,11 @@ async function loadAccountLink() {
     }
     if (infoBoothMailbox) {
       infoBoothMailbox.hidden = !signedIn;
+      // Kernel 95 Pass 6: only worth checking once the link is actually
+      // shown -- window.VictoryMailboxBadge silently no-ops (returns
+      // false) against an unauthenticated /api/messages anyway, but
+      // there's no reason to make that request for a signed-out visitor.
+      if (signedIn) window.VictoryMailboxBadge?.refreshPips?.();
     }
     if (appShell) {
       appShell.classList.toggle("app-shell--signed-in", Boolean(signedIn));
