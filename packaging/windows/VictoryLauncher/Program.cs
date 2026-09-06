@@ -54,22 +54,40 @@ internal static class Program
 
         var trayContext = new TrayApplicationContext();
 
-        // Blocking on this Task before Application.Run is deliberate, not
-        // an oversight: FirstRunWizardForm.ShowDialog() pumps its own
-        // nested message loop regardless of whether the main Application
-        // message loop has started, so this is the standard way to do
-        // "async setup, possibly a modal dialog, then enter the tray
-        // loop" without a WindowsFormsSynchronizationContext existing yet.
-        var initialized = trayContext.InitializeAsync().GetAwaiter().GetResult();
-        if (!initialized)
+        // Application.Run starts FIRST, before InitializeAsync's runtime
+        // setup (WSL2 checks, elevation, waiting on winget) ever runs --
+        // that setup can take minutes and involves waiting on a UAC
+        // prompt, and none of it pumps a message loop by itself outside
+        // FirstRunWizardForm's own modal dialog. Running it before
+        // Application.Run left the tray icon visible but completely
+        // inert (created, but nothing dispatching its click/menu
+        // messages) for that whole stretch -- a real bug this fixes, not
+        // a hypothetical one: it reproduced on real hardware. Idle+= runs
+        // InitializeAsync once the loop is actually pumping, so the icon
+        // stays responsive throughout, and the WindowsFormsSynchronizationContext
+        // Application.Run installs is what lets InitializeAsync's own
+        // awaits safely marshal back to touch _trayIcon/forms afterward.
+        void OnceIdle(object? s, EventArgs e)
         {
-            // First-run wizard was closed without completing setup --
-            // nothing is running, nothing to keep the process alive for.
-            return 0;
+            Application.Idle -= OnceIdle;
+            _ = RunInitializeAsync(trayContext);
         }
+        Application.Idle += OnceIdle;
 
         Application.Run(trayContext);
         GC.KeepAlive(singleInstanceMutex);
         return 0;
+    }
+
+    private static async Task RunInitializeAsync(TrayApplicationContext trayContext)
+    {
+        var initialized = await trayContext.InitializeAsync();
+        if (!initialized)
+        {
+            // First-run wizard was closed without completing setup, or a
+            // reboot is now required -- nothing is running, no reason to
+            // keep the tray icon up.
+            Application.Exit();
+        }
     }
 }
