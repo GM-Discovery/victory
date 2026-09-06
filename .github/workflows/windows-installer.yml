@@ -17,10 +17,10 @@ name: Windows installer build
 # push to GM-Discovery/victory-releases specifically -- this repo's own
 # ambient GITHUB_TOKEN can only ever act on this repo, never a different
 # one. Add it under Settings > Secrets and variables > Actions in THIS
-# repo (victory, not victory-releases). Until that secret exists and
-# GM-Discovery/victory-releases exists as a public repo, the pack/upload
-# steps below will fail -- the build/publish steps above them still
-# succeed and upload their own artifact independently either way.
+# repo (victory, not victory-releases). Until that secret exists, only
+# the upload-to-github-releases half of the pack/upload step below
+# fails -- vpk pack itself doesn't need it, so a real installer .exe is
+# still produced and uploaded as this run's own artifact either way.
 
 on:
   push:
@@ -73,12 +73,13 @@ jobs:
       - name: Publish (self-contained win-x64)
         run: dotnet publish --configuration Release --no-restore -r win-x64 --self-contained true -o publish
 
-      - name: Upload publish output
-        uses: actions/upload-artifact@v4
-        with:
-          name: VictoryLauncher-win-x64
-          path: packaging/windows/VictoryLauncher/publish/
-          retention-days: 14
+      # publish/ itself (the raw folder) is intentionally NOT uploaded as
+      # its own artifact anymore, now that vpk pack below reliably
+      # produces a real installer: testing the loose folder means
+      # testing something meaningfully different from what ships (no
+      # install hooks, no shortcuts, and the auto-updater flatly refuses
+      # to run against it -- UpdateChecker checks IsInstalled first).
+      # publish/ still exists here purely as vpk pack's input.
 
       # No formal version scheme exists yet -- 0.0.<run number> is a
       # simple, always-increasing placeholder that's good enough for
