@@ -14,7 +14,20 @@ internal static class Program
         // install/update/uninstall hooks (e.g. creating the Start Menu
         // shortcut on first install, per K100 §28) before any of this
         // app's own code executes.
-        VelopackApp.Build().Run();
+        //
+        // OnBeforeUninstallFastCallback: without this, uninstalling never
+        // stopped Postgres/backend/Caddy first, and victory-backend.exe
+        // specifically lives inside the same folder Velopack's uninstaller
+        // has to remove -- a still-running process holding that file open
+        // blocks the whole folder from being deleted. Confirmed on real
+        // hardware: uninstall got stuck on "file in use" with no obviously
+        // Victory-named process visible in Task Manager's simple view.
+        // 15-second budget for this hook (Velopack's own limit); StopAsync
+        // (Caddy, then the backend, then `pg_ctl stop -m fast -w`) is a
+        // local shutdown of small processes and comfortably fits that.
+        VelopackApp.Build()
+            .OnBeforeUninstallFastCallback(_ => RuntimeManager.StopAsync().GetAwaiter().GetResult())
+            .Run();
 
         using var singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isNewInstance);
         if (!isNewInstance)
