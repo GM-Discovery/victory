@@ -168,9 +168,9 @@ func EnsureKernel49WarehouseStorageSurface(ctx context.Context, pool *pgxpool.Po
 	if err := pool.QueryRow(ctx, `
 		SELECT id::text
 		FROM locations
-		WHERE slug = 'amurray-family'
+		WHERE slug = $1
 		LIMIT 1
-	`).Scan(&locationID); err != nil {
+	`, access.DefaultLocationSlug()).Scan(&locationID); err != nil {
 		return err
 	}
 
@@ -313,9 +313,9 @@ func resolveWarehouseStorageLocationID(ctx context.Context, pool *pgxpool.Pool) 
 	err := pool.QueryRow(ctx, `
 		SELECT id::text
 		FROM locations
-		WHERE slug = 'amurray-family'
+		WHERE slug = $1
 		LIMIT 1
-	`).Scan(&locationID)
+	`, access.DefaultLocationSlug()).Scan(&locationID)
 	if err != nil {
 		return "", err
 	}
@@ -497,11 +497,11 @@ func HandleWarehouseAssets(pool *pgxpool.Pool) http.HandlerFunc {
 				a.last_used_at,
 				a.deleted_at
 			FROM assets a
-			WHERE a.location_id = (SELECT id FROM locations WHERE slug = 'amurray-family' LIMIT 1)
+			WHERE a.location_id = (SELECT id FROM locations WHERE slug = $1 LIMIT 1)
 		`
 
-		args := make([]any, 0, 3)
-		argN := 1
+		args := []any{access.DefaultLocationSlug()}
+		argN := 2
 		if assetType != "" {
 			query += fmt.Sprintf(" AND COALESCE(NULLIF(a.asset_type, ''), 'generic') = $%d", argN)
 			args = append(args, assetType)
@@ -911,9 +911,9 @@ func loadWarehouseStorageSettings(ctx context.Context, pool *pgxpool.Pool) (Ware
 			COALESCE(s.updated_at, NOW())
 		FROM locations l
 		LEFT JOIN warehouse_storage_settings s ON s.location_id = l.id
-		WHERE l.slug = 'amurray-family'
+		WHERE l.slug = $1
 		LIMIT 1
-	`, DefaultWarehouseHardLimitBytes, DefaultWarehouseMaxUploadBytes, DefaultTokenMasterMaxDimension, DefaultTokenStageMaxDimension, DefaultTokenThumbnailMaxDimension).Scan(
+	`, access.DefaultLocationSlug(), DefaultWarehouseHardLimitBytes, DefaultWarehouseMaxUploadBytes, DefaultTokenMasterMaxDimension, DefaultTokenStageMaxDimension, DefaultTokenThumbnailMaxDimension).Scan(
 		&settings.LocationID,
 		&settings.HardLimitBytes,
 		&settings.WarningThresholdPercent,

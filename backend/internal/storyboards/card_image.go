@@ -19,6 +19,8 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"victory/backend/internal/access"
 )
 
 func resolveCardImageStorageScope(ctx context.Context, pool *pgxpool.Pool, ownerUserID string) (producerUserID, locationID string, err error) {
@@ -34,7 +36,7 @@ func resolveCardImageStorageScope(ctx context.Context, pool *pgxpool.Pool, owner
 	}
 
 	var fallbackLocationID string
-	if fbErr := pool.QueryRow(ctx, `SELECT id FROM locations WHERE slug = 'amurray-family' LIMIT 1`).Scan(&fallbackLocationID); fbErr != nil {
+	if fbErr := pool.QueryRow(ctx, `SELECT id FROM locations WHERE slug = $1 LIMIT 1`, access.DefaultLocationSlug()).Scan(&fallbackLocationID); fbErr != nil {
 		return "", "", fbErr
 	}
 	return ownerUserID, fallbackLocationID, nil

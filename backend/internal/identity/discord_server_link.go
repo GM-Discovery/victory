@@ -423,9 +423,9 @@ func resolveProducerOfficeLocation(ctx context.Context, pool *pgxpool.Pool) (str
 	err = pool.QueryRow(ctx, `
 		SELECT id::text, slug, name
 		FROM locations
-		WHERE slug = 'amurray-family'
+		WHERE slug = $1
 		LIMIT 1
-	`).Scan(&location.ID, &location.Slug, &location.Name)
+	`, access.DefaultLocationSlug()).Scan(&location.ID, &location.Slug, &location.Name)
 	return location, err
 }
 

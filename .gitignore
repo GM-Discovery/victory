@@ -4,3 +4,4 @@
 storage/
 backups/
 cookies.txt
+/packaging/podman/data/

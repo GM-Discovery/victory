@@ -79,9 +79,9 @@ func EnsureKernel16VenueSurface(ctx context.Context, pool *pgxpool.Pool) error {
 	if err := pool.QueryRow(ctx, `
 		SELECT id::text
 		FROM locations
-		WHERE slug = 'amurray-family'
+		WHERE slug = $1
 		LIMIT 1
-	`).Scan(&locationID); err != nil {
+	`, DefaultLocationSlug()).Scan(&locationID); err != nil {
 		return err
 	}
 

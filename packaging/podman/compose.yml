@@ -1,0 +1,97 @@
+# Kernel 100: Podman-based runtime for the Windows consumer install (and any
+# other Podman host). Deliberately a SEPARATE file from the repository's
+# own docker-compose.yml, which is Grant's own production deployment
+# (fixed OPERATOR_HANDLE/DEFAULT_LOCATION_SLUG defaults, an external
+# edge_net Caddy network, Linux-only /opt/victory paths) -- none of that
+# belongs in a fresh consumer install, so this does not import or extend
+# it.
+#
+# Every value below is required (${VAR:?message}), not defaulted, on
+# purpose: K100 doc §12 explicitly calls out straturli/victory-theater as
+# Grant-specific defaults that must never leak into a fresh install. The
+# first-run flow (the eventual Windows installer, or generate-env.sh as a
+# stand-in for it during development) generates a real .env before this
+# file is ever brought up -- there is intentionally no fallback path that
+# produces a working stack without one.
+#
+# Postgres and the backend both bind to 127.0.0.1 only (K100 §24: avoid
+# exposing Postgres; avoid opening arbitrary inbound ranges). Remote
+# access is Cloudflare Tunnel's job (separate, later piece of this
+# kernel), connecting to the backend over localhost -- nothing here ever
+# needs to accept a connection from outside this machine.
+
+services:
+  postgres:
+    image: postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    container_name: victory-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: victory
+      POSTGRES_USER: victory
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set -- generate-env.sh creates one}
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - victory_postgres_data:/var/lib/postgresql/data
+    networks:
+      - victory_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U victory -d victory"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../../backend
+    container_name: victory-backend
+    restart: unless-stopped
+    environment:
+      PORT: 8081
+      DATABASE_URL: postgres://victory:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set -- generate-env.sh creates one}@victory-postgres:5432/victory?sslmode=disable
+      STORAGE_ROOT: ${STORAGE_ROOT:?STORAGE_ROOT must be set to a real persistent path}
+      # Kernel 100 §12/§14: no Grant-specific fallback -- a fresh lot
+      # always gets its own Operator handle and location slug from the
+      # first-run answers (§9), never straturli/victory-theater.
+      OPERATOR_HANDLE: ${OPERATOR_HANDLE:?OPERATOR_HANDLE must come from first-run setup, not a fixed default}
+      DEFAULT_LOCATION_SLUG: ${DEFAULT_LOCATION_SLUG:?DEFAULT_LOCATION_SLUG must come from first-run setup, not a fixed default}
+      DEFAULT_LOCATION_NAME: ${DEFAULT_LOCATION_NAME:-}
+      # Cloudflare Tunnel terminates TLS at Cloudflare's edge and reaches
+      # this container over plain HTTP on localhost -- there is no
+      # "insecure hop" here to secure further, but the cookie itself
+      # still needs Secure=true once real remote traffic exists.
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      BACKUP_DIR: ${BACKUP_DIR:?BACKUP_DIR must be set to a real persistent path}
+      EXPORTS_ROOT: ${EXPORTS_ROOT:?EXPORTS_ROOT must be set to a real persistent path}
+      # Discord stays fully optional at first run (K100 §16) -- every
+      # DISCORD_* value is genuinely allowed to be empty here, unlike the
+      # required-or-fail values above.
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
+      DISCORD_REDIRECT_URL: ${DISCORD_REDIRECT_URL:-}
+      DISCORD_OAUTH_SCOPES: ${DISCORD_OAUTH_SCOPES:-identify email}
+      DISCORD_OAUTH_ENABLED: ${DISCORD_OAUTH_ENABLED:-}
+      DISCORD_APPLICATION_ID: ${DISCORD_APPLICATION_ID:-}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      DISCORD_BOT_PERMISSIONS: ${DISCORD_BOT_PERMISSIONS:-16}
+      DISCORD_BOT_REDIRECT_URL: ${DISCORD_BOT_REDIRECT_URL:-}
+      DISCORD_SERVER_LINK_ENABLED: ${DISCORD_SERVER_LINK_ENABLED:-}
+      DISCORD_GATEWAY_INTENTS: ${DISCORD_GATEWAY_INTENTS:-641}
+      DISCORD_GATEWAY_URL: ${DISCORD_GATEWAY_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ${STORAGE_ROOT:?STORAGE_ROOT must be set to a real persistent path}:${STORAGE_ROOT:?STORAGE_ROOT must be set to a real persistent path}
+      - ${BACKUP_DIR:?BACKUP_DIR must be set to a real persistent path}:${BACKUP_DIR:?BACKUP_DIR must be set to a real persistent path}
+      - ${EXPORTS_ROOT:?EXPORTS_ROOT must be set to a real persistent path}:${EXPORTS_ROOT:?EXPORTS_ROOT must be set to a real persistent path}
+    ports:
+      - "127.0.0.1:${BACKEND_HOST_PORT:-8081}:8081"
+    networks:
+      - victory_internal
+
+volumes:
+  victory_postgres_data:
+
+networks:
+  victory_internal:

@@ -35,6 +35,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"victory/backend/internal/access"
 )
 
 const usage = `victory-recover -- Victory break-glass account recovery
@@ -277,7 +279,7 @@ func runBootstrap(ctx context.Context, pool *pgxpool.Pool, operatorHandle, locat
 		return errors.New("--operator-handle must not be empty")
 	}
 	if strings.TrimSpace(locationSlug) == "" {
-		locationSlug = "amurray-family"
+		locationSlug = access.DefaultLocationSlug()
 	}
 
 	var existingID string

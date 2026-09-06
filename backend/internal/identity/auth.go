@@ -60,6 +60,36 @@ func PasswordSignupEnabled() bool {
 	}
 }
 
+// bootstrapWindowOpen reports whether this install has never had a real
+// account created yet. Kernel 100: a fresh install's first Operator account
+// still has to come from somewhere, and Discord must stay optional at first
+// boot, so the one-time window between "no accounts exist" and "the first
+// one was just created" is exempted from the K76-H01 closure above. It closes
+// itself permanently the moment any real account exists -- there is no env
+// var or flag to hold it open, unlike PasswordSignupEnabled.
+func bootstrapWindowOpen(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
+	var exists bool
+	err := pool.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM users
+			WHERE handle <> 'discord_bridge' AND id <> $1
+		)
+	`, tombstoneUserID).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+	return !exists, nil
+}
+
+// OnBootstrapAccount, if set, runs synchronously right after the account
+// created by the one-time bootstrap-window signup (see bootstrapWindowOpen)
+// commits. Wired up by cmd/victory/main.go to internal/firstrun's
+// BootstrapFirstOperator -- identity can't import firstrun directly
+// because firstrun needs showtime, and showtime already imports identity
+// for DiscordServerLinkConfig. A package-level function value, set once at
+// startup, breaks that cycle the same way a driver registration does.
+var OnBootstrapAccount func(ctx context.Context, pool *pgxpool.Pool, userID string)
+
 func HandleSignup(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -67,13 +97,22 @@ func HandleSignup(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc {
 			return
 		}
 
+		isBootstrapAccount := false
 		if !PasswordSignupEnabled() {
-			writeJSON(w, http.StatusForbidden, map[string]any{
-				"ok":     false,
-				"error":  "password_signup_closed",
-				"detail": "Victory accounts are created by signing in with Discord.",
-			})
-			return
+			open, err := bootstrapWindowOpen(r.Context(), pool)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "server_error"})
+				return
+			}
+			if !open {
+				writeJSON(w, http.StatusForbidden, map[string]any{
+					"ok":     false,
+					"error":  "password_signup_closed",
+					"detail": "Victory accounts are created by signing in with Discord.",
+				})
+				return
+			}
+			isBootstrapAccount = true
 		}
 
 		var req SignupRequest
@@ -135,9 +174,9 @@ func HandleSignup(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc {
 		err = tx.QueryRow(ctx, `
 			SELECT id
 			FROM locations
-			WHERE slug = 'amurray-family'
+			WHERE slug = $1
 			LIMIT 1
-		`).Scan(&locationID)
+		`, access.DefaultLocationSlug()).Scan(&locationID)
 		if err == nil {
 			_, _ = tx.Exec(ctx, `
 				INSERT INTO location_memberships (location_id, user_id, role, granted_by_user_id, active)
@@ -149,6 +188,10 @@ func HandleSignup(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc {
 		if err := tx.Commit(ctx); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "tx_commit_failed"})
 			return
+		}
+
+		if isBootstrapAccount && OnBootstrapAccount != nil {
+			OnBootstrapAccount(r.Context(), pool, userID)
 		}
 
 		sessionCtx, sessionCancel := context.WithTimeout(r.Context(), 5*time.Second)

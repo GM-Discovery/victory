@@ -3,11 +3,12 @@ package identity
 import (
 	"context"
 	"errors"
-	"os"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"victory/backend/internal/access"
 )
 
 var (
@@ -49,9 +50,14 @@ func ResolveBootstrapLocation(ctx context.Context, pool *pgxpool.Pool, slug stri
 		slug = defaultBootstrapLocationSlug()
 	}
 
+	// Kernel 42 seeded "victory-theater" specifically as the neutral,
+	// non-personal fallback location every install can rely on existing;
+	// falling back to "amurray-family" here instead (an oversight predating
+	// that seed) would silently hand a fresh install's producer grant to
+	// Grant's own real location the moment the requested slug isn't found.
 	candidates := []string{slug}
-	if slug != "amurray-family" {
-		candidates = append(candidates, "amurray-family")
+	if slug != "victory-theater" {
+		candidates = append(candidates, "victory-theater")
 	}
 	for _, candidate := range candidates {
 		var location BootstrapLocation
@@ -231,9 +237,5 @@ func ensureLocationProducerMembership(ctx context.Context, pool *pgxpool.Pool, l
 }
 
 func defaultBootstrapLocationSlug() string {
-	slug := strings.TrimSpace(os.Getenv("DEFAULT_LOCATION_SLUG"))
-	if slug == "" {
-		slug = "victory-theater"
-	}
-	return slug
+	return access.DefaultLocationSlug()
 }

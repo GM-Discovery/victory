@@ -38,6 +38,7 @@ import (
 	"victory/backend/internal/directorprep"
 	"victory/backend/internal/drawing"
 	"victory/backend/internal/ewrite"
+	"victory/backend/internal/firstrun"
 	"victory/backend/internal/identity"
 	"victory/backend/internal/mailer"
 	"victory/backend/internal/merchant"
@@ -66,10 +67,6 @@ import (
 )
 
 func main() {
-	if strings.TrimSpace(os.Getenv("OPERATOR_HANDLE")) == "" {
-		_ = os.Setenv("OPERATOR_HANDLE", "straturli")
-	}
-
 	port := getenv("PORT", "8081")
 	databaseURL := getenv("DATABASE_URL", "postgres://victory:REDACTED@victory-postgres:5432/victory?sslmode=disable")
 	secureCookie := cookieSecureFromEnv()
@@ -97,6 +94,9 @@ func main() {
 	}
 	migrateCancel()
 
+	if err := access.EnsureDefaultLocation(ctx, pool); err != nil {
+		log.Fatalf("default location bootstrap failed: %v", err)
+	}
 	if err := profiles.EnsureKernel9ProfileSurface(ctx, pool); err != nil {
 		log.Fatalf("kernel 9 profile bootstrap failed: %v", err)
 	}
@@ -226,6 +226,8 @@ func main() {
 		}
 		return result.Ready, nil
 	})
+
+	identity.OnBootstrapAccount = firstrun.BootstrapFirstOperator
 
 	mux := http.NewServeMux()
 

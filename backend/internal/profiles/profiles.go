@@ -99,9 +99,16 @@ type profileRequest struct {
 func EnsureKernel9ProfileSurface(ctx context.Context, pool *pgxpool.Pool) error {
 	// Schema DDL lives in backend/migrations/049_kernel72_profiles_surface_ddl.sql;
 	// this bootstrap only seeds the Greenroom/Trailers venue rows.
+	//
+	// Two separate Exec calls, not one multi-statement string: binding
+	// $1 (Kernel 100's access.DefaultLocationSlug(), replacing a hardcoded
+	// 'amurray-family' literal) forces pgx onto the extended query
+	// protocol, which -- unlike the old parameter-free simple-protocol
+	// exec -- rejects more than one command per prepared statement.
+	locationSlug := access.DefaultLocationSlug()
 	_, err := pool.Exec(ctx, `
 		WITH location_row AS (
-		  SELECT id FROM locations WHERE slug = 'amurray-family' LIMIT 1
+		  SELECT id FROM locations WHERE slug = $1 LIMIT 1
 		),
 		lot_row AS (
 		  SELECT id FROM lots
@@ -126,10 +133,15 @@ func EnsureKernel9ProfileSurface(ctx context.Context, pool *pgxpool.Pool) error 
 		  SELECT 1 FROM venues
 		  WHERE lot_id = (SELECT id FROM lot_row)
 		    AND slug = 'greenroom'
-		);
+		)
+	`, locationSlug)
+	if err != nil {
+		return err
+	}
 
+	_, err = pool.Exec(ctx, `
 		WITH location_row AS (
-		  SELECT id FROM locations WHERE slug = 'amurray-family' LIMIT 1
+		  SELECT id FROM locations WHERE slug = $1 LIMIT 1
 		),
 		lot_row AS (
 		  SELECT id FROM lots
@@ -154,8 +166,8 @@ func EnsureKernel9ProfileSurface(ctx context.Context, pool *pgxpool.Pool) error 
 		  SELECT 1 FROM venues
 		  WHERE lot_id = (SELECT id FROM lot_row)
 		    AND slug = 'trailers'
-		);
-	`)
+		)
+	`, locationSlug)
 	if err != nil {
 		return err
 	}

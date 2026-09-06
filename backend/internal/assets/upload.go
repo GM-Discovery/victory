@@ -893,9 +893,9 @@ func resolveProducerScope(ctx context.Context, pool *pgxpool.Pool, userID string
 		err = pool.QueryRow(ctx, `
 			SELECT id
 			FROM locations
-			WHERE slug = 'amurray-family'
+			WHERE slug = $1
 			LIMIT 1
-		`).Scan(&locationID)
+		`, access.DefaultLocationSlug()).Scan(&locationID)
 		if err != nil {
 			return false, "", "", err
 		}

@@ -554,9 +554,9 @@ func resolveInviteAuthorityScope(ctx context.Context, pool *pgxpool.Pool, userID
 		if err := pool.QueryRow(ctx, `
 			SELECT id::text
 			FROM locations
-			WHERE slug = 'amurray-family'
+			WHERE slug = $1
 			LIMIT 1
-		`).Scan(&locationID); err != nil {
+		`, access.DefaultLocationSlug()).Scan(&locationID); err != nil {
 			return "", "", err
 		}
 		return "producer", locationID, nil

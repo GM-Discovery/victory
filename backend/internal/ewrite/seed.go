@@ -32,6 +32,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"victory/backend/internal/access"
 )
 
 //go:embed seed/socio-v1.1.md
@@ -44,11 +46,6 @@ var quickstartManuscriptSource string
 var niavaManuscriptSource string
 
 const (
-	// Every Victory install gets this location unconditionally from
-	// migration 002_seed_world.sql -- it is the one canonical default
-	// location for the install, not data specific to any one operator.
-	socioSeedLocationSlug = "amurray-family"
-
 	socioSeedRulesetSlug  = "socio-stories-of-us"
 	socioSeedRulesetTitle = "Socio: Stories of Us"
 
@@ -82,7 +79,7 @@ const (
 // check and nothing more.
 func EnsureCanonicalSocioManuscript(ctx context.Context, pool *pgxpool.Pool) error {
 	var locationID string
-	err := pool.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = $1`, socioSeedLocationSlug).Scan(&locationID)
+	err := pool.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = $1`, access.DefaultLocationSlug()).Scan(&locationID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// No canonical location yet (shouldn't happen post-migration, but
 		// this runs at boot on every install) -- nothing to seed onto.
@@ -182,7 +179,7 @@ func EnsureCanonicalSocioManuscript(ctx context.Context, pool *pgxpool.Pool) err
 // Series INSERTs are ON CONFLICT no-ops thereafter.
 func EnsureSocioSeriesHierarchy(ctx context.Context, pool *pgxpool.Pool) error {
 	var locationID string
-	err := pool.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = $1`, socioSeedLocationSlug).Scan(&locationID)
+	err := pool.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = $1`, access.DefaultLocationSlug()).Scan(&locationID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -312,7 +309,7 @@ func ensureSeriesPublication(ctx context.Context, pool *pgxpool.Pool, collection
 // is a safe no-op, not an error.
 func EnsureQuickstartManuscript(ctx context.Context, pool *pgxpool.Pool) error {
 	var locationID string
-	err := pool.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = $1`, socioSeedLocationSlug).Scan(&locationID)
+	err := pool.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = $1`, access.DefaultLocationSlug()).Scan(&locationID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -342,7 +339,7 @@ func EnsureQuickstartManuscript(ctx context.Context, pool *pgxpool.Pool) error {
 // EnsureQuickstartManuscript.
 func EnsureNiavaManuscript(ctx context.Context, pool *pgxpool.Pool) error {
 	var locationID string
-	err := pool.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = $1`, socioSeedLocationSlug).Scan(&locationID)
+	err := pool.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = $1`, access.DefaultLocationSlug()).Scan(&locationID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -406,7 +403,7 @@ type SkillCatalogueEntry struct {
 // silently reverted by a redeploy.
 func EnsureSkillDirectory(ctx context.Context, pool *pgxpool.Pool, catalogue []SkillCatalogueEntry) error {
 	var locationID string
-	err := pool.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = $1`, socioSeedLocationSlug).Scan(&locationID)
+	err := pool.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = $1`, access.DefaultLocationSlug()).Scan(&locationID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}

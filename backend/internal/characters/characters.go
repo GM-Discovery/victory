@@ -1656,7 +1656,7 @@ func resolveCharacterScope(ctx context.Context, q characterQuerier, userID strin
 		return "", "", err
 	}
 
-	err = q.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = 'amurray-family' LIMIT 1`).Scan(&locationID)
+	err = q.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = $1 LIMIT 1`, access.DefaultLocationSlug()).Scan(&locationID)
 	if err != nil {
 		return "", "", err
 	}
@@ -1667,7 +1667,7 @@ func resolveCharacterScope(ctx context.Context, q characterQuerier, userID strin
 func authorityLocation(ctx context.Context, pool *pgxpool.Pool, userID string) (string, error) {
 	if ok, err := access.IsOperatorUser(ctx, pool, userID); err == nil && ok {
 		var locationID string
-		err := pool.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = 'amurray-family' LIMIT 1`).Scan(&locationID)
+		err := pool.QueryRow(ctx, `SELECT id::text FROM locations WHERE slug = $1 LIMIT 1`, access.DefaultLocationSlug()).Scan(&locationID)
 		return locationID, err
 	}
 
