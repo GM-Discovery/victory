@@ -39,19 +39,20 @@ internal static class RuntimeManager
         }
     }
 
-    // NOT YET DONE: no CI pipeline in this repository builds or publishes
-    // this image anywhere. podman/compose.yml (bundled alongside this
-    // launcher) requires it, so StartAsync will fail loudly until a real
-    // registry/publishing step exists and this constant points at it --
-    // that failure is correct and intentional in the meantime, not a bug
-    // to silently work around here.
-    private const string BackendImagePlaceholder = "ghcr.io/REPLACE_ME/victory-backend:latest";
+    // Published by .github/workflows/backend-image.yml on every push to
+    // main that touches backend/. That workflow's GITHUB_TOKEN can push
+    // the image but cannot change its visibility -- until someone with
+    // admin on the package has run the one-time `gh api` visibility
+    // change documented in that workflow's header, this reference is
+    // correct but not yet pullable by a real consumer install (a private
+    // GHCR package requires credentials no install should ship with).
+    private const string BackendImage = "ghcr.io/gm-discovery/victory-backend:latest";
 
     public static async Task<(bool Success, string Output)> StartAsync()
     {
         AppPaths.EnsureDataDirectoriesExist();
         var args = $"compose --env-file \"{AppPaths.EnvFile}\" -f \"{AppPaths.ComposeFile}\" up -d";
-        var (exitCode, stdout, stderr) = await RunAsync("podman", args, TimeSpan.FromMinutes(5), BackendImagePlaceholder);
+        var (exitCode, stdout, stderr) = await RunAsync("podman", args, TimeSpan.FromMinutes(5), BackendImage);
         return (exitCode == 0, exitCode == 0 ? stdout : stderr);
     }
 

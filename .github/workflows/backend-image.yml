@@ -1,0 +1,56 @@
+name: Backend image publish
+
+# Kernel 100: packaging/windows/VictoryLauncher/podman/compose.yml (the
+# consumer's compose file) requires a published VICTORY_BACKEND_IMAGE --
+# a consumer's machine has no source tree or Dockerfile to build from,
+# unlike packaging/podman/compose.yml's local dev-loop `build: context:`.
+# This workflow is what makes that image exist. Until this ran once and
+# the resulting package's visibility was set to public (GHCR packages
+# don't inherit a private repo's visibility automatically, and this
+# workflow's ambient GITHUB_TOKEN can't change package visibility --
+# that's a one-time `gh api` step, see the K100 doc), a consumer install
+# has a real image reference but nothing it can actually pull.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-image.yml"
+  workflow_dispatch: {}
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/victory-backend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
