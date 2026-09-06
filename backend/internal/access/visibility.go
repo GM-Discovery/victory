@@ -101,7 +101,26 @@ func CurrentUserIDFromRequest(ctx context.Context, pool *pgxpool.Pool, rawCookie
 
 func ResolveVisibleVenues(ctx context.Context, pool *pgxpool.Pool, userID string) ([]VisibleVenue, error) {
 	if strings.TrimSpace(userID) == "" {
-		return []VisibleVenue{}, nil
+		rows, err := pool.Query(ctx, `
+			SELECT v.slug, v.name, v.kind, 'public_front_door'::text AS visible_because
+			FROM venues v
+			WHERE v.slug = 'info-booth'
+			LIMIT 1
+		`)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		var out []VisibleVenue
+		for rows.Next() {
+			var v VisibleVenue
+			if err := rows.Scan(&v.Slug, &v.Name, &v.Kind, &v.VisibleBecause); err != nil {
+				return nil, err
+			}
+			out = append(out, v)
+		}
+		return out, rows.Err()
 	}
 
 	if ok, err := IsOperatorUser(ctx, pool, userID); err == nil && ok {
