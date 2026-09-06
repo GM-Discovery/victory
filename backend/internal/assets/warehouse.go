@@ -17,7 +17,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"victory/backend/internal/access"
@@ -1002,36 +1001,18 @@ func loadWarehouseStorageStats(ctx context.Context, pool *pgxpool.Pool, location
 	return stats, nil
 }
 
-func loadWarehouseFilesystemStats(storageRoot string) (warehouseFilesystemStats, error) {
+// resolveStorageRoot centralizes the empty-input fallback shared by both
+// platforms' loadWarehouseFilesystemStats (warehouse_filesystem_unix.go,
+// warehouse_filesystem_windows.go) -- STORAGE_ROOT is required in every
+// real deployment (compose.yml's ${STORAGE_ROOT:?...}), so this only
+// matters for a misconfigured/test caller, never a real install on
+// either platform.
+func resolveStorageRoot(storageRoot string) string {
 	root := strings.TrimSpace(storageRoot)
 	if root == "" {
 		root = "/opt/victory/storage"
 	}
-
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs(root, &stat); err != nil {
-		return warehouseFilesystemStats{}, err
-	}
-
-	blockSize := int64(stat.Bsize)
-	totalBytes := int64(stat.Blocks) * blockSize
-	freeBytes := int64(stat.Bfree) * blockSize
-	availableBytes := int64(stat.Bavail) * blockSize
-	usedBytes := totalBytes - freeBytes
-	usableUploadBytes := availableBytes - WarehousePhysicalReserveBytes
-	if usableUploadBytes < 0 {
-		usableUploadBytes = 0
-	}
-
-	return warehouseFilesystemStats{
-		Path:              root,
-		TotalBytes:        totalBytes,
-		FreeBytes:         freeBytes,
-		AvailableBytes:    availableBytes,
-		UsedBytes:         usedBytes,
-		ReserveBytes:      WarehousePhysicalReserveBytes,
-		UsableUploadBytes: usableUploadBytes,
-	}, nil
+	return root
 }
 
 func checkWarehouseUploadCapacity(ctx context.Context, pool *pgxpool.Pool, locationID, storageRoot string, additionalBytes, hardLimitBytes int64) (string, error) {
