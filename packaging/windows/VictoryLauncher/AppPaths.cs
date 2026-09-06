@@ -57,6 +57,29 @@ internal static class AppPaths
     public static string BackendLogFile => Path.Combine(LogsDir, "victory-backend.log");
     public static string BackendPidFile => Path.Combine(DataRoot, "victory-backend.pid");
 
+    /// <summary>
+    /// The Go backend is API-only: it never served frontend/'s static
+    /// files or handled "/" at all. Every existing deployment (Grant's
+    /// own server, the local Linux dev loop) relies on Caddy in front of
+    /// it for exactly that -- a piece neither the Podman nor the first
+    /// native attempt at this launcher included, so "Open Victory" 404'd
+    /// on real hardware even though the backend itself was healthy.
+    /// Downloaded once on first run (RuntimeSetup), same as Postgres.
+    /// </summary>
+    public static string CaddyRoot => Path.Combine(DataRoot, "caddy");
+    public static string CaddyExe => Path.Combine(CaddyRoot, "caddy.exe");
+    public static string CaddyLogFile => Path.Combine(LogsDir, "caddy.log");
+    public static string CaddyPidFile => Path.Combine(DataRoot, "caddy.pid");
+
+    /// <summary>
+    /// Bundled as static content, not generated: the frontend and Caddy
+    /// binary locations are both fixed relative to AppContext.BaseDirectory
+    /// at build time, so unlike EnvGenerator's secrets there is nothing
+    /// here that actually varies per install.
+    /// </summary>
+    public static string CaddyfilePath => Path.Combine(AppContext.BaseDirectory, "Caddyfile");
+    public static string FrontendRoot => Path.Combine(AppContext.BaseDirectory, "frontend");
+
     public static void EnsureDataDirectoriesExist()
     {
         Directory.CreateDirectory(StorageDir);

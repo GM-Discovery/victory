@@ -9,7 +9,7 @@ namespace VictoryLauncher;
 /// </summary>
 internal sealed class TrayApplicationContext : ApplicationContext
 {
-    private const string LocalOperatorUrl = "http://localhost:8081/";
+    private static readonly string LocalOperatorUrl = $"http://localhost:{RuntimeManager.PublicPort}/";
 
     private readonly NotifyIcon _trayIcon;
     private readonly ToolStripMenuItem _startWithWindowsItem;

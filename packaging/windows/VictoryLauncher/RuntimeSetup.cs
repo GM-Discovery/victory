@@ -9,11 +9,13 @@ namespace VictoryLauncher;
 /// dramatically simpler: no elevation, no reboot, no Windows feature
 /// changes. Everything here runs as the current user.
 ///
-/// NOT VERIFIED ON REAL WINDOWS HARDWARE. Reasoned through carefully
-/// (EDB's own docs describe the Windows binaries zip as intended for
-/// exactly this "bundle it into another application's installer" use
-/// case), but the extracted zip's exact folder layout and every initdb/
-/// pg_ctl flag combination have not been run on a real machine yet.
+/// Downloads two runtimes on first run: PostgreSQL (EDB's own docs
+/// describe the Windows binaries zip as intended for exactly this
+/// "bundle it into another application's installer" use case) and Caddy
+/// (needed because the Go backend is API-only and never served
+/// frontend/'s static files itself -- confirmed missing on real
+/// hardware the first time this branch was tested end to end, "Open
+/// Victory" 404'd even though the backend was healthy).
 /// </summary>
 internal static class RuntimeSetup
 {
@@ -25,6 +27,11 @@ internal static class RuntimeSetup
     // current fileid, the same way the pinned Docker image digests
     // elsewhere in this repo get updated by hand, not automatically.
     private const string PostgresDownloadUrl = "https://sbp.enterprisedb.com/getfile.jsp?fileid=1260494";
+
+    // Caddy 2.11.4 Windows x64, from its own GitHub releases (verified
+    // this exact URL resolves). Re-pin by hand when it needs to change --
+    // see https://github.com/caddyserver/caddy/releases.
+    private const string CaddyDownloadUrl = "https://github.com/caddyserver/caddy/releases/download/v2.11.4/caddy_2.11.4_windows_amd64.zip";
 
     public enum Result
     {
@@ -66,7 +73,49 @@ internal static class RuntimeSetup
         if (!backendOk)
             return new SetupResult(Result.Failed, "Victory could not start:\n" + backendOutput);
 
+        if (!RuntimeManager.IsCaddyInstalled())
+        {
+            reportStep("Downloading the Victory runtime (this only happens once)");
+            var (downloaded, downloadError) = await DownloadAndExtractCaddyAsync();
+            if (!downloaded)
+                return new SetupResult(Result.Failed, downloadError);
+        }
+
+        var (caddyOk, caddyOutput) = RuntimeManager.StartCaddy();
+        if (!caddyOk)
+            return new SetupResult(Result.Failed, "Victory could not be reached:\n" + caddyOutput);
+
         return new SetupResult(Result.Ready, null);
+    }
+
+    private static async Task<(bool Success, string? Error)> DownloadAndExtractCaddyAsync()
+    {
+        var tempZip = Path.Combine(Path.GetTempPath(), "victory-caddy-" + Guid.NewGuid().ToString("N") + ".zip");
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+            using (var response = await client.GetAsync(CaddyDownloadUrl, HttpCompletionOption.ResponseHeadersRead))
+            {
+                response.EnsureSuccessStatusCode();
+                await using var fileStream = File.Create(tempZip);
+                await response.Content.CopyToAsync(fileStream);
+            }
+
+            Directory.CreateDirectory(AppPaths.CaddyRoot);
+            ZipFile.ExtractToDirectory(tempZip, AppPaths.CaddyRoot, overwriteFiles: true);
+
+            if (!File.Exists(AppPaths.CaddyExe))
+                return (false, "The Victory runtime was downloaded, but caddy.exe was not found where expected after extracting it.");
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            return (false, "Could not download or set up the Victory runtime:\n" + ex.Message);
+        }
+        finally
+        {
+            try { File.Delete(tempZip); } catch { /* best effort */ }
+        }
     }
 
     private static async Task<(bool Success, string? Error)> DownloadAndExtractPostgresAsync()

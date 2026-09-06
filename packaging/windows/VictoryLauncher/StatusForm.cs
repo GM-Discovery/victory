@@ -13,7 +13,7 @@ internal sealed class StatusForm : Form
     private readonly Label _runningValue = new() { AutoSize = true };
     private readonly Label _databaseValue = new() { AutoSize = true };
     private readonly Label _remoteValue = new() { AutoSize = true, Text = "Not set up yet" };
-    private readonly Label _urlValue = new() { AutoSize = true, Text = "http://localhost:8081 (this device only)" };
+    private readonly Label _urlValue = new() { AutoSize = true, Text = $"http://localhost:{RuntimeManager.PublicPort} (this device only)" };
     private readonly Label _updateValue = new() { AutoSize = true, Text = "Not set up yet" };
     private readonly Label _discordValue = new() { AutoSize = true };
     private readonly Button _startStopButton = new() { Width = 120 };
@@ -61,9 +61,15 @@ internal sealed class StatusForm : Form
         _refreshButton.Enabled = false;
         try
         {
-            _isRunning = await RuntimeManager.IsBackendHealthyAsync();
+            var backendHealthy = await RuntimeManager.IsBackendHealthyAsync();
+            var publicSiteReachable = await RuntimeManager.IsPublicSiteReachableAsync();
+            // "Running" means what an Operator actually cares about:
+            // can they reach Victory at all. Both need to be true --
+            // a healthy backend behind a dead Caddy is exactly the
+            // 404-while-healthy state this whole fix exists for.
+            _isRunning = backendHealthy && publicSiteReachable;
             _runningValue.Text = _isRunning ? "Running" : "Stopped";
-            _databaseValue.Text = _isRunning ? "Healthy" : "Not running";
+            _databaseValue.Text = backendHealthy ? "Healthy" : "Not running";
             _discordValue.Text = ReadDiscordConfigured() ? "Connected" : "Not configured";
             _startStopButton.Text = _isRunning ? "Stop Victory" : "Start Victory";
         }

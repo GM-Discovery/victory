@@ -137,7 +137,11 @@ internal sealed class FirstRunWizardForm : Form
                 const int maxAttempts = 60;
                 for (var attempt = 0; attempt < maxAttempts; attempt++)
                 {
-                    if (await RuntimeManager.IsBackendHealthyAsync())
+                    // The public port (through Caddy), not just the
+                    // backend's own /health -- that's what "Open Victory"
+                    // actually opens, and what genuinely being ready means
+                    // to the Operator waiting on this screen.
+                    if (await RuntimeManager.IsBackendHealthyAsync() && await RuntimeManager.IsPublicSiteReachableAsync())
                         return;
                     await Task.Delay(2000);
                 }

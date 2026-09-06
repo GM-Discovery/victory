@@ -1,0 +1,22 @@
+# Kernel 100, windows-native: mirrors the real Caddyfile/Caddyfile.local
+# route set (frontend/ static files, /api /ws /auth proxied to the
+# backend) -- this is what makes "Open Victory" actually show the
+# campus map instead of a 404, since the Go backend itself only ever
+# served the API, never any static files.
+#
+# Static content, not generated per install: RuntimeManager launches
+# caddy.exe with this file's directory (AppContext.BaseDirectory) as
+# its working directory, so the relative "frontend" path below always
+# resolves correctly regardless of where Victory is actually installed.
+{
+	admin off
+}
+
+:8080 {
+	root * frontend
+
+	@backend path /api/* /auth/* /ws/*
+	reverse_proxy @backend 127.0.0.1:8081
+
+	file_server
+}

@@ -24,7 +24,7 @@ internal static class Program
             // second launcher. Best-effort open, then exit immediately.
             try
             {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("http://localhost:8081/") { UseShellExecute = true });
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo($"http://localhost:{RuntimeManager.PublicPort}/") { UseShellExecute = true });
             }
             catch { /* best effort; the already-running tray icon is still there regardless */ }
             return 0;

@@ -21,7 +21,8 @@ namespace VictoryLauncher;
 internal static class RuntimeManager
 {
     public const int PostgresPort = 55432; // arbitrary local-only port, chosen to avoid colliding with any real system Postgres on the default 5432
-    public const int BackendPort = 8081;
+    public const int BackendPort = 8081; // internal only -- Caddy is the only thing that talks to this port
+    public const int PublicPort = 8080; // what a browser actually opens; matches the local dev loop's Caddyfile.local convention
 
     // ---- Postgres ----
 
@@ -132,16 +133,85 @@ internal static class RuntimeManager
         }
     }
 
-    public static bool IsBackendProcessRunning()
+    public static bool IsBackendProcessRunning() => IsProcessRunning(AppPaths.BackendPidFile, "victory-backend");
+
+    public static void StopBackend() => StopProcessByPidFile(AppPaths.BackendPidFile);
+
+    // ---- Caddy ----
+    // The Go backend is API-only (never served frontend/'s static files
+    // or handled "/"). Caddy is what makes "Open Victory" show the
+    // campus map instead of a 404 -- confirmed missing on real hardware.
+    // Managed the same way as the backend: no pg_ctl equivalent exists
+    // for Caddy either, so this app tracks its PID itself.
+
+    public static bool IsCaddyInstalled() => File.Exists(AppPaths.CaddyExe);
+
+    public static bool IsCaddyRunning() => IsProcessRunning(AppPaths.CaddyPidFile, "caddy");
+
+    public static (bool Success, string Output) StartCaddy()
     {
-        if (!File.Exists(AppPaths.BackendPidFile))
+        if (IsCaddyRunning())
+            return (true, "already running");
+
+        Directory.CreateDirectory(AppPaths.LogsDir);
+        var psi = new ProcessStartInfo
+        {
+            FileName = AppPaths.CaddyExe,
+            Arguments = $"run --config \"{AppPaths.CaddyfilePath}\" --adapter caddyfile",
+            // frontend/'s Caddyfile "root * frontend" is relative to this
+            // -- AppContext.BaseDirectory is where both the Caddyfile and
+            // the bundled frontend/ copy actually live.
+            WorkingDirectory = AppContext.BaseDirectory,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        try
+        {
+            var process = Process.Start(psi);
+            if (process is null)
+                return (false, "failed to start caddy.exe");
+
+            File.WriteAllText(AppPaths.CaddyPidFile, process.Id.ToString());
+            _ = LogProcessOutputAsync(process, AppPaths.CaddyLogFile);
+            return (true, $"started (pid {process.Id})");
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message);
+        }
+    }
+
+    public static void StopCaddy() => StopProcessByPidFile(AppPaths.CaddyPidFile);
+
+    public static async Task<bool> IsPublicSiteReachableAsync()
+    {
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+            var response = await client.GetAsync($"http://127.0.0.1:{PublicPort}/");
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
             return false;
-        if (!int.TryParse(File.ReadAllText(AppPaths.BackendPidFile).Trim(), out var pid))
+        }
+    }
+
+    // ---- Shared PID-file process tracking (backend and Caddy both use this; Postgres uses pg_ctl instead) ----
+
+    private static bool IsProcessRunning(string pidFile, string expectedProcessName)
+    {
+        if (!File.Exists(pidFile))
+            return false;
+        if (!int.TryParse(File.ReadAllText(pidFile).Trim(), out var pid))
             return false;
         try
         {
             var process = Process.GetProcessById(pid);
-            return !process.HasExited && process.ProcessName.Equals("victory-backend", StringComparison.OrdinalIgnoreCase);
+            return !process.HasExited && process.ProcessName.Equals(expectedProcessName, StringComparison.OrdinalIgnoreCase);
         }
         catch (ArgumentException)
         {
@@ -149,11 +219,11 @@ internal static class RuntimeManager
         }
     }
 
-    public static void StopBackend()
+    private static void StopProcessByPidFile(string pidFile)
     {
-        if (!File.Exists(AppPaths.BackendPidFile))
+        if (!File.Exists(pidFile))
             return;
-        if (int.TryParse(File.ReadAllText(AppPaths.BackendPidFile).Trim(), out var pid))
+        if (int.TryParse(File.ReadAllText(pidFile).Trim(), out var pid))
         {
             try
             {
@@ -166,7 +236,7 @@ internal static class RuntimeManager
                 // already gone -- nothing to do
             }
         }
-        try { File.Delete(AppPaths.BackendPidFile); } catch { /* best effort */ }
+        try { File.Delete(pidFile); } catch { /* best effort */ }
     }
 
     // ---- Combined lifecycle (what the tray icon and wizard actually call) ----
@@ -176,11 +246,18 @@ internal static class RuntimeManager
         var (pgOk, pgOutput) = await StartPostgresAsync();
         if (!pgOk)
             return (false, "Postgres did not start:\n" + pgOutput);
-        return await StartBackendAsync();
+
+        var (backendOk, backendOutput) = await StartBackendAsync();
+        if (!backendOk)
+            return (false, backendOutput);
+
+        var (caddyOk, caddyOutput) = StartCaddy();
+        return (caddyOk, caddyOk ? backendOutput : caddyOutput);
     }
 
     public static async Task<(bool Success, string Output)> StopAsync()
     {
+        StopCaddy();
         StopBackend();
         return await StopPostgresAsync();
     }

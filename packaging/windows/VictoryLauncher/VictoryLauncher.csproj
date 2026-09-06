@@ -48,6 +48,25 @@
     <None Include="favicon.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Static Caddyfile: root/proxy routes, see AppPaths.CaddyfilePath. -->
+    <None Include="Caddyfile">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      The whole repo's frontend/ tree, bundled as-is: the Go backend is
+      API-only and never served these files itself (see AppPaths.FrontendRoot's
+      comment). Caddy needs a real copy of them to serve statically.
+      ~100MB, ~175 files as of this writing; not worth trimming further
+      for a desktop app install.
+    -->
+    <FrontendFile Include="..\..\..\frontend\**\*.*" />
+    <None Include="@(FrontendFile)">
+      <Link>frontend\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>
