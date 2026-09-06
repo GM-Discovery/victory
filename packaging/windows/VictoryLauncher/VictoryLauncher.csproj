@@ -2,12 +2,12 @@
 
   <!--
     Kernel 100, windows-native branch: this is the Windows tray
-    application Velopack packages and updates -- the thing a consumer
+    application Velopack packages and updates, the thing a consumer
     actually double-clicks. It never runs Victory's own logic itself; it
     downloads/initializes Postgres on first run and supervises both
     Postgres and the bundled victory-backend.exe as plain native Windows
     processes (RuntimeManager/RuntimeSetup). No container runtime, no
-    WSL2, no elevation -- see the k100-podman-wsl2-attempt tag for the
+    WSL2, no elevation; see the k100-podman-wsl2-attempt tag for the
     abandoned approach this replaced and why.
 
     net8.0-windows + WinForms, not WPF/Avalonia: a tray icon and two small
@@ -35,7 +35,7 @@
   <ItemGroup>
     <!--
       AppPaths.BackendExePath expects this at <output>\victory-backend.exe.
-      Not checked in here -- .github/workflows/windows-installer.yml
+      Not checked in here: .github/workflows/windows-installer.yml
       cross-compiles it fresh from backend/cmd/victory (GOOS=windows,
       trivial from any host, no Windows toolchain needed for the Go side)
       and drops it in this directory before `dotnet publish` runs, so a
