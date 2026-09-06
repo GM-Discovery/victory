@@ -110,6 +110,16 @@ internal static class RuntimeManager
         psi.Environment["DEFAULT_LOCATION_SLUG"] = env["DEFAULT_LOCATION_SLUG"];
         psi.Environment["DEFAULT_LOCATION_NAME"] = env.GetValueOrDefault("DEFAULT_LOCATION_NAME", "");
         psi.Environment["COOKIE_SECURE"] = "true";
+        // The backend shells out to a bare "pg_dump" for its pre-migration
+        // backup (internal/migrate/migrate.go) -- silently skipped on a
+        // database with no tables yet (a fresh install), so this doesn't
+        // block first-run setup, but it WOULD fail the moment a future
+        // update ships a schema-changing migration against an
+        // already-populated database, since pg_dump.exe only exists
+        // inside the Postgres download this app manages, never on the
+        // system PATH. Prepending here, not replacing: the backend still
+        // needs whatever else is normally on PATH.
+        psi.Environment["PATH"] = AppPaths.PostgresBinDir + ";" + psi.Environment.GetValueOrDefault("PATH", "");
 
         try
         {
