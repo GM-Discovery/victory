@@ -1,0 +1,55 @@
+name: Windows installer build
+
+# Kernel 100: proves the VictoryLauncher project actually compiles on a
+# real Windows toolchain. There is no Windows dev machine in this
+# project's normal workflow -- this workflow IS the build/test
+# environment for the installer, standing in for one (K100 Checkpoint A
+# left this open; windows-latest closes it without requiring Grant to
+# own Windows hardware).
+#
+# This only builds and smoke-tests the launcher for now. It deliberately
+# does not run `vpk pack` (Velopack packaging), sign anything, or publish
+# a release -- those need a real versioning/signing/release strategy
+# decided first, not bolted onto the first CI run that proves the
+# project compiles.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packaging/windows/**"
+      - ".github/workflows/windows-installer.yml"
+  pull_request:
+    paths:
+      - "packaging/windows/**"
+      - ".github/workflows/windows-installer.yml"
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: packaging/windows/VictoryLauncher
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Publish (self-contained win-x64)
+        run: dotnet publish --configuration Release --no-restore -r win-x64 --self-contained true -o publish
+
+      - name: Upload publish output
+        uses: actions/upload-artifact@v4
+        with:
+          name: VictoryLauncher-win-x64
+          path: packaging/windows/VictoryLauncher/publish/
+          retention-days: 14
