@@ -77,6 +77,13 @@ internal static class RuntimeSetup
         if (!pgOk)
             return new SetupResult(Result.Failed, "Postgres did not start:\n" + pgOutput);
 
+        // Intentionally duplicated with the same call inside
+        // RuntimeManager.StartAsync() (which the tray/Status "start"
+        // actions use): this sequence and that one can race each other
+        // in real usage (confirmed on hardware -- clicking the tray icon
+        // while this wizard step is still running), and createdb is
+        // idempotent, so calling it from both places is what actually
+        // makes either one safe regardless of which gets there first.
         var env = EnvGenerator.ReadAll();
         var (dbOk, dbOutput) = await RuntimeManager.CreateVictoryDatabaseAsync(env["POSTGRES_PASSWORD"]);
         if (!dbOk)

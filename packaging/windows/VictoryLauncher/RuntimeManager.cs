@@ -247,6 +247,24 @@ internal static class RuntimeManager
         if (!pgOk)
             return (false, "Postgres did not start:\n" + pgOutput);
 
+        // Confirmed on real hardware: the tray icon stays clickable
+        // during first-run setup (a deliberate, separate fix), which
+        // means "Open Victory" can race the wizard's own
+        // RuntimeSetup.EnsureRuntimeReadyAsync -- if this StartAsync
+        // call reaches the backend before that sequence's own
+        // CreateVictoryDatabaseAsync call does, the backend starts
+        // pointed at a database that doesn't exist yet ("FATAL:
+        // database victory does not exist" in postgres.log). createdb
+        // is safe to call every time (already-exists is treated as
+        // success), so making this function self-sufficient here costs
+        // nothing on the already-correct path and fixes the race on
+        // every other one, rather than relying on every caller of
+        // StartAsync to already know to create the database first.
+        var env = EnvGenerator.ReadAll();
+        var (dbOk, dbOutput) = await CreateVictoryDatabaseAsync(env["POSTGRES_PASSWORD"]);
+        if (!dbOk)
+            return (false, "Could not create the Victory database:\n" + dbOutput);
+
         var (backendOk, backendOutput) = await StartBackendAsync();
         if (!backendOk)
             return (false, backendOutput);
