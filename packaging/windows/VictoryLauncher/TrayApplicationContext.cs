@@ -41,7 +41,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         _trayIcon = new NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = AppIcon.Shared,
             Text = "Victory",
             Visible = true,
             ContextMenuStrip = menu,

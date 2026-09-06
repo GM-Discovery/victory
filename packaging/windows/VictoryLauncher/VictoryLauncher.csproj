@@ -44,6 +44,10 @@
     <None Include="victory-backend.exe" Condition="Exists('victory-backend.exe')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Same file every page of the web app already links as its favicon (see AppIcon.cs). -->
+    <None Include="favicon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>

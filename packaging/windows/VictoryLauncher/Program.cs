@@ -37,6 +37,8 @@ internal static class Program
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 
+        InstallGlobalExceptionHandling();
+
         var trayContext = new TrayApplicationContext();
 
         // Application.Run starts FIRST, before InitializeAsync's runtime
@@ -73,5 +75,44 @@ internal static class Program
             // nothing is running, no reason to keep the tray icon up.
             Application.Exit();
         }
+    }
+
+    /// <summary>
+    /// Before this, any unhandled exception (a disposed-control access,
+    /// a bug nobody caught yet) just made the whole tray app vanish with
+    /// no explanation -- confirmed on real hardware (closing the
+    /// first-run wizard mid-setup did exactly this, separately fixed in
+    /// FirstRunWizardForm's own close guard). This is the backstop for
+    /// whatever the NEXT uncaught one turns out to be: log it somewhere
+    /// findable and tell the Operator plainly, instead of Victory just
+    /// disappearing -- an unexplained silent death is exactly the kind
+    /// of thing that makes unsigned, unfamiliar software feel untrustworthy.
+    /// </summary>
+    private static void InstallGlobalExceptionHandling()
+    {
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+        Application.ThreadException += (_, e) => ReportUnhandledException(e.Exception, canContinue: true);
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            ReportUnhandledException(e.ExceptionObject as Exception, canContinue: false);
+    }
+
+    private static void ReportUnhandledException(Exception? ex, bool canContinue)
+    {
+        try
+        {
+            Directory.CreateDirectory(AppPaths.LogsDir);
+            File.AppendAllText(
+                Path.Combine(AppPaths.LogsDir, "launcher.log"),
+                $"{DateTime.UtcNow:O} unhandled exception (continuing={canContinue}): {ex}\n");
+        }
+        catch { /* the message box below is the fallback if even logging fails */ }
+
+        MessageBox.Show(
+            "Victory ran into a problem it wasn't expecting" + (canContinue ? "." : " and has to close.") +
+            "\n\nDetails were saved to:\n" + Path.Combine(AppPaths.LogsDir, "launcher.log") +
+            "\n\n" + ex?.Message,
+            "Victory",
+            MessageBoxButtons.OK,
+            canContinue ? MessageBoxIcon.Warning : MessageBoxIcon.Error);
     }
 }

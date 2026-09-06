@@ -22,6 +22,7 @@ internal sealed class StatusForm : Form
     public StatusForm()
     {
         Text = "Victory Status";
+        Icon = AppIcon.Shared;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;

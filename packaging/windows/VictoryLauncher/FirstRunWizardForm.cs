@@ -26,9 +26,19 @@ internal sealed class FirstRunWizardForm : Form
 
     public bool Completed { get; private set; }
 
+    // Guards against closing the window mid-setup. Without this, closing
+    // while OnStartClickedAsync is still awaiting something disposes
+    // every control the background continuation later tries to touch
+    // (_progressList.Items.Add, ShowError, ...) -- an ObjectDisposedException
+    // thrown out of an async-void event handler with nothing to catch it,
+    // which crashes the entire process, not just this dialog. Confirmed
+    // on real hardware: closing mid-setup took the whole tray app down.
+    private bool _setupInProgress;
+
     public FirstRunWizardForm()
     {
         Text = "Welcome to Victory";
+        Icon = AppIcon.Shared;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -42,6 +52,21 @@ internal sealed class FirstRunWizardForm : Form
         Controls.Add(_progressPanel);
         Controls.Add(_questionsPanel);
         AcceptButton = _startButton;
+
+        FormClosing += OnFormClosing;
+    }
+
+    private void OnFormClosing(object? sender, FormClosingEventArgs e)
+    {
+        if (!_setupInProgress)
+            return;
+        e.Cancel = true;
+        MessageBox.Show(
+            this,
+            "Victory is still setting itself up. Closing this window now could leave things half-configured -- please wait for it to finish.",
+            "Victory is setting up",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
     }
 
     private void BuildQuestionsPanel()
@@ -89,6 +114,7 @@ internal sealed class FirstRunWizardForm : Form
         _progressList.Items.Clear();
         _questionsPanel.Visible = false;
         _progressPanel.Visible = true;
+        _setupInProgress = true;
 
         try
         {
@@ -121,6 +147,7 @@ internal sealed class FirstRunWizardForm : Form
             _progressStatusLabel.Text = "Victory is ready";
             _progressList.Items.Add("Victory is ready");
             Completed = true;
+            _setupInProgress = false;
             await Task.Delay(700); // let the Operator actually see "ready" before the window closes
             DialogResult = DialogResult.OK;
             Close();
@@ -150,6 +177,7 @@ internal sealed class FirstRunWizardForm : Form
         // Back to the questions panel entirely, not just re-enabling
         // controls in place -- the whole point of two panels is that
         // "which one is showing" is never ambiguous.
+        _setupInProgress = false;
         _progressPanel.Visible = false;
         _questionsPanel.Visible = true;
     }
