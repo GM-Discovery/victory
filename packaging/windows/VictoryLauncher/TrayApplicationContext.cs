@@ -63,7 +63,14 @@ internal sealed class TrayApplicationContext : ApplicationContext
             if (result != DialogResult.OK || !wizard.Completed)
                 return false; // Operator closed the wizard without finishing -- nothing to run yet.
 
-            OpenOperatorUi();
+            // Straight to account creation, not the campus map: nobody
+            // can log into anything yet (OPERATOR_HANDLE only decides
+            // who WOULD be recognized as Operator once an account with
+            // that handle exists -- it doesn't create one). ?handle= is
+            // pre-filled and locked on that page so the account this
+            // creates is guaranteed to match, not a second chance to
+            // mistype the same thing.
+            OpenSignupForOperator(wizard.OperatorHandle);
             return true;
         }
 
@@ -99,6 +106,21 @@ internal sealed class TrayApplicationContext : ApplicationContext
         catch
         {
             _trayIcon.ShowBalloonTip(4000, "Victory", "Could not open your browser. Visit " + LocalOperatorUrl + " manually.", ToolTipIcon.Warning);
+        }
+    }
+
+    private void OpenSignupForOperator(string? operatorHandle)
+    {
+        var url = string.IsNullOrEmpty(operatorHandle)
+            ? LocalOperatorUrl + "signup/"
+            : LocalOperatorUrl + "signup/?handle=" + Uri.EscapeDataString(operatorHandle);
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch
+        {
+            _trayIcon.ShowBalloonTip(4000, "Victory", "Could not open your browser. Visit " + url + " manually.", ToolTipIcon.Warning);
         }
     }
 

@@ -25,6 +25,7 @@ internal sealed class FirstRunWizardForm : Form
     private readonly ListBox _progressList = new() { Width = 380, Height = 220, Location = new Point(20, 46), IntegralHeight = false };
 
     public bool Completed { get; private set; }
+    public string? OperatorHandle { get; private set; }
 
     // Guards against closing the window mid-setup. Without this, closing
     // while OnStartClickedAsync is still awaiting something disposes
@@ -151,6 +152,7 @@ internal sealed class FirstRunWizardForm : Form
             _progressStatusLabel.Text = "Victory is ready";
             _progressList.Items.Add("Victory is ready");
             Completed = true;
+            OperatorHandle = operatorHandle;
             _setupInProgress = false;
             await Task.Delay(700); // let the Operator actually see "ready" before the window closes
             DialogResult = DialogResult.OK;
