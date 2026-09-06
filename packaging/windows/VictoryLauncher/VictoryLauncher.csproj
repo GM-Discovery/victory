@@ -26,9 +26,9 @@
     <!-- Generated from frontend/assets/favicon.png (6 sizes, 16-256px).
          Without this the compiled exe carries no icon resource at all,
          so Explorer/Start Menu/taskbar show Windows' generic default
-         icon -- confirmed on real hardware (the tray icon at runtime is
+         icon (confirmed on real hardware). The tray icon at runtime is
          a separate thing, set in code via AppIcon.cs; this is what a
-         person sees before the app is even running). -->
+         person sees before the app is even running. -->
     <ApplicationIcon>victory.ico</ApplicationIcon>
     <AssemblyName>VictoryLauncher</AssemblyName>
     <RootNamespace>VictoryLauncher</RootNamespace>
