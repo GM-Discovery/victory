@@ -72,7 +72,10 @@ internal sealed class FirstRunWizardForm : Form
         e.Cancel = true;
         MessageBox.Show(
             this,
-            "Victory is still setting itself up. Closing this window now could leave things half-configured -- please wait for it to finish.",
+            "Victory is still setting itself up, so this window can't close yet -- doing so partway through (especially during a download) " +
+            "could leave things in a broken, half-finished state that's harder to recover from than just waiting.\n\n" +
+            "If a step genuinely seems stuck rather than just slow, it will time out and let you retry within a few minutes -- " +
+            "you don't need to force this window shut to get unstuck.",
             "Victory is setting up",
             MessageBoxButtons.OK,
             MessageBoxIcon.Information);
@@ -151,7 +154,13 @@ internal sealed class FirstRunWizardForm : Form
                 return Task.CompletedTask;
             });
 
-            var setupResult = await RuntimeSetup.EnsureRuntimeReadyAsync(step => _progressList.Items.Add(step));
+            var setupResult = await RuntimeSetup.EnsureRuntimeReadyAsync(
+                reportStep: step => _progressList.Items.Add(step),
+                updateProgress: detail =>
+                {
+                    if (_progressList.Items.Count > 0)
+                        _progressList.Items[^1] = detail;
+                });
             if (setupResult.Result == RuntimeSetup.Result.Failed)
             {
                 ShowError(setupResult.Detail ?? "Victory's runtime could not be set up.");

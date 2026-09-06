@@ -41,12 +41,25 @@ internal static class RuntimeSetup
 
     public sealed record SetupResult(Result Result, string? Detail);
 
-    public static async Task<SetupResult> EnsureRuntimeReadyAsync(Action<string> reportStep)
+    /// <summary>
+    /// updateProgress is optional: callers that can only show a step name
+    /// (tray balloon tips, which are transient popups, not a persistent
+    /// line of text) can leave it null. Callers that render a persistent
+    /// status line (the wizard's progress list) should pass one --
+    /// downloading Postgres is 150+MB and was sitting on one static line
+    /// for however long that took with zero feedback, which is exactly
+    /// what prompted "I keep wondering if it's done or broken" on real
+    /// hardware. Real byte progress, not decorative filler: K100 §38
+    /// already establishes "do not fake a percentage" as doctrine for
+    /// this app, and that cuts the other way here too -- the fix for
+    /// looking possibly-frozen is truthful progress, not a distraction.
+    /// </summary>
+    public static async Task<SetupResult> EnsureRuntimeReadyAsync(Action<string> reportStep, Action<string>? updateProgress = null)
     {
         if (!RuntimeManager.IsPostgresInstalled())
         {
             reportStep("Downloading the Victory runtime (this only happens once)");
-            var (downloaded, downloadError) = await DownloadAndExtractPostgresAsync();
+            var (downloaded, downloadError) = await DownloadAndExtractPostgresAsync(updateProgress);
             if (!downloaded)
                 return new SetupResult(Result.Failed, downloadError);
         }
@@ -76,7 +89,7 @@ internal static class RuntimeSetup
         if (!RuntimeManager.IsCaddyInstalled())
         {
             reportStep("Downloading the Victory runtime (this only happens once)");
-            var (downloaded, downloadError) = await DownloadAndExtractCaddyAsync();
+            var (downloaded, downloadError) = await DownloadAndExtractCaddyAsync(updateProgress);
             if (!downloaded)
                 return new SetupResult(Result.Failed, downloadError);
         }
@@ -88,7 +101,7 @@ internal static class RuntimeSetup
         return new SetupResult(Result.Ready, null);
     }
 
-    private static async Task<(bool Success, string? Error)> DownloadAndExtractCaddyAsync()
+    private static async Task<(bool Success, string? Error)> DownloadAndExtractCaddyAsync(Action<string>? updateProgress)
     {
         var tempZip = Path.Combine(Path.GetTempPath(), "victory-caddy-" + Guid.NewGuid().ToString("N") + ".zip");
         try
@@ -98,7 +111,7 @@ internal static class RuntimeSetup
             {
                 response.EnsureSuccessStatusCode();
                 await using var fileStream = File.Create(tempZip);
-                await response.Content.CopyToAsync(fileStream);
+                await CopyWithProgressAsync(response, fileStream, "Downloading the Victory runtime", updateProgress);
             }
 
             Directory.CreateDirectory(AppPaths.CaddyRoot);
@@ -118,7 +131,7 @@ internal static class RuntimeSetup
         }
     }
 
-    private static async Task<(bool Success, string? Error)> DownloadAndExtractPostgresAsync()
+    private static async Task<(bool Success, string? Error)> DownloadAndExtractPostgresAsync(Action<string>? updateProgress)
     {
         var tempZip = Path.Combine(Path.GetTempPath(), "victory-postgres-" + Guid.NewGuid().ToString("N") + ".zip");
         try
@@ -128,7 +141,7 @@ internal static class RuntimeSetup
             {
                 response.EnsureSuccessStatusCode();
                 await using var fileStream = File.Create(tempZip);
-                await response.Content.CopyToAsync(fileStream);
+                await CopyWithProgressAsync(response, fileStream, "Downloading the Victory runtime", updateProgress);
             }
 
             Directory.CreateDirectory(AppPaths.PostgresRoot);
@@ -183,6 +196,40 @@ internal static class RuntimeSetup
         finally
         {
             try { File.Delete(pwFile); } catch { /* best effort */ }
+        }
+    }
+
+    /// <summary>
+    /// Real byte-level progress, not a fixed poll interval: throttled to
+    /// roughly once per 250ms so it updates smoothly on a fast connection
+    /// without flooding the UI thread with marshaled calls on an even
+    /// faster one. If the server doesn't report Content-Length, falls
+    /// back to a running MB-downloaded counter -- still real information,
+    /// just without a percentage or ETA.
+    /// </summary>
+    private static async Task CopyWithProgressAsync(HttpResponseMessage response, Stream destination, string label, Action<string>? updateProgress)
+    {
+        var totalBytes = response.Content.Headers.ContentLength;
+        await using var source = await response.Content.ReadAsStreamAsync();
+
+        var buffer = new byte[81920];
+        long bytesRead = 0;
+        var lastReportedAt = DateTime.UtcNow;
+        int read;
+        while ((read = await source.ReadAsync(buffer)) > 0)
+        {
+            await destination.WriteAsync(buffer.AsMemory(0, read));
+            bytesRead += read;
+
+            var now = DateTime.UtcNow;
+            if (updateProgress is not null && now - lastReportedAt > TimeSpan.FromMilliseconds(250))
+            {
+                lastReportedAt = now;
+                var downloadedMb = bytesRead / 1024.0 / 1024.0;
+                updateProgress(totalBytes.HasValue
+                    ? $"{label}... {downloadedMb:F0} MB / {totalBytes.Value / 1024.0 / 1024.0:F0} MB ({bytesRead * 100 / totalBytes.Value}%)"
+                    : $"{label}... {downloadedMb:F0} MB");
+            }
         }
     }
 }
