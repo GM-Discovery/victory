@@ -2,15 +2,15 @@
 
   <!--
     Kernel 100: this is the Windows tray application Velopack packages and
-    updates -- the thing a consumer actually double-clicks. It never runs
+    updates: the thing a consumer actually double-clicks. It never runs
     Victory itself; it manages the Podman-based runtime proven out in
     ../../podman (detect/start/stop the compose stack, run first-run
     setup, show status), the same way Docker Desktop's tray icon manages
     containers without being one itself.
 
     net8.0-windows + WinForms, not WPF/Avalonia: a tray icon and two small
-    forms (first-run wizard, status) is the entire UI surface (K100 §26-28)
-    -- WinForms is the simplest framework that covers it (K100 §47's
+    forms (first-run wizard, status) is the entire UI surface (K100 §26-28),
+    and WinForms is the simplest framework that covers it (K100 §47's
     "choose the simplest framework" doctrine, applied to the launcher
     itself, not just the outer installer).
   -->
@@ -40,7 +40,7 @@
   <ItemGroup>
     <PackageReference Include="Velopack" Version="1.2.0" />
     <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
-    <!-- Explicit even though net8.0-windows often carries these transitively --
+    <!-- Explicit even though net8.0-windows often carries these transitively:
          CI is the only place this ever actually builds, so an ambiguous
          "usually included" isn't worth the round-trip if it's wrong. -->
     <PackageReference Include="System.Security.AccessControl" Version="6.0.1" />
