@@ -22,7 +22,15 @@ internal sealed class FirstRunWizardForm : Form
     private readonly Label _errorLabel = new() { ForeColor = Color.Firebrick, AutoSize = true, Visible = false, MaximumSize = new Size(380, 0) };
 
     private readonly Label _progressStatusLabel = new() { AutoSize = false, Size = new Size(380, 24), Location = new Point(20, 16) };
-    private readonly ListBox _progressList = new() { Width = 380, Height = 220, Location = new Point(20, 46), IntegralHeight = false };
+    private readonly ListBox _progressList = new() { Width = 380, Height = 190, Location = new Point(20, 46), IntegralHeight = false };
+    // Setup finishing used to auto-open the browser and close this
+    // window on a timer -- easy to miss entirely (confirmed on real
+    // hardware: the Operator never saw it happen, double-clicked the
+    // tray icon out of habit instead, and landed on the map with no
+    // account). An explicit button the Operator has to click is
+    // impossible to miss and ties the browser launch to a real user
+    // gesture instead of a background timer race.
+    private readonly Button _continueButton = new() { Text = "Continue to Create Your Login →", Width = 300, Location = new Point(20, 246), Visible = false };
 
     public bool Completed { get; private set; }
     public string? OperatorHandle { get; private set; }
@@ -96,7 +104,25 @@ internal sealed class FirstRunWizardForm : Form
 
     private void BuildProgressPanel()
     {
-        _progressPanel.Controls.AddRange([_progressStatusLabel, _progressList]);
+        _continueButton.Click += (_, _) => OnContinueClicked();
+        _progressPanel.Controls.AddRange([_progressStatusLabel, _progressList, _continueButton]);
+    }
+
+    private void OnContinueClicked()
+    {
+        var url = string.IsNullOrEmpty(OperatorHandle)
+            ? $"http://localhost:{RuntimeManager.PublicPort}/signup/"
+            : $"http://localhost:{RuntimeManager.PublicPort}/signup/?handle=" + Uri.EscapeDataString(OperatorHandle);
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch
+        {
+            MessageBox.Show(this, "Could not open your browser. Visit " + url + " manually.", "Victory", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+        DialogResult = DialogResult.OK;
+        Close();
     }
 
     private async Task OnStartClickedAsync()
@@ -149,14 +175,15 @@ internal sealed class FirstRunWizardForm : Form
                 throw new TimeoutException("Victory did not report healthy in time.");
             });
 
-            _progressStatusLabel.Text = "Victory is ready";
+            _progressStatusLabel.Text = "Victory is ready -- one more step";
             _progressList.Items.Add("Victory is ready");
             Completed = true;
             OperatorHandle = operatorHandle;
             _setupInProgress = false;
-            await Task.Delay(700); // let the Operator actually see "ready" before the window closes
-            DialogResult = DialogResult.OK;
-            Close();
+            // Stays open here rather than closing itself: clicking the
+            // button (OnContinueClicked) is what actually opens the
+            // browser and closes this window, not a timer.
+            _continueButton.Visible = true;
         }
         catch (Exception ex)
         {

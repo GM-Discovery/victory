@@ -72,18 +72,27 @@ internal sealed class TrayApplicationContext : ApplicationContext
         if (!EnvGenerator.EnvFileExists())
         {
             using var wizard = new FirstRunWizardForm();
-            var result = wizard.ShowDialog();
-            if (result != DialogResult.OK || !wizard.Completed)
+            // wizard.Completed alone, not ShowDialog()'s own DialogResult:
+            // closing the window via the X button after setup finished
+            // but before clicking "Continue" leaves DialogResult at its
+            // WinForms default (Cancel) even though Victory's runtime is
+            // now genuinely up and running -- checking DialogResult too
+            // would wrongly exit the whole tray app over a still-running
+            // install with no UI left to manage it.
+            wizard.ShowDialog();
+            if (!wizard.Completed)
                 return false; // Operator closed the wizard without finishing -- nothing to run yet.
 
-            // Straight to account creation, not the campus map: nobody
-            // can log into anything yet (OPERATOR_HANDLE only decides
-            // who WOULD be recognized as Operator once an account with
-            // that handle exists -- it doesn't create one). ?handle= is
-            // pre-filled and locked on that page so the account this
-            // creates is guaranteed to match, not a second chance to
-            // mistype the same thing.
-            OpenSignupForOperator(wizard.OperatorHandle);
+            // The wizard's own "Continue to Create Your Login" button
+            // already opened the browser to /signup/?handle= directly,
+            // as a real user gesture -- nothing left to do here if they
+            // clicked it. If they closed the window instead without
+            // clicking it, Victory is still running, but there is
+            // currently no other prompt anywhere reminding them an
+            // account still needs creating -- "Open Victory" from the
+            // tray just goes to the map. Known gap, not yet worth a
+            // second reminder mechanism for what should be a rare path
+            // (the button is the obvious, labeled thing to click).
             return true;
         }
 
@@ -137,21 +146,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
         catch
         {
             _trayIcon.ShowBalloonTip(4000, "Victory", "Could not open your browser. Visit " + LocalOperatorUrl + " manually.", ToolTipIcon.Warning);
-        }
-    }
-
-    private void OpenSignupForOperator(string? operatorHandle)
-    {
-        var url = string.IsNullOrEmpty(operatorHandle)
-            ? LocalOperatorUrl + "signup/"
-            : LocalOperatorUrl + "signup/?handle=" + Uri.EscapeDataString(operatorHandle);
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
-        }
-        catch
-        {
-            _trayIcon.ShowBalloonTip(4000, "Victory", "Could not open your browser. Visit " + url + " manually.", ToolTipIcon.Warning);
         }
     }
 
