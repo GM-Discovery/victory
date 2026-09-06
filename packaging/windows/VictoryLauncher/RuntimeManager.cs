@@ -5,94 +5,192 @@ using System.Threading;
 namespace VictoryLauncher;
 
 /// <summary>
-/// Kernel 100 §2-3: "Victory manages its runtime" -- the Operator never
-/// runs `podman` themselves. This wraps the exact compose stack proven
-/// out in packaging/podman (compose.yml, the same env var contract) so a
-/// Windows install and a Linux dev install are running identical
-/// Victory, not a parallel Windows-specific stack.
+/// Kernel 100 §2-3, windows-native branch: "Victory manages its runtime"
+/// now means running Postgres and the Victory backend as plain native
+/// Windows processes this app supervises directly -- no container
+/// runtime, no WSL2, no elevation, ever. Postgres's own pg_ctl handles
+/// start/stop/status via its standard postmaster.pid mechanism (so this
+/// class never has to track that process's PID itself across launcher
+/// restarts); the backend is a plain child process this class does track
+/// via a PID file, since Go has no pg_ctl equivalent.
 ///
-/// Installing Podman itself when it's missing (including WSL2
-/// enablement and reboot handling, §2) is RuntimeSetup's job, not this
-/// class's -- that needs elevation and this class deliberately never
-/// does, so a normal (non-admin) tray-icon action can never silently
-/// trigger a UAC prompt. DetectPodmanAsync here only detects; see
-/// RuntimeSetup.EnsureRuntimeReadyAsync for the install flow.
+/// Installing Postgres itself (downloading, extracting, initdb) is
+/// RuntimeSetup's job, not this class's -- this class assumes
+/// AppPaths.PgCtlExe and AppPaths.PgDataDir already exist and are ready.
 /// </summary>
 internal static class RuntimeManager
 {
-    public sealed record PodmanCheckResult(bool Found, string? Version, string? Error);
+    public const int PostgresPort = 55432; // arbitrary local-only port, chosen to avoid colliding with any real system Postgres on the default 5432
+    public const int BackendPort = 8081;
 
-    public static async Task<PodmanCheckResult> DetectPodmanAsync()
+    // ---- Postgres ----
+
+    public static bool IsPostgresInstalled() => File.Exists(AppPaths.PgCtlExe);
+
+    public static bool IsDatabaseInitialized() =>
+        Directory.Exists(AppPaths.PgDataDir) && File.Exists(Path.Combine(AppPaths.PgDataDir, "PG_VERSION"));
+
+    public static async Task<bool> IsPostgresRunningAsync()
     {
+        var (exitCode, _, _) = await RunAsync(AppPaths.PgCtlExe, $"status -D \"{AppPaths.PgDataDir}\"", TimeSpan.FromSeconds(10));
+        // pg_ctl status: 0 = running, 3 = not running, 4 = data directory
+        // inaccessible -- only 0 means "already up," everything else means
+        // "safe to try starting."
+        return exitCode == 0;
+    }
+
+    public static async Task<(bool Success, string Output)> StartPostgresAsync()
+    {
+        if (await IsPostgresRunningAsync())
+            return (true, "already running");
+
+        Directory.CreateDirectory(AppPaths.LogsDir);
+        var (exitCode, stdout, stderr) = await RunAsync(
+            AppPaths.PgCtlExe,
+            $"start -D \"{AppPaths.PgDataDir}\" -l \"{AppPaths.PostgresLogFile}\" -w -o \"-p {PostgresPort}\"",
+            TimeSpan.FromMinutes(2));
+        return (exitCode == 0, exitCode == 0 ? stdout : stderr);
+    }
+
+    public static async Task<(bool Success, string Output)> StopPostgresAsync()
+    {
+        var (exitCode, stdout, stderr) = await RunAsync(
+            AppPaths.PgCtlExe, $"stop -D \"{AppPaths.PgDataDir}\" -m fast -w", TimeSpan.FromSeconds(30));
+        return (exitCode == 0, exitCode == 0 ? stdout : stderr);
+    }
+
+    /// <summary>
+    /// initdb only creates the "postgres"/template0/template1 databases --
+    /// this creates the actual "victory" database compose.yml's
+    /// DATABASE_URL always pointed at, run once, after the server is up.
+    /// </summary>
+    public static async Task<(bool Success, string Output)> CreateVictoryDatabaseAsync(string postgresPassword)
+    {
+        var createdbExe = Path.Combine(AppPaths.PostgresBinDir, "createdb.exe");
+        var (exitCode, stdout, stderr) = await RunAsync(
+            createdbExe,
+            $"-U victory -h 127.0.0.1 -p {PostgresPort} victory",
+            TimeSpan.FromSeconds(30),
+            extraEnv: new() { ["PGPASSWORD"] = postgresPassword });
+        // createdb exits non-zero if the database already exists -- treated
+        // as success since this is meant to be safe to call on every boot,
+        // same idempotency contract as the Ensure*Surface bootstraps on
+        // the backend side.
+        if (exitCode == 0 || stderr.Contains("already exists", StringComparison.OrdinalIgnoreCase))
+            return (true, stdout);
+        return (false, stderr);
+    }
+
+    // ---- Backend ----
+
+    public static async Task<(bool Success, string Output)> StartBackendAsync()
+    {
+        if (IsBackendProcessRunning())
+            return (true, "already running");
+
+        Directory.CreateDirectory(AppPaths.LogsDir);
+        var env = EnvGenerator.ReadAll();
+        var postgresPassword = env["POSTGRES_PASSWORD"];
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = AppPaths.BackendExePath,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        psi.Environment["PORT"] = BackendPort.ToString();
+        psi.Environment["DATABASE_URL"] = $"postgres://victory:{postgresPassword}@127.0.0.1:{PostgresPort}/victory?sslmode=disable";
+        psi.Environment["STORAGE_ROOT"] = env["STORAGE_ROOT"];
+        psi.Environment["BACKUP_DIR"] = env["BACKUP_DIR"];
+        psi.Environment["EXPORTS_ROOT"] = env["EXPORTS_ROOT"];
+        psi.Environment["OPERATOR_HANDLE"] = env["OPERATOR_HANDLE"];
+        psi.Environment["DEFAULT_LOCATION_SLUG"] = env["DEFAULT_LOCATION_SLUG"];
+        psi.Environment["DEFAULT_LOCATION_NAME"] = env.GetValueOrDefault("DEFAULT_LOCATION_NAME", "");
+        psi.Environment["COOKIE_SECURE"] = "true";
+
         try
         {
-            var (exitCode, stdout, stderr) = await RunAsync("podman", "--version", TimeSpan.FromSeconds(10));
-            if (exitCode != 0)
-                return new PodmanCheckResult(false, null, string.IsNullOrWhiteSpace(stderr) ? "podman --version failed" : stderr);
-            return new PodmanCheckResult(true, stdout.Trim(), null);
+            var process = Process.Start(psi);
+            if (process is null)
+                return (false, "failed to start victory-backend.exe");
+
+            await File.WriteAllTextAsync(AppPaths.BackendPidFile, process.Id.ToString());
+
+            // Not awaited: this is a long-running server process, not a
+            // one-shot command RunAsync's model fits. Its own log file
+            // (redirected below) is the record of what it does after this
+            // point, same as postgres.log for the database.
+            _ = LogProcessOutputAsync(process, AppPaths.BackendLogFile);
+
+            return (true, $"started (pid {process.Id})");
         }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or FileNotFoundException)
+        catch (Exception ex)
         {
-            return new PodmanCheckResult(false, null, "Podman is not installed or not on PATH.");
+            return (false, ex.Message);
         }
     }
 
-    // Published by .github/workflows/backend-image.yml on every push to
-    // main that touches backend/. That workflow's GITHUB_TOKEN can push
-    // the image but cannot change its visibility -- until someone with
-    // admin on the package has run the one-time `gh api` visibility
-    // change documented in that workflow's header, this reference is
-    // correct but not yet pullable by a real consumer install (a private
-    // GHCR package requires credentials no install should ship with).
-    private const string BackendImage = "ghcr.io/gm-discovery/victory-backend:latest";
+    public static bool IsBackendProcessRunning()
+    {
+        if (!File.Exists(AppPaths.BackendPidFile))
+            return false;
+        if (!int.TryParse(File.ReadAllText(AppPaths.BackendPidFile).Trim(), out var pid))
+            return false;
+        try
+        {
+            var process = Process.GetProcessById(pid);
+            return !process.HasExited && process.ProcessName.Equals("victory-backend", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (ArgumentException)
+        {
+            return false; // no process with that PID exists anymore
+        }
+    }
+
+    public static void StopBackend()
+    {
+        if (!File.Exists(AppPaths.BackendPidFile))
+            return;
+        if (int.TryParse(File.ReadAllText(AppPaths.BackendPidFile).Trim(), out var pid))
+        {
+            try
+            {
+                var process = Process.GetProcessById(pid);
+                if (!process.HasExited)
+                    process.Kill(entireProcessTree: true);
+            }
+            catch (ArgumentException)
+            {
+                // already gone -- nothing to do
+            }
+        }
+        try { File.Delete(AppPaths.BackendPidFile); } catch { /* best effort */ }
+    }
+
+    // ---- Combined lifecycle (what the tray icon and wizard actually call) ----
 
     public static async Task<(bool Success, string Output)> StartAsync()
     {
-        AppPaths.EnsureDataDirectoriesExist();
-        var args = $"compose --env-file \"{AppPaths.EnvFile}\" -f \"{AppPaths.ComposeFile}\" up -d";
-        var (exitCode, stdout, stderr) = await RunAsync("podman", args, TimeSpan.FromMinutes(5), BackendImage);
-        return (exitCode == 0, exitCode == 0 ? stdout : stderr);
+        var (pgOk, pgOutput) = await StartPostgresAsync();
+        if (!pgOk)
+            return (false, "Postgres did not start:\n" + pgOutput);
+        return await StartBackendAsync();
     }
 
     public static async Task<(bool Success, string Output)> StopAsync()
     {
-        var args = $"compose --env-file \"{AppPaths.EnvFile}\" -f \"{AppPaths.ComposeFile}\" down";
-        var (exitCode, stdout, stderr) = await RunAsync("podman", args, TimeSpan.FromMinutes(2));
-        return (exitCode == 0, exitCode == 0 ? stdout : stderr);
+        StopBackend();
+        return await StopPostgresAsync();
     }
 
-    /// <summary>
-    /// Run once, right after Podman itself is first installed: unlike
-    /// Linux, Windows Podman needs an explicit WSL2-backed machine before
-    /// `podman compose` has anywhere to run. `machine init` is expected
-    /// to fail with "already exists" on every call after the first --
-    /// treated as success here rather than requiring a separate existence
-    /// check, since that failure mode is unambiguous and harmless.
-    /// </summary>
-    public static async Task<(bool Success, string Output)> InitializeMachineAsync()
-    {
-        var (initExit, initOut, initErr) = await RunAsync("podman", "machine init", TimeSpan.FromMinutes(10));
-        if (initExit != 0 && !initErr.Contains("already exists", StringComparison.OrdinalIgnoreCase))
-            return (false, initErr);
-
-        var (startExit, startOut, startErr) = await RunAsync("podman", "machine start", TimeSpan.FromMinutes(5));
-        if (startExit != 0 && !startErr.Contains("already running", StringComparison.OrdinalIgnoreCase))
-            return (false, startErr);
-
-        return (true, initOut + startOut);
-    }
-
-    /// <summary>
-    /// Backend health, for the consumer status surface (K100 §26) --
-    /// never surface raw container state as the primary signal, per that
-    /// section's "do not expose container internals" rule.
-    /// </summary>
-    public static async Task<bool> IsBackendHealthyAsync(string baseUrl = "http://127.0.0.1:8081")
+    public static async Task<bool> IsBackendHealthyAsync()
     {
         try
         {
             using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
-            var response = await client.GetAsync($"{baseUrl}/health");
+            var response = await client.GetAsync($"http://127.0.0.1:{BackendPort}/health");
             return response.IsSuccessStatusCode;
         }
         catch
@@ -101,8 +199,33 @@ internal static class RuntimeManager
         }
     }
 
-    private static async Task<(int ExitCode, string Stdout, string Stderr)> RunAsync(
-        string fileName, string arguments, TimeSpan timeout, string? backendImage = null)
+    // ---- Shared process-execution helpers ----
+
+    private static async Task LogProcessOutputAsync(Process process, string logFile)
+    {
+        try
+        {
+            await using var log = new StreamWriter(logFile, append: true) { AutoFlush = true };
+            var stdoutTask = CopyStreamToWriterAsync(process.StandardOutput, log);
+            var stderrTask = CopyStreamToWriterAsync(process.StandardError, log);
+            await Task.WhenAll(stdoutTask, stderrTask);
+        }
+        catch
+        {
+            // Logging failures must never take the actual backend process
+            // down with them.
+        }
+    }
+
+    private static async Task CopyStreamToWriterAsync(StreamReader reader, StreamWriter writer)
+    {
+        string? line;
+        while ((line = await reader.ReadLineAsync()) is not null)
+            await writer.WriteLineAsync(line);
+    }
+
+    internal static async Task<(int ExitCode, string Stdout, string Stderr)> RunAsync(
+        string fileName, string arguments, TimeSpan timeout, Dictionary<string, string>? extraEnv = null)
     {
         var psi = new ProcessStartInfo
         {
@@ -113,8 +236,11 @@ internal static class RuntimeManager
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        if (backendImage is not null)
-            psi.Environment["VICTORY_BACKEND_IMAGE"] = backendImage;
+        if (extraEnv is not null)
+        {
+            foreach (var (key, value) in extraEnv)
+                psi.Environment[key] = value;
+        }
 
         using var process = Process.Start(psi) ?? throw new InvalidOperationException($"failed to start {fileName}");
         var stdoutTask = process.StandardOutput.ReadToEndAsync();

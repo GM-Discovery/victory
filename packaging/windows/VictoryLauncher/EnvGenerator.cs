@@ -9,15 +9,38 @@ namespace VictoryLauncher;
 /// Kernel 100 §9-11: the Windows equivalent of packaging/podman/generate-env.sh.
 /// Asks only the two questions §9 allows (lot name, Operator handle),
 /// generates everything else, and never asks the user to hand-edit a
-/// config file. Keep this in sync with generate-env.sh's slugify/secret
-/// logic -- they must produce compatible .env files, since both feed the
-/// same compose.yml contract.
+/// config file. Slugify/secret-generation logic is deliberately kept
+/// equivalent to generate-env.sh's, even though nothing reads both --
+/// the two are independent implementations of the same contract the
+/// backend itself defines, not literally shared code.
 /// </summary>
 internal static class EnvGenerator
 {
     public sealed record FirstRunAnswers(string LotName, string OperatorHandle);
 
     public static bool EnvFileExists() => File.Exists(AppPaths.EnvFile);
+
+    /// <summary>
+    /// Parsed back out by RuntimeManager to build the backend process's
+    /// own environment at launch time -- this file is the single source
+    /// of truth for POSTGRES_PASSWORD/OPERATOR_HANDLE/etc., not duplicated
+    /// state kept in memory across launcher restarts.
+    /// </summary>
+    public static Dictionary<string, string> ReadAll()
+    {
+        var values = new Dictionary<string, string>();
+        foreach (var line in File.ReadAllLines(AppPaths.EnvFile))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.Length == 0 || trimmed.StartsWith('#'))
+                continue;
+            var separatorIndex = trimmed.IndexOf('=');
+            if (separatorIndex <= 0)
+                continue;
+            values[trimmed[..separatorIndex]] = trimmed[(separatorIndex + 1)..];
+        }
+        return values;
+    }
 
     public static void Generate(FirstRunAnswers answers)
     {
@@ -42,12 +65,14 @@ internal static class EnvGenerator
             "# This file is created fresh per install and is never checked into",
             "# version control -- treat it as a machine secret.",
             $"POSTGRES_PASSWORD={postgresPassword}",
-            // Windows compose bind-mounts need forward slashes even on
-            // Windows -- Docker/Podman's Windows client accepts the
-            // drive-letter form (C:/ProgramData/...) but not backslashes.
-            $"STORAGE_ROOT={ToComposePath(AppPaths.StorageDir)}",
-            $"BACKUP_DIR={ToComposePath(AppPaths.BackupDir)}",
-            $"EXPORTS_ROOT={ToComposePath(AppPaths.ExportsDir)}",
+            // Plain Windows paths -- unlike the Podman-era .env, nothing
+            // here ever gets fed through a container bind-mount syntax.
+            // The backend runs as a native Windows process now and reads
+            // these with Go's platform-aware path/filepath, same as it
+            // reads Linux paths on the server.
+            $"STORAGE_ROOT={AppPaths.StorageDir}",
+            $"BACKUP_DIR={AppPaths.BackupDir}",
+            $"EXPORTS_ROOT={AppPaths.ExportsDir}",
             $"OPERATOR_HANDLE={operatorHandle}",
             $"DEFAULT_LOCATION_SLUG={locationSlug}",
             $"DEFAULT_LOCATION_NAME={lotName}",
@@ -56,8 +81,6 @@ internal static class EnvGenerator
         File.WriteAllText(AppPaths.EnvFile, string.Join("\n", lines) + "\n", new UTF8Encoding(false));
         RestrictToCurrentUserAndAdministrators(AppPaths.EnvFile);
     }
-
-    private static string ToComposePath(string windowsPath) => windowsPath.Replace('\\', '/');
 
     /// <summary>
     /// Mirrors generate-env.sh's `tr '[:upper:]' '[:lower:]' | tr -s ' ' '-' | tr -cd 'a-z0-9-'`.

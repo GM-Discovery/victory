@@ -1,29 +1,34 @@
-using System.Diagnostics;
-using System.Threading;
+using System.IO.Compression;
+using System.Net.Http;
 
 namespace VictoryLauncher;
 
 /// <summary>
-/// Kernel 100 §2: "Victory manages its runtime." Owns the whole
-/// missing-Podman path end to end -- checking WSL2, elevating to enable
-/// it, elevating to install Podman, and starting its machine -- so
-/// nothing above this class ever needs to know Podman didn't exist yet.
+/// Kernel 100 §2, windows-native branch. Compared to the abandoned
+/// Podman/WSL2 approach (see the k100-podman-wsl2-attempt tag), this is
+/// dramatically simpler: no elevation, no reboot, no Windows feature
+/// changes. Everything here runs as the current user.
 ///
-/// NOT VERIFIED ON REAL WINDOWS HARDWARE. GitHub's hosted windows-latest
-/// CI runners cannot exercise WSL2 feature enablement or elevation
-/// prompts (no nested virtualization, no interactive session for UAC) --
-/// this code compiles and its control flow has been reasoned through
-/// carefully, but "compiles" is not "works." This needs a real Windows
-/// machine before it reaches an actual tester, ideally run by a human
-/// who can watch what Windows actually does at each elevated step.
+/// NOT VERIFIED ON REAL WINDOWS HARDWARE. Reasoned through carefully
+/// (EDB's own docs describe the Windows binaries zip as intended for
+/// exactly this "bundle it into another application's installer" use
+/// case), but the extracted zip's exact folder layout and every initdb/
+/// pg_ctl flag combination have not been run on a real machine yet.
 /// </summary>
 internal static class RuntimeSetup
 {
+    // PostgreSQL 16.15 Windows x64 binaries, matching the major version
+    // this project runs everywhere else (docker-compose.yml,
+    // packaging/podman/compose.yml both pin postgres:16). Re-pin
+    // deliberately when it needs to change -- check
+    // https://www.enterprisedb.com/download-postgresql-binaries for the
+    // current fileid, the same way the pinned Docker image digests
+    // elsewhere in this repo get updated by hand, not automatically.
+    private const string PostgresDownloadUrl = "https://sbp.enterprisedb.com/getfile.jsp?fileid=1260494";
+
     public enum Result
     {
         Ready,
-        RebootRequired,
-        ElevationDeclined,
         Failed,
     }
 
@@ -31,87 +36,104 @@ internal static class RuntimeSetup
 
     public static async Task<SetupResult> EnsureRuntimeReadyAsync(Action<string> reportStep)
     {
-        reportStep("Checking for the Victory runtime");
-        if ((await RuntimeManager.DetectPodmanAsync()).Found)
-            return new SetupResult(Result.Ready, null);
-
-        reportStep("Checking Windows compatibility");
-        if (!await IsWsl2AvailableAsync())
+        if (!RuntimeManager.IsPostgresInstalled())
         {
-            reportStep("Setting up a required Windows feature (WSL2) -- Windows will ask you to approve this");
-            var wslResult = await PrivilegedSetup.RunElevatedAsync(PrivilegedSetup.ElevatedStep.EnableWsl2);
-            if (wslResult.UserDeclinedElevation)
-                return new SetupResult(Result.ElevationDeclined, "Victory needs permission to enable a required Windows feature (WSL2) to continue.");
-            if (!wslResult.Succeeded)
-                return new SetupResult(Result.Failed, $"Enabling WSL2 did not succeed (exit code {wslResult.ExitCode}).");
-
-            // wsl --install always requires a reboot to finish taking
-            // effect, even when it reports success -- there is no
-            // "succeeded and no reboot needed" outcome to distinguish
-            // here (K100 §39).
-            return new SetupResult(Result.RebootRequired, "Windows needs to restart to finish enabling a feature Victory depends on (WSL2).");
+            reportStep("Downloading the Victory runtime (this only happens once)");
+            var (downloaded, downloadError) = await DownloadAndExtractPostgresAsync();
+            if (!downloaded)
+                return new SetupResult(Result.Failed, downloadError);
         }
 
-        reportStep("Installing the Victory runtime -- Windows will ask you to approve this");
-        var podmanInstall = await PrivilegedSetup.RunElevatedAsync(PrivilegedSetup.ElevatedStep.InstallPodman);
-        if (podmanInstall.UserDeclinedElevation)
-            return new SetupResult(Result.ElevationDeclined, "Victory needs permission to install its runtime (Podman) to continue.");
-        if (!podmanInstall.Succeeded)
-            return new SetupResult(Result.Failed, $"Installing Podman did not succeed (exit code {podmanInstall.ExitCode}).");
+        if (!RuntimeManager.IsDatabaseInitialized())
+        {
+            reportStep("Setting up private storage");
+            var (initialized, initError) = await InitializeDatabaseAsync();
+            if (!initialized)
+                return new SetupResult(Result.Failed, initError);
+        }
 
-        // The elevated winget install just updated the machine/user PATH
-        // in the registry -- this already-running process's own cached
-        // environment block does not pick that up on its own, so the
-        // very next DetectPodmanAsync would still report "not found"
-        // without this. A brand new process (e.g. after the eventual
-        // restart-with-Windows relaunch) would not have needed it, but
-        // this same run does.
-        RefreshProcessPathFromRegistry();
+        reportStep("Starting Victory");
+        var (pgOk, pgOutput) = await RuntimeManager.StartPostgresAsync();
+        if (!pgOk)
+            return new SetupResult(Result.Failed, "Postgres did not start:\n" + pgOutput);
 
-        reportStep("Starting the Victory runtime for the first time");
-        var (machineOk, machineOutput) = await RuntimeManager.InitializeMachineAsync();
-        if (!machineOk)
-            return new SetupResult(Result.Failed, "Podman installed, but its machine could not start:\n" + machineOutput);
+        var env = EnvGenerator.ReadAll();
+        var (dbOk, dbOutput) = await RuntimeManager.CreateVictoryDatabaseAsync(env["POSTGRES_PASSWORD"]);
+        if (!dbOk)
+            return new SetupResult(Result.Failed, "Could not create the Victory database:\n" + dbOutput);
 
-        return (await RuntimeManager.DetectPodmanAsync()).Found
-            ? new SetupResult(Result.Ready, null)
-            : new SetupResult(Result.Failed, "Podman was installed but still cannot be found on PATH.");
+        var (backendOk, backendOutput) = await RuntimeManager.StartBackendAsync();
+        if (!backendOk)
+            return new SetupResult(Result.Failed, "Victory could not start:\n" + backendOutput);
+
+        return new SetupResult(Result.Ready, null);
     }
 
-    private static async Task<bool> IsWsl2AvailableAsync()
+    private static async Task<(bool Success, string? Error)> DownloadAndExtractPostgresAsync()
     {
+        var tempZip = Path.Combine(Path.GetTempPath(), "victory-postgres-" + Guid.NewGuid().ToString("N") + ".zip");
         try
         {
-            var psi = new ProcessStartInfo
+            using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(15) };
+            using (var response = await client.GetAsync(PostgresDownloadUrl, HttpCompletionOption.ResponseHeadersRead))
             {
-                FileName = "wsl.exe",
-                Arguments = "--status",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-            };
-            using var process = Process.Start(psi);
-            if (process is null)
-                return false;
+                response.EnsureSuccessStatusCode();
+                await using var fileStream = File.Create(tempZip);
+                await response.Content.CopyToAsync(fileStream);
+            }
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            await process.WaitForExitAsync(cts.Token);
-            // Exit code alone, not the (possibly localized) text output:
-            // `wsl --status` succeeds only once WSL is actually installed
-            // and functional, regardless of display language.
-            return process.ExitCode == 0;
+            Directory.CreateDirectory(AppPaths.PostgresRoot);
+            ZipFile.ExtractToDirectory(tempZip, AppPaths.PostgresRoot, overwriteFiles: true);
+
+            // EDB's zip has a top-level "pgsql" folder wrapping bin/lib/
+            // share -- flatten it so AppPaths.PostgresBinDir
+            // (PostgresRoot\bin) is right regardless of whether a given
+            // release's archive nests it or not.
+            var nestedPgsql = Path.Combine(AppPaths.PostgresRoot, "pgsql");
+            if (Directory.Exists(nestedPgsql) && !File.Exists(AppPaths.PgCtlExe))
+            {
+                foreach (var entry in Directory.GetFileSystemEntries(nestedPgsql))
+                {
+                    var destination = Path.Combine(AppPaths.PostgresRoot, Path.GetFileName(entry));
+                    if (Directory.Exists(entry))
+                        Directory.Move(entry, destination);
+                    else
+                        File.Move(entry, destination);
+                }
+                Directory.Delete(nestedPgsql, recursive: true);
+            }
+
+            if (!File.Exists(AppPaths.PgCtlExe))
+                return (false, "The Victory runtime was downloaded, but pg_ctl.exe was not found where expected after extracting it.");
+            return (true, null);
         }
-        catch
+        catch (Exception ex)
         {
-            return false;
+            return (false, "Could not download or set up the Victory runtime:\n" + ex.Message);
+        }
+        finally
+        {
+            try { File.Delete(tempZip); } catch { /* best effort */ }
         }
     }
 
-    private static void RefreshProcessPathFromRegistry()
+    private static async Task<(bool Success, string? Error)> InitializeDatabaseAsync()
     {
-        var machinePath = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine) ?? "";
-        var userPath = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User) ?? "";
-        Environment.SetEnvironmentVariable("PATH", machinePath + ";" + userPath, EnvironmentVariableTarget.Process);
+        var env = EnvGenerator.ReadAll();
+        var password = env["POSTGRES_PASSWORD"];
+        var pwFile = Path.Combine(Path.GetTempPath(), "victory-pg-pw-" + Guid.NewGuid().ToString("N") + ".txt");
+        try
+        {
+            await File.WriteAllTextAsync(pwFile, password + "\n");
+            var (exitCode, _, stderr) = await RuntimeManager.RunAsync(
+                AppPaths.InitDbExe,
+                $"-D \"{AppPaths.PgDataDir}\" -U victory --auth=scram-sha-256 --pwfile=\"{pwFile}\" -E UTF8",
+                TimeSpan.FromMinutes(2));
+            return exitCode == 0 ? (true, null) : (false, "Setting up private storage failed:\n" + stderr);
+        }
+        finally
+        {
+            try { File.Delete(pwFile); } catch { /* best effort */ }
+        }
     }
 }

@@ -67,31 +67,18 @@ internal sealed class TrayApplicationContext : ApplicationContext
             return true;
         }
 
-        // A relaunch (e.g. "start with Windows" after the reboot WSL2
-        // setup itself required) can land here with the runtime still
-        // not actually ready yet -- resume that setup automatically
-        // (K100 §39) rather than just trying to start compose and
-        // failing with a confusing error.
+        // A relaunch (e.g. after a crash, or "start with Windows") can
+        // land here with Postgres not yet downloaded/initialized, or not
+        // currently running -- EnsureRuntimeReadyAsync handles every one
+        // of those states itself and leaves things running when it
+        // returns Ready, so this one call covers both "totally fresh"
+        // and "resuming from wherever it left off."
         var setupResult = await RuntimeSetup.EnsureRuntimeReadyAsync(
             step => _trayIcon.ShowBalloonTip(3000, "Victory", step, ToolTipIcon.Info));
-        switch (setupResult.Result)
+        if (setupResult.Result == RuntimeSetup.Result.Failed)
         {
-            case RuntimeSetup.Result.RebootRequired:
-                StartupRegistration.SetEnabled(true); // so this same setup resumes after the restart
-                using (var restartForm = new RestartRequiredForm(setupResult.Detail!))
-                    restartForm.ShowDialog();
-                return false;
-            case RuntimeSetup.Result.ElevationDeclined:
-            case RuntimeSetup.Result.Failed:
-                _trayIcon.ShowBalloonTip(6000, "Victory", setupResult.Detail ?? "Victory's runtime could not be set up. Click Status for details.", ToolTipIcon.Error);
-                return true; // tray icon still shows so the Operator can retry via Status, rather than the process just vanishing
-        }
-
-        _trayIcon.ShowBalloonTip(3000, "Victory", "Starting Victory...", ToolTipIcon.Info);
-        var (success, output) = await RuntimeManager.StartAsync();
-        if (!success)
-        {
-            _trayIcon.ShowBalloonTip(5000, "Victory", "Victory could not start. Click Status for details.", ToolTipIcon.Error);
+            _trayIcon.ShowBalloonTip(6000, "Victory", setupResult.Detail ?? "Victory's runtime could not be set up. Click Status for details.", ToolTipIcon.Error);
+            return true; // tray icon still shows so the Operator can retry via Status, rather than the process just vanishing
         }
         return true;
     }

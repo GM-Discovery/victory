@@ -8,27 +8,12 @@ internal static class Program
     private const string SingleInstanceMutexName = "Global\\VictoryLauncher-SingleInstance";
 
     [STAThread]
-    private static int Main(string[] args)
+    private static int Main()
     {
-        // Checked before Velopack's own bootstrap and before anything
-        // else: this is PrivilegedSetup's elevated child process (see its
-        // header comment), not a normal launch. It runs one narrow
-        // operation and exits -- no tray icon, no update-apply lifecycle,
-        // no first-run wizard.
-        if (args.Length == 2 && args[0] == "--elevated-step" && Enum.TryParse<PrivilegedSetup.ElevatedStep>(args[1], out var step))
-        {
-            return step switch
-            {
-                PrivilegedSetup.ElevatedStep.EnableWsl2 => ElevatedSteps.EnableWsl2Async().GetAwaiter().GetResult(),
-                PrivilegedSetup.ElevatedStep.InstallPodman => ElevatedSteps.InstallPodmanAsync().GetAwaiter().GetResult(),
-                _ => -1,
-            };
-        }
-
-        // Must be the very first thing that runs in the normal app
-        // lifecycle (Velopack docs): handles install/update/uninstall
-        // hooks (e.g. creating the Start Menu shortcut on first install,
-        // per K100 §28) before any of this app's own code executes.
+        // Must be the very first thing that runs (Velopack docs): handles
+        // install/update/uninstall hooks (e.g. creating the Start Menu
+        // shortcut on first install, per K100 §28) before any of this
+        // app's own code executes.
         VelopackApp.Build().Run();
 
         using var singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isNewInstance);
@@ -55,14 +40,14 @@ internal static class Program
         var trayContext = new TrayApplicationContext();
 
         // Application.Run starts FIRST, before InitializeAsync's runtime
-        // setup (WSL2 checks, elevation, waiting on winget) ever runs --
-        // that setup can take minutes and involves waiting on a UAC
-        // prompt, and none of it pumps a message loop by itself outside
-        // FirstRunWizardForm's own modal dialog. Running it before
-        // Application.Run left the tray icon visible but completely
-        // inert (created, but nothing dispatching its click/menu
-        // messages) for that whole stretch -- a real bug this fixes, not
-        // a hypothetical one: it reproduced on real hardware. Idle+= runs
+        // setup (downloading Postgres on first run, initdb, starting both
+        // processes) ever runs -- none of that pumps a message loop by
+        // itself outside FirstRunWizardForm's own modal dialog. Running
+        // setup before Application.Run left the tray icon visible but
+        // completely inert (created, but nothing dispatching its
+        // click/menu messages) for that whole stretch on the Podman/WSL2
+        // branch this was first built on -- a real bug that reproduced on
+        // real hardware, not a hypothetical one. Idle+= runs
         // InitializeAsync once the loop is actually pumping, so the icon
         // stays responsive throughout, and the WindowsFormsSynchronizationContext
         // Application.Run installs is what lets InitializeAsync's own
@@ -84,9 +69,8 @@ internal static class Program
         var initialized = await trayContext.InitializeAsync();
         if (!initialized)
         {
-            // First-run wizard was closed without completing setup, or a
-            // reboot is now required -- nothing is running, no reason to
-            // keep the tray icon up.
+            // First-run wizard was closed without completing setup --
+            // nothing is running, no reason to keep the tray icon up.
             Application.Exit();
         }
     }

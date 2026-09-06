@@ -15,13 +15,15 @@ name: Windows installer build
 
 on:
   push:
-    branches: [main]
+    branches: [main, windows-native]
     paths:
       - "packaging/windows/**"
+      - "backend/**"
       - ".github/workflows/windows-installer.yml"
   pull_request:
     paths:
       - "packaging/windows/**"
+      - "backend/**"
       - ".github/workflows/windows-installer.yml"
   workflow_dispatch: {}
 
@@ -33,6 +35,21 @@ jobs:
         working-directory: packaging/windows/VictoryLauncher
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+
+      # windows-native: the launcher supervises the Victory backend as a
+      # plain native process (RuntimeManager.StartBackendAsync), not a
+      # container -- it needs the actual .exe bundled alongside it.
+      # Building this native ON windows-latest rather than
+      # cross-compiling from Linux CI, even though Go could do either,
+      # so this one job is the single source of truth for "does the
+      # whole Windows package actually work together."
+      - name: Build victory-backend.exe
+        working-directory: backend
+        run: go build -o ../packaging/windows/VictoryLauncher/victory-backend.exe ./cmd/victory
 
       - uses: actions/setup-dotnet@v4
         with:
