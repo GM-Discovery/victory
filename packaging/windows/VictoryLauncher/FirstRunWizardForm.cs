@@ -3,14 +3,26 @@ namespace VictoryLauncher;
 /// <summary>
 /// Kernel 100 §9 (ask only these two questions), §37 (product voice, not
 /// jargon), §38 (truthful step-based progress, never a faked percentage).
+///
+/// Two full-size panels swapped by visibility, not individual controls
+/// toggled/disabled in place: an earlier version disabled the question
+/// controls but left them positioned exactly where the progress list
+/// also rendered, so the two visibly overlapped once setup started
+/// (confirmed on real hardware -- looked exactly as broken as it sounds).
+/// Two clean panels can't overlap by construction.
 /// </summary>
 internal sealed class FirstRunWizardForm : Form
 {
+    private readonly Panel _questionsPanel = new() { Dock = DockStyle.Fill };
+    private readonly Panel _progressPanel = new() { Dock = DockStyle.Fill, Visible = false };
+
     private readonly TextBox _lotNameBox = new() { Width = 280 };
     private readonly TextBox _operatorHandleBox = new() { Width = 280 };
     private readonly Button _startButton = new() { Text = "Set up Victory", Width = 140 };
-    private readonly ListBox _progressList = new() { Width = 380, Height = 140, Visible = false, IntegralHeight = false };
     private readonly Label _errorLabel = new() { ForeColor = Color.Firebrick, AutoSize = true, Visible = false, MaximumSize = new Size(380, 0) };
+
+    private readonly Label _progressStatusLabel = new() { AutoSize = false, Size = new Size(380, 24), Location = new Point(20, 16) };
+    private readonly ListBox _progressList = new() { Width = 380, Height = 220, Location = new Point(20, 46), IntegralHeight = false };
 
     public bool Completed { get; private set; }
 
@@ -23,6 +35,17 @@ internal sealed class FirstRunWizardForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(420, 320);
 
+        BuildQuestionsPanel();
+        BuildProgressPanel();
+        _progressStatusLabel.Font = new Font(Font, FontStyle.Bold);
+
+        Controls.Add(_progressPanel);
+        Controls.Add(_questionsPanel);
+        AcceptButton = _startButton;
+    }
+
+    private void BuildQuestionsPanel()
+    {
         var intro = new Label
         {
             Text = "Let's get your Victory lot running. Two questions, then Victory sets itself up.",
@@ -40,11 +63,14 @@ internal sealed class FirstRunWizardForm : Form
         _startButton.Location = new Point(20, 180);
         _startButton.Click += async (_, _) => await OnStartClickedAsync();
 
-        _progressList.Location = new Point(20, 130);
-        _errorLabel.Location = new Point(20, 180);
+        _errorLabel.Location = new Point(20, 220);
 
-        Controls.AddRange([intro, lotNameLabel, _lotNameBox, operatorHandleLabel, _operatorHandleBox, _startButton, _progressList, _errorLabel]);
-        AcceptButton = _startButton;
+        _questionsPanel.Controls.AddRange([intro, lotNameLabel, _lotNameBox, operatorHandleLabel, _operatorHandleBox, _startButton, _errorLabel]);
+    }
+
+    private void BuildProgressPanel()
+    {
+        _progressPanel.Controls.AddRange([_progressStatusLabel, _progressList]);
     }
 
     private async Task OnStartClickedAsync()
@@ -59,11 +85,10 @@ internal sealed class FirstRunWizardForm : Form
             return;
         }
 
-        _lotNameBox.Enabled = false;
-        _operatorHandleBox.Enabled = false;
-        _startButton.Enabled = false;
-        _progressList.Visible = true;
+        _progressStatusLabel.Text = "Setting up Victory...";
         _progressList.Items.Clear();
+        _questionsPanel.Visible = false;
+        _progressPanel.Visible = true;
 
         try
         {
@@ -93,6 +118,7 @@ internal sealed class FirstRunWizardForm : Form
                 throw new TimeoutException("Victory did not report healthy in time.");
             });
 
+            _progressStatusLabel.Text = "Victory is ready";
             _progressList.Items.Add("Victory is ready");
             Completed = true;
             await Task.Delay(700); // let the Operator actually see "ready" before the window closes
@@ -121,8 +147,10 @@ internal sealed class FirstRunWizardForm : Form
 
     private void ResetForRetry()
     {
-        _lotNameBox.Enabled = true;
-        _operatorHandleBox.Enabled = true;
-        _startButton.Enabled = true;
+        // Back to the questions panel entirely, not just re-enabling
+        // controls in place -- the whole point of two panels is that
+        // "which one is showing" is never ambiguous.
+        _progressPanel.Visible = false;
+        _questionsPanel.Visible = true;
     }
 }
