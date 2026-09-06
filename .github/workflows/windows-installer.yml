@@ -7,11 +7,20 @@ name: Windows installer build
 # left this open; windows-latest closes it without requiring Grant to
 # own Windows hardware).
 #
-# This only builds and smoke-tests the launcher for now. It deliberately
-# does not run `vpk pack` (Velopack packaging), sign anything, or publish
-# a release -- those need a real versioning/signing/release strategy
-# decided first, not bolted onto the first CI run that proves the
-# project compiles.
+# Also packs and publishes a real Velopack release on every push, so
+# Grant's own test install can pick up each change through the
+# in-app auto-updater (UpdateChecker.cs) without a manual rebuild.
+# Not yet signing anything -- that's still pending a real certificate.
+#
+# Publishing needs RELEASES_REPO_TOKEN: a GitHub personal access token
+# (classic, `repo` scope, or fine-grained with contents:write) that can
+# push to GM-Discovery/victory-releases specifically -- this repo's own
+# ambient GITHUB_TOKEN can only ever act on this repo, never a different
+# one. Add it under Settings > Secrets and variables > Actions in THIS
+# repo (victory, not victory-releases). Until that secret exists and
+# GM-Discovery/victory-releases exists as a public repo, the pack/upload
+# steps below will fail -- the build/publish steps above them still
+# succeed and upload their own artifact independently either way.
 
 on:
   push:
@@ -70,3 +79,18 @@ jobs:
           name: VictoryLauncher-win-x64
           path: packaging/windows/VictoryLauncher/publish/
           retention-days: 14
+
+      # No formal version scheme exists yet -- 0.0.<run number> is a
+      # simple, always-increasing placeholder that's good enough for
+      # Velopack to recognize "there's a newer one," not a real semantic
+      # version. Revisit once real releases (and signing) are a thing.
+      - name: Pack and publish Velopack release
+        if: github.event_name != 'pull_request'
+        env:
+          VPK_GITHUB_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+        run: |
+          dotnet tool install -g vpk
+          vpk download github --repoUrl https://github.com/GM-Discovery/victory-releases --token $env:VPK_GITHUB_TOKEN
+          vpk pack -u VictoryLauncher -v 0.0.${{ github.run_number }} -p publish -e VictoryLauncher.exe
+          vpk upload github --repoUrl https://github.com/GM-Discovery/victory-releases --token $env:VPK_GITHUB_TOKEN --publish --releaseName "Victory 0.0.${{ github.run_number }}" --tag v0.0.${{ github.run_number }}
+        continue-on-error: true # see this workflow's header: expected to fail until RELEASES_REPO_TOKEN and the releases repo both exist

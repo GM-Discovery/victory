@@ -11,8 +11,15 @@ internal sealed class TrayApplicationContext : ApplicationContext
 {
     private static readonly string LocalOperatorUrl = $"http://localhost:{RuntimeManager.PublicPort}/";
 
+    // K100 §33-ish "don't disrupt active use, but check regularly": no
+    // formal timing decision exists yet for this project specifically --
+    // once every 4 hours is a reasonable, conservative default that
+    // still catches a same-day fix without polling aggressively.
+    private static readonly TimeSpan UpdateCheckInterval = TimeSpan.FromHours(4);
+
     private readonly NotifyIcon _trayIcon;
     private readonly ToolStripMenuItem _startWithWindowsItem;
+    private readonly System.Windows.Forms.Timer _updateTimer = new() { Interval = (int)UpdateCheckInterval.TotalMilliseconds };
     private StatusForm? _statusForm;
 
     public TrayApplicationContext()
@@ -26,6 +33,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
         var statusItem = new ToolStripMenuItem("Status...");
         statusItem.Click += (_, _) => ShowStatus();
         menu.Items.Add(statusItem);
+
+        var checkUpdatesItem = new ToolStripMenuItem("Check for Updates");
+        checkUpdatesItem.Click += async (_, _) => await CheckForUpdatesAsync();
+        menu.Items.Add(checkUpdatesItem);
 
         menu.Items.Add(new ToolStripSeparator());
 
@@ -47,6 +58,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
             ContextMenuStrip = menu,
         };
         _trayIcon.DoubleClick += (_, _) => OpenOperatorUi();
+
+        _updateTimer.Tick += async (_, _) => await CheckForUpdatesAsync();
     }
 
     /// <summary>
@@ -87,7 +100,25 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _trayIcon.ShowBalloonTip(6000, "Victory", setupResult.Detail ?? "Victory's runtime could not be set up. Click Status for details.", ToolTipIcon.Error);
             return true; // tray icon still shows so the Operator can retry via Status, rather than the process just vanishing
         }
+
+        // Only reached once Victory is actually up and running -- never
+        // during first-run setup itself (that path returns earlier,
+        // above) and never mid-retry after a failure (the branch just
+        // above also returns first). ApplyUpdatesAndRestart only
+        // restarts this launcher process, not the Postgres/backend/Caddy
+        // processes it started (those aren't child processes of this one
+        // in any way Windows would tear down together), so an update
+        // landing mid-session doesn't interrupt anyone using Victory.
+        _updateTimer.Start();
+        _ = CheckForUpdatesAsync();
+
         return true;
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        await UpdateChecker.CheckAndApplyAsync(
+            status => _trayIcon.ShowBalloonTip(3000, "Victory", status, ToolTipIcon.Info));
     }
 
     private void OpenOperatorUi()
