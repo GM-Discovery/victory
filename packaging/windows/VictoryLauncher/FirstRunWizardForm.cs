@@ -73,14 +73,20 @@ internal sealed class FirstRunWizardForm : Form
                 return Task.CompletedTask;
             });
 
-            var podmanCheck = await RunStepAsync("Checking for the Victory runtime", RuntimeManager.DetectPodmanAsync);
-            if (!podmanCheck.Found)
+            var setupResult = await RuntimeSetup.EnsureRuntimeReadyAsync(step => _progressList.Items.Add(step));
+            switch (setupResult.Result)
             {
-                ShowError(
-                    "Victory needs Podman to run, and it isn't installed yet. " +
-                    "Install Podman (podman.io) and reopen Victory to finish setup.");
-                ResetForRetry();
-                return;
+                case RuntimeSetup.Result.Ready:
+                    break;
+                case RuntimeSetup.Result.RebootRequired:
+                    OfferRestart(setupResult.Detail!);
+                    return;
+                case RuntimeSetup.Result.ElevationDeclined:
+                case RuntimeSetup.Result.Failed:
+                default:
+                    ShowError(setupResult.Detail ?? "Victory's runtime could not be set up.");
+                    ResetForRetry();
+                    return;
             }
 
             await RunStepAsync("Starting Victory", async () =>
@@ -128,6 +134,21 @@ internal sealed class FirstRunWizardForm : Form
         var result = await step();
         _progressList.Items[^1] = label;
         return result;
+    }
+
+    private void OfferRestart(string reason)
+    {
+        // So the SAME setup resumes automatically after the Operator
+        // signs back in (K100 §39) -- they haven't seen the "Start with
+        // Windows" menu item yet, this wizard hasn't shown a tray icon at all.
+        StartupRegistration.SetEnabled(true);
+        using var restartForm = new RestartRequiredForm(reason);
+        restartForm.ShowDialog();
+        // Completed stays false: nothing is running yet, so the caller
+        // (TrayApplicationContext.InitializeAsync) correctly treats this
+        // exactly like closing the wizard without finishing, and exits
+        // quietly rather than opening a browser to a Victory that isn't up.
+        Close();
     }
 
     private void ShowError(string message)

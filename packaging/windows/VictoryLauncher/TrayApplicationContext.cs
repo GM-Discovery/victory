@@ -1,5 +1,3 @@
-using Microsoft.Win32;
-
 namespace VictoryLauncher;
 
 /// <summary>
@@ -11,8 +9,6 @@ namespace VictoryLauncher;
 /// </summary>
 internal sealed class TrayApplicationContext : ApplicationContext
 {
-    private const string RunRegistryKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string RunValueName = "VictoryLauncher";
     private const string LocalOperatorUrl = "http://localhost:8081/";
 
     private readonly NotifyIcon _trayIcon;
@@ -33,8 +29,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         menu.Items.Add(new ToolStripSeparator());
 
-        _startWithWindowsItem = new ToolStripMenuItem("Start with Windows") { CheckOnClick = true, Checked = IsStartWithWindowsEnabled() };
-        _startWithWindowsItem.Click += (_, _) => SetStartWithWindows(_startWithWindowsItem.Checked);
+        _startWithWindowsItem = new ToolStripMenuItem("Start with Windows") { CheckOnClick = true, Checked = StartupRegistration.IsEnabled() };
+        _startWithWindowsItem.Click += (_, _) => StartupRegistration.SetEnabled(_startWithWindowsItem.Checked);
         menu.Items.Add(_startWithWindowsItem);
 
         menu.Items.Add(new ToolStripSeparator());
@@ -69,6 +65,26 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
             OpenOperatorUi();
             return true;
+        }
+
+        // A relaunch (e.g. "start with Windows" after the reboot WSL2
+        // setup itself required) can land here with the runtime still
+        // not actually ready yet -- resume that setup automatically
+        // (K100 §39) rather than just trying to start compose and
+        // failing with a confusing error.
+        var setupResult = await RuntimeSetup.EnsureRuntimeReadyAsync(
+            step => _trayIcon.ShowBalloonTip(3000, "Victory", step, ToolTipIcon.Info));
+        switch (setupResult.Result)
+        {
+            case RuntimeSetup.Result.RebootRequired:
+                StartupRegistration.SetEnabled(true); // so this same setup resumes after the restart
+                using (var restartForm = new RestartRequiredForm(setupResult.Detail!))
+                    restartForm.ShowDialog();
+                return false;
+            case RuntimeSetup.Result.ElevationDeclined:
+            case RuntimeSetup.Result.Failed:
+                _trayIcon.ShowBalloonTip(6000, "Victory", setupResult.Detail ?? "Victory's runtime could not be set up. Click Status for details.", ToolTipIcon.Error);
+                return true; // tray icon still shows so the Operator can retry via Status, rather than the process just vanishing
         }
 
         _trayIcon.ShowBalloonTip(3000, "Victory", "Starting Victory...", ToolTipIcon.Info);
@@ -109,22 +125,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _statusForm = new StatusForm();
         _statusForm.FormClosed += (_, _) => _statusForm = null;
         _statusForm.Show();
-    }
-
-    private static bool IsStartWithWindowsEnabled()
-    {
-        using var key = Registry.CurrentUser.OpenSubKey(RunRegistryKey, writable: false);
-        return key?.GetValue(RunValueName) is not null;
-    }
-
-    private static void SetStartWithWindows(bool enabled)
-    {
-        using var key = Registry.CurrentUser.OpenSubKey(RunRegistryKey, writable: true)
-            ?? Registry.CurrentUser.CreateSubKey(RunRegistryKey);
-        if (enabled)
-            key.SetValue(RunValueName, "\"" + Environment.ProcessPath + "\"");
-        else
-            key.DeleteValue(RunValueName, throwOnMissingValue: false);
     }
 
     private async Task OnQuitAsync()

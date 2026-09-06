@@ -11,14 +11,12 @@ namespace VictoryLauncher;
 /// Windows install and a Linux dev install are running identical
 /// Victory, not a parallel Windows-specific stack.
 ///
-/// NOT YET DONE (tracked, not silently skipped): §2 requires Victory to
-/// install/configure a container runtime itself when one is missing,
-/// including WSL2 enablement and reboot handling. DetectPodman below only
-/// detects and tells the Operator what's missing -- it does not yet run
-/// a silent Podman/WSL2 install. That is real, separate scope (Windows
-/// feature enablement via DISM, downloading and running Podman's own
-/// installer, resuming after a reboot) deliberately deferred rather than
-/// rushed alongside the launcher skeleton.
+/// Installing Podman itself when it's missing (including WSL2
+/// enablement and reboot handling, §2) is RuntimeSetup's job, not this
+/// class's -- that needs elevation and this class deliberately never
+/// does, so a normal (non-admin) tray-icon action can never silently
+/// trigger a UAC prompt. DetectPodmanAsync here only detects; see
+/// RuntimeSetup.EnsureRuntimeReadyAsync for the install flow.
 /// </summary>
 internal static class RuntimeManager
 {
@@ -61,6 +59,27 @@ internal static class RuntimeManager
         var args = $"compose --env-file \"{AppPaths.EnvFile}\" -f \"{AppPaths.ComposeFile}\" down";
         var (exitCode, stdout, stderr) = await RunAsync("podman", args, TimeSpan.FromMinutes(2));
         return (exitCode == 0, exitCode == 0 ? stdout : stderr);
+    }
+
+    /// <summary>
+    /// Run once, right after Podman itself is first installed: unlike
+    /// Linux, Windows Podman needs an explicit WSL2-backed machine before
+    /// `podman compose` has anywhere to run. `machine init` is expected
+    /// to fail with "already exists" on every call after the first --
+    /// treated as success here rather than requiring a separate existence
+    /// check, since that failure mode is unambiguous and harmless.
+    /// </summary>
+    public static async Task<(bool Success, string Output)> InitializeMachineAsync()
+    {
+        var (initExit, initOut, initErr) = await RunAsync("podman", "machine init", TimeSpan.FromMinutes(10));
+        if (initExit != 0 && !initErr.Contains("already exists", StringComparison.OrdinalIgnoreCase))
+            return (false, initErr);
+
+        var (startExit, startOut, startErr) = await RunAsync("podman", "machine start", TimeSpan.FromMinutes(5));
+        if (startExit != 0 && !startErr.Contains("already running", StringComparison.OrdinalIgnoreCase))
+            return (false, startErr);
+
+        return (true, initOut + startOut);
     }
 
     /// <summary>
