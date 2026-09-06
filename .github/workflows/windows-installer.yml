@@ -93,4 +93,16 @@ jobs:
           vpk download github --repoUrl https://github.com/GM-Discovery/victory-releases --token $env:VPK_GITHUB_TOKEN
           vpk pack -u VictoryLauncher -v 0.0.${{ github.run_number }} -p publish -e VictoryLauncher.exe
           vpk upload github --repoUrl https://github.com/GM-Discovery/victory-releases --token $env:VPK_GITHUB_TOKEN --publish --releaseName "Victory 0.0.${{ github.run_number }}" --tag v0.0.${{ github.run_number }}
-        continue-on-error: true # see this workflow's header: expected to fail until RELEASES_REPO_TOKEN and the releases repo both exist
+        continue-on-error: true # see this workflow's header: the upload half is expected to fail until RELEASES_REPO_TOKEN exists; vpk pack itself already succeeds without it
+
+      # Uploaded regardless of whether the upload-to-github-releases step
+      # above succeeded: vpk pack itself doesn't need RELEASES_REPO_TOKEN
+      # at all, so this is real proof the packaging step works (a real
+      # installer .exe, not just a raw publish folder) even before
+      # publishing is wired up.
+      - name: Upload packed Velopack release
+        uses: actions/upload-artifact@v4
+        with:
+          name: VictoryLauncher-Setup
+          path: packaging/windows/VictoryLauncher/Releases/
+          retention-days: 14
