@@ -119,7 +119,8 @@ internal static class RuntimeManager
         // inside the Postgres download this app manages, never on the
         // system PATH. Prepending here, not replacing: the backend still
         // needs whatever else is normally on PATH.
-        psi.Environment["PATH"] = AppPaths.PostgresBinDir + ";" + psi.Environment.GetValueOrDefault("PATH", "");
+        psi.Environment.TryGetValue("PATH", out var existingPath);
+        psi.Environment["PATH"] = AppPaths.PostgresBinDir + ";" + (existingPath ?? "");
 
         try
         {
