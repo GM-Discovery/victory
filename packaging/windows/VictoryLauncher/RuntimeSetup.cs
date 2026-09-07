@@ -42,6 +42,14 @@ internal static class RuntimeSetup
     public sealed record SetupResult(Result Result, string? Detail);
 
     /// <summary>
+    /// Current/Total lets a caller render an overall progress bar or "step
+    /// N of M" without hardcoding the step count itself -- which steps
+    /// actually run varies (downloads only happen once each), so Total is
+    /// computed fresh at the start of each EnsureRuntimeReadyAsync call.
+    /// </summary>
+    public readonly record struct StepProgress(string Label, int Current, int Total);
+
+    /// <summary>
     /// updateProgress is optional: callers that can only show a step name
     /// (tray balloon tips, which are transient popups, not a persistent
     /// line of text) can leave it null. Callers that render a persistent
@@ -54,19 +62,32 @@ internal static class RuntimeSetup
     /// this app, and that cuts the other way here too -- the fix for
     /// looking possibly-frozen is truthful progress, not a distraction.
     /// </summary>
-    public static async Task<SetupResult> EnsureRuntimeReadyAsync(Action<string> reportStep, Action<string>? updateProgress = null)
+    public static async Task<SetupResult> EnsureRuntimeReadyAsync(Action<StepProgress> reportStep, Action<string>? updateProgress = null)
     {
-        if (!RuntimeManager.IsPostgresInstalled())
+        var needsPostgresDownload = !RuntimeManager.IsPostgresInstalled();
+        var needsDbInit = !RuntimeManager.IsDatabaseInitialized();
+        var needsCaddyDownload = !RuntimeManager.IsCaddyInstalled();
+
+        // Total is whichever of the always-run steps plus the conditional
+        // (first-run-only) downloads actually apply this time -- known
+        // upfront since the checks above are all cheap local lookups, so
+        // a caller can size a progress bar correctly before the first
+        // step even starts.
+        var total = 4 + (needsPostgresDownload ? 1 : 0) + (needsDbInit ? 1 : 0) + (needsCaddyDownload ? 1 : 0);
+        var current = 0;
+        void Report(string label) => reportStep(new StepProgress(label, ++current, total));
+
+        if (needsPostgresDownload)
         {
-            reportStep("Downloading the Victory runtime (this only happens once)");
+            Report("Downloading the Victory runtime (this only happens once)");
             var (downloaded, downloadError) = await DownloadAndExtractPostgresAsync(updateProgress);
             if (!downloaded)
                 return new SetupResult(Result.Failed, downloadError);
         }
 
-        if (!RuntimeManager.IsDatabaseInitialized())
+        if (needsDbInit)
         {
-            reportStep("Setting up private storage");
+            Report("Setting up private storage");
             var (initialized, initError) = await InitializeDatabaseAsync();
             if (!initialized)
                 return new SetupResult(Result.Failed, initError);
@@ -77,31 +98,31 @@ internal static class RuntimeSetup
         // these four was actually running, or how long is normal --
         // exactly what prompted "track the changes it takes to get caddy
         // running... so I don't prematurely click" on real hardware.
-        reportStep("Starting Victory's database");
+        Report("Starting Victory's database");
         var (pgOk, pgOutput) = await RuntimeManager.StartPostgresAsync();
         if (!pgOk)
             return new SetupResult(Result.Failed, "Postgres did not start:\n" + pgOutput);
 
-        reportStep("Setting up Victory's database");
+        Report("Setting up Victory's database");
         var env = EnvGenerator.ReadAll();
         var (dbOk, dbOutput) = await RuntimeManager.CreateVictoryDatabaseAsync(env["POSTGRES_PASSWORD"]);
         if (!dbOk)
             return new SetupResult(Result.Failed, "Could not create the Victory database:\n" + dbOutput);
 
-        reportStep("Starting Victory's server");
+        Report("Starting Victory's server");
         var (backendOk, backendOutput) = await RuntimeManager.StartBackendAsync();
         if (!backendOk)
             return new SetupResult(Result.Failed, "Victory could not start:\n" + backendOutput);
 
-        if (!RuntimeManager.IsCaddyInstalled())
+        if (needsCaddyDownload)
         {
-            reportStep("Downloading Victory's web server (this only happens once)");
+            Report("Downloading Victory's web server (this only happens once)");
             var (downloaded, downloadError) = await DownloadAndExtractCaddyAsync(updateProgress);
             if (!downloaded)
                 return new SetupResult(Result.Failed, downloadError);
         }
 
-        reportStep("Starting Victory's web server");
+        Report("Starting Victory's web server");
         var (caddyOk, caddyOutput) = RuntimeManager.StartCaddy();
         if (!caddyOk)
             return new SetupResult(Result.Failed, "Victory could not be reached:\n" + caddyOutput);

@@ -22,7 +22,19 @@ internal sealed class FirstRunWizardForm : Form
     private readonly Label _errorLabel = new() { ForeColor = Color.Firebrick, AutoSize = true, Visible = false, MaximumSize = new Size(380, 0) };
 
     private readonly Label _progressStatusLabel = new() { AutoSize = false, Size = new Size(380, 24), Location = new Point(20, 16) };
-    private readonly ListBox _progressList = new() { Width = 380, Height = 190, Location = new Point(20, 46), IntegralHeight = false };
+    private readonly ProgressBar _overallProgressBar = new() { Width = 380, Height = 18, Location = new Point(20, 46), Minimum = 0, Maximum = 1, Style = ProgressBarStyle.Continuous };
+    private readonly ListBox _progressList = new() { Width = 380, Height = 166, Location = new Point(20, 72), IntegralHeight = false };
+
+    // A visible clock, ticking every second from the moment setup starts
+    // regardless of which step is running or how chatty it is: real
+    // per-step progress (the ListBox, the byte counts) proves *what* is
+    // happening, but a step that legitimately blocks for a few seconds
+    // with no callback of its own (pg_ctl start, createdb) still needs
+    // *something* moving on screen, or it reads exactly like a hang --
+    // which is the whole thing "so I don't prematurely click" was about.
+    private readonly System.Windows.Forms.Timer _elapsedTimer = new() { Interval = 1000 };
+    private DateTime _setupStartedAt;
+    private string _currentPhaseLabel = "Setting up Victory";
     // Setup finishing used to auto-open the browser and close this
     // window on a timer -- easy to miss entirely (confirmed on real
     // hardware: the Operator never saw it happen, double-clicked the
@@ -63,6 +75,13 @@ internal sealed class FirstRunWizardForm : Form
         AcceptButton = _startButton;
 
         FormClosing += OnFormClosing;
+        _elapsedTimer.Tick += (_, _) => UpdateElapsedLabel();
+    }
+
+    private void UpdateElapsedLabel()
+    {
+        var elapsedSeconds = (int)(DateTime.UtcNow - _setupStartedAt).TotalSeconds;
+        _progressStatusLabel.Text = $"{_currentPhaseLabel} ({elapsedSeconds}s)";
     }
 
     private void OnFormClosing(object? sender, FormClosingEventArgs e)
@@ -108,7 +127,7 @@ internal sealed class FirstRunWizardForm : Form
     private void BuildProgressPanel()
     {
         _continueButton.Click += (_, _) => OnContinueClicked();
-        _progressPanel.Controls.AddRange([_progressStatusLabel, _progressList, _continueButton]);
+        _progressPanel.Controls.AddRange([_progressStatusLabel, _overallProgressBar, _progressList, _continueButton]);
     }
 
     private void OnContinueClicked()
@@ -140,11 +159,16 @@ internal sealed class FirstRunWizardForm : Form
             return;
         }
 
-        _progressStatusLabel.Text = "Setting up Victory...";
+        _currentPhaseLabel = "Setting up Victory";
+        _progressStatusLabel.Text = _currentPhaseLabel;
+        _overallProgressBar.Maximum = 1;
+        _overallProgressBar.Value = 0;
         _progressList.Items.Clear();
         _questionsPanel.Visible = false;
         _progressPanel.Visible = true;
         _setupInProgress = true;
+        _setupStartedAt = DateTime.UtcNow;
+        _elapsedTimer.Start();
 
         try
         {
@@ -155,7 +179,13 @@ internal sealed class FirstRunWizardForm : Form
             });
 
             var setupResult = await RuntimeSetup.EnsureRuntimeReadyAsync(
-                reportStep: step => _progressList.Items.Add(step),
+                reportStep: step =>
+                {
+                    _progressList.Items.Add(step.Label);
+                    _currentPhaseLabel = $"Setting up Victory -- step {step.Current} of {step.Total}";
+                    _overallProgressBar.Maximum = step.Total;
+                    _overallProgressBar.Value = step.Current;
+                },
                 updateProgress: detail =>
                 {
                     if (_progressList.Items.Count > 0)
@@ -168,6 +198,8 @@ internal sealed class FirstRunWizardForm : Form
                 return;
             }
 
+            _currentPhaseLabel = "Almost ready -- waiting for Victory to finish starting";
+            _overallProgressBar.Value = _overallProgressBar.Maximum;
             await RunStepAsync("Waiting for Victory to be ready", async () =>
             {
                 const int maxAttempts = 60;
@@ -184,6 +216,7 @@ internal sealed class FirstRunWizardForm : Form
                 throw new TimeoutException("Victory did not report healthy in time.");
             });
 
+            _elapsedTimer.Stop();
             _progressStatusLabel.Text = "Victory is ready -- one more step";
             _progressList.Items.Add("Victory is ready");
             Completed = true;
@@ -219,6 +252,7 @@ internal sealed class FirstRunWizardForm : Form
         // Back to the questions panel entirely, not just re-enabling
         // controls in place -- the whole point of two panels is that
         // "which one is showing" is never ambiguous.
+        _elapsedTimer.Stop();
         _setupInProgress = false;
         _progressPanel.Visible = false;
         _questionsPanel.Visible = true;
