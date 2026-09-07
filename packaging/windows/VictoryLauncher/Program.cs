@@ -29,7 +29,7 @@ internal static class Program
             .OnBeforeUninstallFastCallback(_ => RuntimeManager.StopAsync().GetAwaiter().GetResult())
             .Run();
 
-        using var singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isNewInstance);
+        var singleInstanceMutex = AcquireSingleInstanceMutex(out var isNewInstance);
         if (!isNewInstance)
         {
             // K100 §28: "do not spawn duplicate server stacks" -- a second
@@ -40,6 +40,7 @@ internal static class Program
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo($"http://localhost:{RuntimeManager.PublicPort}/") { UseShellExecute = true });
             }
             catch { /* best effort; the already-running tray icon is still there regardless */ }
+            singleInstanceMutex.Dispose();
             return 0;
         }
 
@@ -75,8 +76,41 @@ internal static class Program
         Application.Idle += OnceIdle;
 
         Application.Run(trayContext);
-        GC.KeepAlive(singleInstanceMutex);
+        singleInstanceMutex.Dispose();
         return 0;
+    }
+
+    /// <summary>
+    /// ApplyUpdatesAndRestart (UpdateChecker) spawns the new version's
+    /// process, then exits the old one -- but Windows only destroys a
+    /// named mutex once every handle to it is closed, including the
+    /// dying old process's, and that teardown isn't guaranteed to finish
+    /// before the new process gets here. Confirmed on real hardware: an
+    /// update from 0.0.23 to 0.0.25 landed, the relaunch saw
+    /// isNewInstance=false purely from this race, and silently exited
+    /// thinking a second copy was already running -- "it happened
+    /// quickly but then nothing happened." A short retry window absorbs
+    /// normal teardown timing instead of treating it as a real second
+    /// launch; a genuine second launch just pays up to ~3 extra seconds
+    /// before falling back to the existing "open the running instance"
+    /// behavior.
+    /// </summary>
+    private static Mutex AcquireSingleInstanceMutex(out bool isNewInstance)
+    {
+        for (var attempt = 0; attempt < 15; attempt++)
+        {
+            var mutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var createdNew);
+            if (createdNew)
+            {
+                isNewInstance = true;
+                return mutex;
+            }
+            mutex.Dispose();
+            Thread.Sleep(200);
+        }
+
+        isNewInstance = false;
+        return new Mutex(initiallyOwned: true, SingleInstanceMutexName, out _);
     }
 
     private static async Task RunInitializeAsync(TrayApplicationContext trayContext)
