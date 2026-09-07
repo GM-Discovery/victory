@@ -40,17 +40,62 @@ internal static class RuntimeManager
         return exitCode == 0;
     }
 
+    /// <summary>
+    /// Windows-only: pg_ctl start can fail intermittently with "could not
+    /// reserve shared memory region" (Windows error 487), confirmed on
+    /// real hardware via postgres.log -- ASLR relocated a Postgres helper
+    /// process on top of the address the shared memory segment wanted.
+    /// Each attempt gets a fresh random base address, so a short retry
+    /// clears the transient case. If it's actually a fixed-address
+    /// collision (some antivirus/EDR products inject a DLL at the same
+    /// address on every process launch), retries won't help -- which is
+    /// why the final failure surfaces the real postgres.log tail instead
+    /// of pg_ctl's own generic "could not start server, examine the log
+    /// output" (which never actually shows the log it's telling you to
+    /// examine).
+    /// </summary>
     public static async Task<(bool Success, string Output)> StartPostgresAsync()
     {
         if (await IsPostgresRunningAsync())
             return (true, "already running");
 
         Directory.CreateDirectory(AppPaths.LogsDir);
-        var (exitCode, stdout, stderr) = await RunAsync(
-            AppPaths.PgCtlExe,
-            $"start -D \"{AppPaths.PgDataDir}\" -l \"{AppPaths.PostgresLogFile}\" -w -o \"-p {PostgresPort}\"",
-            TimeSpan.FromMinutes(2));
-        return (exitCode == 0, exitCode == 0 ? stdout : stderr);
+
+        const int maxAttempts = 3;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            var (exitCode, stdout, _) = await RunAsync(
+                AppPaths.PgCtlExe,
+                $"start -D \"{AppPaths.PgDataDir}\" -l \"{AppPaths.PostgresLogFile}\" -w -o \"-p {PostgresPort}\"",
+                TimeSpan.FromMinutes(2));
+            if (exitCode == 0)
+                return (true, stdout);
+
+            if (attempt < maxAttempts)
+                await Task.Delay(2000);
+        }
+
+        var logTail = ReadLogTail(AppPaths.PostgresLogFile, 20);
+        return (false, string.IsNullOrWhiteSpace(logTail)
+            ? "Postgres did not start after several attempts."
+            : "Postgres did not start after several attempts. Its own log said:\n" + logTail);
+    }
+
+    private static string? ReadLogTail(string path, int lineCount)
+    {
+        try
+        {
+            if (!File.Exists(path))
+                return null;
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = new StreamReader(stream);
+            var lines = reader.ReadToEnd().Split('\n');
+            return string.Join('\n', lines.Length > lineCount ? lines[^lineCount..] : lines).Trim();
+        }
+        catch
+        {
+            return null; // best effort -- a missing/locked log shouldn't hide the real failure behind a secondary one
+        }
     }
 
     public static async Task<(bool Success, string Output)> StopPostgresAsync()
@@ -259,36 +304,25 @@ internal static class RuntimeManager
 
     // ---- Combined lifecycle (what the tray icon and wizard actually call) ----
 
+    /// <summary>
+    /// Delegates entirely to RuntimeSetup.EnsureRuntimeReadyAsync rather
+    /// than re-implementing a shorter version of the same sequence. This
+    /// used to duplicate the Postgres-start/create-database/backend-start
+    /// steps here, which drifted out of sync with the real sequence twice
+    /// in a row on real hardware: first missing the database-creation
+    /// step (a race with the wizard's own setup), then missing the
+    /// Caddy-not-yet-downloaded check entirely (confirmed on hardware:
+    /// Postgres and the backend both running, no caddy.exe process at
+    /// all, because this function tried to start it without ever
+    /// checking it had been downloaded). One authoritative "make sure
+    /// everything is actually running" sequence, used everywhere,
+    /// closes off this entire class of bug rather than patching each
+    /// missing step as it's discovered.
+    /// </summary>
     public static async Task<(bool Success, string Output)> StartAsync()
     {
-        var (pgOk, pgOutput) = await StartPostgresAsync();
-        if (!pgOk)
-            return (false, "Postgres did not start:\n" + pgOutput);
-
-        // Confirmed on real hardware: the tray icon stays clickable
-        // during first-run setup (a deliberate, separate fix), which
-        // means "Open Victory" can race the wizard's own
-        // RuntimeSetup.EnsureRuntimeReadyAsync -- if this StartAsync
-        // call reaches the backend before that sequence's own
-        // CreateVictoryDatabaseAsync call does, the backend starts
-        // pointed at a database that doesn't exist yet ("FATAL:
-        // database victory does not exist" in postgres.log). createdb
-        // is safe to call every time (already-exists is treated as
-        // success), so making this function self-sufficient here costs
-        // nothing on the already-correct path and fixes the race on
-        // every other one, rather than relying on every caller of
-        // StartAsync to already know to create the database first.
-        var env = EnvGenerator.ReadAll();
-        var (dbOk, dbOutput) = await CreateVictoryDatabaseAsync(env["POSTGRES_PASSWORD"]);
-        if (!dbOk)
-            return (false, "Could not create the Victory database:\n" + dbOutput);
-
-        var (backendOk, backendOutput) = await StartBackendAsync();
-        if (!backendOk)
-            return (false, backendOutput);
-
-        var (caddyOk, caddyOutput) = StartCaddy();
-        return (caddyOk, caddyOk ? backendOutput : caddyOutput);
+        var result = await RuntimeSetup.EnsureRuntimeReadyAsync(reportStep: _ => { });
+        return (result.Result == RuntimeSetup.Result.Ready, result.Detail ?? "Victory is running");
     }
 
     public static async Task<(bool Success, string Output)> StopAsync()
