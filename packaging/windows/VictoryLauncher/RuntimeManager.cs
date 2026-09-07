@@ -404,6 +404,23 @@ internal static class RuntimeManager
             throw new TimeoutException($"{fileName} {arguments} did not exit within {timeout}");
         }
 
-        return (process.ExitCode, await stdoutTask, await stderrTask);
+        // The process itself exiting is not the same as its stdout/stderr
+        // pipes reaching end-of-stream: `pg_ctl start` launches postgres.exe
+        // as a detached background process, confirms it's ready, and exits
+        // -- but postgres.exe inherits the same redirected pipe handles,
+        // and since it runs indefinitely by design, ReadToEndAsync would
+        // otherwise wait forever for EOF that will only arrive when
+        // postgres itself eventually stops. Confirmed on real hardware:
+        // "Starting Victory's database" hung indefinitely even though
+        // postgres.log showed the server had started fine in under a
+        // second -- this await was never covered by the timeout above,
+        // which only guarded WaitForExitAsync. A short bounded wait here
+        // means a still-open inherited handle can no longer block forever;
+        // whatever text arrived in time is still returned.
+        var outputReady = Task.WhenAll(stdoutTask, stderrTask);
+        var finished = await Task.WhenAny(outputReady, Task.Delay(TimeSpan.FromSeconds(5)));
+        var stdout = finished == outputReady ? await stdoutTask : "";
+        var stderr = finished == outputReady ? await stderrTask : "";
+        return (process.ExitCode, stdout, stderr);
     }
 }
