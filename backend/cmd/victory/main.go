@@ -68,6 +68,18 @@ import (
 
 func main() {
 	port := getenv("PORT", "8081")
+	// Empty by default (binds every interface, ":8081") -- exactly
+	// today's behavior, required for the container deployments (Grant's
+	// production server, packaging/podman) where the backend has to be
+	// reachable from other containers on the network, not just itself.
+	// The Windows native launcher sets this to "127.0.0.1" specifically:
+	// binding all interfaces there is what triggers a Windows Firewall
+	// "allow this app" prompt (Windows can't tell the difference between
+	// "accepts connections from the internet" and "accepts connections
+	// from Caddy on the same machine" just from the bind address) --
+	// confirmed on real hardware. A loopback-only bind can't be reached
+	// from another machine at all, so Windows has nothing to prompt about.
+	bindHost := getenv("BIND_HOST", "")
 	databaseURL := getenv("DATABASE_URL", "postgres://victory:REDACTED@victory-postgres:5432/victory?sslmode=disable")
 	secureCookie := cookieSecureFromEnv()
 	storageRoot := getenv("STORAGE_ROOT", "/opt/victory/storage")
@@ -1299,7 +1311,7 @@ func main() {
 	// deliberately -- it would sever long-lived WebSocket upgrades, which share
 	// this server -- so idle and read limits carry the protection instead.
 	server := &http.Server{
-		Addr:              ":" + port,
+		Addr:              bindHost + ":" + port,
 		Handler:           requestBodyLimit(loggingMiddleware(mux)),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       60 * time.Second,

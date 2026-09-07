@@ -102,6 +102,13 @@ internal static class RuntimeManager
             RedirectStandardError = true,
         };
         psi.Environment["PORT"] = BackendPort.ToString();
+        // Binding every interface (the backend's own default, needed for
+        // container deployments) is what triggers a Windows Firewall
+        // "allow this app" prompt -- confirmed on real hardware. Nothing
+        // outside this machine ever needs to reach the backend directly
+        // (Caddy is the only thing that talks to it, also on localhost),
+        // so loopback-only is both correct and firewall-prompt-free.
+        psi.Environment["BIND_HOST"] = "127.0.0.1";
         psi.Environment["DATABASE_URL"] = $"postgres://victory:{postgresPassword}@127.0.0.1:{PostgresPort}/victory?sslmode=disable";
         psi.Environment["STORAGE_ROOT"] = env["STORAGE_ROOT"];
         psi.Environment["BACKUP_DIR"] = env["BACKUP_DIR"];
