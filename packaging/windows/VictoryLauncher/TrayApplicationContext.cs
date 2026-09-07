@@ -50,11 +50,20 @@ internal sealed class TrayApplicationContext : ApplicationContext
         quitItem.Click += async (_, _) => await OnQuitAsync();
         menu.Items.Add(quitItem);
 
+        // Visible = false at construction, deliberately: a tray icon
+        // that exists but is doing nothing useful yet is still something
+        // to click, and every real bug found on hardware so far in this
+        // whole runtime-startup sequence traced back to exactly that --
+        // clicking Open Victory (or right-clicking the menu at all)
+        // before Postgres/backend/Caddy were all actually confirmed
+        // running. If there's nothing in the tray to click, there's
+        // nothing to click too early. ShowTrayIconNowReady() is the only
+        // place this flips to true.
         _trayIcon = new NotifyIcon
         {
             Icon = AppIcon.Shared,
             Text = "Victory",
-            Visible = true,
+            Visible = false,
             ContextMenuStrip = menu,
         };
         _trayIcon.DoubleClick += (_, _) => OpenOperatorUi();
@@ -83,6 +92,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
             if (!wizard.Completed)
                 return false; // Operator closed the wizard without finishing -- nothing to run yet.
 
+            // Only now: Postgres, the database, the backend, and Caddy
+            // are all confirmed running (that's what wizard.Completed
+            // means -- it only becomes true after the wizard's own
+            // "waiting for Victory to be ready" check succeeds).
+            _trayIcon.Visible = true;
+
             // The wizard's own "Continue to Create Your Login" button
             // already opened the browser to /signup/?handle= directly,
             // as a real user gesture -- nothing left to do here if they
@@ -101,9 +116,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
         // currently running -- EnsureRuntimeReadyAsync handles every one
         // of those states itself and leaves things running when it
         // returns Ready, so this one call covers both "totally fresh"
-        // and "resuming from wherever it left off."
-        var setupResult = await RuntimeSetup.EnsureRuntimeReadyAsync(
-            step => _trayIcon.ShowBalloonTip(3000, "Victory", step, ToolTipIcon.Info));
+        // and "resuming from wherever it left off." No step-by-step
+        // balloon tips here: the icon isn't visible yet (nothing to
+        // anchor a balloon to), and that's deliberate -- see the tray
+        // icon's own Visible=false comment.
+        var setupResult = await RuntimeSetup.EnsureRuntimeReadyAsync(reportStep: _ => { });
+        _trayIcon.Visible = true;
         if (setupResult.Result == RuntimeSetup.Result.Failed)
         {
             _trayIcon.ShowBalloonTip(6000, "Victory", setupResult.Detail ?? "Victory's runtime could not be set up. Click Status for details.", ToolTipIcon.Error);

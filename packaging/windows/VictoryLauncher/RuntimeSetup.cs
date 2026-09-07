@@ -72,35 +72,36 @@ internal static class RuntimeSetup
                 return new SetupResult(Result.Failed, initError);
         }
 
-        reportStep("Starting Victory");
+        // Four granular steps, not one "Starting Victory" covering all of
+        // them silently: that used to leave no visible sign of which of
+        // these four was actually running, or how long is normal --
+        // exactly what prompted "track the changes it takes to get caddy
+        // running... so I don't prematurely click" on real hardware.
+        reportStep("Starting Victory's database");
         var (pgOk, pgOutput) = await RuntimeManager.StartPostgresAsync();
         if (!pgOk)
             return new SetupResult(Result.Failed, "Postgres did not start:\n" + pgOutput);
 
-        // Intentionally duplicated with the same call inside
-        // RuntimeManager.StartAsync() (which the tray/Status "start"
-        // actions use): this sequence and that one can race each other
-        // in real usage (confirmed on hardware -- clicking the tray icon
-        // while this wizard step is still running), and createdb is
-        // idempotent, so calling it from both places is what actually
-        // makes either one safe regardless of which gets there first.
+        reportStep("Setting up Victory's database");
         var env = EnvGenerator.ReadAll();
         var (dbOk, dbOutput) = await RuntimeManager.CreateVictoryDatabaseAsync(env["POSTGRES_PASSWORD"]);
         if (!dbOk)
             return new SetupResult(Result.Failed, "Could not create the Victory database:\n" + dbOutput);
 
+        reportStep("Starting Victory's server");
         var (backendOk, backendOutput) = await RuntimeManager.StartBackendAsync();
         if (!backendOk)
             return new SetupResult(Result.Failed, "Victory could not start:\n" + backendOutput);
 
         if (!RuntimeManager.IsCaddyInstalled())
         {
-            reportStep("Downloading the Victory runtime (this only happens once)");
+            reportStep("Downloading Victory's web server (this only happens once)");
             var (downloaded, downloadError) = await DownloadAndExtractCaddyAsync(updateProgress);
             if (!downloaded)
                 return new SetupResult(Result.Failed, downloadError);
         }
 
+        reportStep("Starting Victory's web server");
         var (caddyOk, caddyOutput) = RuntimeManager.StartCaddy();
         if (!caddyOk)
             return new SetupResult(Result.Failed, "Victory could not be reached:\n" + caddyOutput);
