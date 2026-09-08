@@ -1016,6 +1016,7 @@
           </button>
           <div id="account-menu" class="account-menu" hidden>
             <a href="/account/" id="account-page-link">Account</a>
+            <button id="invite-people-button" type="button" onclick="window.VictoryInviteModal?.open()">Invite People</button>
             <button id="account-logout-button" type="button">Log Out</button>
           </div>
         </div>
@@ -1921,6 +1922,7 @@
     setChatOpen(false);
     bootstrapMiddleSchoolStage();
   </script>
+  <script src="/lib/invite-modal.js"></script>
 </body>
 </html>
   <link rel="icon" type="image/png" href="/assets/favicon.png" />

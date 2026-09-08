@@ -289,6 +289,7 @@ func main() {
 	mux.HandleFunc("GET /api/auth/discord/callback", identity.HandleDiscordOAuthCallback(pool, discordOAuthConfig, secureCookie))
 	mux.HandleFunc("/api/auth/password-reset/request", ratelimit.Middleware(credentialLimiter, identity.HandleForgotPassword(pool, forgotPasswordConfigFromEnv())))
 	mux.HandleFunc("/api/auth/password-reset/confirm", ratelimit.Middleware(credentialLimiter, identity.HandleResetPassword(pool, secureCookie)))
+	mux.HandleFunc("GET /api/invites/authority", identity.HandleInviteAuthority(pool))
 	mux.HandleFunc("/api/invites", identity.HandleCreateInvite(pool))
 	mux.HandleFunc("GET /api/invites/preview", identity.HandlePreviewInvite(pool))
 	mux.HandleFunc("/api/invites/accept", identity.HandleAcceptInvite(pool, secureCookie))

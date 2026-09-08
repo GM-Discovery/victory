@@ -35,6 +35,56 @@ type AcceptInviteRequest struct {
 	DisplayName string `json:"display_name"`
 }
 
+// HandleInviteAuthority tells the frontend which roles the current user
+// is actually allowed to invite -- Producer sees all four, a Director
+// only cast/crew/audience (the same restriction HandleCreateInvite
+// already enforces server-side; this just lets the UI reflect it rather
+// than showing options that would 403 on submit). One shared invite
+// modal, adapting to whoever's using it, rather than a Producer-flavored
+// copy in one office and a Director-flavored copy in another.
+func HandleInviteAuthority(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method_not_allowed"})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		userID, err := currentUserID(ctx, pool, r)
+		if err != nil {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "not_authenticated"})
+			return
+		}
+
+		role, _, err := resolveInviteAuthorityScope(ctx, pool, userID)
+		if err != nil {
+			writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "producer_membership_required"})
+			return
+		}
+
+		var availableRoles []string
+		switch role {
+		case "producer":
+			availableRoles = []string{"director", "cast", "crew", "audience"}
+		case "director":
+			availableRoles = []string{"cast", "crew", "audience"}
+		default:
+			writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "insufficient_role"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok": true,
+			"data": map[string]any{
+				"role":            role,
+				"available_roles": availableRoles,
+			},
+		})
+	}
+}
+
 func HandleCreateInvite(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
