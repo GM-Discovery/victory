@@ -80,6 +80,28 @@ internal static class AppPaths
     public static string CaddyfilePath => Path.Combine(AppContext.BaseDirectory, "Caddyfile");
     public static string FrontendRoot => Path.Combine(AppContext.BaseDirectory, "frontend");
 
+    /// <summary>
+    /// Cloudflare Tunnel, off by default (TUNNEL_MODE in .env) -- remote
+    /// access is meaningfully different from the other bundled runtimes
+    /// (it changes who can reach this machine at all), so unlike
+    /// Postgres/Caddy this is downloaded lazily the first time a tunnel
+    /// mode actually needs it, not unconditionally on every first run.
+    /// cloudflared.exe ships as a single file, no zip to extract.
+    /// </summary>
+    public static string CloudflaredRoot => Path.Combine(DataRoot, "cloudflared");
+    public static string CloudflaredExe => Path.Combine(CloudflaredRoot, "cloudflared.exe");
+    public static string CloudflaredLogFile => Path.Combine(LogsDir, "cloudflared.log");
+    public static string CloudflaredPidFile => Path.Combine(DataRoot, "cloudflared.pid");
+
+    /// <summary>
+    /// Quick Tunnel's assigned https://*.trycloudflare.com address only
+    /// ever appears once, printed to cloudflared's own output when it
+    /// starts -- captured from there and persisted here so Status can
+    /// show the last-known address even before a freshly (re)started
+    /// tunnel has printed a new one.
+    /// </summary>
+    public static string TunnelUrlFile => Path.Combine(DataRoot, "tunnel-url.txt");
+
     public static void EnsureDataDirectoriesExist()
     {
         Directory.CreateDirectory(StorageDir);

@@ -33,6 +33,11 @@ internal static class RuntimeSetup
     // see https://github.com/caddyserver/caddy/releases.
     private const string CaddyDownloadUrl = "https://github.com/caddyserver/caddy/releases/download/v2.11.4/caddy_2.11.4_windows_amd64.zip";
 
+    // cloudflared 2026.8.3 Windows x64, from its own GitHub releases
+    // (verified this exact URL resolves). Ships as a single exe, no zip.
+    // Re-pin by hand -- see https://github.com/cloudflare/cloudflared/releases.
+    private const string CloudflaredDownloadUrl = "https://github.com/cloudflare/cloudflared/releases/download/2026.8.3/cloudflared-windows-amd64.exe";
+
     public enum Result
     {
         Ready,
@@ -67,13 +72,17 @@ internal static class RuntimeSetup
         var needsPostgresDownload = !RuntimeManager.IsPostgresInstalled();
         var needsDbInit = !RuntimeManager.IsDatabaseInitialized();
         var needsCaddyDownload = !RuntimeManager.IsCaddyInstalled();
+        var tunnelMode = EnvGenerator.EnvFileExists() ? EnvGenerator.ReadAll().GetValueOrDefault("TUNNEL_MODE", "off") : "off";
+        var needsTunnel = tunnelMode == "quick";
+        var needsCloudflaredDownload = needsTunnel && !RuntimeManager.IsCloudflaredInstalled();
 
         // Total is whichever of the always-run steps plus the conditional
         // (first-run-only) downloads actually apply this time -- known
         // upfront since the checks above are all cheap local lookups, so
         // a caller can size a progress bar correctly before the first
         // step even starts.
-        var total = 4 + (needsPostgresDownload ? 1 : 0) + (needsDbInit ? 1 : 0) + (needsCaddyDownload ? 1 : 0);
+        var total = 4 + (needsPostgresDownload ? 1 : 0) + (needsDbInit ? 1 : 0) + (needsCaddyDownload ? 1 : 0)
+            + (needsTunnel ? 1 : 0) + (needsCloudflaredDownload ? 1 : 0);
         var current = 0;
         void Report(string label) => reportStep(new StepProgress(label, ++current, total));
 
@@ -127,7 +136,54 @@ internal static class RuntimeSetup
         if (!caddyOk)
             return new SetupResult(Result.Failed, "Victory could not be reached:\n" + caddyOutput);
 
+        if (needsTunnel)
+        {
+            // Remote access is an enhancement, not core functionality --
+            // Victory must stay usable locally even if the tunnel can't
+            // start (no internet, Cloudflare's own service being down,
+            // whatever). Deliberately not gated behind a return-Failed
+            // check the way every step above it is; failures here are
+            // swallowed and left for Status to surface honestly, rather
+            // than blocking the Operator from using Victory at all over
+            // an optional feature they may not even be watching for.
+            if (needsCloudflaredDownload)
+            {
+                Report("Downloading Victory's remote access tool (this only happens once)");
+                await DownloadCloudflaredAsync(updateProgress);
+            }
+
+            if (RuntimeManager.IsCloudflaredInstalled())
+            {
+                Report("Starting your Victory address");
+                try { await RuntimeManager.StartQuickTunnelAsync(); }
+                catch { /* best effort -- see comment above */ }
+            }
+        }
+
         return new SetupResult(Result.Ready, null);
+    }
+
+    private static async Task<(bool Success, string? Error)> DownloadCloudflaredAsync(Action<string>? updateProgress)
+    {
+        try
+        {
+            Directory.CreateDirectory(AppPaths.CloudflaredRoot);
+            using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+            using var response = await client.GetAsync(CloudflaredDownloadUrl, HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+            await using (var fileStream = File.Create(AppPaths.CloudflaredExe))
+            {
+                await CopyWithProgressAsync(response, fileStream, "Downloading Victory's remote access tool", updateProgress);
+            }
+
+            if (!File.Exists(AppPaths.CloudflaredExe))
+                return (false, "cloudflared.exe was not found where expected after downloading it.");
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            return (false, "Could not download Victory's remote access tool:\n" + ex.Message);
+        }
     }
 
     private static async Task<(bool Success, string? Error)> DownloadAndExtractCaddyAsync(Action<string>? updateProgress)

@@ -16,7 +16,7 @@ namespace VictoryLauncher;
 /// </summary>
 internal static class EnvGenerator
 {
-    public sealed record FirstRunAnswers(string LotName, string OperatorHandle);
+    public sealed record FirstRunAnswers(string LotName, string OperatorHandle, string TunnelMode);
 
     public static bool EnvFileExists() => File.Exists(AppPaths.EnvFile);
 
@@ -76,8 +76,28 @@ internal static class EnvGenerator
             $"OPERATOR_HANDLE={operatorHandle}",
             $"DEFAULT_LOCATION_SLUG={locationSlug}",
             $"DEFAULT_LOCATION_NAME={lotName}",
+            // "off" or "quick" -- asked as the first-run wizard's third
+            // question, right alongside lot name/handle, not decided
+            // silently. See RuntimeSetup for what each mode does.
+            $"TUNNEL_MODE={answers.TunnelMode}",
         };
 
+        File.WriteAllText(AppPaths.EnvFile, string.Join("\n", lines) + "\n", new UTF8Encoding(false));
+        RestrictToCurrentUserAndAdministrators(AppPaths.EnvFile);
+    }
+
+    /// <summary>
+    /// Used by Status to change remote-access mode after first run --
+    /// Generate only ever runs once (the wizard), but this is something
+    /// an Operator reasonably changes later (e.g. turning Quick Tunnel on
+    /// after initially declining it). Rewrites just the known keys, not
+    /// the whole first-run flow.
+    /// </summary>
+    public static void UpdateTunnelMode(string tunnelMode)
+    {
+        var values = ReadAll();
+        values["TUNNEL_MODE"] = tunnelMode;
+        var lines = values.Select(kv => $"{kv.Key}={kv.Value}");
         File.WriteAllText(AppPaths.EnvFile, string.Join("\n", lines) + "\n", new UTF8Encoding(false));
         RestrictToCurrentUserAndAdministrators(AppPaths.EnvFile);
     }

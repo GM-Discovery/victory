@@ -18,6 +18,13 @@ internal sealed class FirstRunWizardForm : Form
 
     private readonly TextBox _lotNameBox = new() { Width = 280 };
     private readonly TextBox _operatorHandleBox = new() { Width = 280 };
+    // Asked right here, immediately after the two required questions --
+    // not something surfaced later in Status for the Operator to
+    // stumble onto. Nobody should have to monitor the whole install
+    // waiting to be prompted for something; if there's a real decision
+    // to make, it belongs up front, before setup itself starts.
+    private readonly RadioButton _tunnelOffRadio = new() { Text = "Just this computer, for now", Width = 340, Checked = true };
+    private readonly RadioButton _tunnelQuickRadio = new() { Text = "Give people outside this computer a free address automatically", Width = 340 };
     private readonly Button _startButton = new() { Text = "Set up Victory", Width = 140 };
     private readonly Label _errorLabel = new() { ForeColor = Color.Firebrick, AutoSize = true, Visible = false, MaximumSize = new Size(380, 0) };
 
@@ -64,7 +71,7 @@ internal sealed class FirstRunWizardForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(420, 320);
+        ClientSize = new Size(420, 340);
 
         BuildQuestionsPanel();
         BuildProgressPanel();
@@ -104,24 +111,44 @@ internal sealed class FirstRunWizardForm : Form
     {
         var intro = new Label
         {
-            Text = "Let's get your Victory lot running. Two questions, then Victory sets itself up.",
+            Text = "Let's get your Victory lot running.",
             AutoSize = false,
-            Size = new Size(380, 40),
+            Size = new Size(380, 24),
             Location = new Point(20, 16),
         };
 
-        var lotNameLabel = new Label { Text = "What should this Victory lot be called?", AutoSize = true, Location = new Point(20, 66) };
-        _lotNameBox.Location = new Point(20, 86);
+        var lotNameLabel = new Label { Text = "What should this Victory lot be called?", AutoSize = true, Location = new Point(20, 50) };
+        _lotNameBox.Location = new Point(20, 70);
 
-        var operatorHandleLabel = new Label { Text = "What should your Operator handle be?", AutoSize = true, Location = new Point(20, 122) };
-        _operatorHandleBox.Location = new Point(20, 142);
+        var operatorHandleLabel = new Label { Text = "What should your Operator handle be?", AutoSize = true, Location = new Point(20, 106) };
+        _operatorHandleBox.Location = new Point(20, 126);
 
-        _startButton.Location = new Point(20, 180);
+        var tunnelLabel = new Label { Text = "Should people outside this computer be able to reach it?", AutoSize = true, Location = new Point(20, 162) };
+        _tunnelOffRadio.Location = new Point(20, 182);
+        _tunnelQuickRadio.Location = new Point(20, 204);
+        // "Free," changes on every restart, no account needed from
+        // anyone -- the honest tradeoff up front, not a surprise
+        // discovered later when a shared link stops working.
+        var tunnelNote = new Label
+        {
+            Text = "That free address changes if this computer restarts -- how stable it stays depends on how reliable this machine and its connection are.",
+            AutoSize = false,
+            Size = new Size(380, 32),
+            Location = new Point(20, 226),
+            ForeColor = SystemColors.GrayText,
+            Font = new Font(Font.FontFamily, 7.5f),
+        };
+
+        _startButton.Location = new Point(20, 262);
         _startButton.Click += async (_, _) => await OnStartClickedAsync();
 
-        _errorLabel.Location = new Point(20, 220);
+        _errorLabel.Location = new Point(20, 300);
 
-        _questionsPanel.Controls.AddRange([intro, lotNameLabel, _lotNameBox, operatorHandleLabel, _operatorHandleBox, _startButton, _errorLabel]);
+        _questionsPanel.Controls.AddRange([
+            intro, lotNameLabel, _lotNameBox, operatorHandleLabel, _operatorHandleBox,
+            tunnelLabel, _tunnelOffRadio, _tunnelQuickRadio, tunnelNote,
+            _startButton, _errorLabel,
+        ]);
     }
 
     private void BuildProgressPanel()
@@ -172,9 +199,10 @@ internal sealed class FirstRunWizardForm : Form
 
         try
         {
+            var tunnelMode = _tunnelQuickRadio.Checked ? "quick" : "off";
             await RunStepAsync("Preparing your Victory lot", () =>
             {
-                EnvGenerator.Generate(new EnvGenerator.FirstRunAnswers(lotName, operatorHandle));
+                EnvGenerator.Generate(new EnvGenerator.FirstRunAnswers(lotName, operatorHandle, tunnelMode));
                 return Task.CompletedTask;
             });
 

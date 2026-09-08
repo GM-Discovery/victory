@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace VictoryLauncher;
@@ -249,6 +250,97 @@ internal static class RuntimeManager
 
     public static void StopCaddy() => StopProcessByPidFile(AppPaths.CaddyPidFile);
 
+    // ---- Tunnel (Cloudflare) ----
+    // Off by default -- remote access is an explicit Operator/first-run
+    // choice (TUNNEL_MODE in .env), never forced. Quick Tunnel needs no
+    // Cloudflare account from anyone: cloudflared just prints a fresh
+    // https://*.trycloudflare.com address to its own output every time
+    // it starts, which is captured below the same way the backend/Caddy
+    // logs are captured, with one extra regex check per line. That
+    // address changes on every restart -- Status is expected to surface
+    // that plainly rather than pretend it's stable.
+
+    public static bool IsCloudflaredInstalled() => File.Exists(AppPaths.CloudflaredExe);
+
+    public static bool IsTunnelRunning() => IsProcessRunning(AppPaths.CloudflaredPidFile, "cloudflared");
+
+    public static void StopTunnel() => StopProcessByPidFile(AppPaths.CloudflaredPidFile);
+
+    private static readonly Regex QuickTunnelUrlPattern = new(@"https://[a-z0-9-]+\.trycloudflare\.com", RegexOptions.Compiled);
+
+    public static async Task<(bool Success, string Output)> StartQuickTunnelAsync()
+    {
+        if (IsTunnelRunning())
+            return (true, "already running");
+
+        Directory.CreateDirectory(AppPaths.LogsDir);
+        var psi = new ProcessStartInfo
+        {
+            FileName = AppPaths.CloudflaredExe,
+            Arguments = $"tunnel --url http://127.0.0.1:{PublicPort}",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        try
+        {
+            var process = Process.Start(psi);
+            if (process is null)
+                return (false, "failed to start cloudflared.exe");
+
+            await File.WriteAllTextAsync(AppPaths.CloudflaredPidFile, process.Id.ToString());
+            _ = LogTunnelOutputAndCaptureUrlAsync(process);
+            return (true, $"started (pid {process.Id})");
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message);
+        }
+    }
+
+    private static async Task LogTunnelOutputAndCaptureUrlAsync(Process process)
+    {
+        try
+        {
+            await using var log = new StreamWriter(AppPaths.CloudflaredLogFile, append: true) { AutoFlush = true };
+            var stdoutTask = CopyStreamAndWatchForTunnelUrlAsync(process.StandardOutput, log);
+            var stderrTask = CopyStreamAndWatchForTunnelUrlAsync(process.StandardError, log);
+            await Task.WhenAll(stdoutTask, stderrTask);
+        }
+        catch
+        {
+            // Logging failures must never take the actual tunnel process down with them.
+        }
+    }
+
+    private static async Task CopyStreamAndWatchForTunnelUrlAsync(StreamReader reader, StreamWriter writer)
+    {
+        string? line;
+        while ((line = await reader.ReadLineAsync()) is not null)
+        {
+            await writer.WriteLineAsync(line);
+            var match = QuickTunnelUrlPattern.Match(line);
+            if (match.Success)
+            {
+                try { await File.WriteAllTextAsync(AppPaths.TunnelUrlFile, match.Value); } catch { /* best effort */ }
+            }
+        }
+    }
+
+    public static string? GetLastKnownTunnelUrl()
+    {
+        try
+        {
+            return File.Exists(AppPaths.TunnelUrlFile) ? File.ReadAllText(AppPaths.TunnelUrlFile).Trim() : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public static async Task<bool> IsPublicSiteReachableAsync()
     {
         try
@@ -327,6 +419,7 @@ internal static class RuntimeManager
 
     public static async Task<(bool Success, string Output)> StopAsync()
     {
+        StopTunnel();
         StopCaddy();
         StopBackend();
         return await StopPostgresAsync();
