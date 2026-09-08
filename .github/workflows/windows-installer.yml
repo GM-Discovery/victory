@@ -44,6 +44,26 @@ jobs:
         working-directory: packaging/windows/VictoryLauncher
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history -- needed to diff against github.event.before below
+
+      # Kernel 100 §33: the launcher must not restart victory-backend.exe
+      # (a real, disruptive outage) unless the backend actually changed --
+      # a frontend-only release applies immediately with no outage at all,
+      # so it needs to know which kind of release this is. Computed here,
+      # not guessed client-side, since CI is the only place that actually
+      # knows what changed in this push.
+      - name: Determine whether the backend changed
+        id: backend_changed
+        shell: bash
+        run: |
+          if [ -z "${{ github.event.before }}" ] || [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT" # no prior commit to diff against -- assume changed, safer than assuming not
+          elif git -C "$GITHUB_WORKSPACE" diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- backend/ | grep -q .; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/setup-go@v5
         with:
@@ -95,6 +115,22 @@ jobs:
           vpk pack -u VictoryLauncher -v 0.0.${{ github.run_number }} -p publish -e VictoryLauncher.exe
           vpk upload github --repoUrl https://github.com/GM-Discovery/victory-releases --token $env:VPK_GITHUB_TOKEN --publish --releaseName "Victory 0.0.${{ github.run_number }}" --tag v0.0.${{ github.run_number }}
         continue-on-error: true # see this workflow's header: the upload half is expected to fail until RELEASES_REPO_TOKEN exists; vpk pack itself already succeeds without it
+
+      # A small extra file attached to the same release, read by
+      # UpdateChecker.cs before deciding whether an update can apply
+      # immediately (frontend-only) or must wait for the 2:30am-local
+      # quiet window (backend changed). Same RELEASES_REPO_TOKEN as the
+      # vpk upload above, same expected-to-fail-until-the-secret-exists
+      # story.
+      - name: Upload update manifest to the release
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+        run: |
+          echo '{"backend_changed": ${{ steps.backend_changed.outputs.changed }}}' > update-manifest.json
+          gh release upload "v0.0.${{ github.run_number }}" update-manifest.json --repo GM-Discovery/victory-releases --clobber
+        continue-on-error: true
 
       # Uploaded regardless of whether the upload-to-github-releases step
       # above succeeded: vpk pack itself doesn't need RELEASES_REPO_TOKEN

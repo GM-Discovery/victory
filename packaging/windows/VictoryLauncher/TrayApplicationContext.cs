@@ -11,11 +11,15 @@ internal sealed class TrayApplicationContext : ApplicationContext
 {
     private static readonly string LocalOperatorUrl = $"http://localhost:{RuntimeManager.PublicPort}/";
 
-    // K100 §33-ish "don't disrupt active use, but check regularly": no
-    // formal timing decision exists yet for this project specifically --
-    // once every 4 hours is a reasonable, conservative default that
-    // still catches a same-day fix without polling aggressively.
+    // K100 §33: once every 4 hours is fine while nothing is actually
+    // waiting on anything. Once UpdateChecker has a downloaded
+    // backend-changing update waiting for the 2:30am-local quiet window,
+    // that cadence is far too coarse -- a tick that happens to land at,
+    // say, 2:15 and next at 6:15 would skip straight over the entire
+    // 30-minute window. Tightened to every 15 minutes for exactly that
+    // waiting period, then relaxed back once applied.
     private static readonly TimeSpan UpdateCheckInterval = TimeSpan.FromHours(4);
+    private static readonly TimeSpan PendingUpdateCheckInterval = TimeSpan.FromMinutes(15);
 
     private readonly NotifyIcon _trayIcon;
     private readonly ToolStripMenuItem _startWithWindowsItem;
@@ -35,7 +39,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
         menu.Items.Add(statusItem);
 
         var checkUpdatesItem = new ToolStripMenuItem("Check for Updates");
-        checkUpdatesItem.Click += async (_, _) => await CheckForUpdatesAsync();
+        // Manual: a deliberate click may apply a backend-changing update
+        // right away instead of waiting for the 2:30am window -- the
+        // Operator is actively here for it. Never skips the live-session
+        // safety check regardless (UpdateChecker's own rule, not this
+        // caller's to relax).
+        checkUpdatesItem.Click += async (_, _) => await CheckForUpdatesAsync(manual: true);
         menu.Items.Add(checkUpdatesItem);
 
         menu.Items.Add(new ToolStripSeparator());
@@ -68,7 +77,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         };
         _trayIcon.DoubleClick += (_, _) => OpenOperatorUi();
 
-        _updateTimer.Tick += async (_, _) => await CheckForUpdatesAsync();
+        _updateTimer.Tick += async (_, _) => await CheckForUpdatesAsync(manual: false);
     }
 
     /// <summary>
@@ -131,21 +140,30 @@ internal sealed class TrayApplicationContext : ApplicationContext
         // Only reached once Victory is actually up and running -- never
         // during first-run setup itself (that path returns earlier,
         // above) and never mid-retry after a failure (the branch just
-        // above also returns first). ApplyUpdatesAndRestart only
+        // above also returns first). ApplyUpdatesAndRestart itself only
         // restarts this launcher process, not the Postgres/backend/Caddy
         // processes it started (those aren't child processes of this one
-        // in any way Windows would tear down together), so an update
-        // landing mid-session doesn't interrupt anyone using Victory.
+        // in any way Windows would tear down together) -- but a
+        // backend-changing update does now explicitly restart
+        // victory-backend.exe too (UpdateChecker), which is exactly the
+        // disruption §33's quiet-window/live-session gating exists for.
+        // A frontend-only update never touches it, so those really are
+        // interruption-free.
         _updateTimer.Start();
-        _ = CheckForUpdatesAsync();
+        _ = CheckForUpdatesAsync(manual: false);
 
         return true;
     }
 
-    private async Task CheckForUpdatesAsync()
+    private async Task CheckForUpdatesAsync(bool manual)
     {
         await UpdateChecker.CheckAndApplyAsync(
-            status => _trayIcon.ShowBalloonTip(3000, "Victory", status, ToolTipIcon.Info));
+            status => _trayIcon.ShowBalloonTip(3000, "Victory", status, ToolTipIcon.Info),
+            manual);
+        // Tightened while something is actually waiting on the quiet
+        // window; relaxed back once it's applied (or once it turns out
+        // there was nothing pending after all).
+        _updateTimer.Interval = (int)(UpdateChecker.HasPendingBackendUpdate ? PendingUpdateCheckInterval : UpdateCheckInterval).TotalMilliseconds;
     }
 
     private void OpenOperatorUi()

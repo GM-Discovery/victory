@@ -80,6 +80,11 @@ internal static class EnvGenerator
             // question, right alongside lot name/handle, not decided
             // silently. See RuntimeSetup for what each mode does.
             $"TUNNEL_MODE={answers.TunnelMode}",
+            // "automatic" or "off" -- unlike TUNNEL_MODE, not asked at
+            // first run (Grant: opt-out belongs in Status, not as a
+            // fourth wizard question). See UpdateChecker for what each
+            // mode does and how backend-changing updates are scheduled.
+            "UPDATE_MODE=automatic",
         };
 
         File.WriteAllText(AppPaths.EnvFile, string.Join("\n", lines) + "\n", new UTF8Encoding(false));
@@ -97,6 +102,16 @@ internal static class EnvGenerator
     {
         var values = ReadAll();
         values["TUNNEL_MODE"] = tunnelMode;
+        var lines = values.Select(kv => $"{kv.Key}={kv.Value}");
+        File.WriteAllText(AppPaths.EnvFile, string.Join("\n", lines) + "\n", new UTF8Encoding(false));
+        RestrictToCurrentUserAndAdministrators(AppPaths.EnvFile);
+    }
+
+    /// <summary>"automatic" or "off" -- the Operator opt-out, changeable from Status.</summary>
+    public static void UpdateUpdateMode(string updateMode)
+    {
+        var values = ReadAll();
+        values["UPDATE_MODE"] = updateMode;
         var lines = values.Select(kv => $"{kv.Key}={kv.Value}");
         File.WriteAllText(AppPaths.EnvFile, string.Join("\n", lines) + "\n", new UTF8Encoding(false));
         RestrictToCurrentUserAndAdministrators(AppPaths.EnvFile);

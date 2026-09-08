@@ -251,6 +251,24 @@ func main() {
 		})
 	})
 
+	// Unauthenticated like /health, and just as safe to expose: a bare
+	// count carries no session/venue/user identity. Kernel 100's Windows
+	// launcher calls this before applying a backend-changing update, to
+	// avoid restarting mid-Show -- a scheduled 2:30am-local apply window
+	// still checks this first, since a Show can genuinely be live then.
+	mux.HandleFunc("/api/system/live-sessions", func(w http.ResponseWriter, r *http.Request) {
+		var liveCount int
+		err := pool.QueryRow(r.Context(), `SELECT COUNT(*) FROM sessions WHERE status IN ('rehearsal', 'live')`).Scan(&liveCount)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "could not check live sessions"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":         true,
+			"live_count": liveCount,
+		})
+	})
+
 	// Kernel 72: every endpoint that accepts a credential guess shares one
 	// per-IP token bucket (burst 10, refill 10/min). Ordinary API routes are
 	// deliberately unthrottled.

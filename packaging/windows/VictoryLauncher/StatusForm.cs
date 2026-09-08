@@ -2,11 +2,12 @@ namespace VictoryLauncher;
 
 /// <summary>
 /// Kernel 100 §26: human-readable status, never raw container internals
-/// as the primary view. Remote access and update status genuinely don't
-/// exist as features yet (Cloudflare Tunnel and the Velopack update
-/// check are later K100 phases) -- shown honestly as "not set up yet"
-/// rather than faked, matching §38's "do not fake" doctrine applied to
-/// status as well as progress.
+/// as the primary view. Remote access (Quick Tunnel) and updates
+/// (automatic, with §33's live-Show/quiet-window scheduling for
+/// backend-changing releases) are both real here now -- shown as their
+/// actual current state, including "downloaded, waiting for quiet
+/// hours," rather than a static label, matching §38's "do not fake"
+/// doctrine applied to status as well as progress.
 /// </summary>
 internal sealed class StatusForm : Form
 {
@@ -26,6 +27,7 @@ internal sealed class StatusForm : Form
         Font = new Font(FontFamily.GenericSansSerif, 7.5f),
         Visible = false,
     };
+    private readonly Button _updateToggleButton = new() { Width = 90, Height = 22 };
     private readonly Button _startStopButton = new() { Width = 120 };
     private readonly Button _refreshButton = new() { Text = "Refresh", Width = 100 };
 
@@ -49,6 +51,8 @@ internal sealed class StatusForm : Form
         _copyAddressButton.Click += (_, _) => CopyAddressToClipboard();
         _tunnelNoteLabel.Location = new Point(20, 132);
         AddRow("Updates:", _updateValue, 170);
+        _updateToggleButton.Location = new Point(280, 168);
+        _updateToggleButton.Click += async (_, _) => await OnUpdateToggleClickedAsync();
         AddRow("Discord:", _discordValue, 200);
 
         _startStopButton.Location = new Point(20, 250);
@@ -57,7 +61,7 @@ internal sealed class StatusForm : Form
         _refreshButton.Location = new Point(150, 250);
         _refreshButton.Click += async (_, _) => await RefreshAsync();
 
-        Controls.AddRange([_tunnelToggleButton, _copyAddressButton, _tunnelNoteLabel, _startStopButton, _refreshButton]);
+        Controls.AddRange([_tunnelToggleButton, _copyAddressButton, _tunnelNoteLabel, _updateToggleButton, _startStopButton, _refreshButton]);
         Shown += async (_, _) => await RefreshAsync();
     }
 
@@ -133,6 +137,7 @@ internal sealed class StatusForm : Form
             _discordValue.Text = ReadDiscordConfigured() ? "Connected" : "Not configured";
             _startStopButton.Text = _isRunning ? "Stop Victory" : "Start Victory";
             RefreshTunnelDisplay();
+            RefreshUpdateDisplay();
         }
         finally
         {
@@ -196,6 +201,40 @@ internal sealed class StatusForm : Form
             _copyAddressButton.Visible = currentUrl is not null;
             _tunnelNoteLabel.Text = "Victory hasn't gotten a public address yet -- click Refresh in a moment, or check your internet connection.";
             _tunnelNoteLabel.Visible = true;
+        }
+    }
+
+    /// <summary>
+    /// Grant: "people should be able to opt out of updates." Off stops
+    /// the periodic automatic check entirely -- the tray's own "Check for
+    /// Updates" menu item still works regardless, since a manual click is
+    /// inherently consensual. Also shows honestly when a backend-changing
+    /// update is downloaded but deliberately holding for the 2:30am-local
+    /// window rather than pretending nothing is happening.
+    /// </summary>
+    private void RefreshUpdateDisplay()
+    {
+        var updateMode = EnvGenerator.EnvFileExists() ? EnvGenerator.ReadAll().GetValueOrDefault("UPDATE_MODE", "automatic") : "automatic";
+        _updateToggleButton.Text = updateMode == "off" ? "Turn On" : "Turn Off";
+        _updateValue.Text = updateMode == "off"
+            ? "Off"
+            : UpdateChecker.HasPendingBackendUpdate
+                ? "Update ready -- applying overnight (~2:30am)"
+                : "Automatic";
+    }
+
+    private async Task OnUpdateToggleClickedAsync()
+    {
+        _updateToggleButton.Enabled = false;
+        try
+        {
+            var turningOff = _updateToggleButton.Text == "Turn Off";
+            EnvGenerator.UpdateUpdateMode(turningOff ? "off" : "automatic");
+        }
+        finally
+        {
+            await RefreshAsync();
+            _updateToggleButton.Enabled = true;
         }
     }
 
