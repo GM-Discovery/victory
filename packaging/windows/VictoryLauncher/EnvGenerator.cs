@@ -16,7 +16,7 @@ namespace VictoryLauncher;
 /// </summary>
 internal static class EnvGenerator
 {
-    public sealed record FirstRunAnswers(string LotName, string OperatorHandle, string TunnelMode);
+    public sealed record FirstRunAnswers(string LotName, string OperatorHandle, string TunnelMode, string TunnelToken = "", string TunnelHostname = "");
 
     public static bool EnvFileExists() => File.Exists(AppPaths.EnvFile);
 
@@ -76,10 +76,15 @@ internal static class EnvGenerator
             $"OPERATOR_HANDLE={operatorHandle}",
             $"DEFAULT_LOCATION_SLUG={locationSlug}",
             $"DEFAULT_LOCATION_NAME={lotName}",
-            // "off" or "quick" -- asked as the first-run wizard's third
-            // question, right alongside lot name/handle, not decided
-            // silently. See RuntimeSetup for what each mode does.
+            // "off", "quick", or "named" -- asked as the first-run
+            // wizard's third question, right alongside lot name/handle,
+            // not decided silently. See RuntimeSetup for what each mode
+            // does. Token/hostname only apply to "named" -- an
+            // Operator's own pre-existing Cloudflare Tunnel, not
+            // something Victory provisions.
             $"TUNNEL_MODE={answers.TunnelMode}",
+            $"CLOUDFLARE_TUNNEL_TOKEN={answers.TunnelToken}",
+            $"CLOUDFLARE_TUNNEL_HOSTNAME={answers.TunnelHostname}",
             // "automatic" or "off" -- unlike TUNNEL_MODE, not asked at
             // first run (Grant: opt-out belongs in Status, not as a
             // fourth wizard question). See UpdateChecker for what each

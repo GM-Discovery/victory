@@ -300,6 +300,49 @@ internal static class RuntimeManager
         }
     }
 
+    /// <summary>
+    /// For an Operator who already has their own Cloudflare account,
+    /// domain, and Tunnel token -- created entirely outside Victory, in
+    /// Cloudflare's own dashboard. No URL to capture here: unlike Quick
+    /// Tunnel, the address is whatever the Operator already configured on
+    /// Cloudflare's side (CLOUDFLARE_TUNNEL_HOSTNAME, stored only for
+    /// Status to display/copy), so this just logs plainly like the
+    /// backend/Caddy already do.
+    /// </summary>
+    public static async Task<(bool Success, string Output)> StartNamedTunnelAsync(string tunnelToken)
+    {
+        if (IsTunnelRunning())
+            return (true, "already running");
+        if (string.IsNullOrWhiteSpace(tunnelToken))
+            return (false, "no tunnel token configured");
+
+        Directory.CreateDirectory(AppPaths.LogsDir);
+        var psi = new ProcessStartInfo
+        {
+            FileName = AppPaths.CloudflaredExe,
+            Arguments = $"tunnel run --token {tunnelToken}",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        try
+        {
+            var process = Process.Start(psi);
+            if (process is null)
+                return (false, "failed to start cloudflared.exe");
+
+            await File.WriteAllTextAsync(AppPaths.CloudflaredPidFile, process.Id.ToString());
+            _ = LogProcessOutputAsync(process, AppPaths.CloudflaredLogFile);
+            return (true, $"started (pid {process.Id})");
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message);
+        }
+    }
+
     private static async Task LogTunnelOutputAndCaptureUrlAsync(Process process)
     {
         try

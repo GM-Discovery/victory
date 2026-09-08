@@ -25,6 +25,19 @@ internal sealed class FirstRunWizardForm : Form
     // to make, it belongs up front, before setup itself starts.
     private readonly RadioButton _tunnelOffRadio = new() { Text = "Just this computer, for now", Width = 340, Checked = true };
     private readonly RadioButton _tunnelQuickRadio = new() { Text = "Give people outside this computer a free address automatically", Width = 340 };
+    private readonly RadioButton _tunnelNamedRadio = new() { Text = "I already have my own domain and Cloudflare Tunnel token", Width = 380 };
+    private readonly Label _tunnelNote = new()
+    {
+        Text = "That free address changes if this computer restarts -- how stable it stays depends on how reliable this machine and its connection are.",
+        AutoSize = false,
+        Size = new Size(380, 32),
+        ForeColor = SystemColors.GrayText,
+        Visible = false,
+    };
+    private readonly Label _tunnelTokenLabel = new() { Text = "Your Cloudflare Tunnel token", AutoSize = true, Visible = false };
+    private readonly TextBox _tunnelTokenBox = new() { Width = 380, UseSystemPasswordChar = true, Visible = false };
+    private readonly Label _tunnelHostnameLabel = new() { Text = "What address is it? (e.g. victory.theater)", AutoSize = true, Visible = false };
+    private readonly TextBox _tunnelHostnameBox = new() { Width = 380, Visible = false };
     private readonly Button _startButton = new() { Text = "Set up Victory", Width = 140 };
     private readonly Label _errorLabel = new() { ForeColor = Color.Firebrick, AutoSize = true, Visible = false, MaximumSize = new Size(380, 0) };
 
@@ -71,7 +84,7 @@ internal sealed class FirstRunWizardForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(420, 340);
+        ClientSize = new Size(420, 440);
 
         BuildQuestionsPanel();
         BuildProgressPanel();
@@ -126,29 +139,43 @@ internal sealed class FirstRunWizardForm : Form
         var tunnelLabel = new Label { Text = "Should people outside this computer be able to reach it?", AutoSize = true, Location = new Point(20, 162) };
         _tunnelOffRadio.Location = new Point(20, 182);
         _tunnelQuickRadio.Location = new Point(20, 204);
-        // "Free," changes on every restart, no account needed from
-        // anyone -- the honest tradeoff up front, not a surprise
-        // discovered later when a shared link stops working.
-        var tunnelNote = new Label
-        {
-            Text = "That free address changes if this computer restarts -- how stable it stays depends on how reliable this machine and its connection are.",
-            AutoSize = false,
-            Size = new Size(380, 32),
-            Location = new Point(20, 226),
-            ForeColor = SystemColors.GrayText,
-            Font = new Font(Font.FontFamily, 7.5f),
-        };
+        _tunnelNamedRadio.Location = new Point(20, 226);
 
-        _startButton.Location = new Point(20, 262);
+        // Detail area shares one vertical slot -- whichever option is
+        // picked shows its own honest tradeoff/fields there, not three
+        // permanently-stacked blocks most of which never apply.
+        var detailFont = new Font(Font.FontFamily, 7.5f);
+        _tunnelNote.Font = detailFont;
+        _tunnelNote.Location = new Point(20, 250);
+        _tunnelTokenLabel.Location = new Point(20, 250);
+        _tunnelTokenBox.Location = new Point(20, 270);
+        _tunnelHostnameLabel.Location = new Point(20, 300);
+        _tunnelHostnameBox.Location = new Point(20, 320);
+
+        _tunnelOffRadio.CheckedChanged += (_, _) => UpdateTunnelDetailVisibility();
+        _tunnelQuickRadio.CheckedChanged += (_, _) => UpdateTunnelDetailVisibility();
+        _tunnelNamedRadio.CheckedChanged += (_, _) => UpdateTunnelDetailVisibility();
+
+        _startButton.Location = new Point(20, 362);
         _startButton.Click += async (_, _) => await OnStartClickedAsync();
 
-        _errorLabel.Location = new Point(20, 300);
+        _errorLabel.Location = new Point(20, 400);
 
         _questionsPanel.Controls.AddRange([
             intro, lotNameLabel, _lotNameBox, operatorHandleLabel, _operatorHandleBox,
-            tunnelLabel, _tunnelOffRadio, _tunnelQuickRadio, tunnelNote,
+            tunnelLabel, _tunnelOffRadio, _tunnelQuickRadio, _tunnelNamedRadio,
+            _tunnelNote, _tunnelTokenLabel, _tunnelTokenBox, _tunnelHostnameLabel, _tunnelHostnameBox,
             _startButton, _errorLabel,
         ]);
+    }
+
+    private void UpdateTunnelDetailVisibility()
+    {
+        _tunnelNote.Visible = _tunnelQuickRadio.Checked;
+        _tunnelTokenLabel.Visible = _tunnelNamedRadio.Checked;
+        _tunnelTokenBox.Visible = _tunnelNamedRadio.Checked;
+        _tunnelHostnameLabel.Visible = _tunnelNamedRadio.Checked;
+        _tunnelHostnameBox.Visible = _tunnelNamedRadio.Checked;
     }
 
     private void BuildProgressPanel()
@@ -185,6 +212,13 @@ internal sealed class FirstRunWizardForm : Form
             ShowError("Both a lot name and an Operator handle are required.");
             return;
         }
+        var tunnelToken = _tunnelTokenBox.Text.Trim();
+        var tunnelHostname = _tunnelHostnameBox.Text.Trim();
+        if (_tunnelNamedRadio.Checked && (tunnelToken.Length == 0 || tunnelHostname.Length == 0))
+        {
+            ShowError("Both the Cloudflare Tunnel token and your address are required for this option.");
+            return;
+        }
 
         _currentPhaseLabel = "Setting up Victory";
         _progressStatusLabel.Text = _currentPhaseLabel;
@@ -199,10 +233,10 @@ internal sealed class FirstRunWizardForm : Form
 
         try
         {
-            var tunnelMode = _tunnelQuickRadio.Checked ? "quick" : "off";
+            var tunnelMode = _tunnelNamedRadio.Checked ? "named" : _tunnelQuickRadio.Checked ? "quick" : "off";
             await RunStepAsync("Preparing your Victory lot", () =>
             {
-                EnvGenerator.Generate(new EnvGenerator.FirstRunAnswers(lotName, operatorHandle, tunnelMode));
+                EnvGenerator.Generate(new EnvGenerator.FirstRunAnswers(lotName, operatorHandle, tunnelMode, tunnelToken, tunnelHostname));
                 return Task.CompletedTask;
             });
 

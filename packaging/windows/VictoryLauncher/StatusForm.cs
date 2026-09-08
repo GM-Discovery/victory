@@ -173,16 +173,38 @@ internal sealed class StatusForm : Form
     /// </summary>
     private void RefreshTunnelDisplay()
     {
-        var tunnelMode = EnvGenerator.EnvFileExists() ? EnvGenerator.ReadAll().GetValueOrDefault("TUNNEL_MODE", "off") : "off";
-        if (tunnelMode != "quick")
+        var env = EnvGenerator.EnvFileExists() ? EnvGenerator.ReadAll() : new Dictionary<string, string>();
+        var tunnelMode = env.GetValueOrDefault("TUNNEL_MODE", "off");
+        if (tunnelMode == "off")
         {
             _remoteValue.Text = "Off (this device only)";
             _urlValue.Text = $"http://localhost:{RuntimeManager.PublicPort} (this device only)";
             _copyAddressButton.Visible = false;
             _tunnelNoteLabel.Visible = false;
+            _tunnelToggleButton.Visible = true;
             _tunnelToggleButton.Text = "Turn On";
             return;
         }
+
+        if (tunnelMode == "named")
+        {
+            // Set up once via the first-run wizard, using an Operator's
+            // own pre-existing Cloudflare account -- Status can turn it
+            // off, but there's nowhere here to collect a token/hostname
+            // to turn it back on with, so no on-ramp back to "named" is
+            // offered from this screen. Not a real gap in practice: an
+            // Operator who set this up once still has their own token.
+            var hostname = env.GetValueOrDefault("CLOUDFLARE_TUNNEL_HOSTNAME", "");
+            _remoteValue.Text = RuntimeManager.IsTunnelRunning() ? "On" : "On, but not connected yet";
+            _urlValue.Text = hostname.Length > 0 ? $"https://{hostname}" : "(configured, no address on record)";
+            _copyAddressButton.Visible = hostname.Length > 0;
+            _tunnelNoteLabel.Visible = false;
+            _tunnelToggleButton.Visible = true;
+            _tunnelToggleButton.Text = "Turn Off";
+            return;
+        }
+
+        _tunnelToggleButton.Visible = true;
         _tunnelToggleButton.Text = "Turn Off";
 
         var currentUrl = RuntimeManager.GetLastKnownTunnelUrl();

@@ -73,7 +73,7 @@ internal static class RuntimeSetup
         var needsDbInit = !RuntimeManager.IsDatabaseInitialized();
         var needsCaddyDownload = !RuntimeManager.IsCaddyInstalled();
         var tunnelMode = EnvGenerator.EnvFileExists() ? EnvGenerator.ReadAll().GetValueOrDefault("TUNNEL_MODE", "off") : "off";
-        var needsTunnel = tunnelMode == "quick";
+        var needsTunnel = tunnelMode is "quick" or "named";
         var needsCloudflaredDownload = needsTunnel && !RuntimeManager.IsCloudflaredInstalled();
 
         // Total is whichever of the always-run steps plus the conditional
@@ -155,7 +155,13 @@ internal static class RuntimeSetup
             if (RuntimeManager.IsCloudflaredInstalled())
             {
                 Report("Starting your Victory address");
-                try { await RuntimeManager.StartQuickTunnelAsync(); }
+                try
+                {
+                    if (tunnelMode == "named")
+                        await RuntimeManager.StartNamedTunnelAsync(env.GetValueOrDefault("CLOUDFLARE_TUNNEL_TOKEN", ""));
+                    else
+                        await RuntimeManager.StartQuickTunnelAsync();
+                }
                 catch { /* best effort -- see comment above */ }
             }
         }
