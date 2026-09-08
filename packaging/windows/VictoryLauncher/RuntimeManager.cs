@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net.Http;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -368,6 +369,7 @@ internal static class RuntimeManager
             if (match.Success)
             {
                 try { await File.WriteAllTextAsync(AppPaths.TunnelUrlFile, match.Value); } catch { /* best effort */ }
+                _ = UpdateGistPointerAsync(match.Value);
             }
         }
     }
@@ -381,6 +383,70 @@ internal static class RuntimeManager
         catch
         {
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Quick Tunnel's address is inherently ephemeral -- this is the
+    /// optional fix an Operator can turn on themselves: a GitHub Gist
+    /// (their own account, their own token, nothing for anyone else to
+    /// host) that always holds the current address, so a link shared
+    /// once keeps working across restarts. No-op entirely if no token is
+    /// configured (the default -- this is opt-in, not asked at first
+    /// run). Best-effort like the rest of the tunnel subsystem: a failed
+    /// Gist update never affects Victory's own availability.
+    /// </summary>
+    private static async Task UpdateGistPointerAsync(string currentUrl)
+    {
+        try
+        {
+            if (!EnvGenerator.EnvFileExists())
+                return;
+            var token = EnvGenerator.ReadAll().GetValueOrDefault("GITHUB_GIST_TOKEN", "");
+            if (string.IsNullOrWhiteSpace(token))
+                return;
+
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            client.DefaultRequestHeaders.Add("Authorization", $"token {token}");
+            client.DefaultRequestHeaders.Add("User-Agent", "VictoryLauncher");
+            client.DefaultRequestHeaders.Add("Accept", "application/vnd.github+json");
+
+            var fileContent = JsonSerializer.Serialize(new
+            {
+                files = new Dictionary<string, object> { ["victory-address.txt"] = new { content = currentUrl } },
+            });
+
+            var existingGistId = File.Exists(AppPaths.GistIdFile) ? File.ReadAllText(AppPaths.GistIdFile).Trim() : "";
+            if (!string.IsNullOrEmpty(existingGistId))
+            {
+                var patchResponse = await client.PatchAsync(
+                    $"https://api.github.com/gists/{existingGistId}",
+                    new StringContent(fileContent, System.Text.Encoding.UTF8, "application/json"));
+                if (patchResponse.IsSuccessStatusCode)
+                    return;
+                // Fall through to create a fresh one if the stored id is
+                // stale (e.g. the Gist was deleted on GitHub's side).
+            }
+
+            var createBody = JsonSerializer.Serialize(new
+            {
+                description = "Victory's current address (kept updated automatically)",
+                @public = false,
+                files = new Dictionary<string, object> { ["victory-address.txt"] = new { content = currentUrl } },
+            });
+            var createResponse = await client.PostAsync(
+                "https://api.github.com/gists",
+                new StringContent(createBody, System.Text.Encoding.UTF8, "application/json"));
+            if (!createResponse.IsSuccessStatusCode)
+                return;
+
+            using var doc = JsonDocument.Parse(await createResponse.Content.ReadAsStringAsync());
+            if (doc.RootElement.TryGetProperty("id", out var idProp))
+                await File.WriteAllTextAsync(AppPaths.GistIdFile, idProp.GetString());
+        }
+        catch
+        {
+            // best effort -- see summary above
         }
     }
 

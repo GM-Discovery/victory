@@ -28,6 +28,12 @@ internal sealed class StatusForm : Form
         Visible = false,
     };
     private readonly Button _updateToggleButton = new() { Width = 90, Height = 22 };
+    // Only ever shown when TUNNEL_MODE is "quick" -- Quick Tunnel is the
+    // one address that's actually ephemeral; "named" already has a
+    // stable domain, "off" has no address to rediscover at all.
+    private readonly Label _rediscoveryValue = new() { AutoSize = true, Visible = false };
+    private readonly Button _rediscoveryToggleButton = new() { Width = 130, Height = 22, Visible = false };
+    private readonly Button _copyRediscoveryButton = new() { Text = "Copy", Width = 50, Height = 22, Visible = false };
     private readonly Button _startStopButton = new() { Width = 120 };
     private readonly Button _refreshButton = new() { Text = "Refresh", Width = 100 };
 
@@ -39,7 +45,7 @@ internal sealed class StatusForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(420, 300);
+        ClientSize = new Size(420, 330);
 
         AddRow("Victory:", _runningValue, 20);
         AddRow("Database:", _databaseValue, 50);
@@ -50,18 +56,29 @@ internal sealed class StatusForm : Form
         _copyAddressButton.Location = new Point(340, 108);
         _copyAddressButton.Click += (_, _) => CopyAddressToClipboard();
         _tunnelNoteLabel.Location = new Point(20, 132);
-        AddRow("Updates:", _updateValue, 170);
-        _updateToggleButton.Location = new Point(280, 168);
-        _updateToggleButton.Click += async (_, _) => await OnUpdateToggleClickedAsync();
-        AddRow("Discord:", _discordValue, 200);
 
-        _startStopButton.Location = new Point(20, 250);
+        AddRow("Rediscovery:", _rediscoveryValue, 170);
+        _rediscoveryToggleButton.Location = new Point(280, 168);
+        _rediscoveryToggleButton.Click += async (_, _) => await OnRediscoveryToggleClickedAsync();
+        _copyRediscoveryButton.Location = new Point(20, 190);
+        _copyRediscoveryButton.Click += (_, _) => CopyRediscoveryLinkToClipboard();
+
+        AddRow("Updates:", _updateValue, 220);
+        _updateToggleButton.Location = new Point(280, 218);
+        _updateToggleButton.Click += async (_, _) => await OnUpdateToggleClickedAsync();
+        AddRow("Discord:", _discordValue, 250);
+
+        _startStopButton.Location = new Point(20, 290);
         _startStopButton.Click += async (_, _) => await OnStartStopClickedAsync();
 
-        _refreshButton.Location = new Point(150, 250);
+        _refreshButton.Location = new Point(150, 290);
         _refreshButton.Click += async (_, _) => await RefreshAsync();
 
-        Controls.AddRange([_tunnelToggleButton, _copyAddressButton, _tunnelNoteLabel, _updateToggleButton, _startStopButton, _refreshButton]);
+        Controls.AddRange([
+            _tunnelToggleButton, _copyAddressButton, _tunnelNoteLabel,
+            _rediscoveryToggleButton, _copyRediscoveryButton,
+            _updateToggleButton, _startStopButton, _refreshButton,
+        ]);
         Shown += async (_, _) => await RefreshAsync();
     }
 
@@ -183,6 +200,7 @@ internal sealed class StatusForm : Form
             _tunnelNoteLabel.Visible = false;
             _tunnelToggleButton.Visible = true;
             _tunnelToggleButton.Text = "Turn On";
+            RefreshRediscoveryDisplay(env);
             return;
         }
 
@@ -201,6 +219,7 @@ internal sealed class StatusForm : Form
             _tunnelNoteLabel.Visible = false;
             _tunnelToggleButton.Visible = true;
             _tunnelToggleButton.Text = "Turn Off";
+            RefreshRediscoveryDisplay(env);
             return;
         }
 
@@ -224,6 +243,109 @@ internal sealed class StatusForm : Form
             _tunnelNoteLabel.Text = "Victory hasn't gotten a public address yet -- click Refresh in a moment, or check your internet connection.";
             _tunnelNoteLabel.Visible = true;
         }
+
+        RefreshRediscoveryDisplay(env);
+    }
+
+    /// <summary>
+    /// Quick Tunnel only -- an optional fix for its one real weakness
+    /// (the address doesn't survive a restart). An Operator's own GitHub
+    /// Gist, kept updated automatically once they provide a token
+    /// (gist-scope only). Off by default; nothing for anyone but the
+    /// Operator to host or be responsible for.
+    /// </summary>
+    private void RefreshRediscoveryDisplay(Dictionary<string, string> env)
+    {
+        var tunnelMode = env.GetValueOrDefault("TUNNEL_MODE", "off");
+        if (tunnelMode != "quick")
+        {
+            _rediscoveryValue.Visible = false;
+            _rediscoveryToggleButton.Visible = false;
+            _copyRediscoveryButton.Visible = false;
+            return;
+        }
+
+        _rediscoveryValue.Visible = true;
+        _rediscoveryToggleButton.Visible = true;
+
+        var hasToken = !string.IsNullOrWhiteSpace(env.GetValueOrDefault("GITHUB_GIST_TOKEN", ""));
+        if (!hasToken)
+        {
+            _rediscoveryValue.Text = "Off";
+            _rediscoveryToggleButton.Text = "Set Up...";
+            _copyRediscoveryButton.Visible = false;
+            return;
+        }
+
+        _rediscoveryToggleButton.Text = "Turn Off";
+        var gistId = File.Exists(AppPaths.GistIdFile) ? File.ReadAllText(AppPaths.GistIdFile).Trim() : "";
+        if (gistId.Length > 0)
+        {
+            _rediscoveryValue.Text = $"https://gist.github.com/{gistId}";
+            _copyRediscoveryButton.Visible = true;
+        }
+        else
+        {
+            _rediscoveryValue.Text = "On -- waiting for the first address to record";
+            _copyRediscoveryButton.Visible = false;
+        }
+    }
+
+    private void CopyRediscoveryLinkToClipboard()
+    {
+        try { Clipboard.SetText(_rediscoveryValue.Text); }
+        catch { /* best effort -- clipboard access can transiently fail on Windows */ }
+    }
+
+    private async Task OnRediscoveryToggleClickedAsync()
+    {
+        _rediscoveryToggleButton.Enabled = false;
+        try
+        {
+            if (_rediscoveryToggleButton.Text == "Turn Off")
+            {
+                EnvGenerator.UpdateGistToken("");
+                return;
+            }
+
+            var token = PromptForToken(
+                "Set Up Address Rediscovery",
+                "Paste a GitHub token with only the \"gist\" scope. Create one at github.com/settings/tokens -- Victory will use it solely to keep one private Gist updated with your current address.");
+            if (string.IsNullOrWhiteSpace(token))
+                return;
+            EnvGenerator.UpdateGistToken(token.Trim());
+        }
+        finally
+        {
+            await RefreshAsync();
+            _rediscoveryToggleButton.Enabled = true;
+        }
+    }
+
+    /// <summary>
+    /// A minimal, self-contained prompt -- this is the one place Status
+    /// needs to collect a secret rather than just toggle a mode, and it
+    /// isn't worth a whole separate form file for one text field.
+    /// </summary>
+    private static string? PromptForToken(string title, string message)
+    {
+        using var prompt = new Form
+        {
+            Text = title,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            StartPosition = FormStartPosition.CenterParent,
+            ClientSize = new Size(380, 160),
+        };
+        var messageLabel = new Label { Text = message, AutoSize = false, Size = new Size(340, 70), Location = new Point(20, 16) };
+        var tokenBox = new TextBox { Location = new Point(20, 92), Width = 340, UseSystemPasswordChar = true };
+        var okButton = new Button { Text = "Save", Location = new Point(200, 122), DialogResult = DialogResult.OK };
+        var cancelButton = new Button { Text = "Cancel", Location = new Point(285, 122), DialogResult = DialogResult.Cancel };
+        prompt.Controls.AddRange([messageLabel, tokenBox, okButton, cancelButton]);
+        prompt.AcceptButton = okButton;
+        prompt.CancelButton = cancelButton;
+        return prompt.ShowDialog() == DialogResult.OK ? tokenBox.Text : null;
     }
 
     /// <summary>

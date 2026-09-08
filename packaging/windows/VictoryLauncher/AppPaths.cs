@@ -102,6 +102,16 @@ internal static class AppPaths
     /// </summary>
     public static string TunnelUrlFile => Path.Combine(DataRoot, "tunnel-url.txt");
 
+    /// <summary>
+    /// Optional: a Quick Tunnel address is inherently ephemeral, so an
+    /// Operator who wants invited players to be able to find them again
+    /// after a restart can point Victory at their own GitHub Gist (their
+    /// account, their token, nothing for anyone else to host). The Gist's
+    /// id is persisted here once created so later address changes PATCH
+    /// the same Gist instead of creating a new one each time.
+    /// </summary>
+    public static string GistIdFile => Path.Combine(DataRoot, "gist-id.txt");
+
     public static void EnsureDataDirectoriesExist()
     {
         Directory.CreateDirectory(StorageDir);

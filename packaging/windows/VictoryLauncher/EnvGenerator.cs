@@ -123,6 +123,21 @@ internal static class EnvGenerator
     }
 
     /// <summary>
+    /// The Operator's own GitHub token (gist scope only), used to keep a
+    /// Gist updated with the current Quick Tunnel address so invited
+    /// players can find it again after a restart. Empty means the
+    /// feature is off -- Status-only, not asked at first run.
+    /// </summary>
+    public static void UpdateGistToken(string gistToken)
+    {
+        var values = ReadAll();
+        values["GITHUB_GIST_TOKEN"] = gistToken;
+        var lines = values.Select(kv => $"{kv.Key}={kv.Value}");
+        File.WriteAllText(AppPaths.EnvFile, string.Join("\n", lines) + "\n", new UTF8Encoding(false));
+        RestrictToCurrentUserAndAdministrators(AppPaths.EnvFile);
+    }
+
+    /// <summary>
     /// Mirrors generate-env.sh's `tr '[:upper:]' '[:lower:]' | tr -s ' ' '-' | tr -cd 'a-z0-9-'`.
     /// </summary>
     internal static string Slugify(string lotName)
