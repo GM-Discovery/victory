@@ -42,7 +42,7 @@ func TestPasswordSignupClosedByDefault(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/signup", body)
 	rec := httptest.NewRecorder()
 
-	HandleSignup(pool, true).ServeHTTP(rec, req)
+	HandleSignup(pool, true, DiscordOAuthConfig{}).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("closed signup should be 403, got %d body=%s", rec.Code, rec.Body.String())
@@ -83,7 +83,7 @@ func TestPasswordSignupOpensOnlyForFirstAccount(t *testing.T) {
 	firstBody := strings.NewReader(`{"email":"first_` + suffix + `@example.com","handle":"first_` + suffix + `","password":"hunter2hunter2","display_name":"First Account"}`)
 	firstReq := httptest.NewRequest(http.MethodPost, "/api/auth/signup", firstBody)
 	firstRec := httptest.NewRecorder()
-	HandleSignup(pool, true).ServeHTTP(firstRec, firstReq)
+	HandleSignup(pool, true, DiscordOAuthConfig{}).ServeHTTP(firstRec, firstReq)
 	if firstRec.Code != http.StatusOK {
 		t.Fatalf("first-ever signup should succeed while the bootstrap window is open, got %d body=%s", firstRec.Code, firstRec.Body.String())
 	}
@@ -94,7 +94,7 @@ func TestPasswordSignupOpensOnlyForFirstAccount(t *testing.T) {
 	secondBody := strings.NewReader(`{"email":"second_` + suffix + `@example.com","handle":"second_` + suffix + `","password":"hunter2hunter2","display_name":"Second Account"}`)
 	secondReq := httptest.NewRequest(http.MethodPost, "/api/auth/signup", secondBody)
 	secondRec := httptest.NewRecorder()
-	HandleSignup(pool, true).ServeHTTP(secondRec, secondReq)
+	HandleSignup(pool, true, DiscordOAuthConfig{}).ServeHTTP(secondRec, secondReq)
 	if secondRec.Code != http.StatusForbidden {
 		t.Fatalf("signup after the first account exists should be closed again, got %d body=%s", secondRec.Code, secondRec.Body.String())
 	}

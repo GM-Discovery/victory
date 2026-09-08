@@ -172,11 +172,11 @@
 <body>
   <div class="panel">
     <h1>Create Account</h1>
-    <p>Most Victory accounts are created by signing in with Discord.</p>
+    <p id="discord-intro">Most Victory accounts are created by signing in with Discord.</p>
 
-    <a class="discord-button" href="/auth/discord/start">Continue with Discord</a>
+    <a id="discord-button" class="discord-button" href="/auth/discord/start" style="display:none;">Continue with Discord</a>
 
-    <p class="hint" style="margin-top:16px;">
+    <p id="signup-hint" class="hint" style="margin-top:16px;">
       Password signup below only works for a fresh install's very first
       account. If it's closed for this lot, ask the operator for a
       recovery link instead.
@@ -219,6 +219,27 @@
   <script>
     const form = document.getElementById("signup-form");
     const statusEl = document.getElementById("status");
+
+    // Was unconditionally offering "Continue with Discord" even on a lot
+    // that never configured it -- clicking it just hit a different dead
+    // end (/auth/discord/start returning discord_oauth_not_configured).
+    // Only show it when it would actually work.
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/providers");
+        const payload = await res.json();
+        if (payload?.data?.discord_enabled) {
+          document.getElementById("discord-button").style.display = "block";
+        } else {
+          document.getElementById("discord-intro").style.display = "none";
+        }
+      } catch {
+        // Best effort -- if this fails, the form itself still tells the
+        // truth once submitted (see the password_signup_closed handling
+        // below), so leaving the Discord button hidden by default here
+        // is the safer failure mode than offering something broken.
+      }
+    })();
 
     // Windows launcher's first-run wizard links here with the exact
     // handle it already wrote into OPERATOR_HANDLE, so this account
@@ -267,6 +288,15 @@
         }
 
         if (!response.ok || !payload.ok) {
+          if (payload.error === "password_signup_closed") {
+            // The backend already worked out whether Discord is actually
+            // configured for this lot -- show its real explanation
+            // instead of the raw error code, and stop offering a form
+            // that's never going to work.
+            statusEl.textContent = payload.detail || "Registration is closed for this lot.";
+            form.querySelectorAll("input, button").forEach((el) => (el.disabled = true));
+            return;
+          }
           throw new Error(payload.error || `Signup failed (HTTP ${response.status})`);
         }
 

@@ -90,7 +90,7 @@ func bootstrapWindowOpen(ctx context.Context, pool *pgxpool.Pool) (bool, error) 
 // startup, breaks that cycle the same way a driver registration does.
 var OnBootstrapAccount func(ctx context.Context, pool *pgxpool.Pool, userID string)
 
-func HandleSignup(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc {
+func HandleSignup(pool *pgxpool.Pool, secureCookie bool, discordCfg DiscordOAuthConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method_not_allowed"})
@@ -105,10 +105,23 @@ func HandleSignup(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc {
 				return
 			}
 			if !open {
+				// The old message always claimed Discord, even for a lot
+				// that never configured it -- a real, confusing dead end
+				// (confirmed: the frontend didn't even show this text,
+				// just the raw "password_signup_closed" error code).
+				// discord_enabled lets the frontend tell these two cases
+				// apart and point at a direct invite instead when Discord
+				// genuinely isn't an option here.
+				discordEnabled := DiscordOAuthConfigured(discordCfg)
+				detail := "Victory accounts are created by signing in with Discord."
+				if !discordEnabled {
+					detail = "This lot hasn't turned on Discord sign-in yet, so open registration isn't available. Ask the Operator for a direct invite link instead."
+				}
 				writeJSON(w, http.StatusForbidden, map[string]any{
-					"ok":     false,
-					"error":  "password_signup_closed",
-					"detail": "Victory accounts are created by signing in with Discord.",
+					"ok":              false,
+					"error":           "password_signup_closed",
+					"detail":          detail,
+					"discord_enabled": discordEnabled,
 				})
 				return
 			}

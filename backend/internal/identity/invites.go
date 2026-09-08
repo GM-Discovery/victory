@@ -187,6 +187,63 @@ func HandleCreateInvite(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+// HandlePreviewInvite is read-only -- no uses_count increment, no
+// membership row, nothing consumed. The accept page calls this first so
+// a recipient sees what they're actually agreeing to ("join The Sandlot
+// as Cast") before filling out an account-creation form, rather than
+// discovering it only after submitting.
+func HandlePreviewInvite(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method_not_allowed"})
+			return
+		}
+
+		token := strings.TrimSpace(r.URL.Query().Get("token"))
+		if token == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "token_required"})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		tokenHash := sha256.Sum256([]byte(token))
+
+		var targetRole, lotName string
+		var maxUses, usesCount int
+		var expiresAt time.Time
+		var revokedAt *time.Time
+		err := pool.QueryRow(ctx, `
+			SELECT i.target_role::text, l.name, i.max_uses, i.uses_count, i.expires_at, i.revoked_at
+			FROM invites i
+			JOIN locations l ON l.id = i.location_id
+			WHERE i.token_hash = $1
+			LIMIT 1
+		`, tokenHash[:]).Scan(&targetRole, &lotName, &maxUses, &usesCount, &expiresAt, &revokedAt)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid_invite"})
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "invite_lookup_failed"})
+			return
+		}
+
+		valid := revokedAt == nil && expiresAt.After(time.Now().UTC()) && usesCount < maxUses
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok": true,
+			"data": map[string]any{
+				"target_role": targetRole,
+				"lot_name":    lotName,
+				"expires_at":  expiresAt,
+				"valid":       valid,
+			},
+		})
+	}
+}
+
 func HandleAcceptInvite(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
