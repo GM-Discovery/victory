@@ -25,6 +25,7 @@
           <button id="account-menu-toggle" class="account-menu-toggle" type="button" hidden aria-label="Account options" aria-expanded="false">▾</button>
           <div id="account-menu" class="account-menu" hidden>
             <a id="account-profile-link" class="account-menu-link" href="/account/">View Profile</a>
+            <button id="invite-people-button" class="account-menu-button" type="button" onclick="window.VictoryInviteModal?.open()">Invite People</button>
             <button id="account-logout-button" class="account-menu-button" type="button">Logout</button>
           </div>
         </div>
@@ -136,6 +137,7 @@
 
   <script src="/lib/tour-engine.js?v=kernel91-1"></script>
   <script src="/lib/mailbox-badge.js"></script>
+  <script src="/lib/invite-modal.js"></script>
   <script src="/app.js?v=map-5"></script>
 </body>
 </html>

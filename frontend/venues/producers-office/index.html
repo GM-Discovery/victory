@@ -691,60 +691,6 @@
         </div>
       </section>
 
-      <section class="card">
-        <h2>Grant Access / Invite</h2>
-        <p class="muted small">
-          Use an audience invite for venue access, or a production invite for cast, crew, and director permissions. People will see the public display name, not the private login handle. First Theater can be granted directly from here too.
-        </p>
-
-        <form id="invite-form">
-          <label for="target-role">Target Role</label>
-          <select id="target-role" required>
-            <option value="director">Director</option>
-            <option value="cast">Cast</option>
-            <option value="crew">Crew</option>
-            <option value="audience">Audience</option>
-          </select>
-
-          <div class="inline">
-            <div>
-              <label for="production-id">Current Production</label>
-              <select id="production-id">
-                <option value="">Loading productions...</option>
-              </select>
-            </div>
-            <div>
-              <label for="venue-slug">Venue</label>
-              <select id="venue-slug" required>
-                <option value="the-cave">The Cave</option>
-                <option value="first-theater">First Theater</option>
-                <option value="catharsis">Catharsis</option>
-                <option value="workshop">Workshop</option>
-                <option value="audition-hall">Audition Hall</option>
-                <option value="greenroom">The Greenroom</option>
-                <option value="trailers">Trailers</option>
-                <option value="producers-office">Producer's Office</option>
-                <option value="directors-chair">The Director's Chair</option>
-              </select>
-            </div>
-          </div>
-
-          <label for="target-email">Invite Email</label>
-          <input id="target-email" type="email" placeholder="Optional email for the invite" />
-          <div class="muted small" style="margin-top:-8px; margin-bottom:14px;">
-            If you leave this blank, you still get a shareable invite code.
-          </div>
-
-          <label for="invite-note">Note</label>
-          <textarea id="invite-note" placeholder="Why are you granting this permission?"></textarea>
-
-          <div class="chip-list">
-            <button class="button" type="submit">Create Invite</button>
-          </div>
-        </form>
-
-        <div id="invite-status" class="status"></div>
-      </section>
     </main>
   </div>
 
@@ -755,11 +701,6 @@
     const officeShell = document.getElementById("office-shell");
     const incomingRequests = document.getElementById("incoming-requests");
     const incomingStatus = document.getElementById("incoming-status");
-    const inviteForm = document.getElementById("invite-form");
-    const inviteStatus = document.getElementById("invite-status");
-    const targetRole = document.getElementById("target-role");
-    const productionID = document.getElementById("production-id");
-    const venueSlug = document.getElementById("venue-slug");
     const discordServerStatus = document.getElementById("discord-server-status");
     const discordServerName = document.getElementById("discord-server-name");
     const discordServerChannel = document.getElementById("discord-server-channel");
@@ -1280,40 +1221,6 @@
       setStatus(incomingStatus, decision === "approve" ? "Request approved." : "Request denied.");
     }
 
-    async function loadProductions() {
-      productionID.innerHTML = `<option value="">Loading productions...</option>`;
-      try {
-        const res = await fetch("/api/productions", { credentials: "include" });
-        const payload = await res.json().catch(() => null);
-        if (!res.ok || !payload?.ok) {
-          throw new Error(payload?.error || `Failed to load productions (HTTP ${res.status})`);
-        }
-        const rows = Array.isArray(payload.data) ? payload.data : [];
-        productionID.innerHTML = "";
-        if (!rows.length) {
-          const option = document.createElement("option");
-          option.value = "";
-          option.textContent = "No productions available";
-          productionID.appendChild(option);
-          productionID.disabled = true;
-          return;
-        }
-        for (const row of rows) {
-          const option = document.createElement("option");
-          option.value = row.id;
-          option.textContent = row.name || row.slug || row.id;
-          productionID.appendChild(option);
-        }
-        if (rows.length === 1) {
-          productionID.selectedIndex = 0;
-        }
-      } catch (error) {
-        productionID.innerHTML = `<option value="">Unavailable</option>`;
-        productionID.disabled = true;
-        console.error(error);
-      }
-    }
-
     async function loadIncomingRequests() {
       setStatus(incomingStatus, "Loading incoming requests...");
       try {
@@ -1542,56 +1449,6 @@
       }
     }
 
-    inviteForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      setStatus(inviteStatus, "Creating invite...");
-
-      const selectedRole = targetRole.value;
-      const selectedProduction = productionID.value.trim();
-      const selectedVenue = venueSlug.value.trim();
-      const note = document.getElementById("invite-note").value.trim();
-      const email = document.getElementById("target-email").value.trim();
-
-      if (selectedRole === "director" && !selectedProduction) {
-        setStatus(inviteStatus, "Pick a production for director invites.");
-        return;
-      }
-
-      if (selectedRole === "audience" && !selectedVenue) {
-        setStatus(inviteStatus, "Pick a venue for audience access.");
-        return;
-      }
-
-      try {
-        const response = await fetch("/api/invites", {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            target_role: selectedRole,
-            target_email: email,
-            production_id: selectedProduction,
-            venue_slug: selectedVenue,
-            expires_in_hours: 72,
-            max_uses: 1,
-            note,
-          }),
-        });
-
-        const payload = await response.json().catch(() => null);
-        if (!response.ok || !payload?.ok) {
-          throw new Error(payload?.error || `Invite failed (HTTP ${response.status})`);
-        }
-
-        setStatus(inviteStatus, `Invite created. Token: ${payload.data?.token || "(hidden)"}`);
-        await loadIncomingRequests();
-      } catch (error) {
-        setStatus(inviteStatus, error.message || String(error));
-      }
-    });
-
     discordServerUnlink?.addEventListener("click", async () => {
       await unlinkDiscordServer();
     });
@@ -1652,14 +1509,7 @@
           mount: "#discord-audio-catharsis",
         });
 
-        for (const option of Array.from(venueSlug.options)) {
-          if (option.value === "audition-hall" || venueOptions.includes(option.value)) {
-            option.hidden = false;
-          }
-        }
-
         await Promise.all([
-          loadProductions(),
           loadIncomingRequests(),
           loadDiscordServerStatus(),
           loadDiscordGatewayStatus(),
