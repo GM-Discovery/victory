@@ -279,7 +279,7 @@ func main() {
 	// actions (chat, note cards, uploads, command execution) -- bounded
 	// against flooding, not tuned to make live play feel rate-limited.
 	actionLimiter := ratelimit.New(30, 60)
-	mux.HandleFunc("/api/auth/signup", ratelimit.Middleware(credentialLimiter, identity.HandleSignup(pool, secureCookie)))
+	mux.HandleFunc("/api/auth/signup", ratelimit.Middleware(credentialLimiter, identity.HandleSignup(pool, secureCookie, discordOAuthConfig)))
 	mux.HandleFunc("/api/auth/login", ratelimit.Middleware(credentialLimiter, identity.HandleLogin(pool, secureCookie)))
 	mux.HandleFunc("/api/auth/logout", identity.HandleLogout(pool, secureCookie))
 	mux.HandleFunc("/api/auth/providers", identity.HandleDiscordOAuthProviders(discordOAuthConfig))
@@ -290,6 +290,7 @@ func main() {
 	mux.HandleFunc("/api/auth/password-reset/request", ratelimit.Middleware(credentialLimiter, identity.HandleForgotPassword(pool, forgotPasswordConfigFromEnv())))
 	mux.HandleFunc("/api/auth/password-reset/confirm", ratelimit.Middleware(credentialLimiter, identity.HandleResetPassword(pool, secureCookie)))
 	mux.HandleFunc("/api/invites", identity.HandleCreateInvite(pool))
+	mux.HandleFunc("GET /api/invites/preview", identity.HandlePreviewInvite(pool))
 	mux.HandleFunc("/api/invites/accept", identity.HandleAcceptInvite(pool, secureCookie))
 	mux.HandleFunc("GET /api/discord/server-link/status", identity.HandleDiscordServerLinkStatus(pool, discordServerLinkConfig))
 	mux.HandleFunc("/api/discord/server/bootstrap", identity.HandleDiscordServerBootstrap(pool, discordServerLinkConfig))
