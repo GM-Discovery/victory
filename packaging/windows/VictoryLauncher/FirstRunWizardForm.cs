@@ -1,3 +1,5 @@
+using System.Media;
+
 namespace VictoryLauncher;
 
 /// <summary>
@@ -96,6 +98,25 @@ internal sealed class FirstRunWizardForm : Form
 
         FormClosing += OnFormClosing;
         _elapsedTimer.Tick += (_, _) => UpdateElapsedLabel();
+
+        // Confirmed on real hardware: right after Setup.exe finishes
+        // installing and launches this app, this window can open behind
+        // Explorer/whatever else has focus -- Windows' own focus-stealing
+        // prevention doesn't reliably treat "just-installed app's first
+        // window" as an exception. Someone watching the desktop sees
+        // nothing happen at all. TopMost-then-release on Shown is the
+        // standard WinForms way to force a genuinely new window to the
+        // front exactly once, without pinning it above everything
+        // permanently (that would be its own annoyance for a form that
+        // stays open through a multi-minute download).
+        Shown += (_, _) => ForceToForeground();
+    }
+
+    private void ForceToForeground()
+    {
+        TopMost = true;
+        Activate();
+        TopMost = false;
     }
 
     private void UpdateElapsedLabel()
@@ -286,8 +307,16 @@ internal sealed class FirstRunWizardForm : Form
             _setupInProgress = false;
             // Stays open here rather than closing itself: clicking the
             // button (OnContinueClicked) is what actually opens the
-            // browser and closes this window, not a timer.
+            // browser and closes this window, not a timer. But a download
+            // this long is exactly the kind of wait someone alt-tabs away
+            // from -- forced back to the front here too (not just on
+            // Shown), with real keyboard focus and a system sound, so
+            // "it's done" doesn't just sit quietly in a background window.
             _continueButton.Visible = true;
+            AcceptButton = _continueButton;
+            ForceToForeground();
+            _continueButton.Focus();
+            try { SystemSounds.Asterisk.Play(); } catch { /* best effort */ }
         }
         catch (Exception ex)
         {
