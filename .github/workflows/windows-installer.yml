@@ -136,10 +136,18 @@ jobs:
       # above succeeded: vpk pack itself doesn't need RELEASES_REPO_TOKEN
       # at all, so this is real proof the packaging step works (a real
       # installer .exe, not just a raw publish folder) even before
-      # publishing is wired up.
+      # publishing is wired up. Now that RELEASES_REPO_TOKEN exists and
+      # real releases publish (proven: v0.0.37), this is a redundant
+      # convenience link, not the real distribution path -- continue-on-
+      # error so a GitHub Actions artifact-storage quota (hit and
+      # confirmed real, 2026-09-08 -- Windows runners burn quota fast at
+      # ~600MB/run) doesn't mark the whole run "failed" over something
+      # that no longer matters. Shorter retention so it can't reaccumulate
+      # the same way.
       - name: Upload packed Velopack release
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: VictoryLauncher-Setup
           path: packaging/windows/VictoryLauncher/Releases/
-          retention-days: 14
+          retention-days: 3

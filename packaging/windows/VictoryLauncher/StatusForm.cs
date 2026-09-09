@@ -360,11 +360,15 @@ internal sealed class StatusForm : Form
     {
         var updateMode = EnvGenerator.EnvFileExists() ? EnvGenerator.ReadAll().GetValueOrDefault("UPDATE_MODE", "automatic") : "automatic";
         _updateToggleButton.Text = updateMode == "off" ? "Turn On" : "Turn Off";
-        _updateValue.Text = updateMode == "off"
+        var modeText = updateMode == "off"
             ? "Off"
             : UpdateChecker.HasPendingBackendUpdate
                 ? "Update ready -- applying overnight (~2:30am)"
                 : "Automatic";
+        // "Did the update actually take" shouldn't require inferring it
+        // from whether a feature seems present -- confirmed on real
+        // hardware this was genuinely ambiguous during an update loop.
+        _updateValue.Text = $"{modeText} (v{UpdateChecker.CurrentVersionText()})";
     }
 
     private async Task OnUpdateToggleClickedAsync()

@@ -49,6 +49,7 @@ internal static class UpdateChecker
     private static UpdateManager? _manager;
     private static UpdateInfo? _pendingUpdate;
     private static bool _pendingRequiresBackendRestart;
+    private static bool _checkInProgress;
 
     /// <summary>
     /// True whenever a downloaded update is waiting on the quiet window
@@ -59,8 +60,42 @@ internal static class UpdateChecker
     /// </summary>
     public static bool HasPendingBackendUpdate => _pendingUpdate is not null && _pendingRequiresBackendRestart;
 
+    /// <summary>
+    /// Status shows this directly so "did the update actually take" is
+    /// something an Operator can just look at, rather than infer from
+    /// whether a feature seems to be there or not.
+    /// </summary>
+    public static string CurrentVersionText()
+    {
+        try
+        {
+            var manager = new UpdateManager(new GithubSource(ReleaseFeedRepoUrl, accessToken: null, prerelease: false));
+            if (!manager.IsInstalled)
+                return "not a real install";
+            return manager.CurrentVersion?.ToString() ?? "unknown";
+        }
+        catch
+        {
+            return "unknown";
+        }
+    }
+
     public static async Task CheckAndApplyAsync(Action<string> reportStatus, bool manual = false)
     {
+        // Confirmed on real hardware: repeated "Check for Updates" clicks
+        // while one was already in flight raced multiple full
+        // check/download/apply cycles against the same shared state --
+        // "downloading" and "restarting" messages interleaving forever,
+        // never landing anywhere stable. A second click while one is
+        // already running just tells the Operator that plainly instead
+        // of starting a competing cycle.
+        if (_checkInProgress)
+        {
+            if (manual)
+                reportStatus("Already checking for an update -- give it a moment.");
+            return;
+        }
+        _checkInProgress = true;
         try
         {
             if (!manual && ReadUpdateMode() == "off")
@@ -134,6 +169,14 @@ internal static class UpdateChecker
             // does, which is indistinguishable from broken.
             if (manual)
                 reportStatus("Could not check for updates: " + ex.Message);
+        }
+        finally
+        {
+            // Moot if ApplyPendingUpdateAsync actually reached
+            // ApplyUpdatesAndRestart (the process is exiting regardless),
+            // but every other return path needs this cleared so the next
+            // check isn't permanently locked out.
+            _checkInProgress = false;
         }
     }
 
