@@ -840,6 +840,35 @@ async function loadAccountLink() {
     // Private browsing / storage disabled -- just skip the intro, not worth failing anything over.
   }
 
+  // Explicit, persistent opt-out of hover-to-reveal, separate from the
+  // one-time first-visit intro above -- someone who decides they always
+  // want the menu visible shouldn't have to re-discover the hover zone
+  // (or re-hover, then wait) on every single page load.
+  const headerPinToggle = document.getElementById("header-pin-toggle");
+  if (headerPinToggle && appShell) {
+    let pinned = false;
+    try {
+      pinned = localStorage.getItem("victoryMapHeaderPinned") === "1";
+    } catch {
+      // Private browsing / storage disabled -- defaults to unpinned, same as before this existed.
+    }
+    const applyPinned = (next) => {
+      pinned = next;
+      appShell.classList.toggle("app-shell--pinned", pinned);
+      headerPinToggle.setAttribute("aria-pressed", String(pinned));
+      headerPinToggle.title = pinned ? "Stop keeping this menu open" : "Keep this menu open";
+    };
+    applyPinned(pinned);
+    headerPinToggle.addEventListener("click", () => {
+      applyPinned(!pinned);
+      try {
+        localStorage.setItem("victoryMapHeaderPinned", pinned ? "1" : "0");
+      } catch {
+        // Best effort -- the toggle still works for this page view even if it can't persist.
+      }
+    });
+  }
+
   const setMapSignedInState = (signedIn) => {
     if (infoBoothGuestActions) {
       infoBoothGuestActions.hidden = Boolean(signedIn);
