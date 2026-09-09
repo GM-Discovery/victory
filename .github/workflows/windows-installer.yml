@@ -28,11 +28,13 @@ on:
     paths:
       - "packaging/windows/**"
       - "backend/**"
+      - "frontend/**"
       - ".github/workflows/windows-installer.yml"
   pull_request:
     paths:
       - "packaging/windows/**"
       - "backend/**"
+      - "frontend/**"
       - ".github/workflows/windows-installer.yml"
   workflow_dispatch: {}
 
