@@ -112,6 +112,20 @@ internal static class AppPaths
     /// </summary>
     public static string GistIdFile => Path.Combine(DataRoot, "gist-id.txt");
 
+    /// <summary>
+    /// Records which version an apply was last attempted for, written right
+    /// before ApplyUpdatesAndRestart is called (UpdateChecker) -- so it's on
+    /// disk regardless of whether that call throws, hangs, or actually
+    /// replaces the process. A relaunched process's own fresh UpdateManager
+    /// can end up seeing the same "new" release as still available (a
+    /// version-staleness race, not something this app controls) and would
+    /// otherwise reapply it, relaunch, see it again, and repeat -- confirmed
+    /// on real hardware as a tight restart loop with no exception ever
+    /// logged anywhere, meaning the applies were genuinely succeeding, just
+    /// pointlessly repeating.
+    /// </summary>
+    public static string LastAppliedUpdateMarkerFile => Path.Combine(DataRoot, "last-applied-update.txt");
+
     public static void EnsureDataDirectoriesExist()
     {
         Directory.CreateDirectory(StorageDir);

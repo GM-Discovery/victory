@@ -128,6 +128,27 @@ internal static class UpdateChecker
                     return;
                 }
 
+                // Confirmed on real hardware as a tight restart loop with
+                // no exception ever logged anywhere (LogApplyFailure never
+                // fired): applying this exact version had already been
+                // attempted moments ago -- ApplyUpdatesAndRestart genuinely
+                // succeeded, but the freshly-relaunched process's own new
+                // UpdateManager still saw the same release as available
+                // (a version-staleness race, not something in this app's
+                // control) and would otherwise reapply it, relaunch, see it
+                // again, and repeat. Skip rather than loop; 10 minutes is
+                // long enough for that race to resolve itself and short
+                // enough that a genuine future re-release of this exact
+                // version number (shouldn't happen, but not this code's
+                // job to assume) isn't blocked for long.
+                var targetVersion = update.TargetFullRelease.Version.ToString();
+                if (WasRecentlyAttempted(targetVersion))
+                {
+                    if (manual)
+                        reportStatus("Victory just updated to this version -- give it a moment to finish starting.");
+                    return;
+                }
+
                 reportStatus("Downloading a Victory update...");
                 await _manager.DownloadUpdatesAsync(update);
 
@@ -200,6 +221,12 @@ internal static class UpdateChecker
         if (alsoStopBackend)
             RuntimeManager.StopBackend();
 
+        // Written before the call below, not after: if it actually
+        // succeeds, this process is about to exit, and the marker needs to
+        // already be on disk for the next process to find -- there is no
+        // reliable "after" in the success case.
+        MarkAttempted(_pendingUpdate!.TargetFullRelease.Version.ToString());
+
         try
         {
             _manager!.ApplyUpdatesAndRestart(_pendingUpdate!.TargetFullRelease);
@@ -220,6 +247,35 @@ internal static class UpdateChecker
             _pendingRequiresBackendRestart = false;
             reportStatus("The update couldn't apply (see launcher.log) -- Victory is still running the current version.");
         }
+    }
+
+    private static readonly TimeSpan RecentAttemptWindow = TimeSpan.FromMinutes(10);
+
+    private static bool WasRecentlyAttempted(string version)
+    {
+        try
+        {
+            var path = AppPaths.LastAppliedUpdateMarkerFile;
+            if (!File.Exists(path))
+                return false;
+            if (DateTime.UtcNow - File.GetLastWriteTimeUtc(path) > RecentAttemptWindow)
+                return false;
+            return File.ReadAllText(path).Trim() == version;
+        }
+        catch
+        {
+            return false; // best effort -- an unreadable marker shouldn't block a real update
+        }
+    }
+
+    private static void MarkAttempted(string version)
+    {
+        try
+        {
+            Directory.CreateDirectory(AppPaths.DataRoot);
+            File.WriteAllText(AppPaths.LastAppliedUpdateMarkerFile, version);
+        }
+        catch { /* best effort -- worst case this specific loop-guard just doesn't engage */ }
     }
 
     private static void LogApplyFailure(Exception ex)
