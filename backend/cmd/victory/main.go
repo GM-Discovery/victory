@@ -256,9 +256,25 @@ func main() {
 	// launcher calls this before applying a backend-changing update, to
 	// avoid restarting mid-Show -- a scheduled 2:30am-local apply window
 	// still checks this first, since a Show can genuinely be live then.
+	//
+	// the-cave is excluded: migration 004_seed_session.sql unconditionally
+	// seeds it a permanent 'live' session on every fresh database, but
+	// the-cave itself is "a deliberate, permanently hidden DOM-only test
+	// harness" (see the-cave's own comment above, Kernel 70A) -- not a
+	// real Show anyone is ever actually in. Left in, this count was never
+	// once zero on any fresh install, so no backend-changing update could
+	// ever pass this check -- confirmed on real hardware, 2026-09-09:
+	// every manual "Check for Updates" click reported "a Show looks like
+	// it's in progress" indefinitely on an install that had never run one.
 	mux.HandleFunc("/api/system/live-sessions", func(w http.ResponseWriter, r *http.Request) {
 		var liveCount int
-		err := pool.QueryRow(r.Context(), `SELECT COUNT(*) FROM sessions WHERE status IN ('rehearsal', 'live')`).Scan(&liveCount)
+		err := pool.QueryRow(r.Context(), `
+			SELECT COUNT(*)
+			FROM sessions s
+			JOIN venues v ON v.id = s.venue_id
+			WHERE s.status IN ('rehearsal', 'live')
+			  AND v.slug != 'the-cave'
+		`).Scan(&liveCount)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "could not check live sessions"})
 			return
