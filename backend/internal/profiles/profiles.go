@@ -105,6 +105,26 @@ func EnsureKernel9ProfileSurface(ctx context.Context, pool *pgxpool.Pool) error 
 	// 'amurray-family' literal) forces pgx onto the extended query
 	// protocol, which -- unlike the old parameter-free simple-protocol
 	// exec -- rejects more than one command per prepared statement.
+	//
+	// The "already exists" checks below are deliberately GLOBAL (by slug
+	// alone), not scoped to this install's own lot_row, even though
+	// venues.slug is only unique per-lot (UNIQUE(lot_id, slug), 001_init.sql)
+	// and other venues genuinely do have one row per lot. Greenroom/Trailers
+	// are the exception: ResolveVisibleVenues (visibility.go) has always
+	// matched them by slug alone with no location scoping at all -- they are
+	// install-wide personal-profile surfaces, not per-location content, and
+	// were never meant to have more than one row in the whole database.
+	// migration 007 already seeds a 'trailers'/'greenroom' pair unconditionally
+	// on every fresh database under the legacy 'amurray-family' lot; a
+	// lot-scoped check here couldn't see that row (different lot_id) and
+	// inserted a second, real 'trailers' row under this install's own lot on
+	// every fresh Windows-native install -- both matched the same unscoped
+	// visibility query, producing a duplicate "Trailers" pin on the map.
+	// Confirmed reproducing on two separate fresh installs, 2026-09-07/08;
+	// root-caused via ResolveVisibleVenues + this function together, not
+	// either alone. A global check makes these two venues a true singleton
+	// (whichever lot happens to hold them), matching how they were already
+	// being read.
 	locationSlug := access.DefaultLocationSlug()
 	_, err := pool.Exec(ctx, `
 		WITH location_row AS (
@@ -130,9 +150,7 @@ func EnsureKernel9ProfileSurface(ctx context.Context, pool *pgxpool.Pool) error 
 		  FALSE,
 		  FALSE
 		WHERE NOT EXISTS (
-		  SELECT 1 FROM venues
-		  WHERE lot_id = (SELECT id FROM lot_row)
-		    AND slug = 'greenroom'
+		  SELECT 1 FROM venues WHERE slug = 'greenroom'
 		)
 	`, locationSlug)
 	if err != nil {
@@ -163,9 +181,7 @@ func EnsureKernel9ProfileSurface(ctx context.Context, pool *pgxpool.Pool) error 
 		  FALSE,
 		  FALSE
 		WHERE NOT EXISTS (
-		  SELECT 1 FROM venues
-		  WHERE lot_id = (SELECT id FROM lot_row)
-		    AND slug = 'trailers'
+		  SELECT 1 FROM venues WHERE slug = 'trailers'
 		)
 	`, locationSlug)
 	if err != nil {
