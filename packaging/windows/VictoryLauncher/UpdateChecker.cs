@@ -181,25 +181,57 @@ internal static class UpdateChecker
     }
 
     /// <summary>
-    /// Exits this process and relaunches the new version -- there is no
-    /// code path after ApplyUpdatesAndRestart that runs. Caddy and the
-    /// backend are both independent processes, not children of the
-    /// launcher, so the *new* launcher instance would otherwise just see
-    /// them as "already running" and leave them alone -- permanently
-    /// serving stale files/code from a version directory Velopack is
-    /// about to replace. Caddy is always stopped first so it actually
-    /// picks up new frontend files on every update, not just
-    /// backend-changing ones; the backend is only stopped when this
-    /// specific release actually changed it.
+    /// Exits this process and relaunches the new version -- normally
+    /// there is no code path after ApplyUpdatesAndRestart that runs. But
+    /// if it throws instead of exiting (permissions, antivirus, a locked
+    /// file -- something on the machine actually preventing the swap),
+    /// two real problems compound: Caddy/backend were already stopped to
+    /// prepare for it, so Victory is now down with nothing left to bring
+    /// it back up (the process never exited to trigger a fresh start);
+    /// and _pendingUpdate stays cached, so every future automatic check
+    /// just retries the identical failing apply forever. Confirmed on
+    /// real hardware as exactly this: "tried to do .37 again and again
+    /// and again," on its own schedule, not from repeated clicking.
     /// </summary>
-    private static Task ApplyPendingUpdateAsync(Action<string> reportStatus, bool alsoStopBackend)
+    private static async Task ApplyPendingUpdateAsync(Action<string> reportStatus, bool alsoStopBackend)
     {
         reportStatus("Restarting to finish updating...");
         RuntimeManager.StopCaddy();
         if (alsoStopBackend)
             RuntimeManager.StopBackend();
-        _manager!.ApplyUpdatesAndRestart(_pendingUpdate!.TargetFullRelease);
-        return Task.CompletedTask;
+
+        try
+        {
+            _manager!.ApplyUpdatesAndRestart(_pendingUpdate!.TargetFullRelease);
+            // No code below this line normally runs -- the process just exited.
+        }
+        catch (Exception ex)
+        {
+            LogApplyFailure(ex);
+            // Undo the stop above so Victory stays usable rather than
+            // silently down until someone notices and manually restarts
+            // it -- EnsureRuntimeReadyAsync is idempotent, safe to call
+            // here the same way Status's own Start button does.
+            await RuntimeSetup.EnsureRuntimeReadyAsync(reportStep: _ => { });
+            // Clear the cached update so this exact failure can't retry
+            // itself forever -- the next periodic check starts fresh
+            // rather than reusing state tied to whatever just broke.
+            _pendingUpdate = null;
+            _pendingRequiresBackendRestart = false;
+            reportStatus("The update couldn't apply (see launcher.log) -- Victory is still running the current version.");
+        }
+    }
+
+    private static void LogApplyFailure(Exception ex)
+    {
+        try
+        {
+            Directory.CreateDirectory(AppPaths.LogsDir);
+            File.AppendAllText(
+                Path.Combine(AppPaths.LogsDir, "launcher.log"),
+                $"{DateTime.UtcNow:O} update apply failed: {ex}\n");
+        }
+        catch { /* best effort -- the balloon message is the fallback if even logging fails */ }
     }
 
     private static string ReadUpdateMode()
