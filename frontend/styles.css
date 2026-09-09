@@ -683,7 +683,12 @@ body {
   width: clamp(64px, 6vw, 88px);
   height: auto;
   object-fit: contain;
-  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5));
+  /* Toned to sit into the map's own painted palette rather than pop off
+     it at full source saturation/brightness -- previously only applied
+     in the signed-out (.map-layer--anonymous) state, so every pin looked
+     correct there but read as an oversaturated "glow" against the map
+     once signed in, which is the state almost everyone actually sees. */
+  filter: saturate(0.88) brightness(0.96) drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5));
   transition: transform 0.18s ease, filter 0.18s ease;
 }
 
