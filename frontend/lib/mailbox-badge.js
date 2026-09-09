@@ -57,15 +57,29 @@
   // toggles the pip dot on it based on current unread state. Safe to call
   // repeatedly (e.g. on page load and again when a menu containing one of
   // these targets opens) -- the TTL cache above keeps repeat calls cheap.
-  async function refreshPips(root = document) {
+  async function refreshPips(root = document, { force = false } = {}) {
     const targets = root.querySelectorAll("[data-mailbox-pip-target]");
     if (targets.length === 0) return;
     installStyle();
-    const hasUnread = await hasUnreadMessages();
+    const hasUnread = await hasUnreadMessages({ force });
     targets.forEach((el) => {
       el.classList.toggle("has-unread-pip", hasUnread);
     });
   }
+
+  // Reported: the pip kept showing unread even after reading everything
+  // in the Mailbox. The backend's own is_read tracking (messages.go's
+  // getMessage) was already correct -- this was the page, not the data.
+  // Pressing Back after reading mail restores the previous page from the
+  // browser's bfcache rather than re-running its script from scratch, so
+  // whatever pip state was on screen on the way out (unread) just sits
+  // there -- nothing ever calls refreshPips again to notice it's stale.
+  // `pageshow` with `event.persisted` is the standard signal for exactly
+  // this restoration; forcing past the TTL cache here matters since a
+  // bfcache restore can happen well within its 20s window.
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) refreshPips(document, { force: true });
+  });
 
   window.VictoryMailboxBadge = { hasUnreadMessages, refreshPips };
 })();
