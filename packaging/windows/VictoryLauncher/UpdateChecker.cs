@@ -71,15 +71,27 @@ internal static class UpdateChecker
             // Running from a raw `dotnet publish` folder (a CI artifact,
             // or a local dev build) rather than a real Velopack-managed
             // install -- there is deliberately nothing to check yet, and
-            // asking anyway would just throw.
+            // asking anyway would just throw. Confirmed on real hardware:
+            // a manual "Check for Updates" click here silently did
+            // nothing, indistinguishable from broken -- "not sure how I
+            // installed" was the exact right question, and this is the
+            // silent branch that made it hard to tell.
             if (!_manager.IsInstalled)
+            {
+                if (manual)
+                    reportStatus("This isn't a real Victory install (looks like it's running from an unpacked folder) -- updates can't be checked from here.");
                 return;
+            }
 
             if (_pendingUpdate is null)
             {
                 var update = await _manager.CheckForUpdatesAsync();
                 if (update is null)
+                {
+                    if (manual)
+                        reportStatus("Victory is already up to date.");
                     return;
+                }
 
                 reportStatus("Downloading a Victory update...");
                 await _manager.DownloadUpdatesAsync(update);
@@ -112,11 +124,16 @@ internal static class UpdateChecker
                 reportStatus("A Victory update is ready -- it will apply automatically overnight (around 2:30am).");
             }
         }
-        catch
+        catch (Exception ex)
         {
             // Update checks are best-effort: a network hiccup, DNS
             // failure, or the release feed not existing yet must never
-            // interrupt someone just trying to use Victory.
+            // interrupt someone just trying to use Victory -- but a
+            // manual, deliberate check should still say *something*
+            // rather than fail exactly as silently as "no update found"
+            // does, which is indistinguishable from broken.
+            if (manual)
+                reportStatus("Could not check for updates: " + ex.Message);
         }
     }
 
