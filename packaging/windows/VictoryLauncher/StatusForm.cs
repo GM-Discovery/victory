@@ -36,6 +36,7 @@ internal sealed class StatusForm : Form
     private readonly Button _copyRediscoveryButton = new() { Text = "Copy", Width = 50, Height = 22, Visible = false };
     private readonly Button _startStopButton = new() { Width = 120 };
     private readonly Button _refreshButton = new() { Text = "Refresh", Width = 100 };
+    private readonly Button _supportBundleButton = new() { Text = "Support Bundle...", Width = 150 };
 
     public StatusForm()
     {
@@ -45,7 +46,7 @@ internal sealed class StatusForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(420, 330);
+        ClientSize = new Size(420, 362);
 
         AddRow("Victory:", _runningValue, 20);
         AddRow("Database:", _databaseValue, 50);
@@ -74,10 +75,14 @@ internal sealed class StatusForm : Form
         _refreshButton.Location = new Point(150, 290);
         _refreshButton.Click += async (_, _) => await RefreshAsync();
 
+        _supportBundleButton.Location = new Point(20, 324);
+        _supportBundleButton.Click += (_, _) => OnSupportBundleClicked();
+
         Controls.AddRange([
             _tunnelToggleButton, _copyAddressButton, _tunnelNoteLabel,
             _rediscoveryToggleButton, _copyRediscoveryButton,
             _updateToggleButton, _startStopButton, _refreshButton,
+            _supportBundleButton,
         ]);
         Shown += async (_, _) => await RefreshAsync();
     }
@@ -176,6 +181,34 @@ internal sealed class StatusForm : Form
         {
             await RefreshAsync();
             _startStopButton.Enabled = true;
+        }
+    }
+
+    /// <summary>
+    /// Zips the available logs plus a plain-text manifest (version, OS,
+    /// tunnel/update mode, disk space -- never secrets) to the Desktop and
+    /// opens Explorer with it selected, so handing over evidence for a real
+    /// problem is one click instead of finding %LocalAppData%\Victory\logs
+    /// and attaching several files by hand -- exactly what the .37
+    /// update-loop investigation had to do manually.
+    /// </summary>
+    private void OnSupportBundleClicked()
+    {
+        _supportBundleButton.Enabled = false;
+        try
+        {
+            var zipPath = SupportBundle.Create();
+            if (zipPath is null)
+            {
+                MessageBox.Show(this, "Could not create a support bundle.", "Victory", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{zipPath}\""); }
+            catch { /* the file is still on the Desktop even if Explorer can't be launched to show it */ }
+        }
+        finally
+        {
+            _supportBundleButton.Enabled = true;
         }
     }
 

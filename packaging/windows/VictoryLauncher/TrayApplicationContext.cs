@@ -89,6 +89,21 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         if (!EnvGenerator.EnvFileExists())
         {
+            // Checked before the wizard even opens: failing obscurely
+            // partway through a 150+MB Postgres download or an initdb call
+            // with no disk left is a much worse first impression than
+            // saying up front this machine can't run Victory yet.
+            var prereqs = HostPrerequisites.Check();
+            if (!prereqs.Ok)
+            {
+                MessageBox.Show(
+                    prereqs.Detail,
+                    "Victory can't set up on this computer",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return false;
+            }
+
             using var wizard = new FirstRunWizardForm();
             // wizard.Completed alone, not ShowDialog()'s own DialogResult:
             // closing the window via the X button after setup finished
