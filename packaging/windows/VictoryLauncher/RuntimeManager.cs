@@ -493,7 +493,25 @@ internal static class RuntimeManager
             {
                 var process = Process.GetProcessById(pid);
                 if (!process.HasExited)
+                {
                     process.Kill(entireProcessTree: true);
+                    // Kill() requests termination but returns immediately --
+                    // it does not wait for Windows to actually finish tearing
+                    // the process down and releasing its open file handles.
+                    // Confirmed on real hardware as the likely cause of
+                    // update-apply failures specific to this app: Caddy
+                    // serves static files directly out of the very
+                    // directory (current\frontend\) Velopack's updater needs
+                    // to rename moments later, and callers here (StopCaddy,
+                    // called right before ApplyUpdatesAndRestart) had no
+                    // guarantee those handles were actually released by the
+                    // time the risky call happened. 5s is generous for a
+                    // process that was just force-killed, not asked to shut
+                    // down gracefully -- if it somehow still hasn't exited by
+                    // then, proceeding anyway is no worse than the previous
+                    // unconditional behavior.
+                    process.WaitForExit(5000);
+                }
             }
             catch (ArgumentException)
             {
