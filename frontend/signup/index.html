@@ -172,16 +172,17 @@
 <body>
   <div class="panel">
     <h1>Create Account</h1>
-    <p>Victory accounts are created by signing in with Discord.</p>
+    <p>Most Victory accounts are created by signing in with Discord.</p>
 
     <a class="discord-button" href="/auth/discord/start">Continue with Discord</a>
 
     <p class="hint" style="margin-top:16px;">
-      Email and password registration is closed. If you already have a Victory
-      account and cannot get in, ask the operator for a recovery link.
+      Password signup below only works for a fresh install's very first
+      account. If it's closed for this lot, ask the operator for a
+      recovery link instead.
     </p>
 
-    <form id="signup-form" hidden>
+    <form id="signup-form">
       <div class="field">
         <label for="handle">Handle</label>
         <input id="handle" name="handle" type="text" required />
@@ -218,6 +219,18 @@
   <script>
     const form = document.getElementById("signup-form");
     const statusEl = document.getElementById("status");
+
+    // Windows launcher's first-run wizard links here with the exact
+    // handle it already wrote into OPERATOR_HANDLE, so this account
+    // ends up recognized as the Operator (access.IsOperatorUser matches
+    // on handle) rather than needing to be typed twice and risk a
+    // mismatch. Locked, not just pre-filled, so it can't drift.
+    const presetHandle = new URLSearchParams(window.location.search).get("handle");
+    if (presetHandle) {
+      const handleInput = document.getElementById("handle");
+      handleInput.value = presetHandle;
+      handleInput.readOnly = true;
+    }
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
