@@ -104,7 +104,7 @@ internal static class UpdateChecker
     {
         try
         {
-            var manager = new UpdateManager(new GithubSource(ReleaseFeedRepoUrl, accessToken: null, prerelease: false), logger: new VelopackFileLogger());
+            var manager = new UpdateManager(new GithubSource(ReleaseFeedRepoUrl, accessToken: null, prerelease: false));
             if (!manager.IsInstalled)
                 return "not a real install";
             return manager.CurrentVersion?.ToString() ?? "unknown";
@@ -136,7 +136,7 @@ internal static class UpdateChecker
             if (!manual && ReadUpdateMode() == "off")
                 return;
 
-            _manager ??= new UpdateManager(new GithubSource(ReleaseFeedRepoUrl, accessToken: null, prerelease: false), logger: new VelopackFileLogger());
+            _manager ??= new UpdateManager(new GithubSource(ReleaseFeedRepoUrl, accessToken: null, prerelease: false));
 
             // Running from a raw `dotnet publish` folder (a CI artifact,
             // or a local dev build) rather than a real Velopack-managed
