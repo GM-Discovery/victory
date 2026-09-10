@@ -17,6 +17,26 @@
   let linkResultEl = null;
   let linkInput = null;
 
+  // Confirmed on real hardware as a real bug: window.location.origin is
+  // always "localhost" for an Operator browsing their own machine, which
+  // is useless to anyone else the link gets sent to -- localhost on the
+  // recipient's machine means their machine, not the Operator's. The
+  // Windows launcher (when remote access is on) keeps the backend told
+  // about its actual reachable address; this asks for that first and only
+  // falls back to the browser's own origin when nothing better is known
+  // (no remote access configured, or any non-Windows deployment where
+  // this endpoint always reports null).
+  async function resolvePublicOrigin() {
+    try {
+      const res = await fetch("/api/system/public-url", { credentials: "include" });
+      const payload = await res.json().catch(() => null);
+      if (payload?.ok && payload.public_url) return payload.public_url;
+    } catch {
+      // fall through to the origin fallback below
+    }
+    return window.location.origin;
+  }
+
   function installStyle() {
     if (document.getElementById("invite-modal-style")) return;
     const style = document.createElement("style");
@@ -60,6 +80,7 @@
         background: transparent; border-color: rgba(255,255,255,0.18); margin-top: 8px;
       }
       .invite-modal-status { margin-top: 10px; min-height: 1.2em; color: #ff6d8e; font-size: 0.9rem; }
+      .invite-modal-email-hint { margin: 6px 0 0; color: #bda9ae; font-size: 0.78rem; line-height: 1.4; }
       .invite-modal-close {
         float: right; background: transparent; border: none; color: #bda9ae;
         font-size: 1.2rem; cursor: pointer; width: auto; margin: 0; padding: 0;
@@ -103,7 +124,12 @@
           <label for="invite-modal-link">Share this link</label>
           <input id="invite-modal-link" type="text" readonly />
           <button type="button" id="invite-modal-copy" class="invite-modal-secondary">Copy Link</button>
-          <button type="button" id="invite-modal-email-share" class="invite-modal-secondary">Share via Email</button>
+          <button type="button" id="invite-modal-email-share" class="invite-modal-secondary">Open in Mail App</button>
+          <p class="invite-modal-email-hint">
+            Uses whatever email app this computer has set as default -- often not
+            configured, or set to a work account. If nothing opens, Copy Link works
+            with any email, text, or chat app instead.
+          </p>
         </div>
       </div>
     `;
@@ -166,7 +192,7 @@
         throw new Error(payload?.error || `Invite failed (HTTP ${response.status})`);
       }
 
-      const link = `${window.location.origin}/invite/?token=${encodeURIComponent(payload.data.token)}`;
+      const link = `${await resolvePublicOrigin()}/invite/?token=${encodeURIComponent(payload.data.token)}`;
       linkInput.value = link;
       linkResultEl.hidden = false;
       statusEl.textContent = "Invite created -- expires in 72 hours, single use.";

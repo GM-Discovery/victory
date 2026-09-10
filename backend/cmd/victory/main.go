@@ -285,6 +285,35 @@ func main() {
 		})
 	})
 
+	// Unauthenticated like /health: a public base URL carries no identity
+	// of its own. Confirmed on real hardware as a real bug: an invite link
+	// built client-side from window.location.origin is always "localhost"
+	// for an Operator browsing their own machine -- useless to anyone
+	// else, since localhost on the recipient's machine means their
+	// machine, not the Operator's. The backend has no way to know its own
+	// reachable address on its own, so the Windows launcher tells it where
+	// to look (PUBLIC_URL_FILE) -- read fresh on every request rather than
+	// cached, since a Quick Tunnel's address changes on every restart.
+	// Empty/unset PUBLIC_URL_FILE (every non-Windows deployment, or
+	// TUNNEL_MODE=off) reports public_url: null; callers fall back to
+	// their own request origin in that case.
+	mux.HandleFunc("/api/system/public-url", func(w http.ResponseWriter, r *http.Request) {
+		publicURL := ""
+		if path := strings.TrimSpace(os.Getenv("PUBLIC_URL_FILE")); path != "" {
+			if data, err := os.ReadFile(path); err == nil {
+				publicURL = strings.TrimSpace(string(data))
+			}
+		}
+		var publicURLValue any
+		if publicURL != "" {
+			publicURLValue = publicURL
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":         true,
+			"public_url": publicURLValue,
+		})
+	})
+
 	// Kernel 72: every endpoint that accepts a credential guess shares one
 	// per-IP token bucket (burst 10, refill 10/min). Ordinary API routes are
 	// deliberately unthrottled.
