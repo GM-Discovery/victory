@@ -104,7 +104,7 @@ internal static class UpdateChecker
     {
         try
         {
-            var manager = new UpdateManager(new GithubSource(ReleaseFeedRepoUrl, accessToken: null, prerelease: false));
+            var manager = new UpdateManager(new GithubSource(ReleaseFeedRepoUrl, accessToken: null, prerelease: false), logger: new VelopackFileLogger());
             if (!manager.IsInstalled)
                 return "not a real install";
             return manager.CurrentVersion?.ToString() ?? "unknown";
@@ -136,7 +136,7 @@ internal static class UpdateChecker
             if (!manual && ReadUpdateMode() == "off")
                 return;
 
-            _manager ??= new UpdateManager(new GithubSource(ReleaseFeedRepoUrl, accessToken: null, prerelease: false));
+            _manager ??= new UpdateManager(new GithubSource(ReleaseFeedRepoUrl, accessToken: null, prerelease: false), logger: new VelopackFileLogger());
 
             // Running from a raw `dotnet publish` folder (a CI artifact,
             // or a local dev build) rather than a real Velopack-managed
@@ -259,12 +259,15 @@ internal static class UpdateChecker
         // succeeds, this process is about to exit, and the marker needs to
         // already be on disk for the next process to find -- there is no
         // reliable "after" in the success case.
-        MarkAttempted(_pendingUpdate!.TargetFullRelease.Version.ToString());
+        var targetVersion = _pendingUpdate!.TargetFullRelease.Version.ToString();
+        MarkAttempted(targetVersion);
+        AppendLauncherLog($"about to call ApplyUpdatesAndRestart for v{targetVersion}");
 
         try
         {
             _manager!.ApplyUpdatesAndRestart(_pendingUpdate!.TargetFullRelease);
             // No code below this line normally runs -- the process just exited.
+            AppendLauncherLog("ApplyUpdatesAndRestart returned without exiting the process (unexpected)");
         }
         catch (Exception ex)
         {
@@ -311,14 +314,26 @@ internal static class UpdateChecker
         catch { /* best effort -- worst case this specific loop-guard just doesn't engage */ }
     }
 
-    private static void LogApplyFailure(Exception ex)
+    private static void LogApplyFailure(Exception ex) => AppendLauncherLog("update apply failed: " + ex);
+
+    /// <summary>
+    /// A checkpoint trail around the risky call, not just its exception:
+    /// three silent failures on real hardware in a row produced nothing in
+    /// launcher.log at all, meaning the process died somewhere between
+    /// "about to call ApplyUpdatesAndRestart" and whatever would have
+    /// followed it -- with no managed exception ever thrown on this side.
+    /// A line written immediately before that call, flushed synchronously,
+    /// at least proves how far execution got even when nothing after it
+    /// ever runs.
+    /// </summary>
+    private static void AppendLauncherLog(string message)
     {
         try
         {
             Directory.CreateDirectory(AppPaths.LogsDir);
             File.AppendAllText(
                 Path.Combine(AppPaths.LogsDir, "launcher.log"),
-                $"{DateTime.UtcNow:O} update apply failed: {ex}\n");
+                $"{DateTime.UtcNow:O} {message}\n");
         }
         catch { /* best effort -- the balloon message is the fallback if even logging fails */ }
     }

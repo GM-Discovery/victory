@@ -81,6 +81,12 @@
 
   <ItemGroup>
     <PackageReference Include="Velopack" Version="1.2.0" />
+    <!-- Explicit so UpdateManager's own optional ILogger parameter can be
+         wired up (VelopackFileLogger.cs) -- Velopack takes a dependency on
+         this transitively already, but being explicit here matches this
+         project's own stated practice below and guarantees the type is
+         actually resolvable at compile time rather than "usually is." -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
     <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
     <!-- Explicit even though net8.0-windows often carries these transitively:
          CI is the only place this ever actually builds, so an ambiguous
