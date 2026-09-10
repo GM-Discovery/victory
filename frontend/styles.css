@@ -448,6 +448,11 @@ body {
   background-image:
     linear-gradient(180deg, rgba(10, 8, 7, 0.08), rgba(10, 8, 7, 0.22)),
     url("/assets/mapbackground.png");
+  /* Light, not the moodier signed-out treatment below -- just enough to
+     keep the base layer in the same family as the now-toned venue icons
+     rather than sitting at a different, more saturated baseline than
+     everything placed on top of it. */
+  filter: saturate(0.95) contrast(1.02);
 }
 
 .map-layer--anonymous {
@@ -683,12 +688,29 @@ body {
   width: clamp(64px, 6vw, 88px);
   height: auto;
   object-fit: contain;
-  /* Toned to sit into the map's own painted palette rather than pop off
-     it at full source saturation/brightness -- previously only applied
-     in the signed-out (.map-layer--anonymous) state, so every pin looked
-     correct there but read as an oversaturated "glow" against the map
-     once signed in, which is the state almost everyone actually sees. */
-  filter: saturate(0.88) brightness(0.96) drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5));
+  /* The icon set spans several unrelated rendering styles (glossy 3D
+     renders, painted illustration, ink sketches) and a handful carry
+     their own baked-in rectangular vignette background instead of real
+     alpha transparency -- confirmed by inspecting the source PNGs
+     directly (info-booth, third-place, and storyboards all show a
+     colored halo baked into the image itself). No CSS filter can remove
+     color that already exists in the pixels, but every one of those
+     source images centers its actual subject, so a soft radial mask
+     fades exactly that peripheral bleed to transparent while leaving
+     the subject untouched -- also cleans up the edges on icons that
+     were already properly transparent, at no cost to them. */
+  mask-image: radial-gradient(circle at 50% 45%, black 62%, transparent 97%);
+  -webkit-mask-image: radial-gradient(circle at 50% 45%, black 62%, transparent 97%);
+  /* One shared tone + one shared neutral ground shadow for every venue,
+     replacing the mix of per-venue colored glows below -- warmed and
+     desaturated slightly toward the map's own muted, painterly palette
+     rather than each icon's native rendering style fighting the others. */
+  filter:
+    saturate(0.82)
+    brightness(0.97)
+    sepia(0.08)
+    contrast(1.02)
+    drop-shadow(0 10px 14px rgba(10, 8, 6, 0.55));
   transition: transform 0.18s ease, filter 0.18s ease;
 }
 
@@ -747,66 +769,17 @@ body {
   z-index: 31;
 }
 
-.venue-pin--info-booth::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 45%;
-  width: 78%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  translate: -50% -50%;
-  background: radial-gradient(circle, rgba(255, 213, 112, 0.3) 0%, rgba(255, 192, 70, 0.12) 42%, transparent 72%);
-  filter: blur(5px);
-  animation: info-booth-beacon 3.2s ease-in-out infinite;
-}
-
-.venue-pin--info-booth img {
-  position: relative;
-  filter:
-    brightness(1.12)
-    saturate(1.18)
-    drop-shadow(0 0 7px rgba(255, 221, 139, 0.62))
-    drop-shadow(0 8px 16px rgba(0, 0, 0, 0.56));
-}
-
 .venue-pin--audition-hall {
   z-index: 29;
 }
 
-.venue-pin--audition-hall::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 45%;
-  width: 72%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  translate: -50% -50%;
-  background: radial-gradient(circle, rgba(255, 203, 140, 0.22) 0%, rgba(171, 92, 53, 0.14) 45%, transparent 74%);
-  filter: blur(4px);
-  pointer-events: none;
-}
-
 .venue-pin--audition-hall img {
   transform: scale(1.03);
-  filter:
-    brightness(1.08)
-    saturate(1.12)
-    contrast(1.08)
-    drop-shadow(0 0 8px rgba(255, 198, 126, 0.34))
-    drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5));
 }
 
 .venue-pin--audition-hall:hover img,
 .venue-pin--audition-hall:focus-visible img {
   transform: scale(1.08);
-  filter:
-    brightness(1.14)
-    saturate(1.16)
-    contrast(1.12)
-    drop-shadow(0 0 12px rgba(255, 198, 126, 0.46))
-    drop-shadow(0 10px 18px rgba(0, 0, 0, 0.54));
 }
 
 .venue-pin--audition-hall .venue-label {
@@ -818,17 +791,6 @@ body {
   box-shadow:
     0 0 0 1px rgba(255, 226, 190, 0.08),
     0 6px 14px rgba(0, 0, 0, 0.45);
-}
-
-@keyframes info-booth-beacon {
-  0%, 100% { opacity: 0.66; }
-  50% { opacity: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .venue-pin--info-booth::before {
-    animation: none;
-  }
 }
 
 .venue-pin:focus-visible {
@@ -846,18 +808,12 @@ body {
 .venue-pin--theater img {
   transform: scale(1.7);
   transform-origin: center bottom;
-  filter:
-    drop-shadow(0 0 8px rgba(255, 220, 120, 0.55))
-    drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5));
   animation: theaterPulse 3.5s ease-in-out infinite;
 }
 
 .venue-pin--theater:hover img,
 .venue-pin--theater:focus-visible img {
   transform: scale(1.7);
-  filter:
-    drop-shadow(0 0 12px rgba(255, 220, 120, 0.7))
-    drop-shadow(0 8px 18px rgba(0, 0, 0, 0.55));
 }
 
 .venue-pin--theater .venue-label {
@@ -1241,21 +1197,33 @@ body {
   margin: 0 0 14px;
 }
 
+/* A quiet "this one's alive" cue for the flagship venue -- depth only,
+   no color, so it stays in the same coherent family as every other pin
+   instead of standing out as its own differently-toned glow. */
 @keyframes theaterPulse {
   0% {
     filter:
-      drop-shadow(0 0 6px rgba(255, 220, 120, 0.4))
-      drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5));
+      saturate(0.82)
+      brightness(0.97)
+      sepia(0.08)
+      contrast(1.02)
+      drop-shadow(0 10px 14px rgba(10, 8, 6, 0.55));
   }
   50% {
     filter:
-      drop-shadow(0 0 14px rgba(255, 220, 120, 0.7))
-      drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5));
+      saturate(0.82)
+      brightness(1.01)
+      sepia(0.08)
+      contrast(1.02)
+      drop-shadow(0 12px 20px rgba(10, 8, 6, 0.62));
   }
   100% {
     filter:
-      drop-shadow(0 0 6px rgba(255, 220, 120, 0.4))
-      drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5));
+      saturate(0.82)
+      brightness(0.97)
+      sepia(0.08)
+      contrast(1.02)
+      drop-shadow(0 10px 14px rgba(10, 8, 6, 0.55));
   }
 }
 
