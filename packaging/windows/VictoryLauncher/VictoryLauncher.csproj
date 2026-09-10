@@ -82,7 +82,7 @@
   <ItemGroup>
     <PackageReference Include="Velopack" Version="1.2.0" />
     <!-- Explicit so UpdateManager's own optional ILogger parameter can be
-         wired up (VelopackFileLogger.cs) -- Velopack takes a dependency on
+         wired up (VelopackFileLogger.cs). Velopack takes a dependency on
          this transitively already, but being explicit here matches this
          project's own stated practice below and guarantees the type is
          actually resolvable at compile time rather than "usually is." -->
