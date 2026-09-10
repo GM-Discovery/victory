@@ -152,6 +152,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
             return true; // tray icon still shows so the Operator can retry via Status, rather than the process just vanishing
         }
 
+        // A no-op on every ordinary launch; fires exactly once, right
+        // after a launch that was actually the result of a successful
+        // update applying and relaunching this process.
+        UpdateChecker.AnnounceIfJustUpdated(status => _trayIcon.ShowBalloonTip(5000, "Victory", status, ToolTipIcon.Info));
+
         // Only reached once Victory is actually up and running -- never
         // during first-run setup itself (that path returns earlier,
         // above) and never mid-retry after a failure (the branch just

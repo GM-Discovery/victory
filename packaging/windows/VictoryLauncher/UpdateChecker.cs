@@ -63,6 +63,39 @@ internal static class UpdateChecker
     public static bool HasPendingBackendUpdate => _pendingUpdate is not null;
 
     /// <summary>
+    /// Called once on every launch (TrayApplicationContext.InitializeAsync).
+    /// A successful ApplyUpdatesAndRestart replaces this process entirely --
+    /// there is no code path in the OLD process that runs afterward to
+    /// announce anything, and the NEW process starting up looks identical
+    /// to any other launch. Confirmed as a real gap: every version check
+    /// tonight required opening Status and reading a version number by
+    /// hand, nothing ever actually said "this landed." The marker written
+    /// right before every apply attempt (MarkAttempted) is repurposed here
+    /// as positive confirmation too -- if this version now matches what was
+    /// last attempted, that attempt is what got us here. Deleted once
+    /// announced so it fires exactly once per successful update, not on
+    /// every subsequent unrelated launch.
+    /// </summary>
+    public static void AnnounceIfJustUpdated(Action<string> reportBalloon)
+    {
+        try
+        {
+            var path = AppPaths.LastAppliedUpdateMarkerFile;
+            if (!File.Exists(path))
+                return;
+            var attemptedVersion = File.ReadAllText(path).Trim();
+            if (attemptedVersion.Length == 0 || attemptedVersion != CurrentVersionText())
+                return; // either no marker, or the last attempt didn't land -- already reported at attempt time
+            reportBalloon($"Victory updated to v{attemptedVersion}.");
+            File.Delete(path);
+        }
+        catch
+        {
+            // Best effort -- a missed announcement isn't worth failing startup over.
+        }
+    }
+
+    /// <summary>
     /// Status shows this directly so "did the update actually take" is
     /// something an Operator can just look at, rather than infer from
     /// whether a feature seems to be there or not.
