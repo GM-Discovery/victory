@@ -11,25 +11,27 @@ namespace VictoryLauncher;
 /// manually." Kernel 100 §33: "Victory should not auto-restart in the
 /// middle of a live Showing."
 ///
-/// Those two requirements pull in different directions for anything that
-/// actually changes victory-backend.exe, so this class treats two kinds
-/// of release differently:
+/// Every update, backend-changing or not, downloads right away but is held
+/// until a 2:30am *local-time* quiet window, and only then applied if
+/// nothing is actually live (checked via the backend's own
+/// /api/system/live-sessions). A manual "Check for Updates" click may apply
+/// immediately instead of waiting for the window, but the live-session
+/// check is never skipped -- that one is a safety guarantee, not a
+/// courtesy.
 ///
-/// - Frontend-only (Caddy serves new static files; the bundled backend
-///   binary is byte-identical to what's already running): applied
-///   immediately. Caddy restarts as part of the launcher's own relaunch
-///   -- sub-second, WebSocket clients auto-reconnect -- but
-///   victory-backend.exe is never touched, so nothing an Operator or
-///   player was doing is interrupted. The Operator gets a balloon telling
-///   them to ask people to refresh (Ctrl+R) using whatever they already
-///   use to reach their players -- no new broadcast feature needed.
-/// - Backend-changing: downloaded right away, but held until a 2:30am
-///   *local-time* quiet window, and only then applied if nothing is
-///   actually live (checked via the backend's own /api/system/live-sessions).
-///   A manual "Check for Updates" click may apply a backend-changing
-///   update immediately instead of waiting for the window, but the
-///   live-session check is never skipped -- that one is a safety
-///   guarantee, not a courtesy.
+/// This used to treat "frontend-only" releases (CI's own backend_changed
+/// flag in update-manifest.json false) as exempt from all of the above --
+/// applied immediately, victory-backend.exe deliberately left running
+/// through the apply since its content genuinely hadn't changed. Confirmed
+/// on real hardware as the actual cause of a silent, unrecoverable update
+/// failure: CI rebuilds and repackages victory-backend.exe into *every*
+/// release regardless of whether backend/ changed, so Velopack still has to
+/// place a full new copy of that file as part of the swap -- with the old
+/// copy's own process still holding it open the whole time, since nothing
+/// had stopped it. Every update now stops the backend and goes through the
+/// same live-session/quiet-window gate, full stop -- the "frontend-only,
+/// nothing is interrupted" exemption was built on a wrong assumption about
+/// what Velopack's update actually touches.
 ///
 /// Update source is a separate public repo (github.com/GM-Discovery/victory-releases),
 /// not this one: victory itself is private, and GithubSource reading a
@@ -41,14 +43,12 @@ namespace VictoryLauncher;
 internal static class UpdateChecker
 {
     private const string ReleaseFeedRepoUrl = "https://github.com/GM-Discovery/victory-releases";
-    private const string ReleaseAssetsBaseUrl = "https://github.com/GM-Discovery/victory-releases/releases/download";
 
     private static readonly TimeSpan QuietWindowStart = new(2, 30, 0);
     private static readonly TimeSpan QuietWindowEnd = new(3, 0, 0);
 
     private static UpdateManager? _manager;
     private static UpdateInfo? _pendingUpdate;
-    private static bool _pendingRequiresBackendRestart;
     private static bool _checkInProgress;
 
     /// <summary>
@@ -56,9 +56,11 @@ internal static class UpdateChecker
     /// (or on a live-session check) rather than having already applied --
     /// TrayApplicationContext uses this to tighten its own check interval,
     /// since the normal 4-hour cadence could easily skip straight over a
-    /// 30-minute window entirely.
+    /// 30-minute window entirely. Every pending update needs this now (see
+    /// this class's own header comment) -- there is no longer a
+    /// frontend-only fast path that skips the wait entirely.
     /// </summary>
-    public static bool HasPendingBackendUpdate => _pendingUpdate is not null && _pendingRequiresBackendRestart;
+    public static bool HasPendingBackendUpdate => _pendingUpdate is not null;
 
     /// <summary>
     /// Status shows this directly so "did the update actually take" is
@@ -153,18 +155,13 @@ internal static class UpdateChecker
                 await _manager.DownloadUpdatesAsync(update);
 
                 _pendingUpdate = update;
-                _pendingRequiresBackendRestart = await FetchBackendChangedAsync(update.TargetFullRelease.Version.ToString());
-            }
-
-            if (!_pendingRequiresBackendRestart)
-            {
-                await ApplyPendingUpdateAsync(reportStatus, alsoStopBackend: false);
-                return;
             }
 
             // Live-session safety is never skipped, manual or not -- only
             // the quiet-hours *timing* is something a deliberate manual
-            // check can bypass.
+            // check can bypass. Applies to every update now, not just ones
+            // CI flagged as backend-changing -- see this class's header
+            // comment for why that distinction turned out not to be safe.
             if (!await IsSafeToRestartBackendAsync())
             {
                 reportStatus("A Victory update is ready, but a Show looks like it's in progress -- it will apply once things are quiet.");
@@ -173,7 +170,7 @@ internal static class UpdateChecker
 
             if (manual || IsWithinQuietWindow(DateTime.Now.TimeOfDay))
             {
-                await ApplyPendingUpdateAsync(reportStatus, alsoStopBackend: true);
+                await ApplyPendingUpdateAsync(reportStatus);
             }
             else
             {
@@ -214,12 +211,16 @@ internal static class UpdateChecker
     /// real hardware as exactly this: "tried to do .37 again and again
     /// and again," on its own schedule, not from repeated clicking.
     /// </summary>
-    private static async Task ApplyPendingUpdateAsync(Action<string> reportStatus, bool alsoStopBackend)
+    private static async Task ApplyPendingUpdateAsync(Action<string> reportStatus)
     {
         reportStatus("Restarting to finish updating...");
         RuntimeManager.StopCaddy();
-        if (alsoStopBackend)
-            RuntimeManager.StopBackend();
+        // Always, not just for backend-changing releases: CI repackages
+        // victory-backend.exe into every release regardless of whether its
+        // source changed, so Velopack needs this file released even when
+        // the update is otherwise frontend-only. See this class's header
+        // comment.
+        RuntimeManager.StopBackend();
 
         // Written before the call below, not after: if it actually
         // succeeds, this process is about to exit, and the marker needs to
@@ -244,7 +245,6 @@ internal static class UpdateChecker
             // itself forever -- the next periodic check starts fresh
             // rather than reusing state tied to whatever just broke.
             _pendingUpdate = null;
-            _pendingRequiresBackendRestart = false;
             reportStatus("The update couldn't apply (see launcher.log) -- Victory is still running the current version.");
         }
     }
@@ -321,30 +321,6 @@ internal static class UpdateChecker
         catch
         {
             return false;
-        }
-    }
-
-    /// <summary>
-    /// CI computes this (windows-installer.yml), since it's the only
-    /// place that actually knows what changed in a given push -- guessing
-    /// client-side from version numbers alone isn't reliable. Missing
-    /// manifest (an older release published before this existed, or
-    /// RELEASES_REPO_TOKEN still not configured) defaults to true: safer
-    /// to treat an unknown release as backend-changing than to skip the
-    /// live-session check on one that actually was.
-    /// </summary>
-    private static async Task<bool> FetchBackendChangedAsync(string version)
-    {
-        try
-        {
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-            var json = await client.GetStringAsync($"{ReleaseAssetsBaseUrl}/v{version}/update-manifest.json");
-            using var doc = JsonDocument.Parse(json);
-            return !doc.RootElement.TryGetProperty("backend_changed", out var changed) || changed.GetBoolean();
-        }
-        catch
-        {
-            return true;
         }
     }
 }
