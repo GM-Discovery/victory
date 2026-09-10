@@ -126,6 +126,19 @@ internal static class AppPaths
     /// </summary>
     public static string LastAppliedUpdateMarkerFile => Path.Combine(DataRoot, "last-applied-update.txt");
 
+    /// <summary>
+    /// A relaunch on a machine where .env already exists (a fresh Setup.exe
+    /// install over previously-configured data, or "Start with Windows")
+    /// skips the first-run wizard entirely -- which has its own explicit
+    /// "Continue to Create Your Login" moment -- and otherwise announces
+    /// nothing at all: the tray icon just quietly appears. Confirmed on real
+    /// hardware as a real gap ("there should be at least a pop-up"). This
+    /// marker gates a one-time "Victory is running" balloon for exactly that
+    /// path so it fires once ever per install, not on every ordinary
+    /// relaunch afterward.
+    /// </summary>
+    public static string FirstLaunchAnnouncedMarkerFile => Path.Combine(DataRoot, "first-launch-announced.txt");
+
     public static void EnsureDataDirectoriesExist()
     {
         Directory.CreateDirectory(StorageDir);

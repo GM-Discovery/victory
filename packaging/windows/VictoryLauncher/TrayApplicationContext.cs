@@ -157,6 +157,23 @@ internal sealed class TrayApplicationContext : ApplicationContext
         // update applying and relaunching this process.
         UpdateChecker.AnnounceIfJustUpdated(status => _trayIcon.ShowBalloonTip(5000, "Victory", status, ToolTipIcon.Info));
 
+        // This branch (.env already exists) skips the first-run wizard
+        // entirely, including its own explicit "Continue to Create Your
+        // Login" moment -- a fresh Setup.exe install over previously-
+        // configured data otherwise announces nothing at all beyond the
+        // tray icon quietly appearing. Confirmed on real hardware as a
+        // real gap. Fires once ever per install, gated by the marker file.
+        try
+        {
+            if (!File.Exists(AppPaths.FirstLaunchAnnouncedMarkerFile))
+            {
+                _trayIcon.ShowBalloonTip(5000, "Victory", "Victory is running -- use this tray icon to open it.", ToolTipIcon.Info);
+                Directory.CreateDirectory(AppPaths.DataRoot);
+                File.WriteAllText(AppPaths.FirstLaunchAnnouncedMarkerFile, DateTime.UtcNow.ToString("O"));
+            }
+        }
+        catch { /* best effort -- a missed one-time balloon isn't worth failing startup over */ }
+
         // Only reached once Victory is actually up and running -- never
         // during first-run setup itself (that path returns earlier,
         // above) and never mid-retry after a failure (the branch just
