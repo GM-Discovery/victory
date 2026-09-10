@@ -254,6 +254,21 @@ internal static class UpdateChecker
         // the update is otherwise frontend-only. See this class's header
         // comment.
         RuntimeManager.StopBackend();
+        // The actual root cause of every update failure tonight, found by
+        // Grant: Postgres was never stopped here. Every long-running child
+        // process this app starts (Caddy explicitly, the backend and
+        // Postgres implicitly) inherits VictoryLauncher.exe's own current
+        // directory as ITS working directory whenever ProcessStartInfo
+        // doesn't set one -- which is "current\", the exact folder
+        // Velopack's updater needs to rename. Caddy and the backend both
+        // got stopped already, releasing that lock; postgres.exe, kept
+        // alive deliberately by pg_ctl long after pg_ctl itself exits,
+        // never did. A process holding a directory as its working
+        // directory blocks Windows from renaming it -- no antivirus, no
+        // OneDrive, nothing else required to produce exactly the
+        // "being used by another process" error confirmed via
+        // velopack_VictoryLauncher.log on every single failed attempt.
+        await RuntimeManager.StopPostgresAsync();
 
         // Written before the call below, not after: if it actually
         // succeeds, this process is about to exit, and the marker needs to
