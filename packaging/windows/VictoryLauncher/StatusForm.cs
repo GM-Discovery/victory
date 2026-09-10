@@ -396,11 +396,18 @@ internal sealed class StatusForm : Form
         var modeText = updateMode == "off"
             ? "Off"
             : UpdateChecker.HasPendingBackendUpdate
-                ? "Update ready -- applying overnight (~2:30am)"
+                ? "Ready, applies ~2:30am"
                 : "Automatic";
         // "Did the update actually take" shouldn't require inferring it
         // from whether a feature seems present -- confirmed on real
         // hardware this was genuinely ambiguous during an update loop.
+        //
+        // Kept short and on one line deliberately: this label is AutoSize
+        // with no wrap, sitting in the ~140px gap before the toggle button
+        // at x=280 -- the previous, much longer phrasing ("Update ready --
+        // applying overnight (~2:30am) (v0.0.54)") ran straight past the
+        // button and off the edge of the form itself, confirmed on real
+        // hardware via screenshot.
         _updateValue.Text = $"{modeText} (v{UpdateChecker.CurrentVersionText()})";
     }
 
