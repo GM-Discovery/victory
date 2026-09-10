@@ -164,6 +164,18 @@ internal static class RuntimeManager
         psi.Environment["DEFAULT_LOCATION_SLUG"] = env["DEFAULT_LOCATION_SLUG"];
         psi.Environment["DEFAULT_LOCATION_NAME"] = env.GetValueOrDefault("DEFAULT_LOCATION_NAME", "");
         psi.Environment["COOKIE_SECURE"] = "true";
+        // Confirmed on real hardware: an invite link built from
+        // window.location.origin is always "localhost" for an Operator
+        // browsing their own machine -- useless to anyone else, since
+        // localhost on the recipient's machine means their machine, not
+        // the Operator's. The backend has no other way to know its own
+        // reachable address, so it's told where to look: this file (kept
+        // current by both tunnel modes) holds whatever the actual public
+        // address currently is, read fresh on every request rather than
+        // cached, since a Quick Tunnel's address changes on every restart.
+        // Harmless if TUNNEL_MODE is "off" -- the file just never exists,
+        // and GET /api/system/public-url reports that plainly.
+        psi.Environment["PUBLIC_URL_FILE"] = AppPaths.TunnelUrlFile;
         // The backend shells out to a bare "pg_dump" for its pre-migration
         // backup (internal/migrate/migrate.go) -- silently skipped on a
         // database with no tables yet (a fresh install), so this doesn't
@@ -310,12 +322,24 @@ internal static class RuntimeManager
     /// Status to display/copy), so this just logs plainly like the
     /// backend/Caddy already do.
     /// </summary>
-    public static async Task<(bool Success, string Output)> StartNamedTunnelAsync(string tunnelToken)
+    public static async Task<(bool Success, string Output)> StartNamedTunnelAsync(string tunnelToken, string tunnelHostname = "")
     {
         if (IsTunnelRunning())
             return (true, "already running");
         if (string.IsNullOrWhiteSpace(tunnelToken))
             return (false, "no tunnel token configured");
+
+        // Unlike Quick Tunnel, a named tunnel's address is already known --
+        // the Operator configured it themselves -- so this can be written
+        // immediately rather than captured from cloudflared's own output.
+        // Written to the same file Quick Tunnel uses so anything reading
+        // "the current public address" (the invite link, GET
+        // /api/system/public-url) works the same regardless of which mode
+        // is active.
+        if (!string.IsNullOrWhiteSpace(tunnelHostname))
+        {
+            try { await File.WriteAllTextAsync(AppPaths.TunnelUrlFile, $"https://{tunnelHostname}"); } catch { /* best effort */ }
+        }
 
         Directory.CreateDirectory(AppPaths.LogsDir);
         var psi = new ProcessStartInfo

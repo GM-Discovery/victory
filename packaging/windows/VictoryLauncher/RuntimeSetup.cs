@@ -158,7 +158,7 @@ internal static class RuntimeSetup
                 try
                 {
                     if (tunnelMode == "named")
-                        await RuntimeManager.StartNamedTunnelAsync(env.GetValueOrDefault("CLOUDFLARE_TUNNEL_TOKEN", ""));
+                        await RuntimeManager.StartNamedTunnelAsync(env.GetValueOrDefault("CLOUDFLARE_TUNNEL_TOKEN", ""), env.GetValueOrDefault("CLOUDFLARE_TUNNEL_HOSTNAME", ""));
                     else
                         await RuntimeManager.StartQuickTunnelAsync();
                 }
