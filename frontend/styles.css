@@ -89,7 +89,10 @@ body {
   z-index: 20;
   margin: 0;
   padding: 0;
-  min-height: 4px;
+  /* Was 4px -- confirmed on real hardware as "there, but just barely":
+     a razor-thin sliver is nearly impossible to hover into on purpose.
+     24px is still visually unobtrusive but gives a real target. */
+  min-height: 24px;
   overflow: visible;
   background: linear-gradient(
     to bottom,
@@ -116,7 +119,15 @@ body {
   );
   backdrop-filter: blur(12px);
   pointer-events: none;
-  transition: opacity 160ms ease;
+  /* Stickiness: appears immediately on hover (no delay going in), but
+     lingers for a beat before fading once the pointer actually leaves --
+     confirmed on real hardware that a symmetric fast fade felt twitchy,
+     easy to lose again while still moving toward it. */
+  transition: opacity 160ms ease 0s;
+}
+
+.app-header:not(:hover):not(:focus-within)::before {
+  transition: opacity 220ms ease 500ms;
 }
 
 .app-header:hover::before,
@@ -136,12 +147,24 @@ body {
   align-items: center;
   pointer-events: none;
   transition:
-    opacity 140ms ease,
-    transform 180ms ease;
+    opacity 140ms ease 0s,
+    transform 180ms ease 0s;
+}
+
+.app-header:not(:hover):not(:focus-within) .brand-row {
+  transition:
+    opacity 220ms ease 500ms,
+    transform 220ms ease 500ms;
 }
 
 .app-shell--anonymous .app-header::before,
-.app-shell--anonymous .brand-row {
+.app-shell--anonymous .brand-row,
+/* First-ever visit to the map (app.js): shown plainly instead of
+   relying on an Operator to discover a hover-to-reveal header on
+   their own. app.js adds/removes this class; it doesn't change the
+   hover behavior itself, just starts revealed. */
+.app-shell--first-visit .app-header::before,
+.app-shell--first-visit .brand-row {
   opacity: 1;
   pointer-events: auto;
 }

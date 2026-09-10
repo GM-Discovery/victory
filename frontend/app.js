@@ -825,6 +825,21 @@ async function loadAccountLink() {
   const mapLayerEl = document.querySelector(".map-layer");
   if (!accountLink) return;
 
+  // Confirmed on real hardware: a signed-in user's header (menu, account
+  // controls, Invite People, all of it) is hover-to-reveal, and nothing
+  // ever told a first-time visitor that. Shown plainly for a few seconds
+  // on this browser's first-ever visit to the map, then left to the
+  // normal hover behavior from then on -- once, not every load.
+  try {
+    if (appShell && !localStorage.getItem("victoryMapHeaderIntroShown")) {
+      appShell.classList.add("app-shell--first-visit");
+      localStorage.setItem("victoryMapHeaderIntroShown", "1");
+      setTimeout(() => appShell.classList.remove("app-shell--first-visit"), 6000);
+    }
+  } catch {
+    // Private browsing / storage disabled -- just skip the intro, not worth failing anything over.
+  }
+
   const setMapSignedInState = (signedIn) => {
     if (infoBoothGuestActions) {
       infoBoothGuestActions.hidden = Boolean(signedIn);
