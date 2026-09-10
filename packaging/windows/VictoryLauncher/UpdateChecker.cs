@@ -269,6 +269,15 @@ internal static class UpdateChecker
         // "being used by another process" error confirmed via
         // velopack_VictoryLauncher.log on every single failed attempt.
         await RuntimeManager.StopPostgresAsync();
+        // Same bug, same fix, caught by Grant immediately after: cloudflared
+        // (Quick/named tunnel, StartQuickTunnelAsync/StartNamedTunnelAsync)
+        // is started the same way -- no WorkingDirectory set on its
+        // ProcessStartInfo either -- so it inherits "current\" too, and was
+        // never stopped here. Only matters for installs with remote access
+        // turned on, but Grant's does, which is exactly why the Postgres fix
+        // alone wasn't enough. StopTunnel routes through the same
+        // StopProcessByPidFile that already waits for exit.
+        RuntimeManager.StopTunnel();
 
         // Written before the call below, not after: if it actually
         // succeeds, this process is about to exit, and the marker needs to
