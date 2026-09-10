@@ -66,6 +66,13 @@ var Definitions = map[string]Definition{
 				Target: "venue:catharsis",
 				Title:  "Catharsis",
 				Body:   "Catharsis is where live play happens -- character build and the stage itself. This is where a Show is actually run.",
+				// Was missing (unlike campus_mandatory's own pin-pointing
+				// steps): without this, Next and Skip on this single-step
+				// tour did the same thing -- neither was actually gated on
+				// the click, so the tour never cleared on really entering
+				// Catharsis and just sat there until dismissed by hand.
+				// Confirmed on real hardware, 2026-09-10.
+				ActionRequired: true,
 			},
 		},
 	},
@@ -83,6 +90,8 @@ var Definitions = map[string]Definition{
 				Target: "venue:greenroom",
 				Title:  "The Greenroom",
 				Body:   "The Greenroom is preparation, not performance -- your Character workbooks live here, ready before you ever take the stage.",
+				// Same gap as campus_continuation above, same fix.
+				ActionRequired: true,
 			},
 		},
 	},
