@@ -43,6 +43,14 @@ Indirect dependencies currently present in `go.mod`:
 - Kernel 32 uses the Go standard library for OAuth requests, so no new Go OAuth package was added
 - Kernel 33 also adds no new external dependency; the operator bootstrap CLI reuses the existing Go and pgx stack
 
+## Windows Installer Bundle (Kernel 100, `windows-native`)
+Bundled binaries specific to the Windows consumer installer/launcher, not the Docker/Linux deployment path above:
+- **Velopack** — installer packaging/auto-update framework (`vpk`). MIT license. https://github.com/velopack/velopack
+- **cloudflared** — Cloudflare's open-source tunnel client, used for the default no-account "Quick Tunnel" remote-access path and for an Operator-supplied Named Tunnel. Apache License 2.0. https://github.com/cloudflare/cloudflared
+  - Using Cloudflare's Tunnel *service* (as opposed to redistributing the open-source binary) is separately subject to Cloudflare's own terms of service, between the Operator and Cloudflare directly — Victory does not accept that on the Operator's behalf, and nothing in the installer requires an account for the default Quick Tunnel path.
+- **.NET 8 runtime** — bundled via `dotnet publish --self-contained true`, so the launcher ships its own runtime rather than depending on one being preinstalled. MIT license. https://github.com/dotnet/runtime
+- **PostgreSQL** — same engine/license as the Docker path above, bundled as a native Windows binary distribution rather than a container image for this install path.
+
 ## Dependency Philosophy
 - keep external dependencies small and intentional
 - prefer the standard library where practical
