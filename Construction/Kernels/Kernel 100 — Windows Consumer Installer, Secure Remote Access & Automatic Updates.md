@@ -1,6 +1,6 @@
 # Kernel 100 — Windows Consumer Installer, Secure Remote Access & Automatic Updates
 
-**Status:** DRAFT — ready for implementation  
+**Status:** PARTIAL — core install/update/remote-access loop working on real hardware; see `Construction/OperatorLogs/kernel-100-windows-installer-ledger.md` for the full ledger, remaining gaps (code signing, third-party notices, host prerequisite checks), and items needing verification.  
 **Type:** Consumer distribution + Windows installer + first-run bootstrap + remote connectivity + updater  
 **Sequence position:** May be executed immediately after Kernel 95; does not require Kernels 96–99 first  
 **Primary proof:** A normal Windows user can download Victory, double-click one installer, make only the few decisions Victory genuinely needs, and finish with a working self-hosted Victory lot that remote friends can reach securely  
