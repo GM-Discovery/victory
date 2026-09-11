@@ -209,14 +209,20 @@ internal static class UpdateChecker
             // comment for why that distinction turned out not to be safe.
             if (!await IsSafeToRestartBackendAsync())
             {
-                // Confirmed on real hardware as a real, easy-to-hit trap:
-                // a Showing left open (Close Showing never clicked, even
-                // long after everyone's actually gone) blocks every future
-                // update indefinitely, and "a Show looks like it's in
-                // progress" alone doesn't tell an Operator what to
-                // actually go do about it -- naming the exact button and
-                // where it lives does.
-                Report(reportStatus, "A Victory update is ready, but a Show looks like it's in progress -- it will apply once things are quiet. If nothing is actually happening, open Victory > Director's Chair and click \"Close Showing.\"");
+                // Confirmed on real hardware as a real, easy-to-hit trap: a
+                // Show left running (sessions.status never moved off
+                // 'rehearsal'/'live') long after everyone's actually gone
+                // blocks every future update indefinitely, and "a Show
+                // looks like it's in progress" alone never told an
+                // Operator what to go do about it. Director's Chair's own
+                // "Close Showing" button is a different thing entirely (it
+                // closes a Showing/ticketing record, not the Session this
+                // check actually looks at) -- confirmed the hard way.
+                // /showtime <code> end (the code is under Stage
+                // Management), typed in any venue's chat, is the actual
+                // mechanism: it's the only code path that sets
+                // sessions.status = 'closed' (backend/internal/showtime/showtime.go).
+                Report(reportStatus, "A Victory update is ready, but a Show looks like it's in progress -- it will apply once things are quiet. If nothing is actually happening, find the show's code under Stage Management and type \"/showtime <code> end\" in any venue's chat.");
                 return;
             }
 
