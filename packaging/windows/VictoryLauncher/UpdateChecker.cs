@@ -209,7 +209,14 @@ internal static class UpdateChecker
             // comment for why that distinction turned out not to be safe.
             if (!await IsSafeToRestartBackendAsync())
             {
-                Report(reportStatus, "A Victory update is ready, but a Show looks like it's in progress -- it will apply once things are quiet.");
+                // Confirmed on real hardware as a real, easy-to-hit trap:
+                // a Showing left open (Close Showing never clicked, even
+                // long after everyone's actually gone) blocks every future
+                // update indefinitely, and "a Show looks like it's in
+                // progress" alone doesn't tell an Operator what to
+                // actually go do about it -- naming the exact button and
+                // where it lives does.
+                Report(reportStatus, "A Victory update is ready, but a Show looks like it's in progress -- it will apply once things are quiet. If nothing is actually happening, open Victory > Director's Chair and click \"Close Showing.\"");
                 return;
             }
 
