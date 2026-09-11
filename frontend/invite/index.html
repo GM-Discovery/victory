@@ -221,7 +221,16 @@
         });
         const payload = await response.json().catch(() => null);
         if (!response.ok || !payload?.ok) {
-          throw new Error(payload?.error || `Could not accept invite (HTTP ${response.status})`);
+          const code = payload?.error;
+          if (code === "email_taken" || code === "handle_taken") {
+            const field = code === "email_taken" ? "email" : "handle";
+            const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+            statusEl.innerHTML =
+              `An account with that ${field} already exists here. ` +
+              `<a href="/login/?return_to=${returnTo}">Sign in</a>, then open this invite link again to join.`;
+            return;
+          }
+          throw new Error(code || `Could not accept invite (HTTP ${response.status})`);
         }
         statusEl.textContent = "You're in. Redirecting...";
         window.location.href = "/";

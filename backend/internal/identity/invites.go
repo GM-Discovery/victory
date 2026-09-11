@@ -14,6 +14,7 @@ import (
 	"victory/backend/internal/sessions"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -394,7 +395,17 @@ func HandleAcceptInvite(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc 
 				RETURNING id
 			`, req.Email, req.Handle, req.DisplayName).Scan(&userID)
 			if err != nil {
-				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "user_create_failed"})
+				errCode := "user_create_failed"
+				var pgErr *pgconn.PgError
+				if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+					switch pgErr.ConstraintName {
+					case "users_email_unique_ci":
+						errCode = "email_taken"
+					case "users_handle_unique":
+						errCode = "handle_taken"
+					}
+				}
+				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": errCode})
 				return
 			}
 

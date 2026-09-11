@@ -70,7 +70,7 @@
         background: #151113; color: #f6edf0; font-size: 0.95rem;
         box-sizing: border-box;
       }
-      .invite-modal button {
+      .invite-modal button:not(.invite-modal-close) {
         margin-top: 16px; width: 100%; padding: 11px 14px;
         border: 1px solid #d92b50; border-radius: 4px;
         background: linear-gradient(180deg, #d31943, #8b0926);
@@ -81,10 +81,19 @@
       }
       .invite-modal-status { margin-top: 10px; min-height: 1.2em; color: #ff6d8e; font-size: 0.9rem; }
       .invite-modal-email-hint { margin: 6px 0 0; color: #bda9ae; font-size: 0.78rem; line-height: 1.4; }
-      .invite-modal-close {
-        float: right; background: transparent; border: none; color: #bda9ae;
-        font-size: 1.2rem; cursor: pointer; width: auto; margin: 0; padding: 0;
+      .invite-modal-header {
+        display: flex; align-items: center; justify-content: space-between;
+        margin: 0 0 12px;
       }
+      .invite-modal-header h2 { margin: 0; }
+      .invite-modal-close {
+        flex: none; background: transparent; border: none; color: #bda9ae;
+        font-size: 1.4rem; line-height: 1; cursor: pointer;
+        width: 28px; height: 28px; margin: 0; padding: 0;
+        border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        transition: background 120ms ease, color 120ms ease;
+      }
+      .invite-modal-close:hover { background: rgba(255,255,255,0.08); color: #f6edf0; }
       .invite-modal [hidden] { display: none !important; }
     `;
     document.head.appendChild(style);
@@ -103,8 +112,10 @@
 
     backdrop.innerHTML = `
       <div class="invite-modal" role="dialog" aria-modal="true">
-        <button type="button" class="invite-modal-close" aria-label="Close">×</button>
-        <h2>Invite People</h2>
+        <div class="invite-modal-header">
+          <h2>Invite People</h2>
+          <button type="button" class="invite-modal-close" aria-label="Close">×</button>
+        </div>
         <form id="invite-modal-form">
           <label for="invite-modal-role">Role</label>
           <select id="invite-modal-role" required></select>
