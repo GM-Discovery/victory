@@ -246,6 +246,8 @@
       return value;
     }
 
+    const returnTo = safeReturnTo(new URL(window.location.href).searchParams.get("return_to"));
+
     async function loadAuthProviders() {
       try {
         const response = await fetch("/api/auth/providers", { credentials: "include" });
@@ -258,7 +260,6 @@
           return;
         }
 
-        const returnTo = safeReturnTo(new URL(window.location.href).searchParams.get("return_to"));
         discordLogin.href = `/auth/discord/start?return_to=${encodeURIComponent(returnTo)}`;
       } catch (error) {
         discordLogin.setAttribute("aria-disabled", "true");
@@ -324,7 +325,7 @@
         }
 
         statusEl.textContent = "Login successful. Redirecting...";
-        window.location.href = "/";
+        window.location.href = returnTo;
       } catch (error) {
         statusEl.textContent = error.message || String(error);
       }
