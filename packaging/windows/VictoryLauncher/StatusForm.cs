@@ -37,6 +37,7 @@ internal sealed class StatusForm : Form
     private readonly Button _startStopButton = new() { Width = 120 };
     private readonly Button _refreshButton = new() { Text = "Refresh", Width = 100 };
     private readonly Button _supportBundleButton = new() { Text = "Support Bundle...", Width = 150 };
+    private readonly Button _deleteDataButton = new() { Text = "Delete Victory Data...", Width = 200 };
 
     public StatusForm()
     {
@@ -78,11 +79,14 @@ internal sealed class StatusForm : Form
         _supportBundleButton.Location = new Point(20, 324);
         _supportBundleButton.Click += (_, _) => OnSupportBundleClicked();
 
+        _deleteDataButton.Location = new Point(190, 324);
+        _deleteDataButton.Click += async (_, _) => await OnDeleteDataClickedAsync();
+
         Controls.AddRange([
             _tunnelToggleButton, _copyAddressButton, _tunnelNoteLabel,
             _rediscoveryToggleButton, _copyRediscoveryButton,
             _updateToggleButton, _startStopButton, _refreshButton,
-            _supportBundleButton,
+            _supportBundleButton, _deleteDataButton,
         ]);
         Shown += async (_, _) => await RefreshAsync();
     }
@@ -209,6 +213,67 @@ internal sealed class StatusForm : Form
         finally
         {
             _supportBundleButton.Enabled = true;
+        }
+    }
+
+    /// <summary>
+    /// K100 §8: routine uninstall already preserves data by construction
+    /// (Velopack only ever touches its own app-files directory, never
+    /// AppPaths.DataRoot) -- this is the separate, explicit, not-
+    /// preselected path for an Operator who actually wants everything
+    /// gone: Characters, Shows, Storyboards, the Operator account, all of
+    /// it. Two confirmations, the second requiring the Operator to type
+    /// the lot's own name, since a single "Are you sure?" is too easy to
+    /// click through on a genuinely destructive, unrecoverable action.
+    /// </summary>
+    private async Task OnDeleteDataClickedAsync()
+    {
+        string? lotName = null;
+        try { lotName = EnvGenerator.ReadAll().GetValueOrDefault("DEFAULT_LOCATION_NAME"); }
+        catch { /* best effort -- fall through to the generic label below */ }
+        if (string.IsNullOrWhiteSpace(lotName)) lotName = "this Victory lot";
+
+        var firstConfirm = MessageBox.Show(
+            this,
+            $"This permanently deletes {lotName} -- every Character, Show, Storyboard, message, and your Operator account. " +
+            "This cannot be undone. Victory will stop and close.\n\nContinue?",
+            "Delete Victory Data",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2);
+        if (firstConfirm != DialogResult.Yes) return;
+
+        using var typedConfirm = new Form
+        {
+            Text = "Confirm Deletion",
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            StartPosition = FormStartPosition.CenterParent,
+            ClientSize = new Size(360, 130),
+        };
+        var prompt = new Label { AutoSize = false, Size = new Size(320, 40), Location = new Point(20, 15), Text = $"Type \"{lotName}\" to confirm:" };
+        var input = new TextBox { Location = new Point(20, 58), Width = 320 };
+        var okButton = new Button { Text = "Delete Everything", Location = new Point(150, 90), Width = 190, DialogResult = DialogResult.OK, Enabled = false };
+        var cancelButton = new Button { Text = "Cancel", Location = new Point(20, 90), Width = 110, DialogResult = DialogResult.Cancel };
+        input.TextChanged += (_, _) => okButton.Enabled = string.Equals(input.Text, lotName, StringComparison.Ordinal);
+        typedConfirm.Controls.AddRange([prompt, input, okButton, cancelButton]);
+        typedConfirm.AcceptButton = okButton;
+        typedConfirm.CancelButton = cancelButton;
+        if (typedConfirm.ShowDialog(this) != DialogResult.OK) return;
+
+        _deleteDataButton.Enabled = false;
+        try
+        {
+            await RuntimeManager.StopAsync();
+            Directory.Delete(AppPaths.DataRoot, recursive: true);
+            MessageBox.Show(this, "Victory data has been deleted. Victory will now close.", "Victory", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            Application.Exit();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Could not fully delete Victory data: {ex.Message}\n\nVictory has been stopped; you can finish removing {AppPaths.DataRoot} by hand.", "Victory", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            _deleteDataButton.Enabled = true;
         }
     }
 
