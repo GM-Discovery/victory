@@ -117,6 +117,18 @@ internal static class UpdateChecker
 
     public static async Task CheckAndApplyAsync(Action<string> reportStatus, bool manual = false)
     {
+        // Confirmed on real hardware: a manual click that produces no
+        // balloon at all is indistinguishable from the click never having
+        // registered, the whole check hanging, or Windows itself
+        // suppressing the notification (Focus Assist, per-app
+        // notification settings) -- none of which this app controls.
+        // Every meaningful outcome below now goes through Report(), which
+        // logs unconditionally in addition to whatever reportStatus does,
+        // so launcher.log is the source of truth regardless of whether a
+        // balloon actually rendered. This first line proves the click was
+        // received at all, before anything else runs.
+        AppendLauncherLog($"check requested (manual={manual})");
+
         // Confirmed on real hardware: repeated "Check for Updates" clicks
         // while one was already in flight raced multiple full
         // check/download/apply cycles against the same shared state --
@@ -127,7 +139,7 @@ internal static class UpdateChecker
         if (_checkInProgress)
         {
             if (manual)
-                reportStatus("Already checking for an update -- give it a moment.");
+                Report(reportStatus, "Already checking for an update -- give it a moment.");
             return;
         }
         _checkInProgress = true;
@@ -149,7 +161,7 @@ internal static class UpdateChecker
             if (!_manager.IsInstalled)
             {
                 if (manual)
-                    reportStatus("This isn't a real Victory install (looks like it's running from an unpacked folder) -- updates can't be checked from here.");
+                    Report(reportStatus, "This isn't a real Victory install (looks like it's running from an unpacked folder) -- updates can't be checked from here.");
                 return;
             }
 
@@ -159,7 +171,7 @@ internal static class UpdateChecker
                 if (update is null)
                 {
                     if (manual)
-                        reportStatus("Victory is already up to date.");
+                        Report(reportStatus, "Victory is already up to date.");
                     return;
                 }
 
@@ -180,11 +192,11 @@ internal static class UpdateChecker
                 if (WasRecentlyAttempted(targetVersion))
                 {
                     if (manual)
-                        reportStatus("Victory just updated to this version -- give it a moment to finish starting.");
+                        Report(reportStatus, "Victory just updated to this version -- give it a moment to finish starting.");
                     return;
                 }
 
-                reportStatus("Downloading a Victory update...");
+                Report(reportStatus, "Downloading a Victory update...");
                 await _manager.DownloadUpdatesAsync(update);
 
                 _pendingUpdate = update;
@@ -197,7 +209,7 @@ internal static class UpdateChecker
             // comment for why that distinction turned out not to be safe.
             if (!await IsSafeToRestartBackendAsync())
             {
-                reportStatus("A Victory update is ready, but a Show looks like it's in progress -- it will apply once things are quiet.");
+                Report(reportStatus, "A Victory update is ready, but a Show looks like it's in progress -- it will apply once things are quiet.");
                 return;
             }
 
@@ -207,7 +219,7 @@ internal static class UpdateChecker
             }
             else
             {
-                reportStatus("A Victory update is ready -- it will apply automatically overnight (around 2:30am).");
+                Report(reportStatus, "A Victory update is ready -- it will apply automatically overnight (around 2:30am).");
             }
         }
         catch (Exception ex)
@@ -218,6 +230,10 @@ internal static class UpdateChecker
             // manual, deliberate check should still say *something*
             // rather than fail exactly as silently as "no update found"
             // does, which is indistinguishable from broken.
+            // Logged unconditionally, unlike the balloon: an automatic
+            // check that silently throws is exactly as invisible as one
+            // that silently hangs, and both should leave a trace.
+            AppendLauncherLog("check threw: " + ex);
             if (manual)
                 reportStatus("Could not check for updates: " + ex.Message);
         }
@@ -336,6 +352,22 @@ internal static class UpdateChecker
             File.WriteAllText(AppPaths.LastAppliedUpdateMarkerFile, version);
         }
         catch { /* best effort -- worst case this specific loop-guard just doesn't engage */ }
+    }
+
+    /// <summary>
+    /// Every meaningful status message goes through here instead of
+    /// calling reportStatus directly: a balloon Windows chooses not to
+    /// render (Focus Assist, notification settings, or anything else this
+    /// app doesn't control) must never be the only record that something
+    /// happened. Confirmed on real hardware as a live question, not a
+    /// hypothetical -- a manual click reported to have produced nothing
+    /// at all, with a real gating reason (a genuinely live Show) that the
+    /// code already tries to report but has no way to prove it tried.
+    /// </summary>
+    private static void Report(Action<string> reportStatus, string message)
+    {
+        AppendLauncherLog("status: " + message);
+        reportStatus(message);
     }
 
     private static void LogApplyFailure(Exception ex) => AppendLauncherLog("update apply failed: " + ex);
