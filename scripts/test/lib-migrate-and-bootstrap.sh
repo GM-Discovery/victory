@@ -1,23 +1,37 @@
 #!/usr/bin/env bash
-# Shared by setup-test-database.sh and reset-test-database.sh: applies every
-# SQL migration, then boots the real backend once against the (already
-# validated) TEST_DATABASE_URL purely so its Go-side Ensure*Surface startup
-# bootstrap runs - see backend/cmd/victory/main.go. Several venues and
-# tables (e.g. the "first-theater"/"catharsis"/"middle-school-stage" venues
-# from internal/access.EnsureKernel16VenueSurface) are only ever created by
-# that Go-side bootstrap, not by any SQL migration file, so a database that
-# only has the SQL migrations applied is missing them. Every Ensure*Surface
-# call is idempotent, so re-running this is always safe.
+# Shared by setup-test-database.sh and reset-test-database.sh: boots the
+# real backend once against the (already validated) TEST_DATABASE_URL,
+# which applies every SQL migration itself (backend/internal/migrate) AND
+# runs its Go-side Ensure*Surface startup bootstrap - see
+# backend/cmd/victory/main.go. Several venues and tables (e.g. the
+# "first-theater"/"catharsis"/"middle-school-stage" venues from
+# internal/access.EnsureKernel16VenueSurface) are only ever created by that
+# Go-side bootstrap, not by any SQL migration file. Every migration and
+# every Ensure*Surface call is idempotent, so re-running this is always
+# safe.
+#
+# Kernel 96: this used to also manually pre-apply every migration file via
+# a raw psql loop, run BEFORE this boot step. That's no longer just
+# redundant, it's actively wrong: migrations from 002 onward now attach
+# their content to whichever location access.EnsureDefaultLocation (Go)
+# marks is_default, and that only happens partway through THIS boot's own
+# phased migration sequence (schema first, then EnsureDefaultLocation, then
+# the rest) - pre-applying them separately would run them before any
+# location is marked default, silently seeding nothing. The real backend
+# boot is now the only thing that touches migrations at all.
+#
+# DEFAULT_LOCATION_SLUG/DEFAULT_LOCATION_NAME are set to the historical
+# "amurray-family"/"amurray.family" fixture name below deliberately -
+# dozens of existing DB-touching tests already hardcode looking for
+# content under that specific location (Kernel 96 §4: "Tests may retain
+# fixtures where clearly isolated"). This is that isolation boundary: an
+# arbitrary, isolated choice of name for a disposable test database, not a
+# leaked default for a real install - no different from naming it
+# "test-lot", except every existing test already expects this one.
 #
 # Callers must have already run require_isolated_database and set db_name.
 
 migrate_and_bootstrap_test_database() {
-  echo "Applying migrations to $db_name..."
-  for migration in "$ROOT"/backend/migrations/*.sql; do
-    echo "  $(basename "$migration")"
-    docker exec -i "$POSTGRES_CONTAINER" psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$db_name" < "$migration"
-  done
-
   local bootstrap_port="${TEST_DB_BOOTSTRAP_PORT:-18082}"
   local bootstrap_bin="${TMPDIR:-/tmp}/victory-test-db-bootstrap-bin"
   local bootstrap_log="${TMPDIR:-/tmp}/victory-test-db-bootstrap.log"
@@ -35,6 +49,8 @@ migrate_and_bootstrap_test_database() {
     SESSION_COOKIE_SECURE=false \
     COOKIE_SECURE=false \
     OPERATOR_HANDLE=victory_test_db_bootstrap \
+    DEFAULT_LOCATION_SLUG=amurray-family \
+    DEFAULT_LOCATION_NAME=amurray.family \
     DISCORD_OAUTH_ENABLED=false \
     DISCORD_SERVER_LINK_ENABLED=false \
     DISCORD_GATEWAY_ENABLED=false \

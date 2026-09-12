@@ -75,6 +75,24 @@ func ValidateTestDatabaseURL(testDatabaseURL, liveDatabaseURL string) error {
 func OpenTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
+	// Kernel 96: access.DefaultLocationSlug() falls back to "victory-theater"
+	// when this is unset -- fine for a real boot, where the launcher/compose
+	// always sets it first, but a `go test` process never does. Several
+	// Ensure* seed functions (e.g. ewrite.EnsureSkillDirectory) call
+	// DefaultLocationSlug() directly rather than taking a location id as a
+	// parameter, and a handful of tests call those functions directly
+	// without going through a full server boot first. Before this pass,
+	// that accidentally worked because migration 025 unconditionally
+	// created a "victory-theater" location on every database; neutralizing
+	// that phantom-location migration (the whole point of this pass) means
+	// nothing does anymore. scripts/test/lib-migrate-and-bootstrap.sh
+	// already establishes "amurray-family" as this fixture's real name;
+	// this is that same convention, for tests that never went through that
+	// script's own bootstrap boot.
+	if os.Getenv("DEFAULT_LOCATION_SLUG") == "" {
+		_ = os.Setenv("DEFAULT_LOCATION_SLUG", "amurray-family")
+	}
+
 	testDatabaseURL := os.Getenv("TEST_DATABASE_URL")
 	if err := ValidateTestDatabaseURL(testDatabaseURL, os.Getenv("DATABASE_URL")); err != nil {
 		t.Fatalf("dbtest: %v", err)
