@@ -36,7 +36,12 @@ on:
       - "backend/**"
       - "frontend/**"
       - ".github/workflows/windows-installer.yml"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 0.1.1). Leave blank for the auto 0.0.<run number> placeholder scheme.'
+        required: false
+        type: string
 
 jobs:
   build:
@@ -103,10 +108,23 @@ jobs:
       # to run against it -- UpdateChecker checks IsInstalled first).
       # publish/ still exists here purely as vpk pack's input.
 
-      # No formal version scheme exists yet -- 0.0.<run number> is a
-      # simple, always-increasing placeholder that's good enough for
-      # Velopack to recognize "there's a newer one," not a real semantic
-      # version. Revisit once real releases (and signing) are a thing.
+      # 0.0.<run number> is a simple, always-increasing placeholder good
+      # enough for Velopack to recognize "there's a newer one" -- not a
+      # real semantic version. workflow_dispatch's optional `version`
+      # input lets a deliberate release (e.g. the first real public cut)
+      # override it without retiring the placeholder scheme for ordinary
+      # pushes, which still don't need anyone to think about a version
+      # number at all.
+      - name: Determine release version
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "value=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=0.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Pack and publish Velopack release
         if: github.event_name != 'pull_request'
         env:
@@ -114,8 +132,8 @@ jobs:
         run: |
           dotnet tool install -g vpk
           vpk download github --repoUrl https://github.com/GM-Discovery/victory-releases --token $env:VPK_GITHUB_TOKEN
-          vpk pack -u VictoryLauncher -v 0.0.${{ github.run_number }} -p publish -e VictoryLauncher.exe
-          vpk upload github --repoUrl https://github.com/GM-Discovery/victory-releases --token $env:VPK_GITHUB_TOKEN --publish --releaseName "Victory 0.0.${{ github.run_number }}" --tag v0.0.${{ github.run_number }}
+          vpk pack -u VictoryLauncher -v ${{ steps.version.outputs.value }} -p publish -e VictoryLauncher.exe
+          vpk upload github --repoUrl https://github.com/GM-Discovery/victory-releases --token $env:VPK_GITHUB_TOKEN --publish --releaseName "Victory ${{ steps.version.outputs.value }}" --tag v${{ steps.version.outputs.value }}
         continue-on-error: true # see this workflow's header: the upload half is expected to fail until RELEASES_REPO_TOKEN exists; vpk pack itself already succeeds without it
 
       # A small extra file attached to the same release, read by
@@ -131,7 +149,7 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
         run: |
           echo '{"backend_changed": ${{ steps.backend_changed.outputs.changed }}}' > update-manifest.json
-          gh release upload "v0.0.${{ github.run_number }}" update-manifest.json --repo GM-Discovery/victory-releases --clobber
+          gh release upload "v${{ steps.version.outputs.value }}" update-manifest.json --repo GM-Discovery/victory-releases --clobber
         continue-on-error: true
 
       # Uploaded regardless of whether the upload-to-github-releases step
