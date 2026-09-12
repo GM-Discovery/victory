@@ -157,3 +157,72 @@ func TestRevalidateSessionsLeavesActiveSessionConnected(t *testing.T) {
 		t.Fatalf("expected a read timeout, got a different error: %v", err)
 	}
 }
+
+// TestRevalidateSessionsClosesConnectionAfterVenueAccessLost proves Kernel 96:
+// a user's SESSION can stay perfectly valid while their AUTHORITY over the
+// one venue their socket is connected to changes (removed from a roster,
+// demoted). Before this, only session validity was rechecked -- a connection
+// scoped to a venue the user can no longer access kept receiving that
+// venue's broadcasts indefinitely.
+func TestRevalidateSessionsClosesConnectionAfterVenueAccessLost(t *testing.T) {
+	pool := dbtest.OpenTestPool(t)
+	ctx := context.Background()
+
+	handle := "wsvenue_" + time.Now().UTC().Format("150405.000000")
+	var userID string
+	if err := pool.QueryRow(ctx, `INSERT INTO users (handle, display_name) VALUES ($1, $2) RETURNING id::text`, handle, "WS Venue Test").Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID) })
+
+	if _, _, err := sessions.CreateSession(ctx, pool, userID, 24*time.Hour, httptest.NewRequest(http.MethodGet, "/", nil)); err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	hub := NewHub()
+	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		// grants-cabin is invite_only/private -- a user with no location
+		// membership at all cannot see it, standing in for "removed from
+		// the venue this connection was authorized for at connect time."
+		client := &Client{Conn: conn, Send: make(chan []byte, 4), UserID: userID, VenueSlug: "grants-cabin"}
+		hub.Add(client)
+		defer hub.Remove(client)
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	clientConn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("client dial failed: %v", err)
+	}
+	defer clientConn.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	revalidateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	hub.RevalidateSessions(revalidateCtx, pool)
+
+	clientConn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	closed := false
+	for i := 0; i < 5; i++ {
+		if _, _, err = clientConn.ReadMessage(); err != nil {
+			closed = true
+			break
+		}
+	}
+	if !closed {
+		t.Fatal("expected the connection to be closed after losing venue access, but it is still open")
+	}
+}
