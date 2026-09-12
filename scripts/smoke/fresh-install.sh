@@ -30,6 +30,14 @@ POSTGRES_USER="${POSTGRES_USER:-victory}"
 # at the first post-rotation run).
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-change_this_now}"
 BACKEND_PORT="${BACKEND_PORT:-18081}"
+# Kernel 96: this used to be hardcoded to 5432 everywhere below, which
+# collides with packaging/podman/.env's own POSTGRES_HOST_PORT the moment
+# postgres started getting brought up via that directory's compose file
+# (needed once the repo-root docker-compose.yml was retired) -- a real dev
+# stack on a non-default port, or anything else already using 5432 on this
+# machine, would make this script's own postgres unreachable at the port it
+# assumes. Overridable the same way every other port here already is.
+POSTGRES_HOST_PORT="${POSTGRES_HOST_PORT:-5432}"
 DB_NAME="victory_fresh_$(date +%s)_$RANDOM"
 BACKEND_LOG="${TMPDIR:-/tmp}/victory-fresh-install-backend.log"
 HEALTH_OUT="${TMPDIR:-/tmp}/victory-fresh-install-health.json"
@@ -95,7 +103,7 @@ echo "Using temporary database: $DB_NAME"
 # production deployment) is retired -- packaging/podman/compose.yml is now
 # the one real deployment path, for production and local dev alike. Run
 # from its own directory so its sibling .env is picked up automatically.
-(cd "$ROOT/packaging/podman" && docker compose up -d postgres >/dev/null)
+(cd "$ROOT/packaging/podman" && POSTGRES_HOST_PORT="$POSTGRES_HOST_PORT" docker compose up -d postgres >/dev/null)
 docker exec -i "$POSTGRES_CONTAINER" createdb -U "$POSTGRES_USER" "$DB_NAME"
 
 # Kernel 96: used to manually pre-apply migrations 000-048 via psql before
@@ -127,7 +135,7 @@ FRESH_INSTALL_BIN="${TMPDIR:-/tmp}/victory-fresh-install-backend-bin"
 
 env \
   PORT="$BACKEND_PORT" \
-  DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
+  DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:${POSTGRES_HOST_PORT}/$DB_NAME?sslmode=disable" \
   MIGRATE_DANGEROUSLY_SKIP_BACKUP=1 \
   STORAGE_ROOT="$ROOT/storage" \
   SESSION_COOKIE_SECURE=false \
@@ -239,7 +247,7 @@ echo "PASS local auth signup issued a session cookie"
 bootstrap_default="$(
   cd "$BACKEND_DIR" && \
   env \
-    DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
+    DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:${POSTGRES_HOST_PORT}/$DB_NAME?sslmode=disable" \
     go run ./cmd/victory-bootstrap producer --handle "$operator_handle"
 )"
 if [[ "$bootstrap_default" != *"Already existed: false"* ]]; then
@@ -255,7 +263,7 @@ echo "PASS bootstrap producer by handle at neutral default location"
 bootstrap_repeat="$(
   cd "$BACKEND_DIR" && \
   env \
-    DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
+    DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:${POSTGRES_HOST_PORT}/$DB_NAME?sslmode=disable" \
     go run ./cmd/victory-bootstrap producer --handle "$operator_handle"
 )"
 if [[ "$bootstrap_repeat" != *"Already existed: true"* ]]; then
@@ -265,7 +273,7 @@ fi
 echo "PASS bootstrap producer is idempotent"
 
 if cd "$BACKEND_DIR" && \
-  env DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
+  env DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:${POSTGRES_HOST_PORT}/$DB_NAME?sslmode=disable" \
   go run ./cmd/victory-bootstrap producer --handle definitely_missing_user >/tmp/victory-fresh-install-bootstrap-error.txt 2>&1; then
   echo "expected missing-user bootstrap to fail" >&2
   exit 1
