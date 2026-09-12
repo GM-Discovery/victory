@@ -33,7 +33,13 @@ services:
       PORT: ${PORT:-8081}
       DATABASE_URL: postgres://victory:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@victory-postgres:5432/victory?sslmode=disable
       STORAGE_ROOT: ${STORAGE_ROOT:-/opt/victory/storage}
-      OPERATOR_HANDLE: ${OPERATOR_HANDLE:-straturli}
+      # Kernel 96: this used to default to "straturli" (Grant's own handle)
+      # when unset, silently granting operator authority to his account on
+      # any fresh install that didn't override it. access.IsOperatorUser
+      # already treats an empty value as "no env-based override" safely --
+      # in-app Producer role grants (victory-bootstrap) work without this
+      # ever being set at all.
+      OPERATOR_HANDLE: ${OPERATOR_HANDLE:-}
       DEFAULT_LOCATION_SLUG: ${DEFAULT_LOCATION_SLUG:-victory-theater}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
