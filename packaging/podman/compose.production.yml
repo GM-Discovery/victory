@@ -1,0 +1,41 @@
+# Kernel 96: layers Grant's actual production infrastructure requirements
+# on top of the shared compose.yml -- run as:
+#   docker compose -f compose.yml -f compose.production.yml up -d
+# rather than maintaining a second, forked copy of the whole deployment.
+# Everything here is a genuine infrastructure fact (a Caddy container this
+# repo doesn't own, shared with another app), not a product default --
+# nothing here is Grant-specific in the sense Kernel 96 cares about, since
+# it never leaks into what a self-hoster who isn't fronting Victory with
+# an existing shared Caddy would ever need.
+services:
+  backend:
+    networks:
+      - edge_net
+    # The base file publishes a loopback host port (127.0.0.1:8081), which
+    # bread-caddy -- a separate container on edge_net -- cannot reach.
+    # expose (container-to-container only, no host publish) is what the
+    # original production file used; ports: is dropped by not repeating it
+    # here, since Compose merges services key-by-key and there's no way to
+    # "unset" a list key via override -- expose alongside the inherited
+    # ports simply gives edge_net a second, container-network-only path in.
+    expose:
+      - "8081"
+    environment:
+      # Kernel 77: self-service recovery email and export staging --
+      # genuinely optional (all empty-default), not yet part of the base
+      # consumer file since the Windows installer doesn't send email at
+      # all yet. Real values come from packaging/podman/.env as normal.
+      RECOVERY_EMAIL_ENABLED: ${RECOVERY_EMAIL_ENABLED:-}
+      RECOVERY_EMAIL_FROM: ${RECOVERY_EMAIL_FROM:-}
+      RECOVERY_EMAIL_FROM_NAME: ${RECOVERY_EMAIL_FROM_NAME:-Victory}
+      RECOVERY_EMAIL_BASE_URL: ${RECOVERY_EMAIL_BASE_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_TLS_MODE: ${SMTP_TLS_MODE:-starttls}
+
+networks:
+  edge_net:
+    external: true
+    name: edge_net

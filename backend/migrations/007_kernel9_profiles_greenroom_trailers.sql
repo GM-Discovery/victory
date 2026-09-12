@@ -42,7 +42,7 @@ CREATE INDEX IF NOT EXISTS idx_performer_profiles_is_published
 -- These are logged-in-only venues surfaced by map visibility.
 -- ---------------------------------------------------------------------------
 WITH location_row AS (
-  SELECT id FROM locations WHERE slug = 'amurray-family' LIMIT 1
+  SELECT id FROM locations WHERE is_default LIMIT 1
 ),
 lot_row AS (
   SELECT id FROM lots
@@ -70,7 +70,7 @@ WHERE NOT EXISTS (
 );
 
 WITH location_row AS (
-  SELECT id FROM locations WHERE slug = 'amurray-family' LIMIT 1
+  SELECT id FROM locations WHERE is_default LIMIT 1
 ),
 lot_row AS (
   SELECT id FROM lots

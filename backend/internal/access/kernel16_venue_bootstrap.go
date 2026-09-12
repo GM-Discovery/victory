@@ -45,7 +45,7 @@ func EnsureKernel16VenueSurface(ctx context.Context, pool *pgxpool.Pool) error {
 			slug:       "grants-cabin",
 			name:       "Grant's Cabin",
 			kind:       "cabin",
-			config:     `{ "surface": "invite_only", "invite_only": true, "contact": "grant@amurray.family" }`,
+			config:     `{ "surface": "invite_only", "invite_only": true, "contact": "GM-Discovery on GitHub, gm_discovery on Discord" }`,
 			isPublic:   false,
 			isWorkshop: false,
 		},

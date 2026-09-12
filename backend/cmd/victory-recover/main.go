@@ -43,11 +43,11 @@ const usage = `victory-recover -- Victory break-glass account recovery
 
 Usage:
   victory-recover whoami   (--handle H | --email E | --discord-id D | --user-id U)
-  victory-recover bootstrap [--operator-handle straturli] [--location SLUG] [--email E]
-  victory-recover claim    (--handle H | --email E | --discord-id D | --user-id U) [--operator-handle straturli]
+  victory-recover bootstrap --operator-handle YOUR_HANDLE [--location SLUG] [--email E]
+  victory-recover claim    (--handle H | --email E | --discord-id D | --user-id U) --operator-handle YOUR_HANDLE
   victory-recover grant    (--handle H | ...) --location SLUG --role producer
   victory-recover revoke   (--handle H | ...) [--all-sessions]
-  victory-recover recover  (--handle H | ...) [--base-url https://victory.amurray.family]
+  victory-recover recover  (--handle H | ...) --base-url https://your-install.example
 
 Reads DATABASE_URL from the environment (or --database-url).
 Run from the server shell. See Construction/Operations/victory-account-recovery-runbook.md.
@@ -87,11 +87,11 @@ func main() {
 	var (
 		t              target
 		databaseURL    = fs.String("database-url", os.Getenv("DATABASE_URL"), "PostgreSQL connection string")
-		operatorHandle = fs.String("operator-handle", envOr("OPERATOR_HANDLE", "straturli"), "handle that carries operator authority")
+		operatorHandle = fs.String("operator-handle", os.Getenv("OPERATOR_HANDLE"), "handle that carries operator authority")
 		location       = fs.String("location", "", "Location slug (grant)")
 		role           = fs.String("role", "", "Location role: producer|director|cast|crew|audience (grant)")
 		allSessions    = fs.Bool("all-sessions", false, "revoke every session for every user (revoke)")
-		baseURL        = fs.String("base-url", envOr("VICTORY_BASE_URL", "https://victory.amurray.family"), "public base URL used to build the recovery link")
+		baseURL        = fs.String("base-url", os.Getenv("VICTORY_BASE_URL"), "public base URL used to build the recovery link")
 	)
 	fs.StringVar(&t.handle, "handle", "", "target by Victory handle")
 	fs.StringVar(&t.email, "email", "", "target by email address")
@@ -486,6 +486,10 @@ func runRevoke(ctx context.Context, pool *pgxpool.Pool, t target, allSessions bo
 // matching what /api/auth/password-reset/confirm verifies; the raw value is
 // printed once, to the operator's terminal, and never written to a log.
 func runRecover(ctx context.Context, pool *pgxpool.Pool, t target, baseURL string) error {
+	if strings.TrimSpace(baseURL) == "" {
+		return errors.New("--base-url or VICTORY_BASE_URL must be set to this installation's own public address")
+	}
+
 	a, err := resolveAccount(ctx, pool, t)
 	if err != nil {
 		return err
@@ -514,13 +518,6 @@ func runRecover(ctx context.Context, pool *pgxpool.Pool, t target, baseURL strin
 	fmt.Println("Single use. Do not paste this into a log, ticket, or chat.")
 	fmt.Println("If the account has no password yet, redeeming this sets one.")
 	return nil
-}
-
-func envOr(key, fallback string) string {
-	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
-		return v
-	}
-	return fallback
 }
 
 func orNone(s string) string {

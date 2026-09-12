@@ -19,7 +19,7 @@ Use this for active kernel work.
 
 Start Postgres:
 ```bash
-cd /opt/victory
+cd /opt/victory/packaging/podman
 docker compose up -d postgres
 ```
 
@@ -51,9 +51,10 @@ PORT=18081 DATABASE_URL='postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/
 ## Install Mode
 Use this when validating the deployable path:
 ```bash
-cd /opt/victory
+cd /opt/victory/packaging/podman
 docker compose up -d --build
 ```
+(Requires a `.env` here first -- run `./generate-env.sh` once if one doesn't exist yet. Kernel 96: the repo root's own docker-compose.yml, Grant's old bespoke production file, is retired -- this is the one deployment path now, for production and local dev alike. Production additionally layers `compose.production.yml` for its shared-Caddy `edge_net` wiring: `docker compose -f compose.yml -f compose.production.yml up -d --build`.)
 
 ## Common Checks
 ```bash

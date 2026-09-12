@@ -7,7 +7,7 @@
 -- "authenticated_surface" visibility class. That code has been silently
 -- returning one fewer venue than it was written to return ever since.
 --
--- Lot: 'amurray-family' / 'main-lot', the same lot every other canonical
+-- Lot: the install's default location / 'main-lot', the same lot every other canonical
 -- venue already lives in (confirmed empirically: all 16 existing venues sit
 -- under this one lot; the separate 'victory-theater' neutral-install
 -- location, seeded by migration 025, deliberately holds no venues and is
@@ -23,7 +23,7 @@
 -- just this one -- map placement is a frontend-static concern here, not a
 -- database one.
 WITH location_row AS (
-  SELECT id FROM locations WHERE slug = 'amurray-family'
+  SELECT id FROM locations WHERE is_default
 ),
 lot_row AS (
   SELECT id FROM lots

@@ -1,14 +1,11 @@
-WITH new_location AS (
-  INSERT INTO locations (name, slug)
-  VALUES ('amurray.family', 'amurray-family')
-  ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
-  RETURNING id
-),
-location_row AS (
-  SELECT id FROM new_location
-  UNION
-  SELECT id FROM locations WHERE slug = 'amurray-family'
-  LIMIT 1
+-- Kernel 96: this used to create its own location literally named
+-- 'amurray-family' unconditionally, on every database, fresh installs
+-- included. access.EnsureDefaultLocation (Go, runs after schema
+-- migrations but before this one) now owns creating the install's own
+-- default location under whatever slug its Operator actually chose --
+-- this just attaches to it.
+WITH location_row AS (
+  SELECT id FROM locations WHERE is_default LIMIT 1
 ),
 new_lot AS (
   INSERT INTO lots (location_id, name, slug)

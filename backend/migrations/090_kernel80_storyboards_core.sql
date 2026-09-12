@@ -170,7 +170,7 @@ CREATE INDEX IF NOT EXISTS idx_storyboard_cards_storyboard ON storyboard_cards(s
 CREATE INDEX IF NOT EXISTS idx_storyboard_cards_author ON storyboard_cards(author_user_id);
 
 WITH location_row AS (
-  SELECT id FROM locations WHERE slug = 'amurray-family'
+  SELECT id FROM locations WHERE is_default
 ),
 lot_row AS (
   SELECT id FROM lots

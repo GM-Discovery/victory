@@ -8,7 +8,7 @@ SET hard_limit_bytes = 8589934592
 WHERE location_id = (
   SELECT id
   FROM locations
-  WHERE slug = 'amurray-family'
+  WHERE is_default
   LIMIT 1
 )
 AND hard_limit_bytes = 16106127360;

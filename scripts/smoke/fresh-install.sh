@@ -91,66 +91,30 @@ need_cmd go
 need_cmd curl
 
 echo "Using temporary database: $DB_NAME"
-docker compose up -d postgres >/dev/null
+# Kernel 96: the repo root's own docker-compose.yml (Grant's bespoke
+# production deployment) is retired -- packaging/podman/compose.yml is now
+# the one real deployment path, for production and local dev alike. Run
+# from its own directory so its sibling .env is picked up automatically.
+(cd "$ROOT/packaging/podman" && docker compose up -d postgres >/dev/null)
 docker exec -i "$POSTGRES_CONTAINER" createdb -U "$POSTGRES_USER" "$DB_NAME"
 
+# Kernel 96: used to manually pre-apply migrations 000-048 via psql before
+# handing off to the real binary for the rest. Now stops after 001 (schema
+# only) -- every content-seeding migration from 002 onward needs
+# access.EnsureDefaultLocation (Go) to have created the install's real
+# default location first, which only the real binary's own phased boot
+# sequence does. Applying them manually here would create that content
+# with no location to attach to at all.
 migrations=(
   "$ROOT/backend/migrations/000_kernel42_productions_baseline.sql"
   "$ROOT/backend/migrations/001_init.sql"
-  "$ROOT/backend/migrations/002_seed_world.sql"
-  "$ROOT/backend/migrations/003_users_handle.sql"
-  "$ROOT/backend/migrations/004_seed_session.sql"
-  "$ROOT/backend/migrations/005_kernel2_identity_invites_assets.sql"
-  "$ROOT/backend/migrations/006_kernel6_action_authority.sql"
-  "$ROOT/backend/migrations/007_kernel9_profiles_greenroom_trailers.sql"
-  "$ROOT/backend/migrations/008_kernel10_info_booth_mailbox.sql"
-  "$ROOT/backend/migrations/009_kernel11_note_cards.sql"
-  "$ROOT/backend/migrations/010_kernel13_workshop_placement.sql"
-  "$ROOT/backend/migrations/011_kernel15_producer_director_offices.sql"
-  "$ROOT/backend/migrations/012_kernel15_production_label.sql"
-  "$ROOT/backend/migrations/013_element_context_class.sql"
-  "$ROOT/backend/migrations/014_kernel21_venue_chat.sql"
-  "$ROOT/backend/migrations/015_kernel22_showings.sql"
-  "$ROOT/backend/migrations/016_kernel23_character_cards.sql"
-  "$ROOT/backend/migrations/017_kernel24_character_sheet_links.sql"
-  "$ROOT/backend/migrations/018_kernel32_discord_oauth.sql"
-  "$ROOT/backend/migrations/019_kernel35_discord_server_link.sql"
-  "$ROOT/backend/migrations/020_kernel35_discord_server_bootstrap.sql"
-  "$ROOT/backend/migrations/021_kernel36_discord_channel_mappings.sql"
-  "$ROOT/backend/migrations/022_kernel37_discord_mic_threads.sql"
-  "$ROOT/backend/migrations/023_kernel38_discord_chat_bridges.sql"
-  "$ROOT/backend/migrations/024_kernel39_discord_gateway_intake.sql"
-  "$ROOT/backend/migrations/025_kernel42_neutral_install_location.sql"
-  "$ROOT/backend/migrations/026_kernel46_first_theater_map.sql"
-  "$ROOT/backend/migrations/027_kernel47_map_display_mode.sql"
-  "$ROOT/backend/migrations/028_kernel47_grid_config.sql"
-  "$ROOT/backend/migrations/029_kernel49_warehouse_storage.sql"
-  "$ROOT/backend/migrations/030_kernel51_capacity_guardrails.sql"
-  "$ROOT/backend/migrations/031_kernel53_character_workbook_foundation.sql"
-  "$ROOT/backend/migrations/032_kernel59_command_registry.sql"
-  "$ROOT/backend/migrations/033_kernel60_character_skills.sql"
-  "$ROOT/backend/migrations/034_kernel59a_character_face_overrides.sql"
-  "$ROOT/backend/migrations/035_kernel59a_director_value_overrides.sql"
-  "$ROOT/backend/migrations/036_kernel61_player_workbook_foundation.sql"
-  "$ROOT/backend/migrations/037_kernel62_player_relationships.sql"
-  "$ROOT/backend/migrations/038_kernel65_third_place.sql"
-  "$ROOT/backend/migrations/039_kernel66_show_runs.sql"
-  "$ROOT/backend/migrations/040_kernel67_shows.sql"
-  "$ROOT/backend/migrations/041_kernel68_productions_created_by.sql"
-  "$ROOT/backend/migrations/042_kernel69_scenes.sql"
-  "$ROOT/backend/migrations/043_kernel70_scene_location_scoping.sql"
-  "$ROOT/backend/migrations/044_kernel70_show_stage_and_variables.sql"
-  "$ROOT/backend/migrations/045_kernel70_cues.sql"
-  "$ROOT/backend/migrations/046_kernel71_show_tickets.sql"
-  "$ROOT/backend/migrations/047_kernel71_roster_character_selection.sql"
-  "$ROOT/backend/migrations/048_kernel71_show_short_codes.sql"
 )
 
 for migration in "${migrations[@]}"; do
   echo "Applying $(basename "$migration")"
   docker exec -i "$POSTGRES_CONTAINER" psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$DB_NAME" < "$migration"
 done
-echo "PASS migrations from empty DB"
+echo "PASS schema migrations from empty DB (the rest apply when the real binary boots)"
 
 # Build once and run the compiled binary directly (rather than `go run`,
 # backgrounded inside a subshell) so $BACKEND_PID is the actual server
@@ -299,18 +263,6 @@ if [[ "$bootstrap_repeat" != *"Already existed: true"* ]]; then
   exit 1
 fi
 echo "PASS bootstrap producer is idempotent"
-
-bootstrap_legacy="$(
-  cd "$BACKEND_DIR" && \
-  env \
-    DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
-    go run ./cmd/victory-bootstrap producer --handle "$operator_handle" --location amurray-family
-)"
-if [[ "$bootstrap_legacy" != *"Location: amurray.family (amurray-family)"* && "$bootstrap_legacy" != *"Location: amurray-family"* ]]; then
-  echo "$bootstrap_legacy" >&2
-  exit 1
-fi
-echo "PASS bootstrap --location works with legacy compatibility location"
 
 if cd "$BACKEND_DIR" && \
   env DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/$DB_NAME?sslmode=disable" \
@@ -685,7 +637,7 @@ echo "PASS Third Place page file exists"
 
 # --- Kernel 66: Show Run, Audience Program, and Roster MVP ---
 # Reuses producer account A ($raw_session, bootstrapped as producer at the
-# neutral "amurray-family" location above) and account B ($second_session).
+# install's default location above) and account B ($second_session).
 # There is currently no in-app "create a Production" flow anywhere in
 # Victory (producers-office's own production picker shows "No productions
 # available" on a database with none) -- this is a pre-existing gap, not
@@ -704,7 +656,7 @@ echo "PASS Show Runs list rejects anonymous requests"
 docker exec -i "$POSTGRES_CONTAINER" psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$DB_NAME" -c "
   INSERT INTO productions (location_id, name, slug)
   SELECT id, 'Fresh Install Test Production', 'fresh-install-test-production'
-  FROM locations WHERE slug = 'amurray-family'
+  FROM locations WHERE is_default
   ON CONFLICT (location_id, slug) DO NOTHING;
 " >/dev/null
 fresh_install_production_id="$(docker exec -i "$POSTGRES_CONTAINER" psql -tAc "
@@ -717,10 +669,10 @@ fi
 echo "PASS fixture production created for Show Run smoke checks ($fresh_install_production_id)"
 
 fresh_install_location_id="$(docker exec -i "$POSTGRES_CONTAINER" psql -tAc "
-  SELECT id FROM locations WHERE slug = 'amurray-family';
+  SELECT id FROM locations WHERE is_default;
 " -U "$POSTGRES_USER" -d "$DB_NAME" | tr -d '[:space:]')"
 if [[ -z "$fresh_install_location_id" ]]; then
-  echo "failed to resolve amurray-family location id for Kernel 70 Scene smoke checks" >&2
+  echo "failed to resolve default location id for Kernel 70 Scene smoke checks" >&2
   exit 1
 fi
 

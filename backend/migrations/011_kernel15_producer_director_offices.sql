@@ -3,7 +3,7 @@ BEGIN;
 WITH location_row AS (
   SELECT id
   FROM locations
-  WHERE slug = 'amurray-family'
+  WHERE is_default
   LIMIT 1
 ),
 lot_row AS (
@@ -32,7 +32,7 @@ WHERE NOT EXISTS (
 WITH location_row AS (
   SELECT id
   FROM locations
-  WHERE slug = 'amurray-family'
+  WHERE is_default
   LIMIT 1
 ),
 lot_row AS (

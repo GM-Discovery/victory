@@ -34,7 +34,7 @@ func TestEmbeddedFilesSortedAndChecksummed(t *testing.T) {
 
 func TestPlanRefusesChecksumDrift(t *testing.T) {
 	files := []file{{Name: "001_a.sql", Checksum: "aaa"}, {Name: "002_b.sql", Checksum: "bbb"}}
-	if _, err := plan(files, map[string]string{"001_a.sql": "TAMPERED"}); err == nil {
+	if _, err := plan(files, map[string]string{"001_a.sql": "TAMPERED"}, ""); err == nil {
 		t.Fatal("expected checksum-drift refusal, got nil")
 	} else if !strings.Contains(err.Error(), "001_a.sql") {
 		t.Fatalf("drift error should name the file, got: %v", err)
@@ -43,7 +43,7 @@ func TestPlanRefusesChecksumDrift(t *testing.T) {
 
 func TestPlanRefusesMissingEmbeddedFile(t *testing.T) {
 	files := []file{{Name: "002_b.sql", Checksum: "bbb"}}
-	if _, err := plan(files, map[string]string{"001_a.sql": "aaa"}); err == nil {
+	if _, err := plan(files, map[string]string{"001_a.sql": "aaa"}, ""); err == nil {
 		t.Fatal("expected missing-file refusal, got nil")
 	}
 }
@@ -54,12 +54,38 @@ func TestPlanReturnsPendingInOrder(t *testing.T) {
 		{Name: "002_b.sql", Checksum: "bbb"},
 		{Name: "003_c.sql", Checksum: "ccc"},
 	}
-	pending, err := plan(files, map[string]string{"001_a.sql": "aaa"})
+	pending, err := plan(files, map[string]string{"001_a.sql": "aaa"}, "")
 	if err != nil {
 		t.Fatalf("plan: %v", err)
 	}
 	if len(pending) != 2 || pending[0].Name != "002_b.sql" || pending[1].Name != "003_c.sql" {
 		t.Fatalf("unexpected pending set: %+v", pending)
+	}
+}
+
+func TestPlanStopAfterDefersLaterFiles(t *testing.T) {
+	files := []file{
+		{Name: "001_a.sql", Checksum: "aaa"},
+		{Name: "002_b.sql", Checksum: "bbb"},
+		{Name: "003_c.sql", Checksum: "ccc"},
+	}
+	pending, err := plan(files, map[string]string{}, "001_a.sql")
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	if len(pending) != 1 || pending[0].Name != "001_a.sql" {
+		t.Fatalf("expected only 001_a.sql pending, got: %+v", pending)
+	}
+
+	// A later phase-2 call, with 001_a.sql now in the ledger, must not
+	// mistake 002/003 for missing just because a phase-1 caller elsewhere
+	// once filtered them out -- validation always sees the full set.
+	pending, err = plan(files, map[string]string{"001_a.sql": "aaa"}, "")
+	if err != nil {
+		t.Fatalf("plan phase 2: %v", err)
+	}
+	if len(pending) != 2 || pending[0].Name != "002_b.sql" || pending[1].Name != "003_c.sql" {
+		t.Fatalf("unexpected phase-2 pending set: %+v", pending)
 	}
 }
 

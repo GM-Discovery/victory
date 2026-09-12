@@ -263,13 +263,13 @@ SELECT
   'Leave Ra',
   'tutorial-handoff'
 FROM locations l
-WHERE l.slug = 'amurray-family'
+WHERE l.is_default
   AND NOT EXISTS (SELECT 1 FROM dialogue_packets p WHERE p.location_id = l.id AND p.slug = 'ra');
 
 INSERT INTO dialogue_topics (packet_id, topic_key, label, response_text, required_for_completion, sort_order)
 SELECT p.id, v.topic_key, v.label, v.response_text, v.required, v.ord
 FROM dialogue_packets p
-JOIN locations l ON l.id = p.location_id AND l.slug = 'amurray-family'
+JOIN locations l ON l.id = p.location_id AND l.is_default
 JOIN (VALUES
   -- canonical source content (pp.13-14): Ra locked the door himself, and
   -- stepped away briefly. The "nature called" line is a Victory onboarding
@@ -317,7 +317,7 @@ WHERE p.slug = 'ra'
 INSERT INTO dialogue_topic_prerequisites (topic_id, requires_topic_id)
 SELECT t.id, req.id
 FROM dialogue_packets p
-JOIN locations l ON l.id = p.location_id AND l.slug = 'amurray-family'
+JOIN locations l ON l.id = p.location_id AND l.is_default
 JOIN (VALUES
   ('crown-bet', 'why-looking'),
   ('what-if-succeed', 'crown-bet'),
@@ -343,7 +343,7 @@ SELECT
   'Placeholder tutorial-handoff projection. Kernel 75 finalizes the art and copy.',
   'ready'
 FROM locations l
-WHERE l.slug = 'amurray-family'
+WHERE l.is_default
   AND NOT EXISTS (SELECT 1 FROM scenes s WHERE s.location_id = l.id AND s.slug = 'tutorial-handoff');
 
 INSERT INTO scene_stage_elements (scene_id, kind, label, data, position, sort_order)
@@ -351,7 +351,7 @@ SELECT s.id, 'map_backdrop', 'Outside the Courtyard',
   '{"content_url": "/assets/tutorial-handoff.png", "display_mode": "fullscreen", "fit": "cover", "grid_enabled": false}'::jsonb,
   '{}'::jsonb, 0
 FROM scenes s
-JOIN locations l ON l.id = s.location_id AND l.slug = 'amurray-family'
+JOIN locations l ON l.id = s.location_id AND l.is_default
 WHERE s.slug = 'tutorial-handoff'
   AND NOT EXISTS (
     SELECT 1 FROM scene_stage_elements e WHERE e.scene_id = s.id AND e.kind = 'map_backdrop'
@@ -362,7 +362,7 @@ SELECT s.id, 'index_card', 'Tutorial complete',
   '{"text": "Tutorial complete. Your Character is equipped and ready. The Narrator will take it from here."}'::jsonb,
   '{"x": 0.5, "y": 0.72}'::jsonb, 1
 FROM scenes s
-JOIN locations l ON l.id = s.location_id AND l.slug = 'amurray-family'
+JOIN locations l ON l.id = s.location_id AND l.is_default
 WHERE s.slug = 'tutorial-handoff'
   AND NOT EXISTS (
     SELECT 1 FROM scene_stage_elements e WHERE e.scene_id = s.id AND e.kind = 'index_card'

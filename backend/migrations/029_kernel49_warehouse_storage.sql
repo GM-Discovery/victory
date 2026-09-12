@@ -81,7 +81,7 @@ SELECT
   128,
   85
 FROM locations l
-WHERE l.slug = 'amurray-family'
+WHERE l.is_default
 ON CONFLICT (location_id) DO NOTHING;
 
 UPDATE assets

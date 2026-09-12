@@ -46,7 +46,7 @@ JOIN (VALUES
   ('Sturdy Boots', 'sturdy-boots', 'Boots built for long roads.', '["clothing","footwear"]', 'unique'),
   ('Simple Dagger', 'simple-dagger', 'A plain but reliable blade.', '["weapon","light"]', 'unique')
 ) AS v(name, slug, description, descriptors, mode) ON TRUE
-WHERE l.slug = 'amurray-family'
+WHERE l.is_default
   AND NOT EXISTS (SELECT 1 FROM equipment_items e WHERE e.location_id = l.id AND e.slug = v.slug);
 
 INSERT INTO merchant_packets (
@@ -66,13 +66,13 @@ SELECT
   'Kessa grins. "I like your nerve. Twenty percent off, just for that."',
   'Kessa shakes her head. "Nice try. Full price stands."'
 FROM locations l
-WHERE l.slug = 'amurray-family'
+WHERE l.is_default
   AND NOT EXISTS (SELECT 1 FROM merchant_packets m WHERE m.location_id = l.id AND m.slug = 'kessa');
 
 INSERT INTO merchant_packet_equipment_items (packet_id, equipment_item_id, sort_order)
 SELECT mp.id, ei.id, v.ord
 FROM merchant_packets mp
-JOIN locations l ON l.id = mp.location_id AND l.slug = 'amurray-family'
+JOIN locations l ON l.id = mp.location_id AND l.is_default
 JOIN (VALUES
   ('travelers-cloak', 1), ('coil-of-rope', 2), ('traveling-rations', 3),
   ('sturdy-boots', 4), ('simple-dagger', 5)
