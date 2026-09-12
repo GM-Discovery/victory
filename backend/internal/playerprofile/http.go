@@ -379,22 +379,6 @@ func HandleSocialFace(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// Kernel 96 finding: this endpoint is what the Third Place commons
-		// list (GET /api/third-place/headshots) links every Trailer to, but
-		// until now it only required being logged in at all -- the commons
-		// list's own "pay for a ready Trailer Face before seeing anyone
-		// else's" admission rule wasn't enforced on the page that rule
-		// exists to gate. Same check the list uses, applied here directly.
-		ready, err := TrailerFaceReady(ctx, pool, viewerUserID)
-		if err != nil {
-			writeError(w, err)
-			return
-		}
-		if !ready.Ready {
-			writeError(w, errors.New("trailer_face_not_ready"))
-			return
-		}
-
 		path := strings.TrimPrefix(r.URL.Path, "/api/player-profile/")
 		if !strings.HasSuffix(path, "/face") {
 			writeJSON(w, http.StatusNotFound, response{Ok: false})
@@ -410,6 +394,27 @@ func HandleSocialFace(pool *pgxpool.Pool) http.HandlerFunc {
 		if err != nil {
 			writeError(w, err)
 			return
+		}
+
+		// Kernel 96 finding: this endpoint is what the Third Place commons
+		// list (GET /api/third-place/headshots) links every OTHER Trailer
+		// to, but until now it only required being logged in at all -- the
+		// commons list's own "pay for a ready Trailer Face before seeing
+		// anyone else's" admission rule wasn't enforced on the page that
+		// rule exists to gate. Same check the list uses, applied here --
+		// except for a self-view, which must always work regardless of
+		// readiness (this is also how an account previews its own
+		// in-progress Trailer before it's ready to publish).
+		if targetUserID != viewerUserID {
+			ready, err := TrailerFaceReady(ctx, pool, viewerUserID)
+			if err != nil {
+				writeError(w, err)
+				return
+			}
+			if !ready.Ready {
+				writeError(w, errors.New("trailer_face_not_ready"))
+				return
+			}
 		}
 
 		face, err := ProjectTrailerFace(ctx, pool, targetUserID)
