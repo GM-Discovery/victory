@@ -91,7 +91,11 @@ need_cmd go
 need_cmd curl
 
 echo "Using temporary database: $DB_NAME"
-docker compose up -d postgres >/dev/null
+# Kernel 96: the repo root's own docker-compose.yml (Grant's bespoke
+# production deployment) is retired -- packaging/podman/compose.yml is now
+# the one real deployment path, for production and local dev alike. Run
+# from its own directory so its sibling .env is picked up automatically.
+(cd "$ROOT/packaging/podman" && docker compose up -d postgres >/dev/null)
 docker exec -i "$POSTGRES_CONTAINER" createdb -U "$POSTGRES_USER" "$DB_NAME"
 
 # Kernel 96: used to manually pre-apply migrations 000-048 via psql before
