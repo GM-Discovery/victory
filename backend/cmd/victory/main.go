@@ -281,7 +281,7 @@ func main() {
 	// ever pass this check -- confirmed on real hardware, 2026-09-09:
 	// every manual "Check for Updates" click reported "a Show looks like
 	// it's in progress" indefinitely on an install that had never run one.
-	mux.HandleFunc("/api/system/live-sessions", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/system/live-sessions", func(w http.ResponseWriter, r *http.Request) {
 		var liveCount int
 		err := pool.QueryRow(r.Context(), `
 			SELECT COUNT(*)
@@ -312,7 +312,7 @@ func main() {
 	// Empty/unset PUBLIC_URL_FILE (every non-Windows deployment, or
 	// TUNNEL_MODE=off) reports public_url: null; callers fall back to
 	// their own request origin in that case.
-	mux.HandleFunc("/api/system/public-url", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/system/public-url", func(w http.ResponseWriter, r *http.Request) {
 		publicURL := ""
 		if path := strings.TrimSpace(os.Getenv("PUBLIC_URL_FILE")); path != "" {
 			if data, err := os.ReadFile(path); err == nil {
@@ -350,9 +350,15 @@ func main() {
 	mux.HandleFunc("/api/auth/password-reset/request", ratelimit.Middleware(credentialLimiter, identity.HandleForgotPassword(pool, forgotPasswordConfigFromEnv())))
 	mux.HandleFunc("/api/auth/password-reset/confirm", ratelimit.Middleware(credentialLimiter, identity.HandleResetPassword(pool, secureCookie)))
 	mux.HandleFunc("GET /api/invites/authority", identity.HandleInviteAuthority(pool))
-	mux.HandleFunc("/api/invites", identity.HandleCreateInvite(pool))
+	// Kernel 96: neither had any rate limit at all. Invite-accept
+	// specifically creates a new account -- the exact "signup/invite
+	// acceptance" category spec §26 calls out as abuse-prone -- and
+	// invite creation is a sensitive, low-frequency action for any
+	// legitimate Operator, so the same credential-guessing bucket fits
+	// both.
+	mux.HandleFunc("/api/invites", ratelimit.Middleware(credentialLimiter, identity.HandleCreateInvite(pool)))
 	mux.HandleFunc("GET /api/invites/preview", identity.HandlePreviewInvite(pool))
-	mux.HandleFunc("/api/invites/accept", identity.HandleAcceptInvite(pool, secureCookie))
+	mux.HandleFunc("/api/invites/accept", ratelimit.Middleware(credentialLimiter, identity.HandleAcceptInvite(pool, secureCookie)))
 	mux.HandleFunc("GET /api/discord/server-link/status", identity.HandleDiscordServerLinkStatus(pool, discordServerLinkConfig))
 	mux.HandleFunc("/api/discord/server/bootstrap", identity.HandleDiscordServerBootstrap(pool, discordServerLinkConfig))
 	mux.HandleFunc("GET /api/discord/gateway/status", identity.HandleDiscordGatewayStatus(pool, discordGatewayConfig))
@@ -1392,7 +1398,7 @@ func main() {
 	// this server -- so idle and read limits carry the protection instead.
 	server := &http.Server{
 		Addr:              bindHost + ":" + port,
-		Handler:           requestBodyLimit(loggingMiddleware(mux)),
+		Handler:           securityHeaders(requestBodyLimit(loggingMiddleware(mux))),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       60 * time.Second,
 		IdleTimeout:       120 * time.Second,
@@ -1615,5 +1621,27 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		start := time.Now()
 		next.ServeHTTP(w, r)
 		log.Printf("%s %s %s", r.Method, r.URL.Path, time.Since(start))
+	})
+}
+
+// securityHeaders sets response headers that are safe on every response
+// regardless of content type or deployment mode -- confirmed nothing here
+// interferes with PixiJS asset loading, WebSocket upgrades, or the Discord
+// OAuth redirect flow. Kernel 96 §36: found the stack set none of these at
+// all before now. Deliberately NOT here yet:
+//   - Content-Security-Policy: the kernel's own doctrine warns against a
+//     generic bundle breaking Pixi/WebSockets/OAuth/assets -- needs a real,
+//     deliberate policy authored and tested against this app specifically,
+//     not a copy-pasted default.
+//   - Strict-Transport-Security: only correct once a deployment is
+//     definitely HTTPS-only; this stack is also reachable over plain HTTP
+//     for pure-local/loopback access, where forcing HTTPS would break
+//     things rather than help.
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("X-Frame-Options", "DENY")
+		next.ServeHTTP(w, r)
 	})
 }

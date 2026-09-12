@@ -47,6 +47,21 @@ func TestClientIPPrefersForwardedFor(t *testing.T) {
 	}
 }
 
+// TestClientIPIgnoresForwardedForFromUntrustedDirectCaller proves Kernel 96:
+// a caller reaching the backend directly from a real (public) internet
+// address must not be able to spoof X-Forwarded-For to a different value
+// and bypass IP-based rate limiting -- only a private-range RemoteAddr
+// (matching every current deployment's actual proxy topology) is trusted
+// to have set that header honestly.
+func TestClientIPIgnoresForwardedForFromUntrustedDirectCaller(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
+	r.RemoteAddr = "203.0.113.50:443" // a real, public, non-private address
+	r.Header.Set("X-Forwarded-For", "198.51.100.1")
+	if got := ClientIP(r); got != "203.0.113.50" {
+		t.Fatalf("expected the direct caller's own address, not the spoofed header: got %q", got)
+	}
+}
+
 func TestMiddlewareReturnsTyped429(t *testing.T) {
 	l := New(1, 1)
 	handler := Middleware(l, func(w http.ResponseWriter, r *http.Request) {

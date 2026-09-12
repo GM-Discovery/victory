@@ -83,17 +83,41 @@ func (l *Limiter) Allow(key string) bool {
 // the first X-Forwarded-For hop is trustworthy; direct connections (local
 // dev, tests) fall back to RemoteAddr.
 func ClientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+
+	// Kernel 96: only honor X-Forwarded-For when the connection actually
+	// came from a trusted reverse proxy, not unconditionally -- trusting
+	// it from anyone meant a caller reaching the backend directly could
+	// spoof a fresh value per request and bypass every IP-based rate
+	// limit (login throttling included) entirely. "Trusted" means a
+	// private-range address rather than strictly loopback: Caddy reaches
+	// the backend over a published loopback port in the self-hosted
+	// Podman path, but production's bread-caddy reaches it over the
+	// edge_net container bridge network instead, which is a private
+	// (non-loopback) address, not a public one. The backend is never
+	// publicly reachable directly in any current deployment (confirmed
+	// elsewhere this pass), so a genuine internet attacker's own
+	// RemoteAddr can never be private-range -- this distinction holds
+	// regardless of which topology actually put the proxy in front.
+	if !isPrivateNetwork(host) {
+		return host
+	}
+
 	if fwd := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); fwd != "" {
 		first := strings.TrimSpace(strings.Split(fwd, ",")[0])
 		if first != "" {
 			return first
 		}
 	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
 	return host
+}
+
+func isPrivateNetwork(host string) bool {
+	ip := net.ParseIP(host)
+	return ip != nil && (ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast())
 }
 
 // Middleware wraps a credential endpoint with a typed 429 refusal.
