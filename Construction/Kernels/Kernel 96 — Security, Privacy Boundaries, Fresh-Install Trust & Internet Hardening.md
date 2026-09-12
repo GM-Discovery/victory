@@ -1,6 +1,6 @@
 # Kernel 96 — Security, Privacy Boundaries, Fresh-Install Trust & Internet Hardening
 
-**Status:** DRAFT — ready for implementation  
+**Status:** PASS (2026-09-12) — trust/default audit and full adversarial sweep complete, real findings fixed and verified (production redeployed clean). See `Construction/OperatorLogs/kernel-96-security-hardening-ledger.md` for the full reportback, fix list, and explicitly-named deferrals (CSP/HSTS, release cleanup, git history scrub).  
 **Type:** Security architecture audit + deployment hardening + fresh-install trust boundary + adversarial proof  
 **Sequence position:** After Kernel 95  
 **Primary proof:** A fresh Victory installation can be safely exposed to the public internet without inheriting Grant’s identity, family lot, Discord application, or production secrets, while preserving strict character/privacy boundaries and an SSH-only break-glass recovery path  
