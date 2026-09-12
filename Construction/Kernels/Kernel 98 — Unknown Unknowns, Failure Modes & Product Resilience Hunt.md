@@ -842,6 +842,14 @@ K98 checks ordinary weird filenames and recovery.
 
 ---
 
+## 36A. Carried-in findings from earlier kernels
+
+Kernel 96's adversarial security sweep (2026-09-12) found this incidentally while testing an unrelated WebSocket-authorization fix and routed it here per its own §40 kernel-boundary doctrine, rather than fixing it out of scope:
+
+- **Dice-roll broadcast panics on a nil pool dereference.** `TestKernel52RollDiceActionBroadcastsCanonicalResult` (`backend/internal/network/dice_roll_test.go`) crashes with a nil-pointer panic in `showings.LoadBySession` (`backend/internal/showings/showings.go:154`), called from `audienceDiceRollsHidden` (`backend/internal/network/ws.go:137`) via `deliverStageMessage` (`ws.go:212`). Confirmed pre-existing and unrelated to Kernel 96's own changes via `git stash` (fails identically with those changes fully reverted). The test itself passes `handleCavePayload(hub, nil, client, ...)` with a deliberately nil pool (mocking `storeDiceRollFunc` for the actual dice-roll write), but `deliverStageMessage` separately calls into `audienceDiceRollsHidden`/`showings.LoadBySession` with that same nil pool for a DIFFERENT purpose (checking the session's Showing-level dice-visibility setting) — a path the test's mock doesn't cover. Unknown whether this is purely a test-harness artifact (production never passes a nil pool) or whether the underlying `LoadBySession` call also mishandles the ordinary, real-world case of a dice roll happening in a session with **no** associated Showing (arguably the common case for ordinary Cave play, not just Showings) — that distinction needs an actual investigation, not a guess. Suggested classification: **UNKNOWN — requires targeted follow-up** until that's determined; escalate to BLOCKER if a real (non-nil-pool) reproduction is found.
+
+---
+
 ## 37. Feature debt classification
 
 Every finding should end in one bucket:
