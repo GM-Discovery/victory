@@ -1,4 +1,4 @@
-FROM golang:1.25-alpine AS build
+FROM golang:1.26-alpine AS build
 
 WORKDIR /app
 
@@ -21,6 +21,18 @@ COPY --from=build /victory /usr/local/bin/victory
 # without ever handing the end user a terminal, so the binary needs to be
 # reachable inside the running container, not run from a human's shell.
 COPY --from=build /victory-bootstrap /usr/local/bin/victory-bootstrap
+
+# Kernel 96: no USER directive meant this ran as root by default -- not
+# independently exploitable given everything else this pass checked, but a
+# real missing defense-in-depth layer regardless. STORAGE_ROOT/BACKUP_DIR/
+# EXPORTS_ROOT are bind-mounted from the host at container-run-time (their
+# actual paths aren't known at build time), owned by whatever host user ran
+# generate-env.sh's mkdir -- a fixed UID here could easily not match that
+# and get permission-denied on every existing install. generate-env.sh now
+# makes those three directories group/other-writable specifically so any
+# container UID can write them regardless of exact host ownership.
+RUN adduser -D -u 65532 victory
+USER 65532
 
 EXPOSE 8081
 CMD ["victory"]

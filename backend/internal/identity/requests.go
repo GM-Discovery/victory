@@ -48,7 +48,7 @@ func HandleCreatePermissionRequest(pool *pgxpool.Pool) http.HandlerFunc {
 
 		tx, err := pool.Begin(ctx)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, "internal_error", http.StatusInternalServerError)
 			return
 		}
 		defer tx.Rollback(ctx)
@@ -66,7 +66,7 @@ func HandleCreatePermissionRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			RETURNING id::text
 		`, userID, input.VenueSlug, requestedRole, input.Note, map[bool]string{true: "approved", false: "pending"}[autoApprove]).Scan(&requestID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, "internal_error", http.StatusInternalServerError)
 			return
 		}
 
@@ -80,7 +80,7 @@ func HandleCreatePermissionRequest(pool *pgxpool.Pool) http.HandlerFunc {
 				LIMIT 1
 			`, input.VenueSlug).Scan(&venueID, &locationID)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, "internal_error", http.StatusInternalServerError)
 				return
 			}
 
@@ -92,7 +92,7 @@ func HandleCreatePermissionRequest(pool *pgxpool.Pool) http.HandlerFunc {
 				    granted_by_user_id = EXCLUDED.granted_by_user_id
 			`, locationID, userID)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, "internal_error", http.StatusInternalServerError)
 				return
 			}
 
@@ -102,7 +102,7 @@ func HandleCreatePermissionRequest(pool *pgxpool.Pool) http.HandlerFunc {
 				ON CONFLICT DO NOTHING
 			`, locationID, userID, venueID)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, "internal_error", http.StatusInternalServerError)
 				return
 			}
 
@@ -121,13 +121,13 @@ func HandleCreatePermissionRequest(pool *pgxpool.Pool) http.HandlerFunc {
 				"Your actor access to Catharsis was auto-approved. The message is waiting here for later reference.",
 				input.VenueSlug)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, "internal_error", http.StatusInternalServerError)
 				return
 			}
 		}
 
 		if err := tx.Commit(ctx); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, "internal_error", http.StatusInternalServerError)
 			return
 		}
 
@@ -171,7 +171,7 @@ func HandleListMyPermissionRequests(pool *pgxpool.Pool) http.HandlerFunc {
 			ORDER BY created_at DESC
 		`, userID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, "internal_error", http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
@@ -187,7 +187,7 @@ func HandleListMyPermissionRequests(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.Status,
 				&row.CreatedAt,
 			); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, "internal_error", http.StatusInternalServerError)
 				return
 			}
 			out = append(out, row)

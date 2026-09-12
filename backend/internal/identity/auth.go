@@ -230,6 +230,12 @@ func HandleSignup(pool *pgxpool.Pool, secureCookie bool, discordCfg DiscordOAuth
 	}
 }
 
+// dummyPasswordHashForTiming is never a real account's hash -- it exists
+// purely so HandleLogin's nonexistent-handle path can pay the same Argon2id
+// cost a real handle's wrong-password path does (Kernel 96 timing-based
+// enumeration fix, see HandleLogin below).
+const dummyPasswordHashForTiming = "$argon2id$v=19$m=65536,t=1,p=4$9Rdn6qBv5/znCZzWGIQayg$t8vPNNTk8bbsC6ucGkgh9V3b4wf80vF/+2BrfVr7RbE"
+
 func HandleLogin(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -257,6 +263,15 @@ func HandleLogin(pool *pgxpool.Pool, secureCookie bool) http.HandlerFunc {
 			LIMIT 1
 		`, handle).Scan(&userID, &passwordHash, &displayName, &email)
 		if err != nil {
+			// Kernel 96: a nonexistent handle used to short-circuit here,
+			// skipping the deliberately slow Argon2id comparison a real
+			// handle goes through below -- a measurable timing difference
+			// that lets handle enumeration happen through response latency
+			// even though the response body itself is identical either
+			// way. Running the same comparison against a fixed dummy hash
+			// (never a real account's) keeps the cost the same regardless
+			// of which case this is.
+			_, _ = VerifyPassword(req.Password, dummyPasswordHashForTiming)
 			writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "invalid_credentials"})
 			return
 		}
