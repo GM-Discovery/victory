@@ -312,6 +312,7 @@ func ServeVenueWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordS
 			Send:      make(chan []byte, 64),
 			UserID:    sessionIdentity.UserID,
 			SessionID: sessionIdentity.SessionID,
+			VenueSlug: venueSlug,
 			Presence: PresenceUser{
 				UserID:      sessionIdentity.UserID,
 				Handle:      sessionIdentity.Handle,

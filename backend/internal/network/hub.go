@@ -8,6 +8,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"victory/backend/internal/access"
 )
 
 type Client struct {
@@ -16,6 +18,15 @@ type Client struct {
 	UserID    string
 	SessionID string
 	Presence  PresenceUser
+
+	// VenueSlug is the venue this connection was authorized for at connect
+	// time (ServeVenueWS). Kernel 96: RevalidateSessions re-checks this
+	// per-venue authorization, not just session validity -- a user removed
+	// from a Show's roster or demoted mid-connection previously kept
+	// receiving that venue's broadcasts until the socket happened to close
+	// on its own. Empty on connection kinds that aren't venue-scoped (the
+	// player-profile/Storyboards watch sockets), which skip that recheck.
+	VenueSlug string
 
 	// closeSendOnce guards close(Send). Kernel 88B gave the channel a second
 	// closer -- the session-revocation path, which queues a final notice and
@@ -160,6 +171,13 @@ func (h *Hub) RevalidateSessions(ctx context.Context, pool *pgxpool.Pool) {
 	h.mu.RUnlock()
 
 	checked := map[string]bool{}
+	// Kernel 96: a user's session can stay perfectly valid while their
+	// AUTHORITY over one specific venue changes mid-connection (removed
+	// from a Show's roster, demoted). That's a separate question from
+	// session validity, and two connections for the same user can be
+	// authorized for two different venues at once (two tabs, two Shows) --
+	// cached per (userID, venueSlug), not per userID.
+	venueChecked := map[[2]string]bool{}
 	for _, c := range clients {
 		if c.UserID == "" {
 			continue
@@ -186,6 +204,25 @@ func (h *Hub) RevalidateSessions(ctx context.Context, pool *pgxpool.Pool) {
 			// Conn directly here would race writePump for the connection's
 			// single writer slot, which is the bug this pass removes.
 			c.SendJSON(map[string]any{"type": "error", "error": "session_revoked"})
+			c.CloseSend()
+			continue
+		}
+
+		if c.VenueSlug == "" {
+			continue
+		}
+		key := [2]string{c.UserID, c.VenueSlug}
+		stillAuthorized, ok := venueChecked[key]
+		if !ok {
+			var err error
+			stillAuthorized, err = access.UserCanAccessVenueSlug(ctx, pool, c.UserID, c.VenueSlug)
+			if err != nil {
+				continue
+			}
+			venueChecked[key] = stillAuthorized
+		}
+		if !stillAuthorized {
+			c.SendJSON(map[string]any{"type": "error", "error": "venue_access_revoked"})
 			c.CloseSend()
 		}
 	}
