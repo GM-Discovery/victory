@@ -12,7 +12,7 @@ BEGIN;
 -- make Third Place exist on any freshly migrated database -- see Kernel 64's
 -- lesson that Go-only seeding makes a database "works live, fails fresh."
 WITH location_row AS (
-  SELECT id FROM locations WHERE slug = 'amurray-family' LIMIT 1
+  SELECT id FROM locations WHERE is_default LIMIT 1
 ),
 lot_row AS (
   SELECT id FROM lots

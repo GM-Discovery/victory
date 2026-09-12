@@ -43,7 +43,7 @@ FROM locations l
 JOIN venues v ON v.slug = 'catharsis' AND v.lot_id IN (
   SELECT id FROM lots WHERE location_id = l.id
 )
-WHERE l.slug = 'amurray-family'
+WHERE l.is_default
   AND NOT EXISTS (
     SELECT 1 FROM scenes s WHERE s.location_id = l.id AND s.slug = 'courtyard'
   );

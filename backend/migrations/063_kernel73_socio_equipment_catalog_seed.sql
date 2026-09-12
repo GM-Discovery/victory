@@ -11,14 +11,14 @@
 UPDATE equipment_items
 SET active = FALSE
 WHERE slug IN ('travelers-cloak', 'coil-of-rope', 'traveling-rations', 'sturdy-boots', 'simple-dagger')
-  AND location_id = (SELECT id FROM locations WHERE slug = 'amurray-family');
+  AND location_id = (SELECT id FROM locations WHERE is_default);
 
 DELETE FROM merchant_packet_equipment_items
 WHERE packet_id = (SELECT id FROM merchant_packets WHERE slug = 'kessa')
   AND equipment_item_id IN (
     SELECT id FROM equipment_items
     WHERE slug IN ('travelers-cloak', 'coil-of-rope', 'traveling-rations', 'sturdy-boots', 'simple-dagger')
-      AND location_id = (SELECT id FROM locations WHERE slug = 'amurray-family')
+      AND location_id = (SELECT id FROM locations WHERE is_default)
   );
 
 INSERT INTO equipment_items (
@@ -173,7 +173,7 @@ JOIN (VALUES
   ('Medicinal Tea', 'medicinal-tea', 'consumable', 10, 'A soothing brew.', 'stackable', '{"effect": "+1 recovery"}'),
   ('Coffee', 'coffee', 'consumable', 20, 'A bracing drink.', 'stackable', '{"effect": "+1 alertness"}')
 ) AS v(name, slug, category, cost_credits, short_description, quantity_mode, stats_json) ON TRUE
-WHERE l.slug = 'amurray-family'
+WHERE l.is_default
   AND NOT EXISTS (
     SELECT 1 FROM equipment_items e WHERE e.location_id = l.id AND e.slug = v.slug
   );
@@ -183,7 +183,7 @@ WHERE l.slug = 'amurray-family'
 INSERT INTO merchant_packet_equipment_items (packet_id, equipment_item_id, sort_order)
 SELECT mp.id, ei.id, v.ord
 FROM merchant_packets mp
-JOIN locations l ON l.id = mp.location_id AND l.slug = 'amurray-family'
+JOIN locations l ON l.id = mp.location_id AND l.is_default
 JOIN (VALUES
   ('secondhand-clothing', 1),
   ('traveling-cloak', 2),

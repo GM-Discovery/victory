@@ -13,12 +13,12 @@
 -- whichever mechanism created it -- untouched.
 --
 -- Same lot rationale as migration 083: every canonical venue lives under
--- 'amurray-family'/'main-lot'. kind is not behaviorally load-bearing
+-- the install's default location/'main-lot'. kind is not behaviorally load-bearing
 -- (venues.kind is never branched on in Go); 'commons' matches other
 -- broadly-scoped non-workshop venues. No map/grid row: map pin position and
 -- icon are frontend-static in frontend/app.js, per 083's recorded decision.
 WITH location_row AS (
-  SELECT id FROM locations WHERE slug = 'amurray-family'
+  SELECT id FROM locations WHERE is_default
 ),
 lot_row AS (
   SELECT id FROM lots
@@ -44,7 +44,7 @@ ON CONFLICT (lot_id, slug) DO UPDATE
       is_workshop = EXCLUDED.is_workshop;
 
 WITH location_row AS (
-  SELECT id FROM locations WHERE slug = 'amurray-family'
+  SELECT id FROM locations WHERE is_default
 ),
 lot_row AS (
   SELECT id FROM lots

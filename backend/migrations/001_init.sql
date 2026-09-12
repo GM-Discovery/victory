@@ -53,8 +53,17 @@ CREATE TABLE IF NOT EXISTS locations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
+  is_default BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- At most one location may be the install's own default -- this is what
+-- every canonical-content seed (002 onward) attaches to, instead of a
+-- hardcoded slug. Set by access.EnsureDefaultLocation, which runs after
+-- this migration but before any content-seeding migration (Kernel 96).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_locations_single_default
+  ON locations (is_default)
+  WHERE is_default;
 
 CREATE TABLE IF NOT EXISTS location_memberships (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

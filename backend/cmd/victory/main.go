@@ -100,15 +100,30 @@ func main() {
 	// Kernel 72: embedded migrations are the single schema truth. This runs
 	// before every Ensure* seed bootstrap and gets its own generous timeout —
 	// a first-time adoption pass re-applies the full history.
+	//
+	// Kernel 96: split into two phases so access.EnsureDefaultLocation runs
+	// between them. Migration 001 only creates schema (no location rows);
+	// 002 onward attaches canonical content to whichever location is
+	// is_default. That location doesn't exist until EnsureDefaultLocation
+	// creates it under this install's own DEFAULT_LOCATION_SLUG -- running
+	// it here, mid-migration, is what lets content-seeding migrations stay
+	// slug-agnostic instead of hardcoding one install's lot name.
+	migrateOpts := migrate.OptionsFromEnv(databaseURL)
 	migrateCtx, migrateCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	if err := migrate.Run(migrateCtx, pool, migrate.OptionsFromEnv(databaseURL)); err != nil {
-		log.Fatalf("migrations: %v", err)
+	phaseOneOpts := migrateOpts
+	phaseOneOpts.StopAfter = "001_init.sql"
+	if err := migrate.Run(migrateCtx, pool, phaseOneOpts); err != nil {
+		log.Fatalf("migrations (schema phase): %v", err)
 	}
-	migrateCancel()
 
 	if err := access.EnsureDefaultLocation(ctx, pool); err != nil {
 		log.Fatalf("default location bootstrap failed: %v", err)
 	}
+
+	if err := migrate.Run(migrateCtx, pool, migrateOpts); err != nil {
+		log.Fatalf("migrations: %v", err)
+	}
+	migrateCancel()
 	if err := profiles.EnsureKernel9ProfileSurface(ctx, pool); err != nil {
 		log.Fatalf("kernel 9 profile bootstrap failed: %v", err)
 	}

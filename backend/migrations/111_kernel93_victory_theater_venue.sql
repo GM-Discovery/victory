@@ -13,12 +13,12 @@ BEGIN;
 -- access.ResolveVisibleVenues's new UNION branch, added alongside this
 -- migration).
 --
--- Same lot every other canonical venue lives in (main-lot / amurray-family,
+-- Same lot every other canonical venue lives in (main-lot / the install's default location,
 -- per migration 083's own confirmation). kind='commons', matching
 -- audition-hall/third-place/show-runs -- venues.kind is not branched on in
 -- Go.
 WITH location_row AS (
-  SELECT id FROM locations WHERE slug = 'amurray-family'
+  SELECT id FROM locations WHERE is_default
 ),
 lot_row AS (
   SELECT id FROM lots

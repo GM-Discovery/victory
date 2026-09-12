@@ -24,7 +24,7 @@ BEGIN;
 -- surfaces derived from *runtime* state, not static venue tiles like this
 -- one).
 WITH location_row AS (
-  SELECT id FROM locations WHERE slug = 'amurray-family' LIMIT 1
+  SELECT id FROM locations WHERE is_default LIMIT 1
 ),
 lot_row AS (
   SELECT id FROM lots

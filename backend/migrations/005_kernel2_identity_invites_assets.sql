@@ -287,7 +287,7 @@ ALTER TABLE venues
 -- Seed: ensure InfoBooth and Workshop exist at the welcome gate / main-lot
 -- using the known seed world location/lot slugs.
 WITH location_row AS (
-  SELECT id FROM locations WHERE slug = 'amurray-family' LIMIT 1
+  SELECT id FROM locations WHERE is_default LIMIT 1
 ),
 lot_row AS (
   SELECT id FROM lots
@@ -310,7 +310,7 @@ WHERE NOT EXISTS (
 );
 
 WITH location_row AS (
-  SELECT id FROM locations WHERE slug = 'amurray-family' LIMIT 1
+  SELECT id FROM locations WHERE is_default LIMIT 1
 ),
 lot_row AS (
   SELECT id FROM lots

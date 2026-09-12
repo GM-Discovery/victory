@@ -46,23 +46,43 @@ func EnsureDefaultLocation(ctx context.Context, pool *pgxpool.Pool) error {
 		name = humanizeSlug(slug)
 	}
 
-	var locationID string
-	err := pool.QueryRow(ctx, `
-		INSERT INTO locations (slug, name)
-		VALUES ($1, $2)
-		ON CONFLICT (slug) DO UPDATE SET slug = EXCLUDED.slug
-		RETURNING id::text
-	`, slug, name).Scan(&locationID)
+	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback(ctx)
 
-	_, err = pool.Exec(ctx, `
+	// Kernel 96: exactly one location may ever be is_default (enforced by a
+	// partial unique index) -- every canonical-content seed migration (002
+	// onward) attaches to whichever one that is, instead of a hardcoded
+	// slug. Clearing any other row first means this stays correct even if
+	// an Operator's DEFAULT_LOCATION_SLUG ever changes between boots.
+	if _, err := tx.Exec(ctx, `
+		UPDATE locations SET is_default = FALSE
+		WHERE is_default AND slug != $1
+	`, slug); err != nil {
+		return err
+	}
+
+	var locationID string
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO locations (slug, name, is_default)
+		VALUES ($1, $2, TRUE)
+		ON CONFLICT (slug) DO UPDATE SET slug = EXCLUDED.slug, is_default = TRUE
+		RETURNING id::text
+	`, slug, name).Scan(&locationID); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(ctx, `
 		INSERT INTO lots (location_id, name, slug)
 		VALUES ($1, 'main-lot', 'main-lot')
 		ON CONFLICT (location_id, slug) DO NOTHING
-	`, locationID)
-	return err
+	`, locationID); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 func humanizeSlug(slug string) string {

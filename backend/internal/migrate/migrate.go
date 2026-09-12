@@ -48,6 +48,13 @@ type Options struct {
 	// DangerouslySkipBackup is for tests against disposable databases only.
 	// Production boots must never set this.
 	DangerouslySkipBackup bool
+	// StopAfter, when set, applies pending migrations only up through this
+	// filename (inclusive) -- everything later stays pending for a later
+	// Run call. Kernel 96: lets main.go run just enough schema (000/001) to
+	// call access.EnsureDefaultLocation before any content-seeding
+	// migration needs a real default location to attach to. Empty = no
+	// limit, the ordinary full-history behavior.
+	StopAfter string
 }
 
 type file struct {
@@ -85,8 +92,10 @@ func embeddedFiles() ([]file, error) {
 }
 
 // plan splits embedded files into already-applied and pending, refusing on
-// any divergence between the ledger and the embedded set.
-func plan(files []file, ledger map[string]string) (pending []file, err error) {
+// any divergence between the ledger and the embedded set. Validation always
+// covers the full embedded set regardless of stopAfter, so a phase-1-only
+// call never mistakes a later, already-applied file for a missing one.
+func plan(files []file, ledger map[string]string, stopAfter string) (pending []file, err error) {
 	byName := make(map[string]file, len(files))
 	for _, f := range files {
 		byName[f.Name] = f
@@ -107,6 +116,9 @@ func plan(files []file, ledger map[string]string) (pending []file, err error) {
 		}
 	}
 	for _, f := range files {
+		if stopAfter != "" && f.Name > stopAfter {
+			continue // reserved for a later Run call
+		}
 		if _, done := ledger[f.Name]; done {
 			continue
 		}
@@ -152,7 +164,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, opts Options) error {
 		return fmt.Errorf("read schema_migrations ledger: %w", err)
 	}
 
-	pending, err := plan(files, ledger)
+	pending, err := plan(files, ledger, opts.StopAfter)
 	if err != nil {
 		return err
 	}
