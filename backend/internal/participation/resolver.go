@@ -223,8 +223,23 @@ func ResolveParticipationContext(ctx context.Context, pool *pgxpool.Pool, userID
 // existing consumer of this return value keeps working unchanged --
 // Context.ViewerMode is where callers that need to distinguish Operator
 // specifically should look instead.
+//
+// Kernel 97: this used to always pass showRunID="" to
+// ResolveParticipationContext, which skips Step 3 (show_run_roster_members)
+// entirely -- the ONLY step that resolves a real roster Cast/Crew/Player
+// role, per that function's own precedence order. A roster Player with no
+// location_memberships row (the normal case) fell through to Step 4's bare
+// "audience" fallback, misclassified exactly as spec Sec5 describes, on
+// every /api/world/* snapshot (the-cave, catharsis, first-theater -- every
+// live caller of this function). Resolving whichever Show Run currently has
+// a live/rehearsal session at this venue fixes it without requiring the
+// three call sites in main.go to change at all.
 func LegacyLookupVenueRole(ctx context.Context, pool *pgxpool.Pool, userID, venueSlug string) (string, error) {
-	result, err := ResolveParticipationContext(ctx, pool, userID, venueSlug, "")
+	showRunID, err := resolveActiveShowRunIDForVenue(ctx, pool, venueSlug)
+	if err != nil {
+		return "", err
+	}
+	result, err := ResolveParticipationContext(ctx, pool, userID, venueSlug, showRunID)
 	if err != nil {
 		return "", err
 	}
@@ -236,6 +251,33 @@ func LegacyLookupVenueRole(ctx context.Context, pool *pgxpool.Pool, userID, venu
 	default:
 		return string(result.ViewerMode), nil
 	}
+}
+
+// resolveActiveShowRunIDForVenue finds the Show Run currently live or in
+// rehearsal at the given venue, if any -- "" (no error) if there isn't one,
+// which is the normal case for a venue with nothing currently staged.
+func resolveActiveShowRunIDForVenue(ctx context.Context, pool *pgxpool.Pool, venueSlug string) (string, error) {
+	venueSlug = strings.ToLower(strings.TrimSpace(venueSlug))
+	if venueSlug == "" {
+		return "", nil
+	}
+	var showRunID string
+	err := pool.QueryRow(ctx, `
+		SELECT sh.show_run_id::text
+		FROM sessions se
+		JOIN venues v ON v.id = se.venue_id
+		JOIN shows sh ON sh.id = se.show_id
+		WHERE v.slug = $1 AND se.status IN ('rehearsal', 'live')
+		ORDER BY se.started_at DESC
+		LIMIT 1
+	`, venueSlug).Scan(&showRunID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return showRunID, nil
 }
 
 func resolveLocationID(ctx context.Context, pool *pgxpool.Pool, venueSlug, showRunID string) (string, error) {
