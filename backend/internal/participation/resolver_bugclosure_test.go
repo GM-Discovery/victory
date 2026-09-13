@@ -175,3 +175,88 @@ func TestValidTicketRosterGrantsEntryWithNoManualAccessGrant(t *testing.T) {
 		t.Fatalf("expected CanParticipate true from roster membership alone, got %+v", result)
 	}
 }
+
+// TestLegacyLookupVenueRoleResolvesRosterPlayerViaLiveSession is the Kernel
+// 97 fix for the exact carried finding in spec Sec5: LegacyLookupVenueRole
+// (the only live caller feeding /api/world/* snapshots for the-cave,
+// catharsis, and first-theater) used to always pass showRunID="" to
+// ResolveParticipationContext, which skips Step 3 -- the only step that
+// resolves a real show_run_roster_members role -- entirely. A roster
+// Player with no location_memberships row (the normal shape) fell through
+// to the bare "audience" fallback despite genuinely being a Player. Proves
+// the fix: LegacyLookupVenueRole now discovers the live session's Show Run
+// at the venue itself, with no caller change required.
+func TestLegacyLookupVenueRoleResolvesRosterPlayerViaLiveSession(t *testing.T) {
+	pool := dbtest.OpenTestPool(t)
+	ctx := context.Background()
+	producer := bugClosureUser(t, pool, "bugclosure_live_producer")
+	player := bugClosureUser(t, pool, "bugclosure_live_player")
+	locationID := bugClosureLocationID(t, pool)
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO location_memberships (location_id, user_id, role, active)
+		VALUES ($1, $2, 'producer', TRUE)
+	`, locationID, producer); err != nil {
+		t.Fatalf("grant producer location_memberships row: %v", err)
+	}
+
+	suffix := bugClosureSuffix(t)
+	var productionID string
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO productions (location_id, name, slug) VALUES ($1, $2, $3) RETURNING id::text
+	`, locationID, "Bug Closure Live Production "+suffix, "bug-closure-live-production-"+suffix).Scan(&productionID); err != nil {
+		t.Fatalf("insert production: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM productions WHERE id = $1`, productionID) })
+
+	sr, err := showruns.CreateShowRun(ctx, pool, producer, productionID, showruns.CreateShowRunInput{
+		Title: "Bug Closure Live Show Run " + suffix, Slug: "bug-closure-live-show-run-" + suffix,
+	})
+	if err != nil {
+		t.Fatalf("create show run: %v", err)
+	}
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO show_run_roster_members (show_run_id, user_id, role, added_by_user_id)
+		VALUES ($1, $2, 'player', $3)
+	`, sr.ID, player, producer); err != nil {
+		t.Fatalf("insert player roster row: %v", err)
+	}
+
+	var showID, sessionID string
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO shows (show_run_id, slug, title, status, created_by_user_id)
+		VALUES ($1, $2, $3, 'live', $4)
+		RETURNING id::text
+	`, sr.ID, "bug-closure-live-show-"+suffix, "Bug Closure Live Show "+suffix, producer).Scan(&showID); err != nil {
+		t.Fatalf("insert show: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM shows WHERE id = $1`, showID) })
+
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO sessions (venue_id, status, show_id)
+		SELECT id, 'live', $1 FROM venues WHERE slug = 'catharsis'
+		RETURNING id::text
+	`, showID).Scan(&sessionID); err != nil {
+		t.Fatalf("insert live session at catharsis: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM sessions WHERE id = $1`, sessionID) })
+
+	for _, table := range []string{"location_memberships", "memberships", "access_grants"} {
+		var count int
+		if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM `+table+` WHERE user_id = $1`, player).Scan(&count); err != nil {
+			t.Fatalf("count %s rows for player: %v", table, err)
+		}
+		if count != 0 {
+			t.Fatalf("test setup invalid: expected zero %s rows for the player, got %d", table, count)
+		}
+	}
+
+	role, err := participation.LegacyLookupVenueRole(ctx, pool, player, "catharsis")
+	if err != nil {
+		t.Fatalf("LegacyLookupVenueRole: %v", err)
+	}
+	if role != "player" {
+		t.Fatalf("expected viewer role %q, got %q (this is the Kernel 97 live-session-hint bug if it says \"none\" or \"audience\")", "player", role)
+	}
+}

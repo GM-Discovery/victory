@@ -634,7 +634,7 @@ func HandleMe(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		role, err := access.CurrentLocationRole(ctx, pool, userID)
+		role, err := access.CurrentDefaultLocationRole(ctx, pool, userID)
 		if err != nil {
 			role = "audience"
 		}

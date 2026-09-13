@@ -27,6 +27,22 @@ func DefaultLocationSlug() string {
 	return slug
 }
 
+// DefaultLocationID returns this install's own is_default location's id.
+// Kernel 97: the canonical way for a caller that needs "this install's own
+// location" (as opposed to some other specific Show/venue's location) to
+// get its id without hardcoding a slug -- e.g. CurrentDefaultLocationRole.
+// Empty string, nil error if EnsureDefaultLocation hasn't run yet (should
+// not happen in practice; every real boot runs it before any handler can
+// receive a request).
+func DefaultLocationID(ctx context.Context, pool *pgxpool.Pool) (string, error) {
+	var id string
+	err := pool.QueryRow(ctx, `SELECT id::text FROM locations WHERE is_default LIMIT 1`).Scan(&id)
+	if err != nil {
+		return "", nil
+	}
+	return id, nil
+}
+
 // EnsureDefaultLocation creates the locations/lots rows for
 // DefaultLocationSlug() if they don't already exist. Every existing
 // Ensure*Surface bootstrap (venues, profiles, the Courtyard, the Socio

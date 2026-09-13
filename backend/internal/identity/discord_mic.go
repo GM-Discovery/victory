@@ -768,7 +768,7 @@ func discordMicCanControl(ctx context.Context, pool *pgxpool.Pool, userID string
 		return false, err
 	}
 
-	role, err := access.CurrentLocationRole(ctx, pool, userID)
+	role, err := access.CurrentDefaultLocationRole(ctx, pool, userID)
 	if err != nil {
 		return false, err
 	}

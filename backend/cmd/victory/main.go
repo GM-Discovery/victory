@@ -900,7 +900,7 @@ func main() {
 			return
 		}
 
-		locationRole, err := access.CurrentLocationRole(ctx, pool, userID)
+		locationRole, err := access.CurrentDefaultLocationRole(ctx, pool, userID)
 		if err != nil {
 			log.Printf("workshop venue role lookup failed: %v", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]any{

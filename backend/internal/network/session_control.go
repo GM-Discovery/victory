@@ -223,7 +223,7 @@ func commandOrDefault(command string) string {
 }
 
 func sessionControlParticipantRole(ctx context.Context, pool *pgxpool.Pool, userID string) string {
-	role, err := access.CurrentLocationRole(ctx, pool, userID)
+	role, err := access.CurrentDefaultLocationRole(ctx, pool, userID)
 	if err != nil {
 		return "producer"
 	}
