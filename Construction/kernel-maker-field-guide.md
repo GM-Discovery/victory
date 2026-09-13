@@ -3,30 +3,38 @@
 ## Purpose
 This guide is for a kernel maker or lower-tier coding agent that needs to change Victory without rediscovering the same runtime traps. Read it before implementing a kernel, then keep it open while testing.
 
-Victory is a browser-based VTT and venue system. The current live table is The Cave. The Greenroom and Trailers are identity/profile spaces. The backend is Go, the database is Postgres, the frontend is static HTML/CSS/JS served by Caddy or the Go backend's routed APIs.
+**This file predates most of Victory's history and was written when Victory was a single-table game (The Cave, Greenroom, Trailers).** Sections below describing "current product behavior" as of an early kernel are historical snapshots, not the current API surface — Victory now spans dozens of venues (Storyboards, eWrite/Writer's Room, First Theater, Catharsis, Producer's Office, Director's Chair, Third Place, Audition Hall, and more) built across 100 kernels. **Before trusting anything below as current, check:**
+- [`Construction/History/Kernel Index.md`](History/Kernel%20Index.md) — the full 1-100 kernel record, what each one actually built, and where its evidence lives.
+- [`Construction/History/Kernel Lineage.md`](History/Kernel%20Lineage.md) — the narrative version, organized by architectural era.
+- [`Construction/History/Superseded Doctrine Map.md`](History/Superseded%20Doctrine%20Map.md) — a "do not resurrect" list of specific architecture Victory deliberately replaced (raw Session-as-product-center, `current_session_personas` as authority, unscoped Location role resolution, and more). Read this before assuming an old comment or old spec still describes real behavior.
+- [`Construction/History/Current Architecture Manifest.md`](History/Current%20Architecture%20Manifest.md) — current services, packages, and runtime modes in one place.
+- [`Construction/Identity/Canonical Role and Authority Resolution.md`](Identity/Canonical%20Role%20and%20Authority%20Resolution.md) — the canonical map of which function answers which authority question (Kernel 97). **Check this before writing any new permission check** — duplicating an existing authority resolver instead of reusing it was the single biggest class of bug Kernel 97 found and fixed.
+- [`Construction/workflow/dev-workflow.md`](workflow/dev-workflow.md) — the actively-maintained operational reference for runtime modes, ports, testing, and frontend conventions. Where this field guide's operational instructions (Docker commands, ports, test commands) conflict with `dev-workflow.md`, **trust `dev-workflow.md`** — it is updated more frequently.
+
+Victory is a browser-based VTT and venue system, Go backend / Postgres database / static HTML+CSS+JS frontend (plus Vue for Storyboards as of Kernel 94), served by Caddy or the Go backend's routed APIs.
 
 Current canon references:
-- [current-state.md](/opt/victory/Construction/current-state.md)
-- [roadmap.md](/opt/victory/Construction/roadmap.md)
-- PixiJS is currently experimental and lives in First Theater, not The Cave; The Cave remains the proving ground for tool clutter and server-authoritative staging
+- [current-state.md](current-state.md)
+- [roadmap.md](roadmap.md)
 
 ## Repo Map
-- `/opt/victory/backend/` - Go service, HTTP APIs, WebSocket handlers, domain packages.
-- `/opt/victory/backend/cmd/victory/main.go` - process entry point, bootstraps kernel surfaces, registers routes.
-- `/opt/victory/backend/cmd/victory-bootstrap/main.go` - operator bootstrap CLI for safe authority grants.
-- `/opt/victory/backend/internal/actions/` - append-only action types, validation, authority rules.
-- `/opt/victory/backend/internal/network/` - Cave WebSocket hub, presence, snapshots, live broadcasts.
-- `/opt/victory/backend/internal/world/` - world and venue snapshot projection.
-- `/opt/victory/backend/internal/access/` - venue visibility, roles, grants.
-- `/opt/victory/backend/internal/identity/` - users, sessions, auth, invites, role helpers.
-- `/opt/victory/backend/internal/profiles/` - Trailers and Greenroom profile surfaces.
-- `/opt/victory/backend/internal/characters/` - character cards, drafting grants, session personas.
-- `/opt/victory/backend/migrations/` - SQL migrations. Add a new numbered file for schema changes.
-- `/opt/victory/frontend/` - static app shell and venue pages.
-- `/opt/victory/frontend/venues/the-cave/index.html` - live table UI and inline Cave client.
-- `/opt/victory/frontend/venues/greenroom/index.html` - public profile and character dressing room.
-- `/opt/victory/frontend/venues/trailers/index.html` - performer profile drafting and publishing.
-- `/opt/victory/Construction/` - kernel specs, reports, operator notes, workflow docs.
+Paths below are relative to the repository root — substitute your own clone location, do not assume `/opt/victory`. This is illustrative, not exhaustive; see `Current Architecture Manifest.md` for the fuller current package list.
+
+- `backend/` - Go service, HTTP APIs, WebSocket handlers, domain packages.
+- `backend/cmd/victory/main.go` - process entry point, bootstraps kernel surfaces, registers routes.
+- `backend/cmd/victory-recover/` - operator break-glass recovery CLI (Kernel 76); `backend/cmd/victory-bootstrap/` - the original, narrower operator bootstrap CLI for safe authority grants.
+- `backend/internal/actions/` - append-only action types, validation, the single WebSocket/command authorization gate (`CanAct`).
+- `backend/internal/network/` - WebSocket hub, presence, snapshots, live broadcasts (now serves multiple venues, not just The Cave).
+- `backend/internal/access/` - Operator identity, Location-scoped role resolution, venue access gates.
+- `backend/internal/participation/` - Show Run roster resolution — canonical Cast/Player/Crew authority within a specific Show (Kernel 66, hardened Kernel 97).
+- `backend/internal/showruns/` - production/management authority (`CanManageShowRun`).
+- `backend/internal/identity/` - users, sessions, auth (including Discord OAuth/server-link/gateway), invites, role helpers.
+- `backend/internal/profiles/`, `backend/internal/playerprofile/` - Trailers/Greenroom/Third Place profile and Face surfaces.
+- `backend/internal/characters/` - character cards, drafting grants, session personas (display only — see the canonical resolver doc for why this is not an authority source).
+- `backend/internal/storyboards/`, `backend/internal/ewrite/`, `backend/internal/scenes/`, `backend/internal/stageobjects/` - later, larger domain packages (Storyboards/Timeline, documents, Scene composition, canonical stage-object visibility).
+- `backend/migrations/` - embedded, checksummed SQL migrations. Add a new numbered file for schema changes; see `dev-workflow.md`'s "Creating a new migration".
+- `frontend/venues/` - one directory per venue; check the directory listing directly rather than assuming this guide's venue list is current.
+- `Construction/` - kernel specs, reports, operator notes, workflow docs, and (as of Kernel 99) the full historical archive under `Construction/History/`.
 
 ## Domain Vocabulary
 - **Location** - hosted world-space. Contains lots, venues, users, memberships, libraries.
@@ -35,141 +43,35 @@ Current canon references:
 - **Library** - reusable element ownership. Reusable assets belong here rather than inside one venue.
 - **Element** - reusable object or asset. `context_class` distinguishes props, scenery, cards, and future types.
 - **Placement** - instruction that places an element into a venue/session context.
-- **Session** - live instance of a venue. Actions happen here.
+- **Session** - live connection instance. Not a durable Show owner (see below) — a Session can be linked to a Show Run, but the Show Run and its roster are what carry authority forward across reconnects.
+- **Show / Showing / Show Run** - Show Run is the canonical production unit (Kernel 66+); a Showing is a scheduled/ticketed event scoped to a Show Run; a Session is a live connection, not a product entity. Do not treat Session as the canonical Show owner — that model was retired (see `Superseded Doctrine Map.md`).
 - **Action** - append-only session event with server-assigned ordering. Do not rewrite old actions to change history.
-- **Presence** - live connection state. It is in-memory and ephemeral, not canonical history.
+- **Presence** - live connection state. It is in-memory and ephemeral, confirmed **never** used as durable authority (Kernel 97, Kernel 98).
 - **User identity** - accountable account identity. Never replace it with a character/persona.
 - **Character card** - story persona owned by a user. It can be drafted, edited, and equipped.
-- **Persona** - the currently equipped character for a Cave session. It sits on top of the user identity.
-- **Producer/Director/Cast/Crew/Audience** - in-app roles. Producer/director are normal app authority, not shell or host authority.
-- **Operator** - infrastructure authority outside ordinary app permissions.
+- **Persona / selected Character** - the currently equipped/selected character. This governs **display** (name/portrait shown) only. **It is not a participation-authority source** — confirmed directly by Kernel 97's audit. Real Show/Showing participation authority (Cast/Player/Crew) is resolved through the Show Run roster (`backend/internal/participation`), never through session personas.
+- **Producer/Director/Cast/Crew/Audience** - in-app roles. Producer/Director are normal app management authority (`CanManageShowRun`), not shell or host authority. Crew has broad backstage *visibility* but narrower *management* authority than Producer/Director — these are deliberately different questions with deliberately different answers for Crew; see the canonical resolver doc §4-5 before assuming this is a bug.
+- **Operator** - infrastructure authority outside ordinary app permissions (`access.IsOperatorUser`). An Operator's client-side role *display* must always match their real server-resolved role for the identity they're using — a Kernel 97 fix removed a bug where the UI silently overrode this.
 
-## Current Character Kernel Baseline
-Kernel 23 added character cards and Cave persona actions. Kernel 24 moved character editing into Greenroom. Kernel 27 added the closed-showing review surface in the Director's Chair. Kernel 28 added the live Director Console for current-showing control.
-Kernel 32 adds Discord OAuth as the primary login path while keeping Victory sessions, users, and role authority authoritative.
-Kernel 33 adds the operator bootstrap command and canon capture so producer authority still comes from Victory, not from Discord login.
+## Historical API Snapshot (Kernel 23-33 era — NOT current)
+The following described "current product behavior" at the time this guide was last substantially rewritten (around Kernel 33). It is preserved as a historical snapshot only — Victory has since added dozens of venues, the full Show/Showing/Show Run model, Storyboards, eWrite, cartography, Socio, and more. **Do not treat the list below as the current API surface.** For the real current picture, see `Construction/History/Kernel-to-Feature Map.md` and `Kernel Index.md`.
 
-Current product behavior:
-- HTTP:
-  - `GET /api/auth/providers`
-  - `GET /auth/discord/start`
-  - `GET /auth/discord/callback`
-  - `GET /api/character-cards/me`
-  - `POST /api/character-cards`
-  - `PATCH /api/character-cards/{id}`
-  - `GET /api/showings`
-  - `GET /api/showings/{id}/review`
-  - `GET /api/director-console/current`
-  - `POST /api/showings/{id}/audience-view`
-  - `POST /api/showings/{id}/close`
-  - `POST /api/showings/start`
-  - `POST /api/venues/{slug}/chat-policy`
-- WebSocket:
-  - `persona/equip`
-  - `persona/unequip`
-- Broadcast/update:
-  - `presence/update`
-  - `showing/update`
-  - `venue/update`
-- Tables:
-  - `character_cards`
-  - `auth.discord_identities`
-  - `auth.oauth_states`
-  - `permission_grants`
-  - `current_session_personas`
+Kernel 23 added character cards and Cave persona actions. Kernel 24 moved character editing into Greenroom. Kernel 27 added the closed-showing review surface in the Director's Chair. Kernel 28 added the live Director Console for current-showing control. Kernel 32 added Discord OAuth as the primary login path. Kernel 33 added the operator bootstrap command.
 
-Current authority rule:
-- any active performer role (`producer`, `director`, `cast`, `crew`) can draft character cards in Greenroom
-- legacy character permission routes still exist in code, but current Greenroom behavior does not depend on them
+Snapshot-era HTTP/WebSocket/tables (frozen at ~Kernel 33, incomplete for current Victory):
+- HTTP: `GET /api/auth/providers`, `/auth/discord/start`, `/auth/discord/callback`, `/api/character-cards/me`, `POST /api/character-cards`, `PATCH /api/character-cards/{id}`, `GET /api/showings`, `/api/showings/{id}/review`, `/api/director-console/current`, `POST /api/showings/{id}/audience-view`, `/api/showings/{id}/close`, `/api/showings/start`, `/api/venues/{slug}/chat-policy`.
+- WebSocket: `persona/equip`, `persona/unequip`.
+- Broadcast/update: `presence/update`, `showing/update`, `venue/update`.
+- Tables: `character_cards`, `auth.discord_identities`, `auth.oauth_states`, `permission_grants`, `current_session_personas` (display-only, see above).
 
 The Greenroom owns character creation and editing. The Cave should only choose an existing character and put it on or take it off.
 The Director's Chair owns closed-showing review. It should read the durable action stream, not render video playback.
-The Director Console owns live current-showing control. It should be utilitarian, authority-gated, and tied to the current Cave session rather than to history.
+The Director Console owns live current-showing control. It should be utilitarian, authority-gated, and tied to the current Show Run rather than to history.
 
-## Runtime Modes
-There are two valid ways to run Victory. Do not mix them accidentally.
+## Runtime Modes, Ports, and Rebuild/Restart
+**This guide no longer duplicates operational mechanics — `Construction/workflow/dev-workflow.md` is the actively-maintained source of truth for runtime modes (dev/install/Windows-consumer), Docker/Podman commands, ports, and rebuild/restart procedure.** The compose file also moved: it now lives at `packaging/podman/compose.yml`, not a repo-root `docker-compose.yml` — dev-workflow.md has the current commands. Read it before running anything below; this guide previously listed exact `docker compose` invocations that have since gone stale twice, which is exactly the drift this update is meant to stop.
 
-### Dev Mode
-Use this for active kernel coding:
-- Postgres runs in Docker as `victory-postgres`.
-- Backend runs directly on the host with `go run`.
-- Default backend port is `8081`, unless you set `PORT`.
-- Host-Go must use `127.0.0.1:5432` in `DATABASE_URL`.
-
-Start from repo root:
-```bash
-cd /opt/victory
-docker compose up -d postgres
-```
-
-Run backend from `backend/`:
-```bash
-cd /opt/victory/backend
-PORT=8081 DATABASE_URL='postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory
-```
-
-If port `8081` is already occupied, either stop the old backend or use a temporary port:
-```bash
-PORT=18081 DATABASE_URL='postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/victory?sslmode=disable' GOCACHE=/tmp/victory-gocache go run ./cmd/victory
-```
-
-Health check:
-```bash
-curl -s http://127.0.0.1:8081/health
-```
-
-### Install Mode
-Use this to validate the deployable path:
-```bash
-cd /opt/victory
-docker compose up -d --build
-```
-
-In install mode:
-- Backend runs in the `victory-backend` container.
-- Postgres host inside Docker is `victory-postgres`.
-- The container `DATABASE_URL` is `postgres://victory:${POSTGRES_PASSWORD}@victory-postgres:5432/victory?sslmode=disable`.
-- Caddy proxies `/api/*` and `/ws/*` to `localhost:8081`.
-
-## Ports And Names
-- Backend HTTP/WebSocket: `8081` by default.
-- Temporary alternate backend often used by agents: `18081`.
-- Postgres host binding: `127.0.0.1:5432`.
-- Postgres container name: `victory-postgres`.
-- Backend container name: `victory-backend`.
-- Caddy config: `/opt/victory/Caddyfile`.
-
-Common checks:
-```bash
-docker ps --format '{{.Names}}\t{{.Status}}\t{{.Ports}}'
-docker logs --tail 80 victory-backend
-docker logs --tail 80 victory-postgres
-curl -s http://127.0.0.1:8081/health
-```
-
-If `8081` is busy:
-```bash
-sudo ss -ltnp | grep ':8081'
-```
-
-Decide whether you are testing host-Go or Docker backend. Do not leave both fighting for the same port.
-
-## Rebuild And Restart Rules
-Use host-Go for fast local code changes:
-1. Stop the old `go run` process.
-2. Re-run `go run ./cmd/victory` from `/opt/victory/backend`.
-3. Refresh the browser.
-
-Use Docker rebuild when validating install mode or Dockerfile/dependency changes:
-```bash
-cd /opt/victory
-docker compose up -d --build
-```
-
-If the backend behavior does not match your code, check for a stale process:
-- A host `go run` may still be serving `8081`.
-- The `victory-backend` container may still be serving `8081`.
-- Browser cache may be holding an old static file. Hard refresh venue pages.
+If the backend behavior does not match your code, the most common cause is still a stale process — check whether a host `go run` or a container is serving the port you're testing, and hard-refresh the browser (no frontend hot-reload exists).
 
 ## Database And Migration Rules
 
@@ -177,11 +79,12 @@ If the backend behavior does not match your code, check for a stale process:
 The migration files are embedded into the backend binary (`backend/migrations/embed.go`)
 and applied automatically at startup by `backend/internal/migrate`, tracked in a
 `schema_migrations` ledger (filename + sha256 checksum). There is no manual
-apply step on deploy anymore: `docker compose up -d --build backend` is the
-whole deploy. Before applying anything pending to a non-empty database the
-runner writes a `pg_dump` backup to `/opt/victory/backups/` and refuses to
+apply step on deploy anymore — see `dev-workflow.md` for the current deploy command.
+Before applying anything pending to a non-empty database the
+runner writes a `pg_dump` backup and refuses to
 migrate if the backup fails. Set `MIGRATE_ON_BOOT=false` to make the backend
 verify-only (it will refuse to boot and name the pending files).
+See `Construction/History/Migration Chronology.md` for the full history of every migration mapped to its originating kernel.
 
 Schema changes are ONE path now:
 - Add a new numbered SQL migration in `backend/migrations/`. Never edit a file
@@ -226,20 +129,11 @@ Do not:
 - Treat presence as history.
 
 ## Frontend Rules
-- The Cave is the live table and the full-feature proving-ground venue.
-- It is acceptable to build runtime tools visibly in The Cave first.
-- Once stable, move them into cleaner overlays, drawers, context menus, or secondary surfaces.
-- A clean template venue should later be extracted from the organized stage-shell surface.
-- Future venues should descend from that cleaned template.
-- PixiJS, when present, is a client-side renderer only. Do not let Pixi state become app truth.
-- Middle School Stage is the first clean stage-shell venue. Keep it simple, producer-only, and drawer-first.
-- The hidden Stage Template venue is the reusable shell descendant and the canonical extraction target.
-- First Theater should use the portable overlay above Pixi so renderer and overlay can be compared side by side.
-- The First Theater overlay proof marker is smoke-only. Treat it as a test affordance for verifying DOM chrome over Pixi, not as normal venue UI.
-- The Greenroom is public profile display plus character dressing room.
-- Trailers owns performer profile drafting and publishing.
-- Avoid putting full editors into The Cave unless the kernel explicitly says the live table owns that workflow.
-- Inline venue scripts should pass `node --check` after extraction.
+**See `dev-workflow.md`'s "Frontend Conventions (Vue / Pixi / Shared Shell)" for the current picture** — Vue (Storyboards, Kernel 94), Pixi (stage/canvas rendering), and the shared live-theater shell (`frontend/venues/shared/venue-shell.js`, Catharsis + First Theater) are now the three real frontend approaches in use, chosen per venue based on its needs. The rules below from the pre-Pixi-maturity era are kept only where still evergreen:
+- PixiJS is a client-side renderer only. Do not let Pixi state become app truth — this remains true regardless of which venue uses it.
+- Avoid putting full editors into a live-session venue unless the kernel explicitly says that venue owns the workflow.
+- Inline venue scripts should pass `node --check` after extraction (see below) — most newer venues avoid large inline scripts entirely, but The Cave and a few others still have them.
+- "Middle School Stage", the "hidden Stage Template venue", and "the First Theater overlay proof marker" were specific extraction experiments from Kernels 30-31 and are historical — check `Construction/History/Kernel Lineage.md` Era 2 before assuming any of them are still an active convention.
 
 Inline script check examples:
 ```bash
@@ -255,46 +149,14 @@ node --check "$tmp"
 ```
 
 ## Backend Test Commands
-Run from `/opt/victory/backend`.
-
-**As of Kernel 64, DB-touching tests require `TEST_DATABASE_URL` and will hard-fail (not skip) without it.** This now extends beyond the original identity/network/assets packages: access, social, Show Run, Show, Scene, Cue, Third Place, and world tests also use PostgreSQL. Treat the full suite as DB-requiring unless running a deliberately selected pure package. Point `TEST_DATABASE_URL` at a dedicated test database whose name contains `test` (e.g. `victory_test`) - never at the live `victory` database. The safety gate lives in `backend/internal/dbtest` (Go) and `scripts/test/require-isolated-database.sh` (shell); both reject a missing, live-looking, or production-looking URL with a clear error instead of silently running against the wrong database.
-
-One-time (or after a schema change) setup of the dedicated test database:
-```bash
-cd /opt/victory
-TEST_DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/victory_test?sslmode=disable" \
-  scripts/test/setup-test-database.sh
-```
-This creates `victory_test` if missing, applies every migration, and boots the real backend once against it so Go-side `Ensure*Surface` bootstrap (e.g. the `first-theater`/`catharsis`/`middle-school-stage` venues from `internal/access.EnsureKernel16VenueSurface`) runs too - the raw SQL migrations alone don't create everything a live install has. Safe to re-run any time; nothing in it is destructive. For a full wipe-and-rebuild instead, see `scripts/test/reset-test-database.sh` (requires `CONFIRM_TEST_DB_RESET=1` in addition to a validated `TEST_DATABASE_URL`, and will refuse to run against anything that isn't a dedicated test database).
-
-Full suite:
-```bash
-GOCACHE=/tmp/victory-gocache TEST_DATABASE_URL="postgres://victory:${POSTGRES_PASSWORD}@127.0.0.1:5432/victory_test?sslmode=disable" go test ./...
-```
-
-Focused suites:
-```bash
-GOCACHE=/tmp/victory-gocache go test ./internal/actions ./internal/network ./internal/world
-GOCACHE=/tmp/victory-gocache go test ./internal/characters
-GOCACHE=/tmp/victory-gocache go test ./internal/profiles ./internal/access
-```
-(Add `TEST_DATABASE_URL=...` to any focused suite containing a DB-backed test. When uncertain, include it.)
-
-Use `GOCACHE=/tmp/victory-gocache` because agents often run in restricted environments where the default Go cache location is not writable.
-
-Always finish with:
-```bash
-git diff --check
-```
-
-Do not set `DATABASE_URL` for test runs - it plays no role in `go test` (the live app database is only read by the real server process and `victory-bootstrap`), and unsetting it removes any chance of a DB-touching test coincidentally reaching it.
+**See `dev-workflow.md`'s "Common Checks", "Dedicated test database (Kernel 64)", and "Domain Authority Helpers" sections for current, exact commands.** Summary of what still matters: DB-touching tests require `TEST_DATABASE_URL` (hard-fail, not skip, since Kernel 64) pointed at a dedicated `*test*`-named database, never the live one; obtain pools via `backend/internal/dbtest.OpenTestPool(t)` rather than dialing `TEST_DATABASE_URL` directly, since it now also fills in `DEFAULT_LOCATION_SLUG` if unset (Kernel 96/97); always use `GOCACHE=/tmp/victory-gocache` in restricted environments; always finish with `git diff --check`. Do not set `DATABASE_URL` for test runs.
 
 ## Common Failure Modes
 - **Port conflict on 8081**: Docker backend and host-Go backend are both running. Stop one or use `PORT=18081`.
 - **Wrong database host**: Host-Go uses `127.0.0.1`; Docker backend uses `victory-postgres`.
 - **Postgres not running**: Start `docker compose up -d postgres`.
 - **Stale backend**: Code changed, but the old process is still serving. Restart the process actually bound to the port.
-- **Stale static frontend**: Hard refresh the venue page. If served by Caddy, it reads `/opt/victory/frontend`.
+- **Stale static frontend**: Hard refresh the venue page. If served by Caddy, check the Caddyfile for which `frontend/` path it actually reads — don't assume a specific absolute path.
 - **Forgot `GOCACHE`**: Go tests fail because cache path is not writable. Add `GOCACHE=/tmp/victory-gocache`.
 - **Migration exists but bootstrap missing**: Fresh databases work, existing databases do not, or vice versa. Add both paths when the repo pattern expects both.
 - **Client claims authority**: Server must resolve current user, role, session, and persona. Client payloads are requests, not facts.
@@ -362,9 +224,10 @@ For Third Place / Headshot Commons:
 - Column renames must be replay-tested against all earlier migrations; `CREATE INDEX IF NOT EXISTS` still resolves stale column references.
 
 ## Kernel Implementation Checklist
-1. Read `Construction/OperatorLogs/operator-notes.md` and the newest relevant kernel docs.
+1. Read `Construction/OperatorLogs/operator-notes.md` and the newest relevant kernel docs — check `Construction/History/Kernel Index.md` for what already exists in this area before assuming it doesn't.
 2. Check `git status --short`.
-3. Locate the existing package and route pattern before inventing a new one.
+3. Locate the existing package and route pattern before inventing a new one; check `Construction/Identity/Canonical Role and Authority Resolution.md` before writing any new permission check.
+3a. Check `Construction/History/Superseded Doctrine Map.md` before resurrecting an assumption an old comment or old spec implies — several specific ones (raw Session-as-product-center, unscoped Location role, `current_session_personas` as authority) are confirmed retired.
 4. Identify database, API, WebSocket, snapshot, and frontend surfaces.
 5. Add additive migrations and bootstrap SQL if schema changes.
 6. Keep authority checks server-side.
