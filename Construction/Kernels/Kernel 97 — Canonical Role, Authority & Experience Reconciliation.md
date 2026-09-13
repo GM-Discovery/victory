@@ -1,6 +1,6 @@
 # Kernel 97 — Canonical Role, Authority & Experience Reconciliation
 
-**Status:** DRAFT — ready for implementation  
+**Status:** CLOSED — PASS (2026-09-12). See `Construction/OperatorLogs/kernel-97-role-authority-reconciliation-ledger.md` and `Construction/Identity/Canonical Role and Authority Resolution.md`.  
 **Type:** Role-resolution audit + authority reconciliation + experience consistency  
 **Sequence position:** After Kernel 96  
 **Primary proof:** Every Victory role resolves consistently across venues, Shows, Showings, stage state, and shared services, with no contradictory authority paths  
