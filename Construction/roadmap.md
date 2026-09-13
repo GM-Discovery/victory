@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This is the current forward-looking roadmap after **Kernel 74**. The chronological record of shipped kernels lives in `Construction/OperatorLogs/operator-log.md`; older kernel specs and the large track roadmaps remain design history, not the source for the next unused kernel number.
+This is the forward-looking roadmap as it stood after **Kernel 74** — preserved as historical planning record, not current guidance. 26 more kernels (75–100) have shipped since this file was last updated, most of which directly overtook items below (the "Recommended Near Horizon" section's Scene composition/capture item, for example, was substantially addressed by Kernel 93; several "Medium Horizon" security items by Kernels 96/97). **Do not treat any bullet below as still-open work without checking `Construction/History/Kernel Index.md` and `Construction/History/Kernel Debt Ledger.md` first** — the debt ledger is the current, actively-reconciled source for what's genuinely still open, this file is not. The chronological record of shipped kernels lives in `Construction/OperatorLogs/operator-log.md`; older kernel specs and the large track roadmaps remain design history, not the source for the next unused kernel number.
 
 ## Shipped Foundation
 

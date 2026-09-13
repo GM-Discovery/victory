@@ -1,4 +1,8 @@
 Kernel Report Back — [Kernel Name / Version]
+
+0. Provenance
+Is this reportback being written contemporaneously (during/immediately after the kernel), or reconstructed later from evidence? If reconstructed, say so explicitly and cite what evidence it's built from (commits, migrations, code, tests) — never present a reconstruction as though it were written at the time.
+
 1. Status
 PASS / PARTIAL / FAIL
 
@@ -18,6 +22,7 @@ Example:
 - WebSocket session loop implemented
 - Actor → audience message propagation working
 - Basic role assignment functional
+
 3. Evidence (MANDATORY)
 
 Proof that it works.
@@ -29,34 +34,39 @@ curl outputs
 logs
 screenshots (if applicable)
 browser behavior
+automated proof (go test output, specific test names) — this is the primary evidence type for most backend kernels
+browser/human proof (Playwright script + assertions, or a described manual walkthrough) — required whenever a kernel touches something a human actually looks at or clicks
 
 Example:
 
-curl -s http://localhost:8080/session/1
+curl -s http://localhost:8081/health
 
 Result:
 
-{ "status": "active", "users": 2 }
+{ "status": "active" }
 
-No evidence = didn’t happen.
+No evidence = didn't happen.
 
-If this kernel touches DB-touching tests (anything under `backend/internal/identity`, `backend/internal/network`, or `backend/internal/assets`, or any new package that opens a Postgres pool in `_test.go`), evidence MUST also include a DB isolation proof, per Kernel 64:
-- `go test ./...` run with `TEST_DATABASE_URL` set to a dedicated test database (never the live app database)
+If this kernel touches DB-touching tests (any package that opens a Postgres pool in `_test.go`), evidence MUST also include a DB isolation proof, per Kernel 64:
+- `go test ./...` run with `TEST_DATABASE_URL` set to a dedicated test database (never the live app database) — obtain pools via `backend/internal/dbtest.OpenTestPool(t)`
 - A run proving DB-touching tests hard-fail with `TEST_DATABASE_URL` unset (not silently skipped)
-- A before/after row-count (or equivalent) comparison on the live database's `users`/`location_memberships`/other affected tables, showing zero change from the test run
+- A before/after row-count (or equivalent) comparison on the live database's affected tables, showing zero change from the test run
 
-4. How to Run (Operator Steps)
+4. Migrations
 
-Exact steps to reproduce from clean state.
+List every migration file this kernel added, by filename (`NNN_kernelXX_description.sql`). If none, say so explicitly rather than leaving this section silently empty. Note anything replay-sensitive (a column rename/drop must be safe against an already-migrated database, not just an empty one).
+
+5. Security and Data Implications
+
+Does this kernel touch authority, visibility, personal data, or anything an adversarial or merely-careless user could exploit? If yes, name the specific check and where it's enforced (server-side, not just client-side). If no, say so explicitly — an unaddressed section reads as an unconsidered risk, not a clean bill of health.
+
+6. How to Run (Operator Steps)
+
+Exact steps to reproduce from clean state, using Victory's actual current runtime modes (see `Construction/workflow/dev-workflow.md` — do not invent generic examples that don't match this project's real stack).
 
 No assumptions.
 
-Example:
-
-git pull
-docker compose up -d --build
-open http://localhost:5173
-5. Operator Notes (CRITICAL)
+7. Operator Notes (CRITICAL)
 
 This is where your future sanity lives.
 
@@ -71,12 +81,10 @@ anything non-obvious
 
 Example:
 
-- Requires PORT 8080 open
-- Fails silently if REDIS_URL not set
-- First startup takes ~30s due to build
-6. Blockers & Workarounds
+- Requires PORT 8081 open
+- First startup takes ~30s while migrations apply
 
-This is the part you explicitly asked for.
+8. Blockers & Workarounds
 
 Format:
 
@@ -92,53 +100,34 @@ What was done
 OPERATOR ACTION REQUIRED:
 What YOU must do (if anything)
 
-Example:
-
-BLOCKER:
-Frontend changes not appearing
-
-CAUSE:
-Vite assets cached in container
-
-WORKAROUND:
-Rebuilt container manually
-
-OPERATOR ACTION REQUIRED:
-Run:
-docker compose up -d --build app
-
-This is where your “rebuild containers” lesson would live.
-
-7. Deviations from Kernel
+9. Deviations from Kernel
 
 Did the builder change anything from the spec?
 
-Must be explicit.
+Must be explicit. This prevents silent drift.
 
-- Used polling instead of WebSockets temporarily
-- Limited audience size to 10 instead of 100
-
-This prevents silent drift.
-
-8. Known Issues
+10. Known Issues
 
 Not blockers—just rough edges.
 
-- Reactions lag ~200ms
-- UI not styled
-- No reconnect logic
-9. Next Recommended Step
+11. Deferred Debt
+
+Anything real but intentionally left for a later kernel — name which kernel it's routed to (K101 polish, K102+ architecture, etc.) if known, or mark UNKNOWN if not yet triaged. Do not let this section silently merge into "Known Issues" — debt is tracked forward, rough edges usually aren't.
+
+12. Deployment Impact
+
+Does this kernel require a restart, a migration on next boot, a config/env change, or anything else an Operator running a live install needs to know before or during deployment? If none, say so explicitly.
+
+13. Next Recommended Step
 
 Builder suggests what to do next.
 
 Not required to follow—but useful.
 
-- Add segmented audience views
-- Implement note card routing
-10. Files Changed / Created
+14. Files Changed / Created
 
 High-level, not a full diff.
 
-- /server/ws.go
-- /client/src/Stage.vue
-- docker-compose.yaml
+15. Exact Commit(s)
+
+The commit hash(es) this kernel's work actually landed in, once committed. If work spans multiple commits, list them. If a commit hasn't happened yet at report-writing time, say so and update this section once it does — don't guess a hash.

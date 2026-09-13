@@ -1015,8 +1015,14 @@ if [[ "$(cat "$BODY_OUT")" == *'"mic_on":true'* ]]; then
   echo "/showtime must never turn the mic on automatically" >&2
   exit 1
 fi
-if [[ "$(cat "$BODY_OUT")" != *'/mic hot'* ]]; then
-  echo "expected /showtime's response to suggest /mic hot" >&2
+# Kernel 99 fresh-install proof: this used to assert the response body
+# contained the literal string "/mic hot" -- stale since Kernel 92 reworked
+# this message into the current Chat-Bridge-status format (a93d68a vs
+# 7bd1733). The message reports real bridge status (Off/On/not configured/
+# not ready/etc.) contextually instead of always suggesting a command that
+# may not even work yet; assert on that instead of dead text.
+if [[ "$(cat "$BODY_OUT")" != *'"chat_bridge_message"'* ]]; then
+  echo "expected /showtime's response to include a chat_bridge_message" >&2
   cat "$BODY_OUT" >&2 || true
   exit 1
 fi
