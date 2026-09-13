@@ -11,7 +11,7 @@ import (
 // asserting no GET handler mutates," made tractable for a 200+ route table.
 //
 // Victory's CSRF posture (documented in
-// Construction/Security/kernel-76-route-matrix.md §2) rests on
+// Construction/Domains/Security/kernel-76-route-matrix.md §2) rests on
 // SameSite=Lax plus the invariant that no GET request ever mutates state.
 // Routes registered with an explicit Go 1.22 method prefix ("GET /path",
 // "POST /path") can't violate this structurally -- the stdlib ServeMux

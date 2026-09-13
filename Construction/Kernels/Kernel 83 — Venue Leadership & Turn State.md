@@ -677,10 +677,10 @@ No PASS based only on API tests.
 
 ```text
 Construction/Kernels/Kernel 83 — Venue Leadership & Turn State.md
-Construction/Venues/collaborative-venue-coordination-contract.md
-Construction/Venues/presence-tray-coordination-actions.md
-Construction/Venues/venue-session-state-lifecycle.md
-Construction/Storyboards/session-state-integration-seam.md
+Construction/Domains/Venues/collaborative-venue-coordination-contract.md
+Construction/Domains/Venues/presence-tray-coordination-actions.md
+Construction/Domains/Venues/venue-session-state-lifecycle.md
+Construction/Domains/Storyboards/session-state-integration-seam.md
 Construction/OperatorLogs/kernel-83-reportback.md
 ```
 

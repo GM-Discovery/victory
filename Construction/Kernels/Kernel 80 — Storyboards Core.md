@@ -778,11 +778,11 @@ Manually prove:
 
 ```text
 Construction/Kernels/Kernel 80 — Storyboards Core.md
-Construction/Storyboards/storyboards-domain-model.md
-Construction/Storyboards/storyboards-permissions.md
-Construction/Storyboards/storyboards-live-events.md
-Construction/Storyboards/storyboards-export-format.md
-Construction/Storyboards/storyboards-ui-contract.md
+Construction/Domains/Storyboards/storyboards-domain-model.md
+Construction/Domains/Storyboards/storyboards-permissions.md
+Construction/Domains/Storyboards/storyboards-live-events.md
+Construction/Domains/Storyboards/storyboards-export-format.md
+Construction/Domains/Storyboards/storyboards-ui-contract.md
 ```
 
 Use the standard reportback template.
@@ -963,4 +963,4 @@ reassignment mechanism.
 
 Full design detail, rationale, and test-by-test mapping to this spec's
 §14/§15 requirements live in the five sibling documents in
-`Construction/Storyboards/` and in the reportback filed for this kernel.
+`Construction/Domains/Storyboards/` and in the reportback filed for this kernel.

@@ -15,7 +15,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BACKEND_DIR="$ROOT/backend"
 
 # Test titles from the nine pre-existing dice.test.js failures
-# (Construction/roadmap.md's tracked, non-blocking exception). Kernel 72
+# (Construction/Canon/roadmap.md's tracked, non-blocking exception). Kernel 72
 # merged the mirrored first-theater/catharsis suites into tests/stage-runtime,
 # so the nine titles appear once now, not twice. Every one of these titles
 # starts with "dice tray"; nothing else in the suite does, so that prefix is
@@ -98,7 +98,7 @@ if [[ -n "$failing_titles" ]]; then
 fi
 
 echo "Node test run exit code: $node_test_exit"
-echo "Total failing tests: $failing_count (expected exactly $KNOWN_DICE_FAILURE_COUNT known '$KNOWN_DICE_FAILURE_PREFIX' failures, tracked in Construction/roadmap.md)"
+echo "Total failing tests: $failing_count (expected exactly $KNOWN_DICE_FAILURE_COUNT known '$KNOWN_DICE_FAILURE_PREFIX' failures, tracked in Construction/Canon/roadmap.md)"
 if [[ "$unexpected_count" -gt 0 ]]; then
   echo "UNEXPECTED failing tests (not the tracked dice exception):"
   printf '%s\n' "$failing_titles" | grep -v "^${KNOWN_DICE_FAILURE_PREFIX}" || true
@@ -108,7 +108,7 @@ if [[ "$unexpected_count" -eq 0 && "$failing_count" -eq "$KNOWN_DICE_FAILURE_COU
   echo "Node suite result: only the tracked, non-blocking dice.test.js exception failed ($failing_count/$failing_count)."
   record_step "Node test suites (stage-runtime/contract)" "PASS (with tracked exception)"
 elif [[ "$unexpected_count" -eq 0 && "$failing_count" -ne "$KNOWN_DICE_FAILURE_COUNT" ]]; then
-  echo "Node suite result: dice.test.js failure count drifted from the tracked $KNOWN_DICE_FAILURE_COUNT (now $failing_count) -- update the tracked count in this script and Construction/roadmap.md if this is an intentional partial fix or new break, and confirm which before treating this as a pass."
+  echo "Node suite result: dice.test.js failure count drifted from the tracked $KNOWN_DICE_FAILURE_COUNT (now $failing_count) -- update the tracked count in this script and Construction/Canon/roadmap.md if this is an intentional partial fix or new break, and confirm which before treating this as a pass."
   record_step "Node test suites (stage-runtime/contract)" "FAIL"
 else
   echo "Node suite result: unexpected failures outside the tracked dice.test.js exception."

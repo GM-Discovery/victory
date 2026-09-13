@@ -3,7 +3,7 @@
 ## Historical Note
 This file is now a historical snapshot.
 
-Use [Construction/vendor-acknowledgements.md](/opt/victory/Construction/vendor-acknowledgements.md) for the current dependency list.
+Use [Construction/Process/vendor-acknowledgements.md](/opt/victory/Construction/Process/vendor-acknowledgements.md) for the current dependency list.
 
 ## Purpose
 

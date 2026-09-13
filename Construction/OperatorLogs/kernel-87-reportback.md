@@ -30,7 +30,7 @@ Everything genuinely proven is listed with evidence below; everything not proven
 - PNG export via `pixiApp.renderer.extract.canvas`, hiding selection/measurement/pending-stroke overlays for the capture frame
 - IC chat tab (`#chat-ic-tab`/`#chat-ic-panel`/`#chat-ic-log`) added to `frontend/venues/catharsis/index.html` and wired in `runtime.js` alongside the existing OOC tab, sending via the same `/command`-execute mechanism OOC already used (`/ic <text>`)
 
-**No new dependency was added.** See `Construction/Stage/drawing-object-contract.md` §7 for the library evaluation and rationale (PIXI.Graphics, already vendored, is sufficient; the repo's no-build-step/no-package.json constraint made a third-party vector library a poor fit for this kernel's actual scope).
+**No new dependency was added.** See `Construction/Domains/Stage/drawing-object-contract.md` §7 for the library evaluation and rationale (PIXI.Graphics, already vendored, is sufficient; the repo's no-build-step/no-package.json constraint made a third-party vector library a poor fit for this kernel's actual scope).
 
 ## 3. Evidence (MANDATORY)
 
@@ -149,7 +149,7 @@ NODE_PATH=/tmp/node_modules node ../scripts/smoke/kernel87-cartograph-browser.js
 ## 7. Deviations from Kernel
 
 - **Live-stroke-while-drawing was not implemented** — completed-stroke sync only (explicitly permitted by kernel §0/§22 as not requiring PARTIAL on its own).
-- **Gridless calibration has server-side math (`PathDistanceCells`'s gridless branch) but no capture UI** (no "click two points, enter a known real-world distance" flow was built). The backend model exists and is documented (`Construction/Stage/measured-tabletop-contract.md` §5); wiring it into the toolbar was judged lower priority than the required core tool set given the time available.
+- **Gridless calibration has server-side math (`PathDistanceCells`'s gridless branch) but no capture UI** (no "click two points, enter a known real-world distance" flow was built). The backend model exists and is documented (`Construction/Domains/Stage/measured-tabletop-contract.md` §5); wiring it into the toolbar was judged lower priority than the required core tool set given the time available.
 - **Shared/followed Detail View across viewers was not built** — only the active editor's own camera moves (the kernel's explicitly-permitted minimum bar, not the "preferred if inexpensive" stretch goal).
 - **IC chat Character avatar is captured in the payload but not rendered as an image** in the chat log yet (name-only speaker label).
 - **First Theater was not wired** — `cartograph_enabled`/`ic_chat_enabled` are seeded true for Catharsis only, matching Kernel 73's Equip-Mode-is-Catharsis-only precedent exactly (a deliberate, documented scope decision, not an oversight).

@@ -90,7 +90,7 @@ No `chromium-cli`/headless browser tooling available in this environment (same g
 - `backend/internal/showruns/authority.go` (`CanViewBackstage`), `http.go`, `showruns.go` (listing SQL), `showruns_test.go`
 - `backend/internal/shows/http.go` (backstage gating)
 - `backend/internal/thirdplace/http.go` (readiness gate on POST), `http_test.go`
-- `Construction/Dictionary.txt` (Trailer Face Ready, Stage Management, Third Place unlock rule)
+- `Construction/Canon/Dictionary.txt` (Trailer Face Ready, Stage Management, Third Place unlock rule)
 - `frontend/app.js` (Trailers-open rule effects on menu grouping, display-name override, map fog)
 - `frontend/index.html`, `frontend/styles.css` (fog layer)
 - `frontend/venues/show-runs/index.html` (Stage Management labels, Create Production UI), `run.html`, `roster.html`, `show.html` (labels only)

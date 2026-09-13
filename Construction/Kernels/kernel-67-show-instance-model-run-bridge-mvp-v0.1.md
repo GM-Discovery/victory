@@ -101,7 +101,7 @@ POST      /api/shows/{show_id}/sessions/{session_id}/unlink
 
 ## 6. Dictionary
 
-`Construction/Dictionary.txt`: added a `Show (Show Instance)` entry, and
+`Construction/Canon/Dictionary.txt`: added a `Show (Show Instance)` entry, and
 **corrected** the existing `Showing (live/runtime) vs. future scheduled
 occurrence` note — it previously predicted scheduling would extend
 `showings`; that was found unsafe, so it now documents that `shows` (not

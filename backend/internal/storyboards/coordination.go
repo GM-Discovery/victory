@@ -6,7 +6,7 @@ package storyboards
 // Group Leader/Current Turn, and how to shape the roster/state for the
 // wire -- while venuecoordination itself stays a dumb, reusable, in-memory
 // state store with no notion of boards, tiers, or grants. See
-// Construction/Venues/collaborative-venue-coordination-contract.md.
+// Construction/Domains/Venues/collaborative-venue-coordination-contract.md.
 
 import (
 	"context"

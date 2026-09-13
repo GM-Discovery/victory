@@ -5,14 +5,14 @@
 encrypted off-host backup with a proven restore. Self-service password recovery is
 code-complete and fully tested but **not yet proven in real-world delivery** — see §5.
 **Supersedes:** `Security-notes-kernel-2-historical.md` (Kernel 2 posture, historical only).
-Kernel 76's evidence in `Construction/Security/kernel-76-*.md` remains authoritative for
+Kernel 76's evidence in `Construction/Domains/Security/kernel-76-*.md` remains authoritative for
 everything it covered; this document layers Kernel 77's changes on top rather than repeating
 Kernel 76's verified guarantees, which the previous version of this file already recorded and
 which remain true.
 
 Full Kernel 77 evidence: `Construction/OperatorLogs/kernel-77-reportback.md`,
-`Construction/Operations/kernel-77-backup-restore-proof.md`,
-`Construction/Privacy/*.md`.
+`Construction/Domains/Operations/kernel-77-backup-restore-proof.md`,
+`Construction/Domains/Privacy/*.md`.
 
 ---
 
@@ -22,7 +22,7 @@ Full Kernel 77 evidence: `Construction/OperatorLogs/kernel-77-reportback.md`,
 - Private data hard-deletes via the existing, Kernel-76-verified CASCADE foreign keys.
 - Shared history (`actions.actor_id` and eleven other previously-`RESTRICT` columns) reassigns
   to a dedicated, credential-less tombstone account (`deleted-user`) rather than blocking
-  deletion or leaving a bare NULL — see `Construction/Privacy/account-deletion-policy.md`.
+  deletion or leaving a bare NULL — see `Construction/Domains/Privacy/account-deletion-policy.md`.
 - Blocked when the account is the sole active Producer at a Location with Productions, or is
   the operator account. Both proven with negative tests.
 - Six tests, all passing: private-only deletion, shared-Action anonymization, sole-producer
@@ -93,7 +93,7 @@ Full Kernel 77 evidence: `Construction/OperatorLogs/kernel-77-reportback.md`,
 ## 2. Repaired in Kernel 76 (unchanged, still true)
 
 See the previous version of this file (`git log` on this path) or
-`Construction/Security/kernel-76-findings.md` for the full account: raw password-reset tokens
+`Construction/Domains/Security/kernel-76-findings.md` for the full account: raw password-reset tokens
 in logs, open public registration, Third Place identity leak, committed default database
 password, Production-list disclosure, unauthenticated Discord gateway status, missing transport
 limits. All seven repairs were re-verified live during this kernel's regression pass and remain

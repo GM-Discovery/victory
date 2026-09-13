@@ -4,7 +4,7 @@
 **Status:** PASS, with one evidence gap honestly stated below (browser rendering)
 **Date:** 2026-08-17
 **Deployed:** not yet — uncommitted, awaiting Grant's review (the pattern since Kernel 86)
-**Operator guide:** `Construction/Operations/stage-object-visibility.md`
+**Operator guide:** `Construction/Domains/Operations/stage-object-visibility.md`
 
 ---
 
@@ -268,7 +268,7 @@ per-merchant Haggle mechanics.
 
 ## 6. Next recommended step
 
-Grant's own walkthrough of `Construction/Operations/stage-object-visibility.md`
+Grant's own walkthrough of `Construction/Domains/Operations/stage-object-visibility.md`
 §9, on a real install (which will also settle whether this host's WebGL
 limitation is specific to this container or reproducible on the deployed
 box — worth checking before assuming the browser proof will pass there

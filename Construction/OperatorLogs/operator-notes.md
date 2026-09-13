@@ -2,8 +2,8 @@
 
 ## Current Canon Note
 Current system truth now lives in:
-- [current-state.md](/opt/victory/Construction/current-state.md)
-- [roadmap.md](/opt/victory/Construction/roadmap.md)
+- [current-state.md](/opt/victory/Construction/Canon/current-state.md)
+- [roadmap.md](/opt/victory/Construction/Canon/roadmap.md)
 
 This file remains useful for longer-form modeling notes and historical reasoning, but some older status sections below are now historical/superseded snapshots rather than the live canonical state.
 
@@ -25,7 +25,7 @@ Read this before making structural changes.
 
 ## Current Status
 Historical note:
-The section below began as an early foundation snapshot and should no longer be treated as the single source of truth for the live system. Use `Construction/current-state.md` for current route, venue, and kernel state.
+The section below began as an early foundation snapshot and should no longer be treated as the single source of truth for the live system. Use `Construction/Canon/current-state.md` for current route, venue, and kernel state.
 
 Current confirmed capabilities:
 - Postgres is running in Docker on the server

@@ -40,7 +40,7 @@ var blockedNames = map[string]bool{
 func ValidateTestDatabaseURL(testDatabaseURL, liveDatabaseURL string) error {
 	trimmed := strings.TrimSpace(testDatabaseURL)
 	if trimmed == "" {
-		return fmt.Errorf("TEST_DATABASE_URL is required for database-touching tests (see Construction/kernel-maker-field-guide.md, Backend Test Commands)")
+		return fmt.Errorf("TEST_DATABASE_URL is required for database-touching tests (see Construction/Process/kernel-maker-field-guide.md, Backend Test Commands)")
 	}
 
 	liveTrimmed := strings.TrimSpace(liveDatabaseURL)

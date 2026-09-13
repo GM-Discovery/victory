@@ -1,6 +1,6 @@
 # Victory Product Glossary
 
-Canonical current meaning of Victory's core vocabulary. Where an older document uses a term differently, this glossary — not that document — is current truth (see `Construction/Identity/Canonical Role and Authority Resolution.md` for the authority-resolution detail behind the role terms, and `Construction/History/Architecture Milestones.md` for when a term's meaning changed).
+Canonical current meaning of Victory's core vocabulary. Where an older document uses a term differently, this glossary — not that document — is current truth (see `Construction/Domains/Identity/Canonical Role and Authority Resolution.md` for the authority-resolution detail behind the role terms, and `Construction/History/Architecture Milestones.md` for when a term's meaning changed).
 
 **Location (a.k.a. "the lot")** — one Victory installation's top-level container: a campus of venues, its own set of people, and its own Operator. Most installs have exactly one. Location membership governs lot-wide access (who's on the campus at all), not what any individual can do inside a specific Show — see Show Run roster below.
 

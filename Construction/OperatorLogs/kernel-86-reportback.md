@@ -34,7 +34,7 @@ Two real, unrelated production bugs were found and fixed only by actually runnin
 | No duplicate dice truth | PASS | `Effect.SourceActionID` is the only link; no second history table exists (`backend/internal/stageeffects` is in-memory only) |
 | Default visibility Cohort, safe Show fallback for Ungrouped | PASS | `rollaudience.Resolve`; live proof: director (Ungrouped throughout) rolling with default/`"cohort"` visibility resolved to `"show"` and reached bob |
 | Director rolls use same default | PASS | Spec §1.11; unchanged code path, no special-casing added for Director rollers |
-| Explosion behavior unchanged, logged as follow-up | PASS | No renderer-side explosion computation exists; `Construction/current-state.md`'s Known Gaps updated with the exact spec §14 language |
+| Explosion behavior unchanged, logged as follow-up | PASS | No renderer-side explosion computation exists; `Construction/Canon/current-state.md`'s Known Gaps updated with the exact spec §14 language |
 | No unrelated dice-engine rewrite | PASS | `dice.go`/`ParseExpression`/`Roll`/`RollExpression`/`SingleGroup` byte-for-byte unchanged |
 
 ---
@@ -43,9 +43,9 @@ Two real, unrelated production bugs were found and fixed only by actually runnin
 
 ### Backend (all additive, zero schema migrations — existing tables/columns reused)
 
-- `backend/internal/rollaudience` (new package) — audience resolution, viewer visibility, live recipient computation. See `Construction/Dice/dice-projection-contract.md`.
-- `backend/internal/stageeffects` (new package) — in-memory transient/static Stage Effect registry. See `Construction/Stage/transient-stage-effects.md`.
-- `backend/internal/network/hub.go` — `Hub.SendToUsers`, the new targeted-delivery primitive. See `Construction/Network/targeted-live-delivery.md`.
+- `backend/internal/rollaudience` (new package) — audience resolution, viewer visibility, live recipient computation. See `Construction/Domains/Dice/dice-projection-contract.md`.
+- `backend/internal/stageeffects` (new package) — in-memory transient/static Stage Effect registry. See `Construction/Domains/Stage/transient-stage-effects.md`.
+- `backend/internal/network/hub.go` — `Hub.SendToUsers`, the new targeted-delivery primitive. See `Construction/Domains/Network/targeted-live-delivery.md`.
 - `backend/internal/network/ws.go` — `roll/dice` case now computes and stores the resolved audience, delivers via `deliverStageMessage` instead of `hub.Broadcast`, creates a Stage Effect; two new WS message cases (`stage_effect/pin`, `stage_effect/dismiss`); pinned-effect hydration added to the connect/reconnect path.
 - `backend/internal/actions/dice.go` — `StoreDiceRoll` now calls `rollaudience.Resolve` and writes `audienceMode`/`cohortId`/`showId` into the existing `visibility` JSONB column, activating a field that previously existed but was always hardcoded and never read.
 - `backend/internal/world/snapshot.go` — `LoadVenueSnapshot`'s actions loop now filters `roll/dice` rows through `rollaudience.VisibleToViewer` before appending to `snap.Actions` (every other action type's filtering, or lack thereof, is unchanged).
@@ -157,14 +157,14 @@ No fixture data, and critically no damage to Grant's real "Cohort 1" or any othe
 
 ## 7. Deferred / not separately proven this pass
 
-- **Explosion semantics remain unchanged, as the spec explicitly requires (§1.7/§14) — not a gap, a deliberate non-goal.** Recorded again here per §14's mandatory-follow-up instruction: *Victory currently auto-resolves exploding dice. Kernel 86 preserves this for compatibility. Before Cartograph depends on dice, define explicit explosion semantics so explosion behavior is requested by a game operation/macro or otherwise deliberately configured.* Also added to `Construction/current-state.md`'s Known Gaps.
+- **Explosion semantics remain unchanged, as the spec explicitly requires (§1.7/§14) — not a gap, a deliberate non-goal.** Recorded again here per §14's mandatory-follow-up instruction: *Victory currently auto-resolves exploding dice. Kernel 86 preserves this for compatibility. Before Cartograph depends on dice, define explicit explosion semantics so explosion behavior is requested by a game operation/macro or otherwise deliberately configured.* Also added to `Construction/Canon/current-state.md`'s Known Gaps.
 - **No screenshot/visual proof of the Pixi rendering itself** (theatrical-fit vs full-screen-fit geometry, exact pixel layout, visual entry animation quality). This session's environment has browser automation but no screenshot-comparison tooling exercised this pass; verification instead relied on (a) unit tests asserting the exact PIXI v7 API calls and settle-on-server-value logic, and (b) the live proof confirming real WS delivery reaches a real mounted Pixi scene with zero page errors (`pageerror` listener was active and silent across all four tabs' full session). If Grant wants pixel-level visual confirmation, that's a short follow-up, not new code.
 - **`kernel85-sustained-play-browser.js`'s own counter-deleting cleanup bug (§4 item 2) was not fixed in that script this pass** — flagged, not silently left, since fixing another kernel's smoke script was judged out of Kernel 86's own scope.
-- **The 9 pre-existing `dice.test.js` failures were not repaired** (a `FakeElement.setAttribute` gap in the Node test harness, unrelated to and predating this kernel — confirmed via `git stash` comparison that the exact same 9 tests fail identically on a clean `main` checkout). Already tracked in `Construction/current-state.md`'s Known Gaps; not re-caused or worsened.
+- **The 9 pre-existing `dice.test.js` failures were not repaired** (a `FakeElement.setAttribute` gap in the Node test harness, unrelated to and predating this kernel — confirmed via `git stash` comparison that the exact same 9 tests fail identically on a clean `main` checkout). Already tracked in `Construction/Canon/current-state.md`'s Known Gaps; not re-caused or worsened.
 - **`canActDiceRoll`'s Director/Producer/Operator-only roll authority (Kernel 52) means an ordinary Cast player cannot literally submit a Cohort-scoped roll for themselves today** — Cohort-mode rolls are, in current practice, rolled *by* a Director/Producer *for* a cohort context, not self-rolled by an ordinary player. This is unchanged, pre-existing, deliberate (Kernel 52's own "future controlled-character roll authority" note), and out of Kernel 86's scope to alter — flagged here because it shapes how the Cohort/Private defaults will actually be used in practice, worth a future kernel's attention if Victory ever widens roll submission to players directly.
 
 None of these are believed to be broken — they're the specific items this session's pass didn't independently close out, named honestly rather than folded into the PASS silently.
 
 ## 8. Deploy/commit status
 
-**Deployed live** (backend container rebuilt and restarted against production; frontend files live immediately via the bind-mounted Caddy static root — see §5). **Deliberately left uncommitted** for review, matching the established house practice for recent kernels — `git status --short` shows the full diff plus new files under `backend/internal/rollaudience/`, `backend/internal/stageeffects/`, `Construction/Dice/`, `Construction/Stage/`, `Construction/Network/`, and the new smoke script and test files.
+**Deployed live** (backend container rebuilt and restarted against production; frontend files live immediately via the bind-mounted Caddy static root — see §5). **Deliberately left uncommitted** for review, matching the established house practice for recent kernels — `git status --short` shows the full diff plus new files under `backend/internal/rollaudience/`, `backend/internal/stageeffects/`, `Construction/Domains/Dice/`, `Construction/Domains/Stage/`, `Construction/Domains/Network/`, and the new smoke script and test files.

@@ -338,9 +338,9 @@ None that blocked the work. Two real bugs were found and fixed along the way (em
 - `Construction/OperatorLogs/kernel-61A-reportback.md` — this file.
 - `Construction/OperatorLogs/operator-log.md` — new dated entry.
 - `Construction/OperatorLogs/operator-notes.md` — new "Kernel 61 / 61A" section.
-- `Construction/kernel-maker-field-guide.md` — fresh-install fix note, two-browser verification technique, Kernel 61/61A notes.
-- `Construction/roadmaps/victory-master-actual-implementation-guide-v1.md` — numbering-collision correction, baseline table row.
-- `Construction/roadmaps/victory-track-roadmaps-v1.md` — new "V8. Player identity and social profile" track entry.
+- `Construction/Process/kernel-maker-field-guide.md` — fresh-install fix note, two-browser verification technique, Kernel 61/61A notes.
+- `Construction/Canon/roadmaps/victory-master-actual-implementation-guide-v1.md` — numbering-collision correction, baseline table row.
+- `Construction/Canon/roadmaps/victory-track-roadmaps-v1.md` — new "V8. Player identity and social profile" track entry.
 
 (All uncommitted as of this reportback; Kernel 61's original backend/HTTP/hover-fix files were found already committed as `b3ebe62`, not part of this kernel's session changes.)
 

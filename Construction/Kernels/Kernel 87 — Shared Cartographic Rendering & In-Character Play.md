@@ -701,10 +701,10 @@ At minimum:
 
 ```text
 Construction/Kernels/Kernel 87 — Shared Cartographic Rendering & In-Character Play.md
-Construction/Stage/drawing-object-contract.md
-Construction/Stage/measured-tabletop-contract.md
-Construction/Stage/detail-view-contract.md
-Construction/Chat/in-character-chat-contract.md
+Construction/Domains/Stage/drawing-object-contract.md
+Construction/Domains/Stage/measured-tabletop-contract.md
+Construction/Domains/Stage/detail-view-contract.md
+Construction/Domains/Chat/in-character-chat-contract.md
 Construction/OperatorLogs/kernel-87-reportback.md
 ```
 

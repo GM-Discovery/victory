@@ -80,14 +80,14 @@ page that redeems a recovery link.
 
 | Artifact | Path |
 |---|---|
-| Finding ledger | `Construction/Security/kernel-76-findings.md` |
-| Current-state inventory | `Construction/Security/kernel-76-current-state-inventory.md` |
-| Architecture and exposure map | `Construction/Security/kernel-76-architecture-exposure-map.md` |
-| HTTP route matrix | `Construction/Security/kernel-76-route-matrix.md` |
-| WebSocket matrix | `Construction/Security/kernel-76-websocket-matrix.md` |
-| Data classification, deletion, export, Markdown pre-audit | `Construction/Security/kernel-76-data-classification.md` |
-| Recovery and anti-lockout runbook | `Construction/Operations/victory-account-recovery-runbook.md` |
-| Backup and restore assessment | `Construction/Operations/victory-backup-restore-assessment.md` |
+| Finding ledger | `Construction/Domains/Security/kernel-76-findings.md` |
+| Current-state inventory | `Construction/Domains/Security/kernel-76-current-state-inventory.md` |
+| Architecture and exposure map | `Construction/Domains/Security/kernel-76-architecture-exposure-map.md` |
+| HTTP route matrix | `Construction/Domains/Security/kernel-76-route-matrix.md` |
+| WebSocket matrix | `Construction/Domains/Security/kernel-76-websocket-matrix.md` |
+| Data classification, deletion, export, Markdown pre-audit | `Construction/Domains/Security/kernel-76-data-classification.md` |
+| Recovery and anti-lockout runbook | `Construction/Domains/Operations/victory-account-recovery-runbook.md` |
+| Backup and restore assessment | `Construction/Domains/Operations/victory-backup-restore-assessment.md` |
 | Updated security notes | `Construction/OperatorLogs/Security-notes.md` |
 | Kernel 77 proposed scope | `Construction/Kernels/Kernel 77 — Proposed Hosted-User Stabilization Scope.md` |
 | Reportback | `Construction/OperatorLogs/kernel-76-reportback.md` |

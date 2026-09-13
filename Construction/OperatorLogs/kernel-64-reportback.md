@@ -87,7 +87,7 @@ Zero failures, zero known-unrelated exceptions to disclaim. Re-ran a second cons
 $ unset TEST_DATABASE_URL
 $ go test ./internal/assets/... -run TestLoadWarehouseStorageStatsKeepsDatabaseUsageWhenFilesystemLookupFails -v
 === RUN   TestLoadWarehouseStorageStatsKeepsDatabaseUsageWhenFilesystemLookupFails
-    warehouse_test.go:42: dbtest: TEST_DATABASE_URL is required for database-touching tests (see Construction/kernel-maker-field-guide.md, Backend Test Commands)
+    warehouse_test.go:42: dbtest: TEST_DATABASE_URL is required for database-touching tests (see Construction/Process/kernel-maker-field-guide.md, Backend Test Commands)
 --- FAIL: TestLoadWarehouseStorageStatsKeepsDatabaseUsageWhenFilesystemLookupFails (0.00s)
 FAIL
 ```
@@ -180,9 +180,9 @@ Modified:
 - `backend/internal/identity/discord_oauth_test.go`, `backend/internal/network/discord_gateway_test.go`, `backend/internal/assets/warehouse_test.go` (pool factories now use `dbtest.OpenTestPool`)
 - `backend/internal/assets/warehouse_test.go` (fixture fix for the known baseline failure)
 - `backend/internal/network/discord_chat_bridge_test.go` (two fixture dependency fixes)
-- `Construction/kernel-maker-field-guide.md` (Backend Test Commands, new Kernel 64 Notes section, checklist item 10)
-- `Construction/workflow/dev-workflow.md` (Common Checks, new Database Changes subsection)
-- `Construction/reportbacktemplate.txt` (DB isolation proof now mandatory for kernels touching DB tests)
+- `Construction/Process/kernel-maker-field-guide.md` (Backend Test Commands, new Kernel 64 Notes section, checklist item 10)
+- `Construction/Process/workflow/dev-workflow.md` (Common Checks, new Database Changes subsection)
+- `Construction/Process/reportbacktemplate.txt` (DB isolation proof now mandatory for kernels touching DB tests)
 - `Construction/OperatorLogs/operator-log.md`, `operator-notes.md`
 
 ## 11. Project-memory updates completed

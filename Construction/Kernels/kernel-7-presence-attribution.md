@@ -130,7 +130,7 @@ Run the kernel evidence test:
 GOCACHE=/tmp/victory-gocache go test ./internal/network -run TestKernel7PresenceAndAttributionEvidence -v
 Run the backend sanity pass:
 GOCACHE=/tmp/victory-gocache go test ./internal/actions ./internal/network ./internal/world
-For normal dev iteration, keep following the active dev workflow in Construction/workflow/dev-workflow.md.
+For normal dev iteration, keep following the active dev workflow in Construction/Process/workflow/dev-workflow.md.
 Operator Notes (CRITICAL)
 
 Presence is intentionally in-memory and non-canonical.
@@ -181,8 +181,8 @@ Files Changed / Created
 /opt/victory/Construction/OperatorLogs/operator-log.md
 /opt/victory/Construction/OperatorLogs/operator-notes.md
 /opt/victory/Construction/OperatorLogs/Security-notes.md
-/opt/victory/Construction/Construction — Contracts.txt
-/opt/victory/Construction/workflow/dev-workflow.md
+/opt/victory/Construction/Process/Construction — Contracts.txt
+/opt/victory/Construction/Process/workflow/dev-workflow.md
 
 kernel-7-presence-attribution.md
 Document · MD

@@ -609,7 +609,7 @@ Prefer additive migration, UUID identity, Show foreign keys, one-active-cohort-p
 
 Do not create duplicate Character-health tables.
 
-**Actual schema implemented:** see Construction/Shows/cohort-scene-progression-contract.md and Construction/Socio/game-status-tool-contract.md.
+**Actual schema implemented:** see Construction/Domains/Shows/cohort-scene-progression-contract.md and Construction/Domains/Socio/game-status-tool-contract.md.
 
 ---
 
@@ -733,11 +733,11 @@ No PASS based only on API evidence.
 
 ```text
 Construction/Kernels/Kernel 85 — Socio Sustained Play — Cohorts, Scene Progression & Game Status.md
-Construction/Socio/sustained-play-contract.md
-Construction/Shows/cohort-scene-progression-contract.md
-Construction/Scenes/scene-configuration-tool.md
-Construction/Socio/game-status-tool-contract.md
-Construction/Identity/people-picker-contract.md
+Construction/Domains/Socio/sustained-play-contract.md
+Construction/Domains/Shows/cohort-scene-progression-contract.md
+Construction/Domains/Scenes/scene-configuration-tool.md
+Construction/Domains/Socio/game-status-tool-contract.md
+Construction/Domains/Identity/people-picker-contract.md
 Construction/OperatorLogs/kernel-85-reportback.md
 ```
 

@@ -3,11 +3,11 @@
 **Status:** READY FOR AUDIT  
 **Type:** Forensic reconciliation / release-prioritization audit  
 **Implementation:** NONE  
-**Primary input:** Current Victory repository plus the agent’s existing `Construction/Everything Implemented.md`
+**Primary input:** Current Victory repository plus the agent’s existing `Construction/Canon/Everything Implemented.md`
 
 ## 0. Kernel contract
 
-You already produced `Construction/Everything Implemented.md`, which answered:
+You already produced `Construction/Canon/Everything Implemented.md`, which answered:
 
 > What does Victory actually implement now?
 
@@ -35,7 +35,7 @@ The goal is not a larger backlog. The goal is:
 
 Create:
 
-`Construction/Recovered Work Reconciliation.md`
+`Construction/Canon/Recovered Work Reconciliation.md`
 
 Do not implement features. Do not create future kernels. Do not create a new roadmap. Do not commit unless explicitly instructed.
 
@@ -49,7 +49,7 @@ Use:
 2. current tests and executable behavior;
 3. current working tree, including identified uncommitted work;
 4. current reportbacks;
-5. `Construction/Everything Implemented.md`;
+5. `Construction/Canon/Everything Implemented.md`;
 6. current-state / operator logs;
 7. Canonical Roadmap;
 8. historical kernel specs/reportbacks;
@@ -809,7 +809,7 @@ This section is required so historical archaeology does not create scope expansi
 
 # 15. Required output structure
 
-`Construction/Recovered Work Reconciliation.md` must contain:
+`Construction/Canon/Recovered Work Reconciliation.md` must contain:
 
 1. Executive Summary
 2. Repository State Audited

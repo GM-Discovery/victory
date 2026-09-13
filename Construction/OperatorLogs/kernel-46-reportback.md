@@ -77,7 +77,7 @@ No backend restart was required for verification in this workspace, but the runn
 - `frontend/lib/victory-pixi-stage.js`
 - `frontend/venues/first-theater/index.html`
 - `scripts/smoke/fresh-install.sh`
-- `Construction/current-state.md`
-- `Construction/roadmap.md`
+- `Construction/Canon/current-state.md`
+- `Construction/Canon/roadmap.md`
 - `Construction/OperatorLogs/operator-log.md`
 - `Construction/OperatorLogs/kernel-46-reportback.md`

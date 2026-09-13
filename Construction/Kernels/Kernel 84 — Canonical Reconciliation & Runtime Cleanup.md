@@ -659,8 +659,8 @@ At minimum:
 Construction/Kernels/Kernel 84 — Canonical Reconciliation & Runtime Cleanup.md
 Construction/OperatorLogs/kernel-84-reportback.md
 Construction/OperatorLogs/kernel-history-reconciliation-through-83.md
-Construction/Operations/websocket-context-lifecycle.md
-Construction/Operations/cleanup-ledger-kernel-84.md
+Construction/Domains/Operations/websocket-context-lifecycle.md
+Construction/Domains/Operations/cleanup-ledger-kernel-84.md
 ```
 
 Update in place where applicable:

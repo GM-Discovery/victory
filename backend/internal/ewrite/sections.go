@@ -1,7 +1,7 @@
 package ewrite
 
 // Section reconciliation: turn a render outline into stable ewrite_sections
-// rows. The contract (Construction/eWrite/ewrite-link-anchor-contract.md):
+// rows. The contract (Construction/Domains/eWrite/ewrite-link-anchor-contract.md):
 //
 //  1. Existing sections are matched by ANCHOR first -- an unchanged anchor
 //     keeps its row UUID, so object links pointing at the section survive

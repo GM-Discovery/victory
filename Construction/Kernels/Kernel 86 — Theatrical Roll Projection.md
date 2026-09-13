@@ -607,9 +607,9 @@ See `scripts/smoke/kernel86-dice-projection-browser.js` and the reportback for t
 
 ```text
 Construction/Kernels/Kernel 86 — Theatrical Roll Projection.md
-Construction/Dice/dice-projection-contract.md
-Construction/Stage/transient-stage-effects.md
-Construction/Network/targeted-live-delivery.md
+Construction/Domains/Dice/dice-projection-contract.md
+Construction/Domains/Stage/transient-stage-effects.md
+Construction/Domains/Network/targeted-live-delivery.md
 Construction/OperatorLogs/kernel-86-reportback.md
 ```
 

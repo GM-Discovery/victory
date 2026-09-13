@@ -372,7 +372,7 @@ Fresh install must prove at minimum:
 
 Update:
 
-- `Construction/Dictionary.txt`
+- `Construction/Canon/Dictionary.txt`
   - define Trailer Face Ready;
   - define Stage Management as user-facing name for Show Runs backstage surface;
   - note Third Place unlock rule.

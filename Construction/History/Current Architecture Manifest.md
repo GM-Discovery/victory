@@ -29,7 +29,7 @@ Single `Hub`/`Client` model (`backend/internal/network`), keyed by connection po
 
 ## Install/runtime modes
 
-Four distinct modes, per `Construction/workflow/dev-workflow.md` (updated this kernel):
+Four distinct modes, per `Construction/Process/workflow/dev-workflow.md` (updated this kernel):
 1. **Local developer mode** — direct Go run + Postgres, hot-reload frontend assets.
 2. **Packaged/install mode** — the embedded-migration, single-binary path.
 3. **Server/Linux mode** — Caddy-fronted, systemd-managed, manual/scripted backup (Kernel 77's automation is available but not on-by-default).

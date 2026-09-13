@@ -3,7 +3,7 @@
 **Provenance:** RECONSTRUCTED — PARTIAL
 **Original date/window:** Unrecoverable precisely; falls between Kernel 24 (Greenroom character dressing) and Kernel 28 (live Director Console), so in the same pre-Kernel-32 window (before Discord OAuth, i.e. before roughly early-to-mid 2026-05 based on Kernel 25's 2026-05-06 commit)
 **Implementation status:** IMPLEMENTED — status not recorded (no surviving spec or reportback)
-**Evidence sources:** `Construction/kernel-maker-field-guide.md:48` — the sole surviving reference: "Kernel 27 added the closed-showing review surface in the Director's Chair."
+**Evidence sources:** `Construction/Process/kernel-maker-field-guide.md:48` — the sole surviving reference: "Kernel 27 added the closed-showing review surface in the Director's Chair."
 
 ## Reconstructed purpose
 

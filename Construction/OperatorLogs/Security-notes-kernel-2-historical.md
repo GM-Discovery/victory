@@ -3,7 +3,7 @@
 ## Current Canon Note
 This file is now partly historical.
 
-Use [current-state.md](/opt/victory/Construction/current-state.md) for the live system view. Keep this file for security foundations, older kernel rationale, and historical implementation notes.
+Use [current-state.md](/opt/victory/Construction/Canon/current-state.md) for the live system view. Keep this file for security foundations, older kernel rationale, and historical implementation notes.
 
 ## Scope
 

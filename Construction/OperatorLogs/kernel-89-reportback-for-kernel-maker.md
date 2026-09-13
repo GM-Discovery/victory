@@ -5,7 +5,7 @@
 **Date:** 2026-08-17
 **Deployed:** yes, 2026-08-17 03:50 UTC — migration 105 applied at boot
 **Narrative companion:** `Construction/OperatorLogs/kernel-89-reportback.md` (same evidence, prose form)
-**Operator guide:** `Construction/Operations/director-prepared-play.md`
+**Operator guide:** `Construction/Domains/Operations/director-prepared-play.md`
 
 > **This file is the protocol-form reportback** (template Part III), written for
 > the kernel maker. Its §2 ledger is the part that matters: every criterion the
@@ -362,12 +362,12 @@ NEW  tests/stage-runtime/kernel89-director-tools.test.js
 
 **Construction / docs**
 ```
-NEW  Construction/Operations/director-prepared-play.md
+NEW  Construction/Domains/Operations/director-prepared-play.md
 NEW  Construction/OperatorLogs/kernel-89-reportback.md
 NEW  Construction/OperatorLogs/kernel-89-reportback-for-kernel-maker.md   (this file)
 NEW  Construction/OperatorLogs/evidence/kernel-89/ (6 screenshots)
-MOD  Construction/current-state.md, Construction/OperatorLogs/operator-log.md,
-     Construction/roadmaps/Victory_Canonical_Roadmap_v2.md, filepaths.md
+MOD  Construction/Canon/current-state.md, Construction/OperatorLogs/operator-log.md,
+     Construction/Canon/roadmaps/Victory_Canonical_Roadmap_v2.md, filepaths.md
 ```
 
 ---
@@ -382,14 +382,14 @@ MOD  Construction/current-state.md, Construction/OperatorLogs/operator-log.md,
 - [x] `dev-workflow.md` — **explicitly not needed**: ports, services, and validation steps unchanged
 - [x] Master guide / canonical roadmap — **note added, not reconciled**. §17 now records that 85–89 shipped and that §12's committed horizon is history. A full reconciliation is Kernel 90's job; Kernel 89 §38 lists it as a non-goal
 - [x] Fresh-install/bootstrap migration list — automatic (embedded migrations); proven by the alpha gate's fresh-install step passing with 105 applied from empty
-- [x] Help/operator documentation updated — `Construction/Operations/director-prepared-play.md`
+- [x] Help/operator documentation updated — `Construction/Domains/Operations/director-prepared-play.md`
 - [x] Project memory written
 
 ---
 
 ## 12. Next recommended step
 
-**Grant's live walkthrough** of `Construction/Operations/director-prepared-play.md` §8, on the real install, with a second account as Player.
+**Grant's live walkthrough** of `Construction/Domains/Operations/director-prepared-play.md` §8, on the real install, with a second account as Player.
 
 Then, for the kernel maker, the smallest coherent continuation — **in this order**:
 

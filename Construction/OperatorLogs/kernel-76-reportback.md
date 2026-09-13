@@ -257,7 +257,7 @@ go run ./cmd/victory-recover whoami --handle straturli
 go run ./cmd/victory-recover recover --handle straturli   # prints a one-time link
 ```
 
-Full procedures: `Construction/Operations/victory-account-recovery-runbook.md`.
+Full procedures: `Construction/Domains/Operations/victory-account-recovery-runbook.md`.
 
 ---
 

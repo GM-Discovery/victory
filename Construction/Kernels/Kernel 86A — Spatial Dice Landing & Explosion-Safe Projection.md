@@ -541,7 +541,7 @@ At minimum:
 
 ```text
 Construction/Kernels/Kernel 86A — Spatial Dice Landing & Explosion-Safe Projection.md
-Construction/Dice/spatial-dice-projection-contract.md
+Construction/Domains/Dice/spatial-dice-projection-contract.md
 Construction/OperatorLogs/kernel-86A-reportback.md
 ```
 

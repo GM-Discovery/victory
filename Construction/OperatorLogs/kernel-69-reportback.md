@@ -157,7 +157,7 @@ One bug caught only by actually running the script (not by review): the initial 
 - `Construction/Kernels/kernel-69-scene-library-show-staging-model-v0.1.md` (new)
 - `Construction/OperatorLogs/kernel-69-reportback.md` (this file)
 - `Construction/OperatorLogs/operator-log.md` (appended)
-- `Construction/Dictionary.txt` (new "Scene" and "Show Scene Placement" entries; updated "Show (Show Instance)" hierarchy line)
+- `Construction/Canon/Dictionary.txt` (new "Scene" and "Show Scene Placement" entries; updated "Show (Show Instance)" hierarchy line)
 
 ## 13. Required project-memory updates completed
 

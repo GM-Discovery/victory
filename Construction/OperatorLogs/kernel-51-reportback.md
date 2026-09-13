@@ -330,8 +330,8 @@ Bounded follow-on scope completed on 2026-06-25:
 
 ## 10. Files Changed / Created
 
-- [Construction/current-state.md](/opt/victory/Construction/current-state.md)
-- [Construction/roadmap.md](/opt/victory/Construction/roadmap.md)
+- [Construction/Canon/current-state.md](/opt/victory/Construction/Canon/current-state.md)
+- [Construction/Canon/roadmap.md](/opt/victory/Construction/Canon/roadmap.md)
 - [Construction/OperatorLogs/operator-log.md](/opt/victory/Construction/OperatorLogs/operator-log.md)
 - [Construction/OperatorLogs/kernel-51-reportback.md](/opt/victory/Construction/OperatorLogs/kernel-51-reportback.md)
 - [backend/cmd/victory/main.go](/opt/victory/backend/cmd/victory/main.go)

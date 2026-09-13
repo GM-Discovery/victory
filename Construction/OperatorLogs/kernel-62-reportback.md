@@ -150,7 +150,7 @@ Modified:
 - `frontend/venues/trailers/view.html` (Add to My People / Open My Notes)
 - `frontend/venues/trailers/face.html`, `frontend/account/index.html` (My People chips)
 - `scripts/smoke/fresh-install.sh` (migration 037 + 9 Kernel 62 assertions)
-- `Construction/OperatorLogs/operator-log.md`, `operator-notes.md`, `Construction/kernel-maker-field-guide.md`, roadmap docs (see §11)
+- `Construction/OperatorLogs/operator-log.md`, `operator-notes.md`, `Construction/Process/kernel-maker-field-guide.md`, roadmap docs (see §11)
 
 ## 11. Project-memory updates completed
 

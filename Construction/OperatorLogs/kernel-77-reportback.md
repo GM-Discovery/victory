@@ -53,7 +53,7 @@ configuration error.
   literal unfilled `[EMAIL]` placeholder. Grant corrected both directly in the Google Docs
   (age language re-drafted himself; `privacy@amurray.family` mailbox created and added). Neither
   document previously linked from anywhere in the app; added links from `/account/` and
-  `/login/`. Full detail in `Construction/Privacy/kernel-77-policy-terms-verification.md`.
+  `/login/`. Full detail in `Construction/Domains/Privacy/kernel-77-policy-terms-verification.md`.
 
 ---
 
@@ -64,25 +64,25 @@ configuration error.
 hard-deletes via existing CASCADE FKs; the twelve previously-`RESTRICT` shared-history columns
 reassign to a new credential-less tombstone account rather than blocking deletion. Blocks only
 on sole-producer-at-a-Location-with-Productions or the operator account. Full design in
-`Construction/Privacy/account-deletion-policy.md` and
-`Construction/Privacy/account-deletion-dependency-map.md`.
+`Construction/Domains/Privacy/account-deletion-policy.md` and
+`Construction/Domains/Privacy/account-deletion-dependency-map.md`.
 
 ### Goal B — Self-service data export
 `backend/internal/identity/account_export.go`, three tests. Background-goroutine job,
 session-authenticated download, JSON+Markdown+original-files archive scoped to the requesting
-user. Format documented in `Construction/Privacy/user-export-format.md`.
+user. Format documented in `Construction/Domains/Privacy/user-export-format.md`.
 
 ### Goal C — Encrypted off-host backup and tested restore
 `scripts/backup/{backup.sh,retention.sh}`, three systemd timer pairs (installed and enabled,
 survive reboot), `GET /api/operator/backup-status`. A real isolated restore was performed and
 measured, not simulated. Full evidence in
-`Construction/Operations/kernel-77-backup-restore-proof.md`; runbooks in
+`Construction/Domains/Operations/kernel-77-backup-restore-proof.md`; runbooks in
 `victory-backup-runbook.md`, `victory-restore-runbook.md`, `victory-backup-secret-recovery.md`.
 
 ### Goal D — Self-service recovery email
 `backend/internal/mailer/`, reopened `HandleForgotPassword`, new email-verification
 request/confirm endpoints, six tests. See §1 for delivery status.
-`Construction/Operations/victory-account-recovery-runbook.md` updated with the self-service
+`Construction/Domains/Operations/victory-account-recovery-runbook.md` updated with the self-service
 path.
 
 ### Goal E — Fresh-database merchant test repair
@@ -145,7 +145,7 @@ Every new/changed inline `<script>` block checked with `node --check`: clean.
 
 ### 4.4 Backup/restore evidence
 
-See `Construction/Operations/kernel-77-backup-restore-proof.md` in full. Summary:
+See `Construction/Domains/Operations/kernel-77-backup-restore-proof.md` in full. Summary:
 
 ```
 Backup destination: encrypted Google Drive crypt remote
@@ -284,7 +284,7 @@ URLs/tokens; live SMTP delivery not proven — see §1, §6.
 See §4.4 and the full standalone evidence document.
 
 ### 7.5 Legal-surface verification
-`Construction/Privacy/kernel-77-policy-terms-verification.md`. Privacy Policy: age language
+`Construction/Domains/Privacy/kernel-77-policy-terms-verification.md`. Privacy Policy: age language
 corrected to 17+ (Grant's own edit), contact placeholder replaced with a real mailbox, both now
 linked from the app. Terms of Service: still has no contact line — flagged as an open operator
 wording decision, not fixed by this kernel (per §10.2, factual corrections yes, new legal

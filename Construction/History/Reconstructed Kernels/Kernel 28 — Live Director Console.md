@@ -3,7 +3,7 @@
 **Provenance:** RECONSTRUCTED — PARTIAL
 **Original date/window:** Unrecoverable precisely; immediately follows Kernel 27, same pre-Kernel-32 window
 **Implementation status:** IMPLEMENTED — status not recorded (no surviving spec or reportback), but unlike Kernel 27, its output is directly traceable in live code today
-**Evidence sources:** `Construction/kernel-maker-field-guide.md:48` ("Kernel 28 added the live Director Console for current-showing control"); `backend/internal/network/director_console.go:355` — a live code comment reading `StartShowingNote: "Kernel 28 defers new-showing startup."`
+**Evidence sources:** `Construction/Process/kernel-maker-field-guide.md:48` ("Kernel 28 added the live Director Console for current-showing control"); `backend/internal/network/director_console.go:355` — a live code comment reading `StartShowingNote: "Kernel 28 defers new-showing startup."`
 
 ## Reconstructed purpose
 
@@ -11,7 +11,7 @@ Add a live Director Console surface for controlling the *currently running* Show
 
 ## What evidence proves was built
 
-`director_console.go` exists today as a substantial, actively-maintained file (subject of real authority fixes in Kernel 97 this same session — see `Construction/Identity/Canonical Role and Authority Resolution.md` §2, §6). The `StartShowingNote` field and its literal string citing "Kernel 28" is direct, unambiguous evidence that this kernel's original scope boundary (control current Showing, defer new-Showing startup) is still legible in the codebase 70+ kernels later.
+`director_console.go` exists today as a substantial, actively-maintained file (subject of real authority fixes in Kernel 97 this same session — see `Construction/Domains/Identity/Canonical Role and Authority Resolution.md` §2, §6). The `StartShowingNote` field and its literal string citing "Kernel 28" is direct, unambiguous evidence that this kernel's original scope boundary (control current Showing, defer new-Showing startup) is still legible in the codebase 70+ kernels later.
 
 ## Files/systems affected
 

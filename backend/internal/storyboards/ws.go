@@ -14,7 +14,7 @@ package storyboards
 // Storyboards "collaborative venue session" is defined as the period
 // during which at least one distinct user is watching a given board (see
 // coordination.go's StoryboardVenueSessionID and
-// Construction/Venues/venue-session-state-lifecycle.md for the full
+// Construction/Domains/Venues/venue-session-state-lifecycle.md for the full
 // rationale). The 0-watcher -> 1-watcher and 1-watcher -> 0-watcher
 // transitions detected in this file are the only session start/end
 // triggers that exist for this venue.
@@ -31,7 +31,7 @@ package storyboards
 // lifetime, and a fresh 5-second bounded context per inbound message,
 // derived from the connection context so it's cancelled early if the
 // connection itself closes mid-query. See
-// Construction/Operations/websocket-context-lifecycle.md.
+// Construction/Domains/Operations/websocket-context-lifecycle.md.
 
 import (
 	"context"

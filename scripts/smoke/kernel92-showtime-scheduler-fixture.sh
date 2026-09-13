@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Kernel 92 browser proof fixture: disposable Director account (fixture-row
-# insertion, per Construction/kernel-maker-field-guide.md's "Two-Browser /
+# insertion, per Construction/Process/kernel-maker-field-guide.md's "Two-Browser /
 # Live-Update Verification Technique" -- production password signup is
 # closed) + a disposable Production/Show Run under the real amurray-family
 # location, so the popup's Show Run picker has something real to select.

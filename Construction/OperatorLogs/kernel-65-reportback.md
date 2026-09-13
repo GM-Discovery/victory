@@ -227,8 +227,8 @@ Modified:
 - `backend/internal/access/visibility.go` (one-line venue-visibility rule change)
 - `scripts/smoke/fresh-install.sh` (migration 038 added to the array; 7 new Kernel 65 assertions)
 - `frontend/app.js` (map href/icon/position for `third-place`)
-- `Construction/roadmaps/victory-master-actual-implementation-guide-v1.md` (numbering-collision note, §4.3)
-- `Construction/roadmaps/victory-track-roadmaps-v1.md` (new "Kernel 65 continuation" under V8)
+- `Construction/Canon/roadmaps/victory-master-actual-implementation-guide-v1.md` (numbering-collision note, §4.3)
+- `Construction/Canon/roadmaps/victory-track-roadmaps-v1.md` (new "Kernel 65 continuation" under V8)
 - `Construction/OperatorLogs/operator-log.md`, `operator-notes.md`
 
 ## 11. Project-memory updates completed
