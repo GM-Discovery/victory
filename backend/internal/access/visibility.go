@@ -41,41 +41,6 @@ func SetThirdPlaceReadinessChecker(fn VenueReadinessChecker) {
 	thirdPlaceReadinessChecker = fn
 }
 
-func CurrentLocationRole(ctx context.Context, pool *pgxpool.Pool, userID string) (string, error) {
-	if strings.TrimSpace(userID) == "" {
-		return "audience", nil
-	}
-
-	var role string
-	err := pool.QueryRow(ctx, `
-		SELECT m.role::text
-		FROM location_memberships m
-		WHERE m.user_id = $1
-		  AND m.active = TRUE
-		ORDER BY
-		  CASE m.role
-			WHEN 'producer' THEN 1
-			WHEN 'director' THEN 2
-			WHEN 'cast' THEN 3
-			WHEN 'crew' THEN 4
-			WHEN 'audience' THEN 5
-			ELSE 99
-		  END,
-		  m.created_at ASC
-		LIMIT 1
-	`, userID).Scan(&role)
-	if err != nil {
-		return "audience", nil
-	}
-
-	switch role {
-	case "producer", "director", "cast", "crew", "audience":
-		return role, nil
-	default:
-		return "audience", nil
-	}
-}
-
 func IsPerformerRole(role string) bool {
 	switch strings.ToLower(strings.TrimSpace(role)) {
 	case "producer", "director", "cast", "crew":

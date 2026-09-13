@@ -162,7 +162,7 @@ func StartShowSession(ctx context.Context, pool *pgxpool.Pool, actorUserID, show
 		}, nil
 	}
 
-	role, err := access.CurrentLocationRole(ctx, pool, actorUserID)
+	role, err := access.CurrentDefaultLocationRole(ctx, pool, actorUserID)
 	if err != nil || strings.TrimSpace(role) == "" {
 		role = "producer"
 	}

@@ -198,7 +198,7 @@ func loadAccountSummary(ctx context.Context, pool *pgxpool.Pool, userID string) 
 		return AccountSummary{}, err
 	}
 
-	currentRole, err := access.CurrentLocationRole(ctx, pool, userID)
+	currentRole, err := access.CurrentDefaultLocationRole(ctx, pool, userID)
 	if err != nil || strings.TrimSpace(currentRole) == "" {
 		currentRole = "audience"
 	}

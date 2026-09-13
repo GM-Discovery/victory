@@ -57,6 +57,26 @@ func CurrentLocationRoleForLocation(ctx context.Context, pool *pgxpool.Pool, use
 	}
 }
 
+// CurrentDefaultLocationRole is CurrentLocationRoleForLocation scoped to
+// this install's own default location -- the canonical replacement for the
+// removed CurrentLocationRole (Kernel 97): that function ignored location_id
+// entirely, returning the caller's single globally-best active role across
+// *every* location they belong to, which is only harmless today because a
+// real install effectively has one location. The moment a second Location
+// exists, a Producer at Location A would silently pass a Producer/Director
+// check meant for Location B via every one of that function's ~11 former
+// call sites (session control, Director Console, warehouse storage
+// permission, Discord mic control, join-flow role resolution, account/auth
+// "what's my current role" display). None of those needed a *different*
+// location than the install's own -- this is a drop-in fix, not a redesign.
+func CurrentDefaultLocationRole(ctx context.Context, pool *pgxpool.Pool, userID string) (string, error) {
+	locationID, err := DefaultLocationID(ctx, pool)
+	if err != nil {
+		return "", err
+	}
+	return CurrentLocationRoleForLocation(ctx, pool, userID, locationID)
+}
+
 // HasAnyManageableLocation reports whether the user is Producer or Director
 // (active) at *any* location, or is Operator. Used where a feature needs a
 // coarse "can this person manage something, somewhere" check without

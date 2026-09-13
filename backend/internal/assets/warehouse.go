@@ -1070,7 +1070,7 @@ func requireWarehouseAccess(ctx context.Context, pool *pgxpool.Pool, r *http.Req
 		return "", false, err
 	}
 
-	role, err := access.CurrentLocationRole(ctx, pool, userID)
+	role, err := access.CurrentDefaultLocationRole(ctx, pool, userID)
 	if err != nil {
 		return "", false, err
 	}
@@ -1086,7 +1086,7 @@ func warehouseStoragePermission(ctx context.Context, pool *pgxpool.Pool, userID 
 	if ok, err := access.IsOperatorUser(ctx, pool, userID); err == nil && ok {
 		return true, true
 	}
-	if role, err := access.CurrentLocationRole(ctx, pool, userID); err == nil {
+	if role, err := access.CurrentDefaultLocationRole(ctx, pool, userID); err == nil {
 		switch strings.ToLower(strings.TrimSpace(role)) {
 		case "producer":
 			return false, true

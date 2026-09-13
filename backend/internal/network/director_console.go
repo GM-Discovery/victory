@@ -330,7 +330,7 @@ func HandleDirectorConsoleChatPolicy(hub *Hub, pool *pgxpool.Pool) http.HandlerF
 }
 
 func loadDirectorConsoleState(ctx context.Context, hub *Hub, pool *pgxpool.Pool, userID string) (directorConsoleState, error) {
-	role, err := access.CurrentLocationRole(ctx, pool, userID)
+	role, err := access.CurrentDefaultLocationRole(ctx, pool, userID)
 	if err != nil {
 		return directorConsoleState{}, err
 	}
@@ -565,7 +565,7 @@ func canAccessDirectorConsole(ctx context.Context, pool *pgxpool.Pool, userID st
 		return true, nil
 	}
 
-	role, err := access.CurrentLocationRole(ctx, pool, userID)
+	role, err := access.CurrentDefaultLocationRole(ctx, pool, userID)
 	if err != nil {
 		return false, err
 	}
