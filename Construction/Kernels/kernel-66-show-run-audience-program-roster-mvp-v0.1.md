@@ -2,7 +2,7 @@
 
 ## 0. Numbering note (read first)
 
-`Construction/roadmaps/victory-master-actual-implementation-guide-v1.md` contains a
+`Construction/Canon/roadmaps/victory-master-actual-implementation-guide-v1.md` contains a
 **stale, unrelated document-internal "Kernel 66 — Scene Transitions, Cue Groups, and
 Courtyard Tutorial Beat"** section, left over from earlier aspirational planning. It is
 **not** this kernel. The operator log confirms Kernel 65 (Third Place Headshot Commons
@@ -20,7 +20,7 @@ site-wide moderation system.
 
 Show Run is the code implementation of the dictionary's pre-existing "Production
 Run" concept (never previously implemented). "Show Run" is its product-facing
-name; the dictionary entry is merged, not duplicated (`Construction/Dictionary.txt`).
+name; the dictionary entry is merged, not duplicated (`Construction/Canon/Dictionary.txt`).
 
 ## 2. Why this kernel now
 

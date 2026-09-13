@@ -18,14 +18,14 @@ Kernel 33 adds a safe operator CLI for producer grants and folds Kernel 32 plus 
 - Unknown Discord user IDs fail clearly instead of creating a grant.
 
 Canon / docs updates:
-- Updated `Construction/current-state.md`
-- Updated `Construction/roadmap.md`
-- Updated `Construction/kernel-maker-field-guide.md`
+- Updated `Construction/Canon/current-state.md`
+- Updated `Construction/Canon/roadmap.md`
+- Updated `Construction/Process/kernel-maker-field-guide.md`
 - Updated `Construction/OperatorLogs/operator-log.md`
 - Updated `Construction/OperatorLogs/operator-notes.md`
 - Updated `Construction/OperatorLogs/Security-notes.md`
-- Updated `Construction/vendor-acknowledgements.md`
-- Updated `Construction/workflow/dev-workflow.md`
+- Updated `Construction/Process/vendor-acknowledgements.md`
+- Updated `Construction/Process/workflow/dev-workflow.md`
 
 Kernel 32 and follow-on live-site work captured in canon:
 - Discord OAuth routes still exist:
@@ -115,12 +115,12 @@ go run ./cmd/victory-bootstrap producer --handle <victory_handle>
 - `backend/cmd/victory-bootstrap/main.go`
 - `backend/internal/identity/bootstrap.go`
 - `backend/internal/identity/bootstrap_test.go`
-- `Construction/current-state.md`
-- `Construction/roadmap.md`
-- `Construction/kernel-maker-field-guide.md`
+- `Construction/Canon/current-state.md`
+- `Construction/Canon/roadmap.md`
+- `Construction/Process/kernel-maker-field-guide.md`
 - `Construction/OperatorLogs/operator-log.md`
 - `Construction/OperatorLogs/operator-notes.md`
 - `Construction/OperatorLogs/Security-notes.md`
-- `Construction/vendor-acknowledgements.md`
-- `Construction/workflow/dev-workflow.md`
+- `Construction/Process/vendor-acknowledgements.md`
+- `Construction/Process/workflow/dev-workflow.md`
 - `Construction/OperatorLogs/kernel-33-reportback.md`

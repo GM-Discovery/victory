@@ -7,7 +7,7 @@ package ewrite
 //
 // Explicit {#anchor} ids are extracted by a line-level pre-pass rather than
 // goldmark's parser.WithHeadingAttribute. Decision recorded from a measured
-// spike (see Construction/eWrite/ewrite-markdown-security.md): goldmark's
+// spike (see Construction/Domains/eWrite/ewrite-markdown-security.md): goldmark's
 // attribute lexer rejects the ( ) ? characters that Sociov1_1.md's
 // Google-Docs-exported ids use throughout, leaving the literal "{#...}"
 // text visible in the rendered heading. The pre-pass strips the id from the

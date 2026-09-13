@@ -1,6 +1,6 @@
 # Developer Setup Guide
 
-This is the orientation doc for a new developer. It tells you where things live and where to go next; it does not duplicate the exact commands — those live in `Construction/workflow/dev-workflow.md`, which is the maintained source of truth for day-to-day commands and gets updated as they change.
+This is the orientation doc for a new developer. It tells you where things live and where to go next; it does not duplicate the exact commands — those live in `Construction/Process/workflow/dev-workflow.md`, which is the maintained source of truth for day-to-day commands and gets updated as they change.
 
 ## What you need before starting
 
@@ -25,7 +25,7 @@ packaging/podman/    Docker Compose stack for both dev-mode Postgres and full in
 ## Clone, run, test
 
 1. Clone the repository.
-2. Follow **Dev Mode** in `Construction/workflow/dev-workflow.md` to start Postgres and run the backend on the host.
+2. Follow **Dev Mode** in `Construction/Process/workflow/dev-workflow.md` to start Postgres and run the backend on the host.
 3. Open a venue directly in your browser (e.g. `http://127.0.0.1:8081/venues/the-cave/`).
 4. Run the test suite: set up the dedicated `victory_test` database once (see the same doc's "Dedicated test database" section), then `go test ./...` from `backend/`.
 
@@ -33,7 +33,7 @@ For validating the deployable path (not day-to-day dev work), use **Install Mode
 
 ## Backend structure
 
-Domain logic lives under `backend/internal/<package>/` — one package per concern (`access`, `participation`, `showruns`, `scenes`, `storyboards`, `ewrite`, and so on). Before adding a new permission check anywhere, read the "Domain Authority Helpers" section of `dev-workflow.md` and `Construction/Identity/Canonical Role and Authority Resolution.md` — most authority questions already have a canonical answer.
+Domain logic lives under `backend/internal/<package>/` — one package per concern (`access`, `participation`, `showruns`, `scenes`, `storyboards`, `ewrite`, and so on). Before adding a new permission check anywhere, read the "Domain Authority Helpers" section of `dev-workflow.md` and `Construction/Domains/Identity/Canonical Role and Authority Resolution.md` — most authority questions already have a canonical answer.
 
 ## Frontend structure
 

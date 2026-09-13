@@ -208,9 +208,9 @@ None from the locked product decisions (§2 of the spec). Two implementation det
 
 **Construction/docs:**
 - `Construction/Kernels/Kernel 81 — Storyboards Presentation Rework.md` (filed, mojibake cleaned)
-- `Construction/Storyboards/storyboards-presentation-contract.md`, `storyboards-drag-and-drop.md`, `storyboards-card-image-contract.md`, `storyboards-accessibility.md` (new)
-- `Construction/Storyboards/storyboards-ui-contract.md` (rewritten to describe Kernel 81's presentation, with Kernel 80's superseded table/plain-card design explicitly marked historical)
-- `Construction/Storyboards/storyboards-domain-model.md`, `storyboards-permissions.md`, `storyboards-live-events.md` (small Kernel 81 addenda)
+- `Construction/Domains/Storyboards/storyboards-presentation-contract.md`, `storyboards-drag-and-drop.md`, `storyboards-card-image-contract.md`, `storyboards-accessibility.md` (new)
+- `Construction/Domains/Storyboards/storyboards-ui-contract.md` (rewritten to describe Kernel 81's presentation, with Kernel 80's superseded table/plain-card design explicitly marked historical)
+- `Construction/Domains/Storyboards/storyboards-domain-model.md`, `storyboards-permissions.md`, `storyboards-live-events.md` (small Kernel 81 addenda)
 - `Construction/OperatorLogs/kernel-81-reportback.md` (this file)
 
 ---

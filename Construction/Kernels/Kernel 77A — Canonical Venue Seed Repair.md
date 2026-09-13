@@ -160,7 +160,7 @@ Do not ask Grant for table or file names that the repository can reveal.
 Create:
 
 ```text
-Construction/Operations/kernel-77a-canonical-venue-reconciliation.md
+Construction/Domains/Operations/kernel-77a-canonical-venue-reconciliation.md
 ```
 
 For every built-in venue currently expected by the application, record:
@@ -303,7 +303,7 @@ Construction/Kernels/Kernel 77A — Canonical Venue Seed Repair.md
 ## Venue reconciliation
 
 ```text
-Construction/Operations/kernel-77a-canonical-venue-reconciliation.md
+Construction/Domains/Operations/kernel-77a-canonical-venue-reconciliation.md
 ```
 
 ## Migration

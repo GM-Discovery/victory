@@ -68,7 +68,7 @@ No backend restart was required for this pass because the changes here are front
 - `frontend/venues/shared/venue-shell.js`
 - `frontend/venues/first-theater/index.html`
 - `frontend/venues/middle-school-stage/index.html`
-- `Construction/current-state.md`
-- `Construction/roadmap.md`
+- `Construction/Canon/current-state.md`
+- `Construction/Canon/roadmap.md`
 - `Construction/OperatorLogs/operator-log.md`
 - `Construction/OperatorLogs/kernel-45-reportback.md`

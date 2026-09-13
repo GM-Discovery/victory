@@ -15,7 +15,7 @@ Baseline: at session start, `git status --short` showed Kernel 83's own uncommit
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| WS context-lifetime bug repaired | PASS | `ws.go` three-tier context scope; `Construction/Operations/websocket-context-lifecycle.md` |
+| WS context-lifetime bug repaired | PASS | `ws.go` three-tier context scope; `Construction/Domains/Operations/websocket-context-lifecycle.md` |
 | Bounded adjacent same-root-cause issues repaired/split | PASS | §3 audit — no second instance found; `network/ws.go` already correct, `profile_ws.go` has no DB work in its loop |
 | Late board-switch/watch works beyond old timeout | PASS | `TestWSLateBoardSwitchSurvivesOldSetupTimeout` (6s sleep, then switch) |
 | Disconnect/session cleanup leaves no stale state | PASS | Same test's final assertions; pre-existing Kernel 83 tests still green |
@@ -49,14 +49,14 @@ Baseline: at session start, `git status --short` showed Kernel 83's own uncommit
 
 ### Documentation reconciliation
 
-- `Construction/roadmaps/Victory_Canonical_Roadmap_v2.md` — new §5.7 baseline band (Kernels 76–84); V3/V6/V9/A1/C4/O4 rewritten Established/Open; new §V11 (Live venue coordination); 9 new skip/defer entries; 1 open decision resolved, 1 added; §12 committed horizon replaced (Kernel 85 — Socio Sustained Play, Kernel 86 — Cartograph-Style Drawing Foundation, third slot explicitly decision-gated); §13 provisional horizon updated; full 2026-08-08 change-log entry; §18/§4.3 stale "next sequence" pointers corrected.
-- `Construction/roadmaps/victory-master-actual-implementation-guide-v1.md`, `victory-track-roadmaps-v1.md` — superseded/historical banners added, content preserved.
-- `Construction/current-state.md` — header brought to Kernel 84; new Major Surfaces for eWrite, Storyboards, and Venue Coordination; new API route families; 3 new proven end-to-end flows; 2 new Known Gaps (the found-not-fixed Timeline boundary bug, the Presence Tray keyboard gap); Next Recommended Direction repointed to Kernel 85/86.
+- `Construction/Canon/roadmaps/Victory_Canonical_Roadmap_v2.md` — new §5.7 baseline band (Kernels 76–84); V3/V6/V9/A1/C4/O4 rewritten Established/Open; new §V11 (Live venue coordination); 9 new skip/defer entries; 1 open decision resolved, 1 added; §12 committed horizon replaced (Kernel 85 — Socio Sustained Play, Kernel 86 — Cartograph-Style Drawing Foundation, third slot explicitly decision-gated); §13 provisional horizon updated; full 2026-08-08 change-log entry; §18/§4.3 stale "next sequence" pointers corrected.
+- `Construction/Canon/roadmaps/victory-master-actual-implementation-guide-v1.md`, `victory-track-roadmaps-v1.md` — superseded/historical banners added, content preserved.
+- `Construction/Canon/current-state.md` — header brought to Kernel 84; new Major Surfaces for eWrite, Storyboards, and Venue Coordination; new API route families; 3 new proven end-to-end flows; 2 new Known Gaps (the found-not-fixed Timeline boundary bug, the Presence Tray keyboard gap); Next Recommended Direction repointed to Kernel 85/86.
 - `Construction/OperatorLogs/kernel-history-reconciliation-through-83.md` (new) — the full per-kernel evidence ledger (title/date/status/reportback path/capabilities/open findings) for Kernels 76–83, plus a documented discrepancies section (the migration-088 gap, the unattributed migration 093, `operator-log.md`'s missing 75–77A entries).
-- `Construction/Operations/websocket-context-lifecycle.md`, `cleanup-ledger-kernel-84.md` (new) — the WS fix's design rationale and the full repaired/deferred/investigated-benign cleanup ledger.
-- `Construction/Storyboards/storyboards-accessibility.md` — new canonical backlog table (blocker/convenience/general, workaround column), consolidating gaps previously scattered across three kernels' own reportbacks.
+- `Construction/Domains/Operations/websocket-context-lifecycle.md`, `cleanup-ledger-kernel-84.md` (new) — the WS fix's design rationale and the full repaired/deferred/investigated-benign cleanup ledger.
+- `Construction/Domains/Storyboards/storyboards-accessibility.md` — new canonical backlog table (blocker/convenience/general, workaround column), consolidating gaps previously scattered across three kernels' own reportbacks.
 - `Construction/OperatorLogs/Security-notes.md` — Brevo reminder status updated (still blocked, no further recheck scheduled on a kernel-number cadence).
-- `Construction/kernel-maker-field-guide.md`, `Construction/workflow/dev-workflow.md` — disposable-account technique rewritten to lead with fixture-row insertion (signup is closed in production).
+- `Construction/Process/kernel-maker-field-guide.md`, `Construction/Process/workflow/dev-workflow.md` — disposable-account technique rewritten to lead with fixture-row insertion (signup is closed in production).
 - `Construction/Kernels/Kernel 84 — Canonical Reconciliation & Runtime Cleanup.md` — filed, mojibake cleaned.
 
 ### Investigated, confirmed benign, deliberately not touched
@@ -71,8 +71,8 @@ Migration 088's numbering gap (harmless — runner sorts by filename, not contig
 
 ```
 $ git status --short   (at session start)
- M Construction/Storyboards/session-state-integration-seam.md
- M Construction/Storyboards/storyboards-accessibility.md
+ M Construction/Domains/Storyboards/session-state-integration-seam.md
+ M Construction/Domains/Storyboards/storyboards-accessibility.md
  M backend/cmd/victory/main.go
  ... (Kernel 83's own uncommitted work)
 $ git rev-parse HEAD
@@ -210,13 +210,13 @@ None from the locked decisions (§1). One scope judgment call worth naming: the 
 - `Construction/Kernels/Kernel 84 — Canonical Reconciliation & Runtime Cleanup.md` (filed, mojibake cleaned)
 - `Construction/OperatorLogs/kernel-84-reportback.md` (this file)
 - `Construction/OperatorLogs/kernel-history-reconciliation-through-83.md` (new)
-- `Construction/Operations/websocket-context-lifecycle.md`, `cleanup-ledger-kernel-84.md` (new)
-- `Construction/roadmaps/Victory_Canonical_Roadmap_v2.md` (extensively updated — see §3)
-- `Construction/roadmaps/victory-master-actual-implementation-guide-v1.md`, `victory-track-roadmaps-v1.md` (superseded banners)
-- `Construction/current-state.md` (updated through Kernel 84)
-- `Construction/Storyboards/storyboards-accessibility.md` (canonical backlog table)
+- `Construction/Domains/Operations/websocket-context-lifecycle.md`, `cleanup-ledger-kernel-84.md` (new)
+- `Construction/Canon/roadmaps/Victory_Canonical_Roadmap_v2.md` (extensively updated — see §3)
+- `Construction/Canon/roadmaps/victory-master-actual-implementation-guide-v1.md`, `victory-track-roadmaps-v1.md` (superseded banners)
+- `Construction/Canon/current-state.md` (updated through Kernel 84)
+- `Construction/Domains/Storyboards/storyboards-accessibility.md` (canonical backlog table)
 - `Construction/OperatorLogs/Security-notes.md` (Brevo status)
-- `Construction/kernel-maker-field-guide.md`, `Construction/workflow/dev-workflow.md` (disposable-account technique)
+- `Construction/Process/kernel-maker-field-guide.md`, `Construction/Process/workflow/dev-workflow.md` (disposable-account technique)
 
 ---
 

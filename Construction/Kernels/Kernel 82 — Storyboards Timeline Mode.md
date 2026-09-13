@@ -811,11 +811,11 @@ No PASS based only on API evidence for the Timeline UI.
 
 ```text
 Construction/Kernels/Kernel 82 — Storyboards Timeline Mode.md
-Construction/Storyboards/timeline-mode-contract.md
-Construction/Storyboards/storyboard-template-contract.md
-Construction/Storyboards/reference-panel-contract.md
-Construction/Storyboards/timeline-navigation.md
-Construction/Storyboards/session-state-integration-seam.md
+Construction/Domains/Storyboards/timeline-mode-contract.md
+Construction/Domains/Storyboards/storyboard-template-contract.md
+Construction/Domains/Storyboards/reference-panel-contract.md
+Construction/Domains/Storyboards/timeline-navigation.md
+Construction/Domains/Storyboards/session-state-integration-seam.md
 Construction/OperatorLogs/kernel-82-reportback.md
 ```
 

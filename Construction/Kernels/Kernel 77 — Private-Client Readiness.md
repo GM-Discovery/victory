@@ -403,11 +403,11 @@ Read:
 - `Victory_Canonical_Roadmap_v2.md`;
 - Kernel 76 spec;
 - Kernel 76 reportback;
-- all Kernel 76 security artifacts (`Construction/Security/kernel-76-findings.md`,
-  `Construction/Security/kernel-76-data-classification.md`);
+- all Kernel 76 security artifacts (`Construction/Domains/Security/kernel-76-findings.md`,
+  `Construction/Domains/Security/kernel-76-data-classification.md`);
 - current `Security-notes.md`;
 - account-recovery runbook;
-- backup/restore assessment (`Construction/Operations/victory-backup-restore-assessment.md`);
+- backup/restore assessment (`Construction/Domains/Operations/victory-backup-restore-assessment.md`);
 - current Privacy Policy and service terms;
 - identity/auth code;
 - session code;
@@ -1092,9 +1092,9 @@ Do not claim Level 4 without this proof.
 Create:
 
 ```text
-Construction/Operations/victory-backup-runbook.md
-Construction/Operations/victory-restore-runbook.md
-Construction/Operations/victory-backup-secret-recovery.md
+Construction/Domains/Operations/victory-backup-runbook.md
+Construction/Domains/Operations/victory-restore-runbook.md
+Construction/Domains/Operations/victory-backup-secret-recovery.md
 ```
 
 The secret-recovery document must describe what Grant must preserve, without containing the secrets in Git.
@@ -1483,14 +1483,14 @@ Construction/Kernels/Kernel 77 — Private-Client Readiness.md
 ## 17.2 Deletion policy and dependency map
 
 ```text
-Construction/Privacy/account-deletion-policy.md
-Construction/Privacy/account-deletion-dependency-map.md
+Construction/Domains/Privacy/account-deletion-policy.md
+Construction/Domains/Privacy/account-deletion-dependency-map.md
 ```
 
 ## 17.3 Export specification
 
 ```text
-Construction/Privacy/user-export-format.md
+Construction/Domains/Privacy/user-export-format.md
 ```
 
 ## 17.4 Recovery runbook update
@@ -1498,7 +1498,7 @@ Construction/Privacy/user-export-format.md
 Update:
 
 ```text
-Construction/Operations/victory-account-recovery-runbook.md
+Construction/Domains/Operations/victory-account-recovery-runbook.md
 ```
 
 Add self-service recovery and preserve break-glass instructions.
@@ -1506,21 +1506,21 @@ Add self-service recovery and preserve break-glass instructions.
 ## 17.5 Backup runbooks
 
 ```text
-Construction/Operations/victory-backup-runbook.md
-Construction/Operations/victory-restore-runbook.md
-Construction/Operations/victory-backup-secret-recovery.md
+Construction/Domains/Operations/victory-backup-runbook.md
+Construction/Domains/Operations/victory-restore-runbook.md
+Construction/Domains/Operations/victory-backup-secret-recovery.md
 ```
 
 ## 17.6 Backup status evidence
 
 ```text
-Construction/Operations/kernel-77-backup-restore-proof.md
+Construction/Domains/Operations/kernel-77-backup-restore-proof.md
 ```
 
 ## 17.7 Legal-surface verification
 
 ```text
-Construction/Privacy/kernel-77-policy-terms-verification.md
+Construction/Domains/Privacy/kernel-77-policy-terms-verification.md
 ```
 
 ## 17.8 Security notes

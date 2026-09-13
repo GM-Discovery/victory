@@ -1312,31 +1312,31 @@ Construction/Kernels/Kernel 78 — eWrite Foundation.md
 ## Architecture note
 
 ```text
-Construction/eWrite/ewrite-domain-model.md
+Construction/Domains/eWrite/ewrite-domain-model.md
 ```
 
 ## Markdown security note
 
 ```text
-Construction/eWrite/ewrite-markdown-security.md
+Construction/Domains/eWrite/ewrite-markdown-security.md
 ```
 
 ## Import/export note
 
 ```text
-Construction/eWrite/ewrite-import-export.md
+Construction/Domains/eWrite/ewrite-import-export.md
 ```
 
 ## Permissions matrix
 
 ```text
-Construction/eWrite/ewrite-permissions.md
+Construction/Domains/eWrite/ewrite-permissions.md
 ```
 
 ## Link and anchor contract
 
 ```text
-Construction/eWrite/ewrite-link-anchor-contract.md
+Construction/Domains/eWrite/ewrite-link-anchor-contract.md
 ```
 
 ## Reportback

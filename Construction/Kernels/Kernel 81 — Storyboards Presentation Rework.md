@@ -706,10 +706,10 @@ No PASS based only on API evidence for this presentation kernel.
 
 ```text
 Construction/Kernels/Kernel 81 — Storyboards Presentation Rework.md
-Construction/Storyboards/storyboards-presentation-contract.md
-Construction/Storyboards/storyboards-drag-and-drop.md
-Construction/Storyboards/storyboards-card-image-contract.md
-Construction/Storyboards/storyboards-accessibility.md
+Construction/Domains/Storyboards/storyboards-presentation-contract.md
+Construction/Domains/Storyboards/storyboards-drag-and-drop.md
+Construction/Domains/Storyboards/storyboards-card-image-contract.md
+Construction/Domains/Storyboards/storyboards-accessibility.md
 Construction/OperatorLogs/kernel-81-reportback.md
 ```
 

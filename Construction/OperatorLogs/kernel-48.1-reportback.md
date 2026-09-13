@@ -111,6 +111,6 @@ None if the browser hard refreshes cleanly after deploy.
 - `backend/internal/actions/place.go`
 - `backend/internal/network/ws.go`
 - `backend/internal/world/snapshot.go`
-- `Construction/current-state.md`
+- `Construction/Canon/current-state.md`
 - `Construction/OperatorLogs/operator-log.md`
 - `Construction/OperatorLogs/kernel-48.1-reportback.md`

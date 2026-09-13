@@ -138,7 +138,7 @@ async function main() {
   // explicit reorder to land it before Ending) -- NOT the raw "+ Column
   // (end)" POST alone, which was found during this same regression pass to
   // append past Ending with no boundary awareness of its own (see
-  // Construction/Operations/cleanup-ledger-kernel-84.md's "found, not
+  // Construction/Domains/Operations/cleanup-ledger-kernel-84.md's "found, not
   // fixed" section -- AddColumn has no Timeline-boundary special-casing;
   // only the client-side insertColumnFlow dance and ReorderColumns'
   // ErrBoundaryColumnDisplaced check keep the UI-driven path correct).

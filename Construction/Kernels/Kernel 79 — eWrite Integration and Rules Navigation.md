@@ -762,11 +762,11 @@ Manually prove:
 
 ```text
 Construction/Kernels/Kernel 79 — eWrite Integration and Rules Navigation.md
-Construction/eWrite/socio-ruleset-organization.md
-Construction/eWrite/ewrite-directory-contract.md
-Construction/eWrite/ewrite-object-link-contract.md
-Construction/eWrite/ewrite-image-visibility.md
-Construction/eWrite/ewrite-hierarchical-export.md
+Construction/Domains/eWrite/socio-ruleset-organization.md
+Construction/Domains/eWrite/ewrite-directory-contract.md
+Construction/Domains/eWrite/ewrite-object-link-contract.md
+Construction/Domains/eWrite/ewrite-image-visibility.md
+Construction/Domains/eWrite/ewrite-hierarchical-export.md
 ```
 
 Use the standard reportback template.

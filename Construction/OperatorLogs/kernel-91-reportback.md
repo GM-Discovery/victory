@@ -90,7 +90,7 @@ All three are recorded as reusable lessons in `operator-notes.md`.
 
 - **No authored tour content for Producer, Crew, Operator, or Audience** — by agreed scope (§2), not oversight. The eligibility plumbing (`RequiredRoles` already accepts any `location_role` value plus the `"operator"` sentinel) needs no further backend work to add them; each is a migration extending the `tour_key` CHECK plus a `Definitions` map entry.
 - **No scripted browser/Playwright proof committed for this pass.** The kernel's core acceptance claims (mandatory tour, campus continuation, Director role-transition) were exercised live by Grant rather than by an automated harness; the three bugs above were found and fixed through that real usage. A follow-up scripted proof (matching the spec's §39-43 required scenarios, including the Director role-transition case using the `k89fixture`/`k90fixture` role-granting pattern) would be the natural next-step evidence gap to close.
-- **No dedicated `Construction/Operations/*.md` operator guide was written** for this kernel, unlike Kernel 89/90 — the reportback's §3/§5 are intended to carry that role for now.
+- **No dedicated `Construction/Domains/Operations/*.md` operator guide was written** for this kernel, unlike Kernel 89/90 — the reportback's §3/§5 are intended to carry that role for now.
 
 ---
 

@@ -67,7 +67,7 @@ request, not part of Kernel 79) and are called out separately below.
 - Grant's actual manuscripts imported: "Socio-: The Locked Courtyard &
   Beyond" (Quickstart, 10,158 words) and "Niava Setting Supplement"
   (Niava, 13,266 words), both cleaned of Google-Docs export artifacts
-  (see `Construction/eWrite/socio-ruleset-organization.md` for exact
+  (see `Construction/Domains/eWrite/socio-ruleset-organization.md` for exact
   cleanup detail).
 
 ### A real bug found and fixed
@@ -81,7 +81,7 @@ test` once) — the second boot tried to recreate a duplicate publication,
 then collided with the reparent's own `UPDATE`. Fixed by keying the
 existence check off `ewrite_publications.location_id` + `slug` directly.
 Full detail and the regression test in
-`Construction/eWrite/socio-ruleset-organization.md`.
+`Construction/Domains/eWrite/socio-ruleset-organization.md`.
 
 ---
 
@@ -345,8 +345,8 @@ implementation, not a silent scope cut:
   what shipped.
 - **Quickstart/Niava manuscripts**: no fabricated content — Grant
   provided the real manuscript files this session, placed on disk at
-  `Construction/eWrite/manuscript/`, imported after cleanup (see
-  `Construction/eWrite/socio-ruleset-organization.md`).
+  `Construction/Domains/eWrite/manuscript/`, imported after cleanup (see
+  `Construction/Domains/eWrite/socio-ruleset-organization.md`).
 
 ---
 
@@ -400,9 +400,9 @@ Part of this kernel:
 - `Construction/Kernels/Kernel 79 — eWrite Integration and Rules
   Navigation.md` (new — the kernel spec, saved to the repo; see note
   below)
-- `Construction/eWrite/socio-ruleset-organization.md` (new)
-- `Construction/eWrite/ewrite-image-visibility.md` (new)
-- `Construction/eWrite/manuscript/` (new — Grant's original, uncleaned
+- `Construction/Domains/eWrite/socio-ruleset-organization.md` (new)
+- `Construction/Domains/eWrite/ewrite-image-visibility.md` (new)
+- `Construction/Domains/eWrite/manuscript/` (new — Grant's original, uncleaned
   manuscript files, untouched)
 
 **Not part of this kernel** (already modified in the working tree from

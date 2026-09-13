@@ -4,8 +4,8 @@ This file records meaningful implementation milestones and notable operational d
 Keep entries factual.
 
 Current status and roadmap now live in:
-- [current-state.md](/opt/victory/Construction/current-state.md)
-- [roadmap.md](/opt/victory/Construction/roadmap.md)
+- [current-state.md](/opt/victory/Construction/Canon/current-state.md)
+- [roadmap.md](/opt/victory/Construction/Canon/roadmap.md)
 
 This file should stay historical and chronological.
 
@@ -1028,8 +1028,8 @@ Implement `perform/speak` using the same action pipeline:
 - Character sheet links are metadata references on character cards, not playable sheet records
 
 ### Documentation Notes
-- Added `Construction/current-state.md` as current canon
-- Added `Construction/roadmap.md` as active roadmap
+- Added `Construction/Canon/current-state.md` as current canon
+- Added `Construction/Canon/roadmap.md` as active roadmap
 - Added placeholder kernel docs for 22–25 naming reconciliation
 - Older notes are being marked historical/superseded instead of silently overwritten
 
@@ -1072,7 +1072,7 @@ Implement `perform/speak` using the same action pipeline:
 - Added `.env.example` with the current runtime and Discord operator settings
 - Kept `.env` ignored while explicitly allowing `.env.example`
 - Added a clean-install smoke harness at `scripts/smoke/fresh-install.sh`
-- Added a fresh-install operator guide at `Construction/deployment/fresh-install.md`
+- Added a fresh-install operator guide at `Construction/Process/deployment/fresh-install.md`
 - Verified the install proof against a temporary database in the local Postgres container
 
 ### Runtime Notes
@@ -1735,7 +1735,7 @@ Visual Scene composition/capture (the standing next-recommendation since Kernel 
 
 ## Kernel 78 — eWrite Foundation (2026-08-04)
 
-**PASS, deployed live, uncommitted.** Migrations `084`–`085` applied to production with a pre-apply backup (ledger at 86). Full detail: `Construction/OperatorLogs/kernel-78-reportback.md`; architecture notes in `Construction/eWrite/`.
+**PASS, deployed live, uncommitted.** Migrations `084`–`085` applied to production with a pre-apply backup (ledger at 86). Full detail: `Construction/OperatorLogs/kernel-78-reportback.md`; architecture notes in `Construction/Domains/eWrite/`.
 
 - Victory's first rules-native writing/publication/reading system: Writer's Room (Crew+ map tile, `ewrite_author_surface`) and Library (authenticated surface; its half-built seeded slot from Kernel 16 finally has pages).
 - First Markdown pipeline in the repo — goldmark + bluemonday, server-side only, policy built from empty; malicious fixtures tested vector by vector. A recorded spike chose a fence-aware regex pre-pass over goldmark's `{#id}` parser, which mangles the Google-Docs anchor charset (`(`, `?`).
@@ -1751,7 +1751,7 @@ Not backfilled into this log in detail — see `Construction/OperatorLogs/kernel
 
 ## Kernel 80 — Storyboards Core (2026-08-06)
 
-**Status: PASS against the written spec, deployed live, uncommitted.** Migrations `090`-`091` applied to production with a pre-apply backup. Full ledger: `Construction/OperatorLogs/kernel-80-reportback.md`; design docs in `Construction/Storyboards/`.
+**Status: PASS against the written spec, deployed live, uncommitted.** Migrations `090`-`091` applied to production with a pre-apply backup. Full ledger: `Construction/OperatorLogs/kernel-80-reportback.md`; design docs in `Construction/Domains/Storyboards/`.
 
 - Victory's first reusable grid-board primitive: ordered columns, ordered rows grouped into bands, cells holding zero-or-more ordered cards, owner + explicit per-user sharing, live server-authoritative multi-user sync, versioned JSON export.
 - New backend package `backend/internal/storyboards/` (39 tests): full role-capability matrix with proven client-role-forgery rejection, optimistic-concurrency card locking proven race-free under real concurrent goroutines, hidden-from-audience filtering enforced identically over HTTP, WebSocket, and export (a per-viewer WS fan-out was built specifically so a hidden card's existence never leaks via even a content-free "something changed" event), and the spec's required occupied-structure removal resolution flow (never a silent cascade).
@@ -1766,7 +1766,7 @@ Not backfilled into this log in detail — see `Construction/OperatorLogs/kernel
 
 ## Kernel 81 — Storyboards Presentation Rework (2026-08-06)
 
-**Status: PASS against the written spec (pending Grant's own live visual sign-off — see below), deployed live, uncommitted.** No new migration ledger entry beyond `092` (one small, no-FK column addition). Full ledger: `Construction/OperatorLogs/kernel-81-reportback.md`; design docs updated/added in `Construction/Storyboards/`.
+**Status: PASS against the written spec (pending Grant's own live visual sign-off — see below), deployed live, uncommitted.** No new migration ledger entry beyond `092` (one small, no-FK column addition). Full ledger: `Construction/OperatorLogs/kernel-81-reportback.md`; design docs updated/added in `Construction/Domains/Storyboards/`.
 
 - Replaced Kernel 80's plain HTML-table board with a real CSS Grid (`grid-model.js`'s `computeGridLayout` is the single source of truth for every grid line number, dual Node/browser like `stage-runtime/geometry.js`), Cave-inspired compact cards with a controlled color-token whitelist (never raw CSS injection), Pointer-Events drag-and-drop as the primary move interaction with the modal fallback retained, a deliberate Swap/Move-existing/Cancel dialog on any occupied-cell drop, column insert-left/right (frontend-only, reusing Kernel 80's existing `AddColumn`+`ReorderColumns` endpoints), the red/rose/black palette, and an entirely new one-pinned-image-per-card capability with a real lightbox and a genuine gravestone-on-deletion behavior.
 - **The Kernel 80 backend was left untouched except two narrow, spec-pre-approved additions**: `SetCardImage` (Crew+-unless-locked, same authority as any other card field) and `SwapCards` (a new atomic transaction — chosen over two sequential `MoveCard` calls specifically because a cell briefly holding two cards during a swap is visible to a third concurrently-loaded watcher, and Swap is one of the kernel's own required proof scenarios).
@@ -1808,7 +1808,7 @@ Not a new kernel — Grant's own live visual review against spec §21's 16 quest
 
 ## Kernel 82 — Storyboards Timeline Mode (2026-08-07)
 
-**Status: PASS, deployed live, uncommitted.** Full ledger: `Construction/OperatorLogs/kernel-82-reportback.md`; five new design docs in `Construction/Storyboards/`.
+**Status: PASS, deployed live, uncommitted.** Full ledger: `Construction/OperatorLogs/kernel-82-reportback.md`; five new design docs in `Construction/Domains/Storyboards/`.
 
 - Timeline ships as a built-in, code-defined (not DB-row-backed) Storyboard template: choosing it instantiates a normal owned board with three columns (Beginning/Middle/Ending — Beginning and Ending carry a new `column_role`, a genuine structural property enforced server-side in `ReorderColumns`/`RemoveColumn`, not just a UI convention), one default band/row, and a four-field Reference Panel (Premise, Beginning, Ending, and one paired-list field combining Include/Exclude as its two sides). Two Timelines are provably independent — editing one's Reference Panel, columns, or anything else never touches another instance or the template itself, proven directly by a dbtest that creates three Timelines in sequence and edits two of them.
 - The Reference Panel is new, generic Storyboards infrastructure (not gated to Timeline mode at all — a Blank board can get one too), reusing Kernel 81A's slug-allocation machinery a third time without any modification to it, and reusing the exact same Crew-content/Director-structure authority split cards already use rather than inventing a third permission tier.
@@ -1821,11 +1821,11 @@ Not a new kernel — Grant's own live walkthrough of Timeline creation, boundary
 
 ## Kernel 83 — Venue Leadership & Turn State (2026-08-08)
 
-**Status: PASS, deployed live, uncommitted.** Full ledger: `Construction/OperatorLogs/kernel-83-reportback.md`; three new design docs in `Construction/Venues/` (new directory).
+**Status: PASS, deployed live, uncommitted.** Full ledger: `Construction/OperatorLogs/kernel-83-reportback.md`; three new design docs in `Construction/Domains/Venues/` (new directory).
 
 - Group Leader and Current Turn ship as a genuinely generic platform primitive, split into two layers on purpose: `backend/internal/venuecoordination` is a small in-memory `Registry` that knows nothing about roles, tiers, or what a "venue" even is, while `backend/internal/storyboards/coordination.go` is Storyboards' own authority-checked wrapper around it. A future venue opting in writes its own thin wrapper file rather than teaching the generic package anything venue-specific — the whole point being that Storyboards never becomes "the owner" of this feature the way a less disciplined implementation might have let it.
 - **Storyboards had zero Presence Tray before this kernel** — Kernel 80's own `ws.go` comment said outright "Storyboards has no location/session/presence concept." This kernel built the first one from scratch (`#presence-tray` in `board.html`), reusing `network.Hub.BoardWatcherUserIDs` (a primitive Kernel 80 built for an unrelated purpose — per-viewer hidden-card event fan-out) as its live "who's here" roster.
-- "Live venue session," which Storyboards also had no concept of, was defined as the period during which ≥1 distinct user is watching a given board — the 0→1 and 1→0 watcher-count transitions on `watch_board`/disconnect are the only session start/end triggers that exist for this venue. Full rationale, including why The Cave's unrelated Production/Show-scoped session concept was deliberately *not* reused, in `Construction/Venues/venue-session-state-lifecycle.md`.
+- "Live venue session," which Storyboards also had no concept of, was defined as the period during which ≥1 distinct user is watching a given board — the 0→1 and 1→0 watcher-count transitions on `watch_board`/disconnect are the only session start/end triggers that exist for this venue. Full rationale, including why The Cave's unrelated Production/Show-scoped session concept was deliberately *not* reused, in `Construction/Domains/Venues/venue-session-state-lifecycle.md`.
 - Right-click on a Presence Tray chip is the only mutation surface, exactly as specified: **Make Group Leader** / **Give Turn**, shown only when the acting user's own authority (Director+/owner, current Group Leader, or — for turn — current Current Turn holder) allows it, and independently re-verified server-side on every POST regardless of what the menu showed (proven directly by forging API calls from unauthorized accounts in the browser proof, not just checking the menu was hidden).
 - Presence Tray ordering is sorted by handle server-side, specifically so it can never appear to reorder itself as leader/turn state changes — verified in the browser proof by capturing chip order before and after a live Give Turn action and asserting exact equality.
 - Kernel 82's previously-unwired Reference Panel integration seam is now live: a small read-only "Group Leader: X / Current Turn: Y" slot renders at the top of the panel whenever a session is active, absent entirely (not disabled) otherwise, and confirmed absent from Timeline JSON export both at the Go test level and via a live fetch of the real export endpoint in the browser proof.
@@ -1856,7 +1856,7 @@ Per the reconciled roadmap: **Kernel 85 — Socio Sustained Play**, then **Kerne
 
 ## Kernel 89 — Director Prepared Play & Training Arena (2026-08-17)
 
-**Status: PASS, deployed live 2026-08-17, uncommitted.** Migration 105 applied cleanly at boot (pre-apply backup `victory_pre_migrate_20260817_035045_1pending.dump`); all three new route families verified live in production answering 401 rather than 404, Kernel 88's routes unregressed, no errors or panics after restart. Full ledger: `Construction/OperatorLogs/kernel-89-reportback.md`; operator guide: `Construction/Operations/director-prepared-play.md`; evidence: `Construction/OperatorLogs/evidence/kernel-89/`.
+**Status: PASS, deployed live 2026-08-17, uncommitted.** Migration 105 applied cleanly at boot (pre-apply backup `victory_pre_migrate_20260817_035045_1pending.dump`); all three new route families verified live in production answering 401 rather than 404, Kernel 88's routes unregressed, no errors or panics after restart. Full ledger: `Construction/OperatorLogs/kernel-89-reportback.md`; operator guide: `Construction/Domains/Operations/director-prepared-play.md`; evidence: `Construction/OperatorLogs/evidence/kernel-89/`.
 
 - Directors can now prepare bounded material ahead of a Show and recall it mid-scene without editing code: target complexities and announcement presets, authored in the Director's Chair or from inside the live venue, stored in one new table (`director_preparations`, migration 105) whose `kind` is CHECK-constrained and whose payload is validated per kind in Go. Unknown payload keys are dropped rather than stored, which is the property that keeps a JSONB column from quietly becoming a scripting surface — proven by test and again in the acceptance run.
 - **The whole preparation package is Director+ with no Player read path at all.** §14's "must not leak" is satisfied structurally rather than by a projection filter: there is nothing for a Player to call. Exposing something to a Player is always a separate, explicit act through an already-canonical model.
@@ -1871,11 +1871,11 @@ Per the reconciled roadmap: **Kernel 85 — Socio Sustained Play**, then **Kerne
 - Evidence: 31/31 acceptance assertions against a real compiled backend over real HTTP and **two independent real WebSockets** (so announcement and Aftercare delivery are proven to somebody else, not to the sender); 21/21 real-mouse browser assertions for the UI claims, including a standing guard against Kernel 88A's B1 drag/`preventDefault` defect recurring on the new panels; 21 new Go tests; 8 new Node tests; full Go suite green; Node suite unchanged at 157 pass / 9 known `dice.test.js` failures.
 
 ### Next recommended step
-Grant's own live walkthrough of the Training Arena sequence in `Construction/Operations/director-prepared-play.md` §8. Genuinely optional follow-ups flagged rather than done: whether announcements should appear in Showing Review (they are ephemeral by design today), a keyboard entry point for the stage context menu, and Kernel 88's still-unproven player-roll path — untouched here per §36.
+Grant's own live walkthrough of the Training Arena sequence in `Construction/Domains/Operations/director-prepared-play.md` §8. Genuinely optional follow-ups flagged rather than done: whether announcements should appear in Showing Review (they are ephemeral by design today), a keyboard entry point for the stage context menu, and Kernel 88's still-unproven player-roll path — untouched here per §36.
 
 ## Kernel 90 — Canonical Stage Object State, Visibility & Cue Control (2026-08-17)
 
-**Status: PASS, uncommitted, not yet deployed.** Full ledger: `Construction/OperatorLogs/kernel-90-reportback.md`; operator guide: `Construction/Operations/stage-object-visibility.md`.
+**Status: PASS, uncommitted, not yet deployed.** Full ledger: `Construction/OperatorLogs/kernel-90-reportback.md`; operator guide: `Construction/Domains/Operations/stage-object-visibility.md`.
 
 - Reconciled the three unrelated reveal/hide/enable/disable mechanisms Kernel 89 §23 identified into **one canonical model**: one object identity (`stageobjects.Ref{kind,id}`, spanning live warehouse elements, Scene-authored composition elements, Kernel 87 drawings, and bound participant interactions), one state store (`stage_object_states` + `stage_object_scope_grants`, migration 106), and **one mutation path** (`stageobjects.ApplyMutation`) that both manual Director controls and the four previously-deferred Cue actions call directly. Manual/Cue parity is therefore structural, not a coincidence kept in sync by tests.
 - The legacy per-session `act/reveal_element`/`act/hide_element` layer replay in `world/snapshot.go` is **deleted outright**, not kept as a parallel source of truth. Per Grant's explicit instruction, **no backfill** was performed — anything hidden under the old mechanism now reads as visible, since the old mechanism never recorded *who* it was hidden from and there was nothing honest to convert.
@@ -1887,7 +1887,7 @@ Grant's own live walkthrough of the Training Arena sequence in `Construction/Ope
 - Full Go suite green (18 new pure unit tests + 20 dbtests in the new `stageobjects` package, 6 new Cue dbtests, 3 new world-projection dbtests). Node suite unchanged at 169 pass / 9 known `dice.test.js` failures, plus 12 new passing unit tests for the visibility menu.
 
 ### Next recommended step
-Grant's own walkthrough of `Construction/Operations/stage-object-visibility.md` §9 on a real install — which will also settle whether the WebGL rendering gap is specific to this dev container or reproducible on the deployed box, before assuming the browser proof will simply pass there unmodified.
+Grant's own walkthrough of `Construction/Domains/Operations/stage-object-visibility.md` §9 on a real install — which will also settle whether the WebGL rendering gap is specific to this dev container or reproducible on the deployed box, before assuming the browser proof will simply pass there unmodified.
 
 ## Kernel 91 — Victory Campus Tours & Guided Onboarding (2026-08-18)
 

@@ -119,7 +119,7 @@ protocol-form companion to this file, written for the kernel maker.
 - `directors-chair/index.html` — the Preparations card, fail-soft in the same
   way the Aftercare card is (a failure there must not blank the Console).
 
-**Docs**: `Construction/Operations/director-prepared-play.md`, including a
+**Docs**: `Construction/Domains/Operations/director-prepared-play.md`, including a
 section on what is deliberately not automated, because that absence is the
 design and will otherwise be mistaken for a gap.
 
@@ -410,7 +410,7 @@ operator access; nothing in production was touched during development.
   Director tool families are right-click-only there. The same operations are
   fully reachable from the toolbar, which is keyboard-navigable. This mirrors
   Kernel 83's Presence Tray gap recorded in
-  `Construction/Storyboards/storyboards-accessibility.md`.
+  `Construction/Domains/Storyboards/storyboards-accessibility.md`.
 - **`GET /api/shows/{show_id}` requires backstage authority to read the
   current placement**, so the Merchant panel's Expose button makes one extra
   round trip for a value the stage snapshot already carries. Harmless, but a

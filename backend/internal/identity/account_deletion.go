@@ -20,7 +20,7 @@ import (
 // tombstoneUserID is the dedicated, credential-less "Deleted User" account
 // created by migration 081. Shared canonical history that would otherwise
 // be blocked from deletion by a RESTRICT foreign key (see
-// Construction/Security/kernel-76-data-classification.md §3) is reassigned
+// Construction/Domains/Security/kernel-76-data-classification.md §3) is reassigned
 // to this account rather than left NULL, so existing rendering code that
 // joins to users.display_name needs no changes to show "Deleted User."
 //

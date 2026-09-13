@@ -34,8 +34,8 @@ Decision:
 
 ## Evidence Source
 - [first-theater/index.html](/opt/victory/frontend/venues/first-theater/index.html)
-- [roadmap.md](/opt/victory/Construction/roadmap.md)
-- [current-state.md](/opt/victory/Construction/current-state.md)
+- [roadmap.md](/opt/victory/Construction/Canon/roadmap.md)
+- [current-state.md](/opt/victory/Construction/Canon/current-state.md)
 
 ## TODO
 - Carry the remaining nameplate and audience hide/show validation into Kernel 30.

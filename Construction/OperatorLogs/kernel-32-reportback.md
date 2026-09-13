@@ -95,11 +95,11 @@ Live-credentials note:
 - `backend/internal/identity/discord_oauth_test.go`
 - `database/migrations/018_kernel32_discord_oauth.sql`
 - `frontend/login/index.html`
-- `Construction/current-state.md`
-- `Construction/roadmap.md`
-- `Construction/kernel-maker-field-guide.md`
+- `Construction/Canon/current-state.md`
+- `Construction/Canon/roadmap.md`
+- `Construction/Process/kernel-maker-field-guide.md`
 - `Construction/OperatorLogs/operator-log.md`
 - `Construction/OperatorLogs/operator-notes.md`
 - `Construction/OperatorLogs/Security-notes.md`
-- `Construction/vendor-acknowledgements.md`
-- `Construction/workflow/dev-workflow.md`
+- `Construction/Process/vendor-acknowledgements.md`
+- `Construction/Process/workflow/dev-workflow.md`

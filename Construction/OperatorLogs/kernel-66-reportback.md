@@ -2,7 +2,7 @@
 
 ## 0. Numbering note
 
-`Construction/roadmaps/victory-master-actual-implementation-guide-v1.md` has a stale,
+`Construction/Canon/roadmaps/victory-master-actual-implementation-guide-v1.md` has a stale,
 unrelated document-internal "Kernel 66 — Scene Transitions, Cue Groups, and Courtyard
 Tutorial Beat" section left over from earlier aspirational planning. It is not this
 kernel. Kernel 65's own reportback (§12) named "Show Run primitive / Run Roster MVP" as
@@ -73,7 +73,7 @@ for kernels 62–65 (the operator reviews before committing).
   picker overlay, calling the existing `POST /api/show-runs/{id}/roster` — no new endpoint.
 
 ### Documentation
-- `Construction/Dictionary.txt`: merged `Production Run` → `Show Run (Production Run)`;
+- `Construction/Canon/Dictionary.txt`: merged `Production Run` → `Show Run (Production Run)`;
   added a `Showing (live/runtime) vs. future scheduled occurrence` note so a later kernel
   doesn't reintroduce the same-named collision with Kernel 22's `Showing`.
 - `Construction/Kernels/kernel-66-show-run-audience-program-roster-mvp-v0.1.md` — the
@@ -273,14 +273,14 @@ None. All resolved operator decisions (§4) were followed as specified.
 - `backend/cmd/victory/main.go` (13 new route registrations)
 - `frontend/venues/third-place/index.html` ("Add to Show Run" chip + picker)
 - `scripts/smoke/fresh-install.sh` (migration 039 added to array; 8 new assertions)
-- `Construction/Dictionary.txt` (Show Run / Production Run merge; Showing collision note)
+- `Construction/Canon/Dictionary.txt` (Show Run / Production Run merge; Showing collision note)
 
 ## 11. Project-memory updates completed
 
 - `Construction/OperatorLogs/operator-log.md` — Kernel 66 entry appended.
 - `Construction/OperatorLogs/operator-notes.md` — JSON-tag lesson, fresh-install
   hardcoded-migration-array lesson, and no-Production-creation-flow gap recorded.
-- `Construction/roadmaps/victory-master-actual-implementation-guide-v1.md` — collision
+- `Construction/Canon/roadmaps/victory-master-actual-implementation-guide-v1.md` — collision
   note added next to the stale internal "Kernel 66" section.
 
 ## 12. Next recommended step

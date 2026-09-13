@@ -6,7 +6,7 @@ package storyboards
 // (ownership or an explicit storyboard_grants row), never location-scoped.
 // Client-supplied role claims are never authority -- every helper here
 // re-derives the tier itself from the database. See migration 090's
-// comment and Construction/Storyboards/storyboards-permissions.md for the
+// comment and Construction/Domains/Storyboards/storyboards-permissions.md for the
 // owner-vs-grant design rationale.
 
 import (

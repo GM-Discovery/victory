@@ -21,7 +21,7 @@ Two real bugs were found and fixed only by actually deploying and browser-testin
 | Criterion | Status | Evidence |
 |---|---|---|
 | Catharsis participants begin Ungrouped | PASS | `cohorts_test.go:TestShowParticipantsBeginUngrouped`; live proof: fixture players began Ungrouped before any cohort existed |
-| Cohort membership required beyond tutorial finish | PASS | No separate gate needed — cohort Scene resolution only ever fires for a viewer with an assignment row (`Construction/Shows/cohort-scene-progression-contract.md`) |
+| Cohort membership required beyond tutorial finish | PASS | No separate gate needed — cohort Scene resolution only ever fires for a viewer with an assignment row (`Construction/Domains/Shows/cohort-scene-progression-contract.md`) |
 | Director+ creates safe serialized cohorts | PASS | `TestCohortSerialAllocationDeterministicAndCollisionSafe`, `TestConcurrentCohortCreationIsSerialSafe` (8 concurrent goroutines, 8 distinct serials); live: Cohort 1/Cohort 2 auto-named |
 | One participant belongs to at most one active cohort/Show | PASS | PK on `(show_id, user_id)` makes this true by construction; `TestParticipantAssignmentMovesAndReturnsToUngrouped` |
 | Director+ moves people between cohorts/Ungrouped | PASS | Same test; live: alice/bob moved and verified via roster reads |
@@ -39,7 +39,7 @@ Two real bugs were found and fixed only by actually deploying and browser-testin
 | All eight Socio HP pools display | PASS | `socio.PoolLabels`; live: `aliceBlock.pools.length === 8` asserted against the real endpoint |
 | Supported HP/status changes use canonical mechanics operations | PASS | `SetPool`/`ApplyStatus`/`ClearStatus` are the only writers; live proof of set→read→apply→read→clear→read round trip |
 | No second health/status database | PASS | `character_socio_state`/`character_socio_status_effects` are the only tables; confirmed by repo-wide grep before building |
-| Show/cohort/Character state survives session break | PASS | `Construction/Socio/sustained-play-contract.md` — Postgres row persistence, not presence; unlike Kernel 83's in-memory registry |
+| Show/cohort/Character state survives session break | PASS | `Construction/Domains/Socio/sustained-play-contract.md` — Postgres row persistence, not presence; unlike Kernel 83's in-memory registry |
 | People Picker resolves canonical identities | PASS | `people-picker.js` merges My People + Third Place by `profile_id`; `kernel85_grants_profile_dbtest_test.go` |
 | Current Show access grantable without opaque-ID guessing | PASS | "Invite to this Show" on `show.html` calls the existing `tickets.InviteFromDirector` with a selected `profile_id`, no canonical membership universe added |
 | Storyboard sharing uses selected canonical identity | PASS | `AddGrantByProfile`; board.html wired to the picker |
@@ -55,8 +55,8 @@ Two real bugs were found and fixed only by actually deploying and browser-testin
 
 ### Schema (additive, migrations 096–097, applied live with pre-migrate backup)
 
-- `show_cohort_serial_counters`, `show_cohorts`, `show_cohort_assignments` — see `Construction/Shows/cohort-scene-progression-contract.md` for the full design rationale (row-locked serial allocation, PK-enforced single-active-cohort, Ungrouped computed not stored).
-- `character_socio_state`, `socio_statuses`, `character_socio_status_effects` — see `Construction/Socio/game-status-tool-contract.md`.
+- `show_cohort_serial_counters`, `show_cohorts`, `show_cohort_assignments` — see `Construction/Domains/Shows/cohort-scene-progression-contract.md` for the full design rationale (row-locked serial allocation, PK-enforced single-active-cohort, Ungrouped computed not stored).
+- `character_socio_state`, `socio_statuses`, `character_socio_status_effects` — see `Construction/Domains/Socio/game-status-tool-contract.md`.
 
 ### Backend packages
 
@@ -152,7 +152,7 @@ run both after the passing run and after every earlier failed/debugging run in t
 18. Can I adjust HP/statuses through canonical mechanics state? **Yes — proven live, round-tripped.**
 19. Do those changes persist through Scene changes and a session break? **Yes** — Postgres rows, not presence.
 20. Can I find Kyle through My People or Third Place? **Yes**, via the People Picker.
-21. Can I see enough identity information to know I have the right person? **Yes** — display name/portrait plus a canonical `profile_id`, deliberately not the private handle (see `Construction/Identity/people-picker-contract.md` for why).
+21. Can I see enough identity information to know I have the right person? **Yes** — display name/portrait plus a canonical `profile_id`, deliberately not the private handle (see `Construction/Domains/Identity/people-picker-contract.md` for why).
 22. Can I add him to the current Show without guessing an opaque ID? **Yes.**
 23. Can I share a Storyboard using the same selected identity? **Yes.**
 24. Does Audition Hall show every eligible canonical venue? **Yes — proven live.**
@@ -173,4 +173,4 @@ None of these are believed to be broken — they're the specific §16 items this
 
 ## 8. Deploy/commit status
 
-Deployed live per house practice (matches Kernel 72–84). **Deliberately left uncommitted** for your review, per your own instruction for this kernel — `git status --short` will show the full diff (~40 files) plus the new files under `backend/internal/cohorts/`, `backend/internal/socio/`, `Construction/Shows/`, `Construction/Scenes/`, `Construction/Socio/`, `Construction/Identity/`, and the two new migrations.
+Deployed live per house practice (matches Kernel 72–84). **Deliberately left uncommitted** for your review, per your own instruction for this kernel — `git status --short` will show the full diff (~40 files) plus the new files under `backend/internal/cohorts/`, `backend/internal/socio/`, `Construction/Domains/Shows/`, `Construction/Domains/Scenes/`, `Construction/Domains/Socio/`, `Construction/Domains/Identity/`, and the two new migrations.

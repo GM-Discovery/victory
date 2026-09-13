@@ -183,7 +183,7 @@ Already deployed live. Open any Storyboard (Blank or Timeline) with at least one
 
 - **Password signup is now closed in production** (`password_signup_closed` — "Victory accounts are created by signing in with Discord."). This is a change from the state documented in earlier kernel notes (Kernel 61/62's Two-Browser technique doc, which assumed `POST /api/auth/signup` worked). The Kernel 83 browser proof used the technique doc's *second* documented method instead — a direct `users` row plus a matching `auth.sessions` row (raw token + `SHA256(raw token string)` as `token_hash`, exactly matching `sessions.HashToken`) — inserted via `docker exec victory-postgres psql`, for all five disposable accounts. Worth updating `kernel-maker-field-guide.md`'s Two-Browser technique section to lead with this method now that signup is closed.
 - **Storyboards had zero presence concept before this kernel** — Kernel 80's own `ws.go` comment said so explicitly ("Storyboards has no location/session/presence concept"). The Presence Tray built here is genuinely new UI, not a reskin of something pre-existing; it reuses `network.Hub.BoardWatcherUserIDs`, a primitive that already existed for a different purpose (per-viewer card-event fan-out).
-- **"Venue session" for Storyboards = watcher-count transitions on a board**, not any CRUD lifecycle. A board can exist archived for months with zero watchers; a coordination session only exists while ≥1 distinct user is actively watching it via `watch_board`. Full rationale in `Construction/Venues/venue-session-state-lifecycle.md` — read this before wiring a second venue, since a venue with its own real session concept (The Cave) should use that instead of reinventing watcher-counting.
+- **"Venue session" for Storyboards = watcher-count transitions on a board**, not any CRUD lifecycle. A board can exist archived for months with zero watchers; a coordination session only exists while ≥1 distinct user is actively watching it via `watch_board`. Full rationale in `Construction/Domains/Venues/venue-session-state-lifecycle.md` — read this before wiring a second venue, since a venue with its own real session concept (The Cave) should use that instead of reinventing watcher-counting.
 - **The pump's WS context is only good for 5 seconds** (`ServeStoryboardWS`'s `context.WithTimeout(r.Context(), 5*time.Second)`, pre-existing since Kernel 80, reused for the whole connection's lifetime). This kernel's disconnect-cleanup path deliberately does *not* reuse that context — it builds its own fresh one — because a disconnect routinely happens well past 5 seconds and every DB-touching cleanup step would otherwise silently fail. The underlying dormant issue in the pump's own mid-loop queries (only reachable if a client sends a second `watch_board` more than 5s into a connection) was left alone as out of scope; flagging it here since it's now directly adjacent to code this kernel added.
 - **`venuecoordination.Registry` is a second, independent in-memory map from `network.PresenceRegistry`** — they look similar (both `map[string]something` keyed by a session-like string) but serve different purposes and were kept deliberately separate: `PresenceRegistry` is Cave-specific connection/persona presence; `venuecoordination.Registry` is the new generic Group Leader/Current Turn store any venue can use. Do not try to merge them.
 - **No migration was needed.** This is the first Storyboards kernel since Kernel 80 with zero new tables/columns — everything is in-memory and cleared on backend restart by design (spec §1.5).
@@ -209,7 +209,7 @@ None from the locked product decisions (spec §1–§2). Implementation interpre
 
 ## 9. Known Issues
 
-- **Presence Tray right-click has no keyboard entry point** (spec §10.3 explicitly scoped this out of Kernel 83 itself). Logged in `Construction/Storyboards/storyboards-accessibility.md` alongside the two pre-existing gaps from Kernel 81/82.
+- **Presence Tray right-click has no keyboard entry point** (spec §10.3 explicitly scoped this out of Kernel 83 itself). Logged in `Construction/Domains/Storyboards/storyboards-accessibility.md` alongside the two pre-existing gaps from Kernel 81/82.
 - **The pump's WS context reuse issue** described in §6 is pre-existing (Kernel 80) and unfixed — flagged, not addressed, since it's outside this kernel's bounded scope and doesn't manifest on the paths Kernel 83 added (which use their own fresh context).
 
 ---
@@ -228,9 +228,9 @@ None from the locked product decisions (spec §1–§2). Implementation interpre
 
 **Construction/docs:**
 - `Construction/Kernels/Kernel 83 — Venue Leadership & Turn State.md` (filed, mojibake cleaned)
-- `Construction/Venues/collaborative-venue-coordination-contract.md`, `presence-tray-coordination-actions.md`, `venue-session-state-lifecycle.md` (new)
-- `Construction/Storyboards/session-state-integration-seam.md` (updated — marked wired)
-- `Construction/Storyboards/storyboards-accessibility.md` (updated — Kernel 83 gap logged)
+- `Construction/Domains/Venues/collaborative-venue-coordination-contract.md`, `presence-tray-coordination-actions.md`, `venue-session-state-lifecycle.md` (new)
+- `Construction/Domains/Storyboards/session-state-integration-seam.md` (updated — marked wired)
+- `Construction/Domains/Storyboards/storyboards-accessibility.md` (updated — Kernel 83 gap logged)
 - `Construction/OperatorLogs/kernel-83-reportback.md` (this file)
 - `Construction/OperatorLogs/evidence/kernel-83/*.png` (3 screenshots)
 

@@ -18,7 +18,7 @@
 // reset-confirm endpoint), or read private content. Every subcommand is a
 // no-op without an explicit target, and every mutation prints what it changed.
 //
-// Documented in Construction/Operations/victory-account-recovery-runbook.md.
+// Documented in Construction/Domains/Operations/victory-account-recovery-runbook.md.
 package main
 
 import (
@@ -50,7 +50,7 @@ Usage:
   victory-recover recover  (--handle H | ...) --base-url https://your-install.example
 
 Reads DATABASE_URL from the environment (or --database-url).
-Run from the server shell. See Construction/Operations/victory-account-recovery-runbook.md.
+Run from the server shell. See Construction/Domains/Operations/victory-account-recovery-runbook.md.
 `
 
 type target struct {

@@ -6,7 +6,7 @@ package storyboards
 // reuse it for every subsequent watch_board message on that connection --
 // so any watch_board sent more than 5 seconds after connecting silently
 // failed with an expired-context error. See ws.go's package comment and
-// Construction/Operations/websocket-context-lifecycle.md.
+// Construction/Domains/Operations/websocket-context-lifecycle.md.
 
 import (
 	"net/http/httptest"

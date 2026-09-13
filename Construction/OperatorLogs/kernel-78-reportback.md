@@ -62,7 +62,7 @@ and makes `library`'s seed migration-canonical (`ON CONFLICT DO NOTHING`).
   `WithHeadingAttribute` mangles the manuscript's `(`/`?` ids. Policy built
   from empty `NewPolicy()` (UGCPolicy allows external images; additive
   policies can't be narrowed). Full design in
-  `Construction/eWrite/ewrite-markdown-security.md`.
+  `Construction/Domains/eWrite/ewrite-markdown-security.md`.
 - `store.go`/`revisions.go`/`sections.go` — hierarchy rules, slug dedupe,
   and the single source-write path: FOR-UPDATE conflict check
   (`base_revision_id` mismatch → 409 with current-revision payload; the

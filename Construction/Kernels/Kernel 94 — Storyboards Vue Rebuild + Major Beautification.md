@@ -508,7 +508,7 @@ Create a small visual-design note for K95 rather than forcing every venue to cha
 
 Suggested path:
 
-`Construction/Design/Kernel 94 Visual Language.md`
+`Construction/Domains/Design/Kernel 94 Visual Language.md`
 
 If an equivalent design reference already exists, update it instead of creating duplicate doctrine.
 

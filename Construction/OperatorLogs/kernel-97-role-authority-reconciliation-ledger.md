@@ -2,7 +2,7 @@
 
 **Kernel spec:** `Construction/Kernels/Kernel 97 — Canonical Role, Authority & Experience Reconciliation.md`
 **Status:** PASS. Full inventory (spec §31's 24-item search list, via five parallel evidence-first audits), three real contradictions found and fixed with verified tests, cross-Show and cross-Location isolation proven, adversarial role-spoofing coverage confirmed (reusing Kernel 96's work where it already applies, per spec §33's own instruction), canonical resolver documentation written, and a short human spot-check list handed off.
-**Companion doc:** `Construction/Identity/Canonical Role and Authority Resolution.md` — the actual §30 canonical-resolver map. This ledger records the process and findings; that document is the living reference.
+**Companion doc:** `Construction/Domains/Identity/Canonical Role and Authority Resolution.md` — the actual §30 canonical-resolver map. This ledger records the process and findings; that document is the living reference.
 
 ---
 

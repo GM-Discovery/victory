@@ -173,7 +173,7 @@ used as fixtures were read-only throughout.
 
 ## 11. Dictionary update summary
 
-`Construction/Dictionary.txt`: added a `Show (Show Instance)` entry (hierarchy,
+`Construction/Canon/Dictionary.txt`: added a `Show (Show Instance)` entry (hierarchy,
 distinction from Session and Showing, notes `sessions.show_id` is a manual, non-wired
 link). **Corrected** the existing `Showing (live/runtime) vs. future scheduled
 occurrence` note from Kernel 66 — it previously predicted future scheduling would
@@ -222,7 +222,7 @@ candidates.
 - `backend/cmd/victory/main.go` (import + 6 new route registrations)
 - `frontend/venues/show-runs/run.html` (new "Shows" section)
 - `scripts/smoke/fresh-install.sh` (migration 040 added; 8 new assertions)
-- `Construction/Dictionary.txt` (new Show entry; corrected Showing note)
+- `Construction/Canon/Dictionary.txt` (new Show entry; corrected Showing note)
 
 ## 14. Project-memory updates completed
 

@@ -168,7 +168,7 @@ func broadcastCellReorder(ctx context.Context, pool *pgxpool.Pool, hub *network.
 // user simply finds their own authority different on their next action or
 // reconnect rather than receiving a live event about their own grant
 // (spec 8.2's grant_changed entry, as scoped in
-// Construction/Storyboards/storyboards-live-events.md).
+// Construction/Domains/Storyboards/storyboards-live-events.md).
 func broadcastGrantChanged(ctx context.Context, pool *pgxpool.Pool, hub *network.Hub, board *Storyboard) {
 	if hub == nil || board == nil {
 		return

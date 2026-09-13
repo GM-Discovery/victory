@@ -12,7 +12,7 @@ package ewrite
 // (CanEditPublication): eWrite drafts are production work product shared
 // within the authoring team, not private reflections. This is a recorded
 // contrast with storysofar/store.go's owner-only precedent -- see
-// Construction/eWrite/ewrite-permissions.md.
+// Construction/Domains/eWrite/ewrite-permissions.md.
 
 import (
 	"context"

@@ -4,7 +4,7 @@ Current as of **Kernel 89** (2026-08-17). Paths are clickable. Agents should sta
 
 The previous version of this file was a flat link dump from an editor picker, last accurate around Kernel 4 — it stopped at migration `004` and listed six backend packages out of the thirty-four that exist. This version is organized by what each area *is*, so it can be read as well as clicked.
 
-For vocabulary see [Dictionary.txt](Construction/Dictionary.txt). For current-state canon see [current-state.md](Construction/current-state.md). For durable implementation traps see [operator-notes.md](Construction/OperatorLogs/operator-notes.md).
+For vocabulary see [Dictionary.txt](Construction/Canon/Dictionary.txt). For current-state canon see [current-state.md](Construction/Canon/current-state.md). For durable implementation traps see [operator-notes.md](Construction/OperatorLogs/operator-notes.md).
 
 ---
 
@@ -74,7 +74,7 @@ Go. Entry point [main.go](backend/cmd/victory/main.go) registers every HTTP rout
 
 | Path | What it is |
 |---|---|
-| [ewrite/](backend/internal/ewrite) | The writing/publication/reading system: typed collection tree, publications with append-forward revisions and 409 save-conflict protection, stable section anchors + aliases, named editor grants, typed object links, Postgres FTS search, per-publication export. [markdown.go](backend/internal/ewrite/markdown.go)/[markdown_policy.go](backend/internal/ewrite/markdown_policy.go) are the repo's **only** Markdown render+sanitize path (goldmark + bluemonday, server-side only). Design notes in [Construction/eWrite/](Construction/eWrite). |
+| [ewrite/](backend/internal/ewrite) | The writing/publication/reading system: typed collection tree, publications with append-forward revisions and 409 save-conflict protection, stable section anchors + aliases, named editor grants, typed object links, Postgres FTS search, per-publication export. [markdown.go](backend/internal/ewrite/markdown.go)/[markdown_policy.go](backend/internal/ewrite/markdown_policy.go) are the repo's **only** Markdown render+sanitize path (goldmark + bluemonday, server-side only). Design notes in [Construction/Domains/eWrite/](Construction/Domains/eWrite). |
 
 ### Schema and infrastructure
 
@@ -150,15 +150,15 @@ Backend tests live beside their packages; DB-touching ones are conventionally `*
 
 | Path | What it is |
 |---|---|
-| [current-state.md](Construction/current-state.md) | **Current-state canon.** Wins over any older current-tense statement. |
-| [roadmap.md](Construction/roadmap.md) | Forward-looking roadmap and standing open items. |
-| [Dictionary.txt](Construction/Dictionary.txt) | Vocabulary. |
+| [current-state.md](Construction/Canon/current-state.md) | **Current-state canon.** Wins over any older current-tense statement. |
+| [roadmap.md](Construction/Canon/roadmap.md) | Forward-looking roadmap and standing open items. |
+| [Dictionary.txt](Construction/Canon/Dictionary.txt) | Vocabulary. |
 | [Kernels/](Construction/Kernels) | Kernel specifications, including the drafted [kernel-75](Construction/Kernels/kernel-75-tutorial-completion-aftercare-continuation-v0.1.md). |
 | [OperatorLogs/](Construction/OperatorLogs) | [operator-log.md](Construction/OperatorLogs/operator-log.md) (chronological), [operator-notes.md](Construction/OperatorLogs/operator-notes.md) (durable traps), and per-kernel reportbacks — most recent [kernel-74-reportback.md](Construction/OperatorLogs/kernel-74-reportback.md). |
-| [Operations/](Construction/Operations) | Operator runbooks, including [director-prepared-play.md](Construction/Operations/director-prepared-play.md) — Kernel 89's Director guide, with an explicit section on what is deliberately *not* automated. |
-| [kernel-maker-field-guide.md](Construction/kernel-maker-field-guide.md), [reportbacktemplate.txt](Construction/reportbacktemplate.txt), [templates/](Construction/templates) | How to write a kernel and its reportback. |
-| [workflow/](Construction/workflow), [deployment/](Construction/deployment), [roadmaps/](Construction/roadmaps) | Dev workflow, install contract, fresh-install guide, long-form track roadmaps. |
-| [character-workbook.md](Construction/character-workbook.md), [Construction — Contracts.txt](<Construction/Construction — Contracts.txt>) | Workbook design and standing contracts. |
+| [Operations/](Construction/Domains/Operations) | Operator runbooks, including [director-prepared-play.md](Construction/Domains/Operations/director-prepared-play.md) — Kernel 89's Director guide, with an explicit section on what is deliberately *not* automated. |
+| [kernel-maker-field-guide.md](Construction/Process/kernel-maker-field-guide.md), [reportbacktemplate.txt](Construction/Process/reportbacktemplate.txt), [templates/](Construction/Process/templates) | How to write a kernel and its reportback. |
+| [workflow/](Construction/Process/workflow), [deployment/](Construction/Process/deployment), [roadmaps/](Construction/Canon/roadmaps) | Dev workflow, install contract, fresh-install guide, long-form track roadmaps. |
+| [character-workbook.md](Construction/Canon/character-workbook.md), [Construction — Contracts.txt](<Construction/Process/Construction — Contracts.txt>) | Workbook design and standing contracts. |
 
 ---
 

@@ -1,6 +1,6 @@
 # Kernel 99 — Fresh Install Proof
 
-**Date:** 2026-09-12. Per spec Part II (§23-28). Proves the documented Linux/developer install path against a genuinely empty, fresh database using only the repository's own documented tooling (`scripts/smoke/fresh-install.sh --local`, per `Construction/deployment/fresh-install.md`) — no manual SQL, no copied config, no tribal knowledge.
+**Date:** 2026-09-12. Per spec Part II (§23-28). Proves the documented Linux/developer install path against a genuinely empty, fresh database using only the repository's own documented tooling (`scripts/smoke/fresh-install.sh --local`, per `Construction/Process/deployment/fresh-install.md`) — no manual SQL, no copied config, no tribal knowledge.
 
 ## Result: PASS, with one real defect found and fixed along the way
 
@@ -24,11 +24,11 @@ The proof hard-failed at `/showtime <code>` with: *"expected /showtime's respons
 
 ## Documentation defect found and fixed
 
-`Construction/deployment/fresh-install.md` step 7 referenced `database/migrations/` — the real path is `backend/migrations/`, confirmed by reading the smoke script itself. Fixed in place.
+`Construction/Process/deployment/fresh-install.md` step 7 referenced `database/migrations/` — the real path is `backend/migrations/`, confirmed by reading the smoke script itself. Fixed in place.
 
 ## No tribal knowledge required
 
-Every step taken was either directly from `Construction/deployment/fresh-install.md` or from reading the smoke script's own `--help`/usage text (which documents the `POSTGRES_HOST_PORT`/`BACKEND_PORT` overrides used here to avoid colliding with the pre-existing real dev stack — a normal, documented override, not an undocumented workaround). No manual SQL, no hand-created rows, no copied `.env`, no knowledge that wasn't either in the repo's own docs or discoverable from `--help`.
+Every step taken was either directly from `Construction/Process/deployment/fresh-install.md` or from reading the smoke script's own `--help`/usage text (which documents the `POSTGRES_HOST_PORT`/`BACKEND_PORT` overrides used here to avoid colliding with the pre-existing real dev stack — a normal, documented override, not an undocumented workaround). No manual SQL, no hand-created rows, no copied `.env`, no knowledge that wasn't either in the repo's own docs or discoverable from `--help`.
 
 ## Fresh database contents audit (spec §26)
 

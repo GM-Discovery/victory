@@ -10,7 +10,7 @@ The clean stage-shell exists and the repo now has the right kernel framing for i
 - Added a map entry and routing for `middle-school-stage` in `frontend/app.js`
 - Seeded the venue in `backend/internal/access/kernel16_venue_bootstrap.go`
 - Made the venue visible to producers in `backend/internal/access/visibility.go`
-- Updated the canon in `Construction/current-state.md`, `Construction/roadmap.md`, and `Construction/kernel-maker-field-guide.md`
+- Updated the canon in `Construction/Canon/current-state.md`, `Construction/Canon/roadmap.md`, and `Construction/Process/kernel-maker-field-guide.md`
 - Kept The Cave untouched
 - Kept Pixi out of The Cave
 
@@ -24,7 +24,7 @@ The clean stage-shell exists and the repo now has the right kernel framing for i
 - Anonymous `curl -s http://127.0.0.1:8081/api/map/visibility` did not return `middle-school-stage`
 
 ## How To Run
-- Start the backend with the normal dev workflow from `Construction/workflow/dev-workflow.md`
+- Start the backend with the normal dev workflow from `Construction/Process/workflow/dev-workflow.md`
 - Open the map and navigate to `Middle School Stage`
 - Sign in with a producer or operator account to pass the shell bootstrap
 
@@ -59,9 +59,9 @@ The clean stage-shell exists and the repo now has the right kernel framing for i
 - `backend/internal/access/visibility.go`
 - `frontend/app.js`
 - `frontend/venues/middle-school-stage/index.html`
-- `Construction/current-state.md`
-- `Construction/roadmap.md`
-- `Construction/kernel-maker-field-guide.md`
+- `Construction/Canon/current-state.md`
+- `Construction/Canon/roadmap.md`
+- `Construction/Process/kernel-maker-field-guide.md`
 - `Construction/Kernels/kernel-31-middle-school-stage-edge-drawer-layout-v1.md`
 
 ## Direct Questions

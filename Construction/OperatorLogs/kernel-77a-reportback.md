@@ -28,7 +28,7 @@ from-scratch database rebuild and on the live host.
   directories (`shared`, `construction`, `construction-site`, `stage-template`,
   `victory-theater`) were confirmed to be non-venue content (a shared component, placeholder
   pages, a template, and the *other* Location's landing page) and were correctly not seeded.
-  Full detail in `Construction/Operations/kernel-77a-canonical-venue-reconciliation.md`.
+  Full detail in `Construction/Domains/Operations/kernel-77a-canonical-venue-reconciliation.md`.
 
 ---
 

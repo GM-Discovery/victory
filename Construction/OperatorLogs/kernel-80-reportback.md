@@ -265,7 +265,7 @@ Grant asked specifically for this to be captured so the next kernel can be budge
 
 **Construction/docs:**
 - `Construction/Kernels/Kernel 80 — Storyboards Core.md` (filed, with an implementation-record addendum)
-- `Construction/Storyboards/storyboards-domain-model.md`, `storyboards-permissions.md`, `storyboards-live-events.md`, `storyboards-export-format.md`, `storyboards-ui-contract.md` (new)
+- `Construction/Domains/Storyboards/storyboards-domain-model.md`, `storyboards-permissions.md`, `storyboards-live-events.md`, `storyboards-export-format.md`, `storyboards-ui-contract.md` (new)
 - `Construction/OperatorLogs/kernel-80-reportback.md` (this file)
 
 ---

@@ -7,7 +7,7 @@
 > Kept here for history only — do not implement from this file.
 
 **Status:** PROPOSAL — not a final specification (superseded, see above)
-**Scope source:** Kernel 76 findings (`Construction/Security/kernel-76-findings.md`)
+**Scope source:** Kernel 76 findings (`Construction/Domains/Security/kernel-76-findings.md`)
 **Purpose:** advance Victory from readiness Level 3 (invited strangers) to Level 4 (private
 paying clients)
 
@@ -43,7 +43,7 @@ Build:
    ownership transfers. Return the specific blocker, not a generic refusal.
 4. Session revocation and credential destruction on deletion.
 
-Per-record dispositions are mapped in `Construction/Security/kernel-76-data-classification.md`
+Per-record dispositions are mapped in `Construction/Domains/Security/kernel-76-data-classification.md`
 §3. The controlling principle: a user may erase themselves but not other people's history of a
 shared performance.
 
@@ -58,7 +58,7 @@ private content. Rate limit it — it is the most expensive endpoint Victory wil
 
 ### K77-03 — Backup and restore
 
-From `Construction/Operations/victory-backup-restore-assessment.md` §5:
+From `Construction/Domains/Operations/victory-backup-restore-assessment.md` §5:
 
 1. Nightly `pg_dump` via systemd timer, 30-day retention.
 2. Nightly `/opt/victory/storage` snapshot.

@@ -185,7 +185,7 @@ None from the locked product decisions (spec §1-§2). Three implementation inte
 
 **Construction/docs:**
 - `Construction/Kernels/Kernel 82 — Storyboards Timeline Mode.md` (filed, mojibake cleaned)
-- `Construction/Storyboards/timeline-mode-contract.md`, `storyboard-template-contract.md`, `reference-panel-contract.md`, `timeline-navigation.md`, `session-state-integration-seam.md` (new)
+- `Construction/Domains/Storyboards/timeline-mode-contract.md`, `storyboard-template-contract.md`, `reference-panel-contract.md`, `timeline-navigation.md`, `session-state-integration-seam.md` (new)
 - `Construction/OperatorLogs/kernel-82-reportback.md` (this file)
 
 ---
