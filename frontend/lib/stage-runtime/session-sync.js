@@ -250,9 +250,15 @@
       }
 
       const data = payload.data || {};
+      // Kernel 97: this used to silently overwrite an Operator's own real,
+      // server-resolved "audience" role to "producer" client-side -- the
+      // server never lied about the role, the UI did. An Operator could
+      // never actually see a true Audience experience through ordinary use,
+      // even in a session where the server correctly resolved them as one.
+      // Real authority (CanManageShowRun, IsOperatorUser) is unaffected by
+      // this value regardless -- it only ever drove which UI/trays render.
       const requestedRole = String(data.role || data.participant?.role || "audience").trim().toLowerCase();
-      const isOperator = Boolean(currentIdentity?.is_operator);
-      currentRole = isOperator && requestedRole === "audience" ? "producer" : requestedRole;
+      currentRole = requestedRole;
       currentSessionId = data.session_id || data.session?.id || data.sessionId || "";
       currentActorId = data.actor_id || data.participant?.actor_id || data.participant?.user_id || data.user_id || "";
       setCurrentRole(currentRole);
