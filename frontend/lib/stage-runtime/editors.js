@@ -550,7 +550,7 @@
         return;
       }
       hideCardEditor();
-      hideGridEditor();
+      hideGridEditorController();
       deps.setMapEditorOriginalState?.(getCurrentVenueMapState() ? { ...getCurrentVenueMapState() } : null);
       mapEditorSelectedAssetID = String(getCurrentVenueMapState()?.asset_id || getCurrentVenueMapAssetID() || "");
       if (panel.hidden) setMapEditorPosition(24, 24);

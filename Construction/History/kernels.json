@@ -1239,13 +1239,13 @@
     "number": 95,
     "name": "Unified Victory Shell, Future Trays, Continuity & Guidance",
     "provenance": "original",
-    "status": "not_executed",
+    "status": "implemented_status_not_recorded",
     "spec_path": "Construction/Kernels/Kernel 95 \u2014 Unified Victory Shell, Future Trays, Continuity & Guidance.md",
     "report_path": null,
     "commits": [],
     "migrations": [],
     "superseded_by": [],
-    "notes": "Never built"
+    "notes": "Corrected 2026-09-17: real multi-pass implementation exists (Pass 2-7+ in runtime.js/catharsis), just never had a reportback written"
   },
   {
     "number": 96,
