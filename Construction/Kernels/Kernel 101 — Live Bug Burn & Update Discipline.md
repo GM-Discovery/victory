@@ -57,8 +57,8 @@ Append new entries here as they're found. Each entry needs: a description, evide
 
 | # | Bug | Status | Notes |
 |---|---|---|---|
-| 101-02 | Fresh installs never go live at Catharsis — `firstrun.BootstrapFirstOperator` creates the Show/Session but never sets the Show's own `status` to `"live"`; stays `"draft"` forever without manual Director intervention | OPEN — data patched on murray-vserver, **code not yet fixed** | `backend/internal/firstrun/firstrun.go`; will recur on every future fresh install (new Windows installs included) until fixed in code |
-| 101-03 | Audition Hall's Cast-permission request may not actually submit — real confirmation email + in-app note, but zero rows in `show_run_tickets` for the show run in question | OPEN — needs repro | Reproduce with exact click sequence before diagnosing further |
+| 101-02 | Fresh installs never go live at Catharsis — `firstrun.BootstrapFirstOperator` creates the Show/Session but never sets the Show's own `status` to `"live"`; stays `"draft"` forever without manual Director intervention | **FIXED**, not yet deployed | `backend/internal/firstrun/firstrun.go` now explicitly sets `status`/`actual_start_at` via `shows.UpdateShow` after `showtime.Start`. New test `firstrun_dbtest_test.go` (package had zero prior coverage) — confirmed it fails without the fix (`got "draft"`), passes with it, in an isolated run. Data on murray-vserver was already patched separately. |
+| 101-03 | Audition Hall's Cast-permission request may not actually submit — real confirmation email + in-app note, but zero rows in `show_run_tickets` for the show run in question | DEFERRED — retest after the rest of Tier 1/2 ship, in case it isn't actually reproducible | Grant's call 2026-09-17: hold this one until other fixes are live |
 | 101-04 | Windows updater sends "dozens of annoying notifications" for a single available update, instead of one clear, stateful prompt | OPEN | See §4 for the fix contract |
 | 101-05 | No way to force a backend update through while a Show is live — the updater only applies backend updates during a quiet window or after an explicit session-close; Grant needs an override with an explicit warning dialog | OPEN | See §4 for the fix contract |
 
@@ -81,6 +81,7 @@ Append new entries here as they're found. Each entry needs: a description, evide
 | 101-13 | Storyboards board-content loaders have no pagination | DEFERRED | Future perf cliff, no evidence of a real board near that size |
 | 101-14 | "WebGL context was lost" seen once alongside 101-01's crash | NEEDS TRIAGE | Watch for recurrence independent of the (now-fixed) crash before treating as its own bug |
 | 101-15 | "Book Antiqua" font repeatedly blocked at visibility level 2 (requires 3) | NEEDS TRIAGE | Unclear if an intentional gate or an over-restrictive default |
+| 101-16 | Some test in `internal/shows`/`internal/showtime` leaves an active Catharsis session behind, colliding with any later test in the same `go test` batch that also needs Catharsis free | NEEDS TRIAGE | Test-infrastructure gap, not a product bug — found while verifying 101-02's fix; `internal/firstrun`'s own test passes cleanly in isolation |
 
 ### Tier 4 — Add new bugs here
 

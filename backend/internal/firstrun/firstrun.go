@@ -17,6 +17,7 @@ package firstrun
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -62,9 +63,15 @@ func BootstrapFirstOperator(ctx context.Context, pool *pgxpool.Pool, userID stri
 		return
 	}
 
-	// Status is left at CreateShow's own "draft" default -- showtime.Start
-	// below is what actually transitions a Show live; there's no
-	// "ready-but-not-live" status a Show needs to pass through first.
+	// Status is left at CreateShow's own "draft" default here -- corrected
+	// to "live" explicitly below, after Start, once there's a real Session
+	// to point at. (Kernel 101: showtime.Start only ever transitions the
+	// Session/Showing to "live" -- it never touches the Show's own status
+	// column. A Show still stuck at "draft" is invisible as "mounted" to a
+	// genuinely fresh Audience viewer, which is exactly the onboarding
+	// experience this whole function exists to deliver. Found live on
+	// murray-vserver's first real fresh install; this is the code-level
+	// fix for the data patch applied there.)
 	show, err := shows.CreateShow(ctx, pool, userID, run.ID, shows.CreateShowInput{
 		Title: "The Locked Courtyard",
 		Slug:  "the-locked-courtyard",
@@ -83,6 +90,21 @@ func BootstrapFirstOperator(ctx context.Context, pool *pgxpool.Pool, userID stri
 	if err != nil {
 		log.Printf("firstrun: show start failed: %v", err)
 		return
+	}
+
+	// Kernel 101: Start only ever transitions the Session/Showing to
+	// "live" -- the Show's own status column is untouched by it and stays
+	// at CreateShow's "draft" default forever unless something else sets
+	// it, same as a Director would from Stage Management's Show settings
+	// panel. Do that explicitly here; this is exactly what a fresh
+	// install's "already mounted" promise depends on.
+	liveStatus := "live"
+	startedAt := time.Now().UTC().Format(time.RFC3339)
+	if _, err := shows.UpdateShow(ctx, pool, userID, show.ID, shows.UpdateShowPatch{
+		Status:        &liveStatus,
+		ActualStartAt: &startedAt,
+	}); err != nil {
+		log.Printf("firstrun: show status update to live failed: %v", err)
 	}
 
 	// Start alone leaves the session in "rehearsal" (Director-console
