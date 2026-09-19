@@ -23,7 +23,7 @@ This kernel is **append-only by design**. Grant is actively finding bugs while p
 Victory is live. This is the operating rule for the rest of this kernel, and for every kernel after it until Grant says otherwise:
 
 - **Do not deploy a fix to murray-vserver, and do not push a branch that triggers a Windows release build, as a reflex the moment a fix is written.** Batch fixes. Grant deploys roughly once a day now, on his own schedule.
-- **Verify locally first.** Use a local Linux test environment — not production — to reproduce and confirm a fix before it's considered done. (Grant: confirm exactly what this environment is — this machine's own local dev/podman stack, as used for tonight's Cast-rename testing, or something else you have in mind — before execution starts in earnest.)
+- **Verify locally first.** Use a local Linux test environment — not production — to reproduce and confirm a fix before it's considered done. Confirmed 2026-09-17: this is "brick," Grant's own local machine — the same podman/docker stack already used for the Cast-rename verification.
 - **A deploy is its own decision, not a side effect of a fix being ready.** Ask, or wait to be told, before pushing/deploying — every single time, not just the first time in a session.
 - Exception: a fix that is purely local-file/documentation/spec work (like this document) never needed a deploy in the first place — this rule is about anything that touches murray-vserver or triggers `windows-installer.yml`.
 
@@ -152,7 +152,7 @@ Do not close Kernel 101 with entries still marked plain "OPEN" — every entry n
 - Victory is live; deploy cadence is Grant's decision, roughly daily, never automatic.
 - This kernel is append-only — new bugs get added without a new kernel number.
 - The update-notification and forced-update-override work (§4) is explicitly in scope despite being a refactor, at Grant's direction.
-- Testing happens on a local Linux environment before anything reaches production, per §1 (exact environment TBD with Grant).
+- Testing happens on "brick" (Grant's own local machine) before anything reaches production, per §1.
 - Do not expand a contained bug fix into a broader rewrite — route it instead (§2, §6).
 
 ---
