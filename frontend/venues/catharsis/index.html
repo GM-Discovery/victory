@@ -2302,50 +2302,43 @@
       width: min(260px, 88vw);
     }
 
+    /* 101-08: collapsed drawer matches the reactions bar's own 26px
+       circular toggle (frontend/lib/stage-runtime/reactions.js) exactly --
+       an icon-only affordance, no visible "Send Fanmail" label. The
+       generic .drawer[data-open="false"] .drawer-head__copy rule already
+       hides the label (opacity/width, not display:none, so it stays
+       reachable to screen readers) -- no override needed here anymore. */
     #audience-drawer[data-open="false"] {
-      width: 132px;
+      width: 26px;
+      height: 26px;
     }
 
-    /* The generic .drawer[data-open="false"] rules (shared with left/right
-       drawer) zero out .drawer-head__copy's width/opacity for a bare
-       hover-rail look -- this drawer has no hover-rail wiring, so its own
-       label+arrow need to stay visibly clickable in the collapsed state
-       instead of disappearing into an unlabeled sliver. */
-    #audience-drawer.drawer[data-open="false"] .drawer-head__copy {
-      opacity: 1;
-      transform: none;
-      pointer-events: auto;
-      width: auto;
-      overflow: visible;
-    }
-
-    /* The generic .drawer[data-open="false"] rule (above) keeps its low
+    /* The generic .drawer[data-open="false"] rule keeps its low
        opacity/blur/transparent-border blend so the collapsed drawer still
        sits quietly on the stage (that part is fine and worth keeping) --
        only the background's radial-gradient(circle at top, ...) layer is
        dropped here; the linear-gradient underneath it is unchanged. */
     #audience-drawer.drawer[data-open="false"] {
       background: linear-gradient(180deg, rgba(15, 18, 25, 0.06), rgba(8, 10, 15, 0.03));
-    }
-
-    /* The actual source of the "curve through the S": .drawer's shared
-       18px border-radius on a box this short (the collapsed drawer-head has
-       zero padding from the generic collapsed rule) reads as a pill/stadium
-       shape, and the label sits with no padding right up against that
-       rounded end -- the corner's own curve visually cuts through the
-       letter. Use a small, regular-button radius instead, give the label
-       real breathing room, and center it on both axes with nothing else
-       showing (the arrow only makes sense once there's room to read it
-       next to the label, i.e. once open). */
-    #audience-drawer.drawer[data-open="false"] {
-      border-radius: 10px;
+      border-radius: 50%;
     }
 
     #audience-drawer.drawer[data-open="false"] .drawer-head {
       justify-content: center;
       align-items: center;
-      padding: 10px 16px;
+      padding: 0;
       min-height: 0;
+      width: 26px;
+      height: 26px;
+      border-bottom: none;
+      box-sizing: border-box;
+    }
+
+    #audience-drawer.drawer[data-open="false"] .drawer-head::before {
+      content: "✉";
+      font-size: 12px;
+      line-height: 1;
+      color: #e8e8ec;
     }
 
     #audience-drawer.drawer[data-open="false"] #audience-drawer-arrow {
