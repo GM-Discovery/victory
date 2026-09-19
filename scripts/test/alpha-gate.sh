@@ -73,8 +73,24 @@ fi
 echo
 
 # --- Step 3: go test ----------------------------------------------------
-echo "--- Step 3/7: go test -count=1 ./... ---"
-if (cd "$BACKEND_DIR" && TEST_DATABASE_URL="$TEST_DATABASE_URL" go test -count=1 ./...); then
+# Kernel 101 (101-16): -p 1 forces Go to test one package at a time rather
+# than its default (one test binary per package, up to NumCPU running
+# concurrently). Several packages (shows, showtime, and others touching
+# real Show/Session state) all start real Sessions on the one, real,
+# shared "catharsis" venue this test database seeds -- there is no
+# disposable per-test venue for that, since the venue slug is hardcoded in
+# production code (scenes/capture.go's liveBridgeVenueSlug and friends).
+# Confirmed empirically: every affected package passes cleanly alone or
+# with -p 1 on a fresh database; the same combination run with Go's
+# default concurrency reproduced a real, reliable (3/3 attempts) race on
+# catharsis's one-live-session-at-a-time constraint, with two different
+# packages' test binaries both starting a live session on it at genuinely
+# the same moment. Not a bug in any individual test -- every one already
+# cleans up correctly -- purely a consequence of shared, unavoidably
+# global fixture state under true concurrent execution. Slower, but this
+# gate should never be flaky.
+echo "--- Step 3/7: go test -p 1 -count=1 ./... ---"
+if (cd "$BACKEND_DIR" && TEST_DATABASE_URL="$TEST_DATABASE_URL" go test -p 1 -count=1 ./...); then
   record_step "go test ./..." "PASS"
 else
   record_step "go test ./..." "FAIL"
