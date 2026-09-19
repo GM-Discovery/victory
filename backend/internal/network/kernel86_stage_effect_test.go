@@ -21,6 +21,20 @@ func mockStoredDiceRoll(t *testing.T, audienceMode, cohortID string) {
 	old := storeDiceRollFunc
 	t.Cleanup(func() { storeDiceRollFunc = old })
 
+	// Kernel 101 (101-12): a "show"-mode roll's broadcast path separately
+	// calls audienceDiceRollsHiddenFunc with the same nil pool every test
+	// using this helper passes to handleCavePayload -- storeDiceRollFunc's
+	// mock above never covered that second, unrelated real-DB read, so any
+	// test exercising the "show" broadcast path panicked on a nil pool
+	// dereference regardless of what this function itself mocks. Fixed
+	// once, here, for every current and future test that calls this shared
+	// helper, rather than per-test. "not hidden" (dice visible) is a safe
+	// default for every existing caller -- "private" mode never reaches
+	// that call at all, so this is a no-op for those tests.
+	oldHidden := audienceDiceRollsHiddenFunc
+	t.Cleanup(func() { audienceDiceRollsHiddenFunc = oldHidden })
+	audienceDiceRollsHiddenFunc = func(ctx context.Context, pool *pgxpool.Pool, sessionID string) bool { return false }
+
 	storeDiceRollFunc = func(ctx context.Context, pool *pgxpool.Pool, incoming actions.DiceRollRequest) (*actions.StoredAction, error) {
 		return &actions.StoredAction{
 			ID:        "action-" + incoming.RequestID,

@@ -124,6 +124,16 @@ func resolvedStoredMode(raw string) string {
 	}
 }
 
+// audienceDiceRollsHiddenFunc indirects both call sites below through a
+// swappable var, matching this file's own established storeXFunc
+// convention (Kernel 101, 101-12): a broadcast/pinned-roll test that mocks
+// storeDiceRollFunc and passes a nil pool (there is nothing else in the
+// broadcast path for it to mock) previously panicked here regardless, since
+// this function's own real DB read was never part of what got mocked.
+// Production never swaps this -- it always calls the real
+// audienceDiceRollsHidden below.
+var audienceDiceRollsHiddenFunc = audienceDiceRollsHidden
+
 // audienceDiceRollsHidden reports whether sessionID's Showing has the
 // Kernel 93 Audience Dice Rolls toggle turned off. A local, deliberate
 // duplicate of audienceprojection.DiceRollsHiddenFromAudience's single-row
@@ -209,7 +219,7 @@ func deliverStageMessage(ctx context.Context, hub *Hub, pool *pgxpool.Pool, sess
 		// actual dice roll -- Director+/Cast/Crew are unaffected, and the
 		// roller always sees their own roll (nonAudienceSessionRecipients
 		// always includes actorID).
-		if decision.Mode == rollaudience.ModeShow && effectType == "dice_roll" && audienceDiceRollsHidden(ctx, pool, sessionID) {
+		if decision.Mode == rollaudience.ModeShow && effectType == "dice_roll" && audienceDiceRollsHiddenFunc(ctx, pool, sessionID) {
 			hub.SendToUsers(sessionID, nonAudienceSessionRecipients(ctx, pool, sessionID, actorID), msg)
 			return
 		}
@@ -389,7 +399,7 @@ func ServeVenueWS(hub *Hub, pool *pgxpool.Pool, discordLinkCfg identity.DiscordS
 			// Show-mode pinned roll the Showing's Director has hidden from
 			// Audience, except their own.
 			if visible && decision.Mode == rollaudience.ModeShow && strings.EqualFold(strings.TrimSpace(sessionIdentity.Role), "audience") && e.ActorID != sessionIdentity.UserID {
-				if audienceDiceRollsHidden(ctx, pool, sessionIdentity.SessionID) {
+				if audienceDiceRollsHiddenFunc(ctx, pool, sessionIdentity.SessionID) {
 					visible = false
 				}
 			}

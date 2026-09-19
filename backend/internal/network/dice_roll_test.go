@@ -13,6 +13,15 @@ import (
 func TestKernel52RollDiceActionBroadcastsCanonicalResult(t *testing.T) {
 	oldStore := storeDiceRollFunc
 	defer func() { storeDiceRollFunc = oldStore }()
+	// Kernel 101 (101-12): the broadcast path this test exercises also
+	// calls audienceDiceRollsHiddenFunc with the same nil pool passed to
+	// handleCavePayload below -- storeDiceRollFunc's own mock never covered
+	// that separate, unrelated real-DB read. Mocked to "not hidden" (dice
+	// visible), matching this test's own subject: a public roll broadcasts
+	// normally.
+	oldHidden := audienceDiceRollsHiddenFunc
+	defer func() { audienceDiceRollsHiddenFunc = oldHidden }()
+	audienceDiceRollsHiddenFunc = func(ctx context.Context, pool *pgxpool.Pool, sessionID string) bool { return false }
 
 	var req actions.DiceRollRequest
 	storeDiceRollFunc = func(ctx context.Context, pool *pgxpool.Pool, incoming actions.DiceRollRequest) (*actions.StoredAction, error) {
