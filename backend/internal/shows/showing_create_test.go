@@ -86,3 +86,85 @@ func TestCreateShowingRequiresManageAuthority(t *testing.T) {
 		t.Fatalf("expected not_authorized, got %v", err)
 	}
 }
+
+// TestCreateShowingDoubleClickReturnsSameRow is the Kernel 101 (101-09)
+// closure: a double-click/double-POST with no idempotency key must not
+// create two Showing rows for what was honestly one submission.
+func TestCreateShowingDoubleClickReturnsSameRow(t *testing.T) {
+	pool := openShowsTestPool(t)
+	producer := insertShowsTestUser(t, pool, "showing_dup_producer")
+	_, showRunID, _ := insertShowFixture(t, pool, producer)
+
+	startAt := time.Now().UTC().Add(24 * time.Hour).Truncate(time.Second)
+	first, err := CreateShowing(context.Background(), pool, producer, CreateShowingInput{
+		ShowRunID:        showRunID,
+		Nickname:         "Opening Night",
+		ScheduledStartAt: startAt,
+	})
+	if err != nil {
+		t.Fatalf("first CreateShowing: %v", err)
+	}
+
+	second, err := CreateShowing(context.Background(), pool, producer, CreateShowingInput{
+		ShowRunID:        showRunID,
+		Nickname:         "Opening Night",
+		ScheduledStartAt: startAt,
+	})
+	if err != nil {
+		t.Fatalf("second (double-click) CreateShowing: %v", err)
+	}
+	if second.ID != first.ID {
+		t.Fatalf("expected the double-click to return the same Showing (id %s), got a new one (id %s)", first.ID, second.ID)
+	}
+
+	var count int
+	if err := pool.QueryRow(context.Background(), `
+		SELECT COUNT(*) FROM shows WHERE show_run_id = $1 AND nickname = $2
+	`, showRunID, "Opening Night").Scan(&count); err != nil {
+		t.Fatalf("count shows: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected exactly 1 row in the database after the double-click, got %d", count)
+	}
+}
+
+// TestCreateShowingAllowsLegitimateReuseOfSameNickname proves the guard is
+// narrow: nicknames are explicitly not unique (kernel doc §28), so two
+// genuinely distinct Showings created moments apart under the same
+// nickname -- the normal shape of, say, a recurring weekly "Game Night" --
+// must never be silently merged the way an actual double-click is.
+func TestCreateShowingAllowsLegitimateReuseOfSameNickname(t *testing.T) {
+	pool := openShowsTestPool(t)
+	producer := insertShowsTestUser(t, pool, "showing_reuse_producer")
+	_, showRunID, _ := insertShowFixture(t, pool, producer)
+
+	first, err := CreateShowing(context.Background(), pool, producer, CreateShowingInput{
+		ShowRunID:        showRunID,
+		Nickname:         "Game Night",
+		ScheduledStartAt: time.Now().UTC().Add(24 * time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("first CreateShowing: %v", err)
+	}
+
+	// Simulate "moments apart, not a double-click" by pushing the first
+	// row's created_at outside the dedup window directly, rather than
+	// sleeping the test for real.
+	if _, err := pool.Exec(context.Background(), `
+		UPDATE shows SET created_at = created_at - interval '1 minute' WHERE id = $1
+	`, first.ID); err != nil {
+		t.Fatalf("backdate first show: %v", err)
+	}
+
+	second, err := CreateShowing(context.Background(), pool, producer, CreateShowingInput{
+		ShowRunID:        showRunID,
+		Nickname:         "Game Night",
+		ScheduledStartAt: time.Now().UTC().Add(24 * time.Hour * 7),
+	})
+	if err != nil {
+		t.Fatalf("second CreateShowing: %v", err)
+	}
+	if second.ID == first.ID {
+		t.Fatal("expected a genuinely new Showing, got the same row back -- the dedup window must not block a legitimate later reuse of the same nickname")
+	}
+}

@@ -46,6 +46,23 @@ func CreateShowing(ctx context.Context, pool *pgxpool.Pool, actorUserID string, 
 		return Show{}, errors.New("scheduled_end_before_start")
 	}
 
+	// Kernel 101 (101-09): a double-click/double-POST here has no
+	// idempotency key to dedupe on (HandleShowingsCollection accepts none
+	// from the client), and every real submission is genuinely allowed to
+	// reuse the same nickname later (nicknames aren't unique -- see this
+	// function's own header comment) -- so a naive "same nickname ever"
+	// check would wrongly block a legitimate later Showing. Narrowed to
+	// the actual double-click shape instead: the same actor, same Show
+	// Run, same nickname, created moments ago. Returns the row that
+	// already exists rather than erroring, since a double-click's honest
+	// intent was "create one Showing," and the caller (a POST response)
+	// has no good way to distinguish "your click landed" from "it didn't."
+	if existing, found, err := recentDuplicateShowing(ctx, pool, in.ShowRunID, actorUserID, nickname); err != nil {
+		return Show{}, err
+	} else if found {
+		return existing, nil
+	}
+
 	slug, err := uniqueShowSlug(ctx, pool, in.ShowRunID, nickname)
 	if err != nil {
 		return Show{}, err
@@ -61,6 +78,44 @@ func CreateShowing(ctx context.Context, pool *pgxpool.Pool, actorUserID string, 
 		ScheduledStartAt: &startAt,
 		ScheduledEndAt:   in.ScheduledEndAt,
 	})
+}
+
+// recentDuplicateShowingWindow bounds how long a duplicate-click guard
+// looks back -- long enough to cover a genuine double-click or a retried
+// POST after a slow/flaky response, short enough that a Director
+// deliberately creating a second, identically-named Showing minutes later
+// is never silently merged into the first one.
+const recentDuplicateShowingWindow = 15 * time.Second
+
+// recentDuplicateShowing is Kernel 101's 101-09 fix: finds a Showing this
+// same actor already created for this Show Run, under this exact
+// nickname, within the last recentDuplicateShowingWindow -- the narrow
+// shape a double-click/double-POST actually produces, not "this nickname
+// was ever used before" (which legitimately happens across real,
+// deliberate Showings and must never block one).
+func recentDuplicateShowing(ctx context.Context, pool *pgxpool.Pool, showRunID, actorUserID, nickname string) (Show, bool, error) {
+	row := pool.QueryRow(ctx, `
+		SELECT `+showColumns+`
+		FROM shows
+		WHERE show_run_id = $1
+		  AND created_by_user_id = $2
+		  AND nickname = $3
+		  AND created_at > NOW() - $4::interval
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, showRunID, actorUserID, nickname, recentDuplicateShowingWindow.String())
+	s, err := scanShow(row)
+	if err != nil {
+		// scanShow itself translates pgx.ErrNoRows into "show_not_found"
+		// (see its own definition) -- every other caller in this package
+		// treats that as a genuine error, but here it's the expected,
+		// ordinary case (no recent duplicate exists), not a failure.
+		if err.Error() == "show_not_found" {
+			return Show{}, false, nil
+		}
+		return Show{}, false, err
+	}
+	return s, true, nil
 }
 
 // uniqueShowSlug derives a URL-safe slug from the nickname and appends a
