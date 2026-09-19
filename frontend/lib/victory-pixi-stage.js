@@ -128,17 +128,37 @@
       state.resize(bounds.width, bounds.height);
     };
 
-    const texturePromise = window.PIXI.Assets?.load
-      ? window.PIXI.Assets.load(imageUrl)
-      : Promise.resolve(window.PIXI.Texture.from(imageUrl));
+    const loadTexture = () =>
+      window.PIXI.Assets?.load
+        ? window.PIXI.Assets.load(imageUrl)
+        : Promise.resolve(window.PIXI.Texture.from(imageUrl));
 
-    texturePromise
+    // Kernel 101 (101-10): a decorative backdrop failing to load is
+    // genuinely low-stakes (the stage still works, nothing is lost) and
+    // stays a console.warn on purpose -- a visible error/toast for a
+    // missing background image would be a worse experience than the
+    // blank backdrop itself. The one real, cheap improvement: most real
+    // failures of a same-origin image load are a transient network
+    // blip, not a permanently broken URL, so one retry after a short
+    // delay before giving up meaningfully reduces how often this shows
+    // up at all, with no new UI needed.
+    loadTexture()
       .then((texture) => {
         const resolvedTexture = texture?.texture || texture || window.PIXI.Texture.from(imageUrl);
         attachSprite(resolvedTexture);
       })
-      .catch((error) => {
-        console.warn("VictoryPixiStage backdrop load failed", error);
+      .catch(() => {
+        if (disposed) return;
+        new Promise((resolve) => setTimeout(resolve, 750))
+          .then(loadTexture)
+          .then((texture) => {
+            if (disposed) return;
+            const resolvedTexture = texture?.texture || texture || window.PIXI.Texture.from(imageUrl);
+            attachSprite(resolvedTexture);
+          })
+          .catch((error) => {
+            console.warn("VictoryPixiStage backdrop load failed after retry", error);
+          });
       });
 
     if (app && mount instanceof Element) {

@@ -364,9 +364,17 @@
     teardown();
     if (isReplay) return; // Replay never writes completion state.
     const path = `/api/tours/${encodeURIComponent(def.key)}/${skipped ? "skip" : "complete"}`;
-    apiFetch(path, { method: "POST" }).catch((error) => {
-      console.error("VictoryTourEngine: failed to record tour state", error);
-    });
+    // Kernel 101 (101-10): this used to be a plain apiFetch whose failure
+    // only ever reached console.error -- a genuinely silent failure (the
+    // overlay is already torn down by the time this runs, so there's
+    // nothing on screen to attach a visible error to anyway) whose real
+    // consequence is the tour quietly never getting marked complete and
+    // re-triggering on a later visit. beaconPost is this same file's own
+    // established, more reliable mechanism for exactly this class of
+    // "must survive, nothing to show for it either way" write (see its
+    // own header comment above) -- switched to it here instead of
+    // inventing a second, parallel best-effort delivery path.
+    beaconPost(path, {});
   }
 
   function beginDefinition(definition, options) {
