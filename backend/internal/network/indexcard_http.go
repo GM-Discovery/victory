@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -136,7 +137,7 @@ func HandleIndexCardSave(hub *Hub, pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			writeJSON(w, http.StatusBadRequest, map[string]any{
 				"ok":    false,
-				"error": err.Error(),
+				"error": clientSafeError(err),
 			})
 			return
 		}
@@ -158,4 +159,39 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+// reasonCodePattern matches this codebase's own established convention for
+// an intentional, hand-written, client-safe error string -- confirmed
+// throughout: "unsupported_visibility_mode", "announcement_text_required",
+// "cast_requires_ticket", "not_authorized", and every ActionDeniedError.Reason
+// value all follow this exact shape. A raw error from somewhere further
+// downstream (a pgx/database error, a context-deadline error, any other
+// internal failure text never meant to leave the server) is essentially
+// guaranteed not to match it -- those read like "ERROR: relation \"foo\"
+// does not exist (SQLSTATE 42P01)" or "dial tcp: connect: connection
+// refused", never pure lowercase_snake_case with no spaces or punctuation.
+var reasonCodePattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
+// clientSafeError is Kernel 101's fix for 101-07: ~24 call sites across
+// this package sent err.Error() straight to the client, which was safe for
+// the many places that construct an intentional stable reason code but a
+// real information-hygiene risk for anything further downstream that
+// isn't -- confirmed concretely reachable via e.g. rollaudience.Resolve's
+// own DB lookup returning a raw, unwrapped pgx error on any failure other
+// than ErrNoRows. Every one of these call sites already logs the real
+// error server-side regardless of what this returns (log.Printf or
+// equivalent, present at each site already) -- this only changes what
+// crosses the wire to the client, never what's diagnosable from
+// launcher.log/stdout. Returns a single generic, stable fallback for
+// anything that doesn't look like an intentional reason code.
+func clientSafeError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := err.Error()
+	if reasonCodePattern.MatchString(msg) {
+		return msg
+	}
+	return "internal_error"
 }

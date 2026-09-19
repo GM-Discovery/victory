@@ -615,7 +615,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			if err != nil {
 				_ = c.SendJSON(map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				})
 				return
 			}
@@ -654,7 +654,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 				_ = c.SendJSON(map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				})
 				log.Printf("chat store failed: user=%s session=%s action=%s err=%v", actorID, sessionID, payload["type"], err)
 				return
@@ -688,7 +688,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			cancel()
 
 			if err != nil {
-				reason := err.Error()
+				reason := clientSafeError(err)
 				var denied *actions.ActionDeniedError
 				if errors.As(err, &denied) {
 					reason = denied.Reason
@@ -747,7 +747,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 				errorPayload := map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				}
 				if strings.TrimSpace(requestID) != "" {
 					errorPayload["request_id"] = requestID
@@ -849,7 +849,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 				errorPayload := map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				}
 				if strings.TrimSpace(requestID) != "" {
 					errorPayload["request_id"] = requestID
@@ -954,7 +954,8 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 			style, resolvedText, err := announcements.Compose(styleKey, text)
 			if err != nil {
-				fail(err.Error())
+				log.Printf("announcement compose failed: user=%s session=%s err=%v", actorID, sessionID, err)
+				fail(clientSafeError(err))
 				return
 			}
 
@@ -965,7 +966,8 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			}
 			decision, err := rollaudience.Resolve(ctx, pool, sessionID, actorID, mode)
 			if err != nil {
-				fail(err.Error())
+				log.Printf("announcement audience resolve failed: user=%s session=%s err=%v", actorID, sessionID, err)
+				fail(clientSafeError(err))
 				return
 			}
 
@@ -1056,7 +1058,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 			if err != nil {
 				_ = c.SendJSON(map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				})
 				return
 			}
@@ -1102,7 +1104,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 				_ = c.SendJSON(map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				})
 				log.Printf("action store failed: user=%s session=%s action=%s target=%s err=%v", actorID, sessionID, payload["type"], elementSlug, err)
 				return
@@ -1176,7 +1178,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 				_ = c.SendJSON(map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				})
 				log.Printf("overlay store failed: user=%s session=%s action=%s target=%s err=%v", actorID, sessionID, payload["type"], elementSlug, err)
 				return
@@ -1238,7 +1240,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 				_ = c.SendJSON(map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				})
 				log.Printf("place element failed: user=%s session=%s venue=%s target=%s err=%v", actorID, sessionID, venueSlug, elementSlug, err)
 				return
@@ -1306,7 +1308,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 				_ = c.SendJSON(map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				})
 				log.Printf("create token failed: user=%s session=%s asset=%s err=%v", c.UserID, sessionID, assetID, err)
 				return
@@ -1378,7 +1380,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 				_ = c.SendJSON(map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				})
 				log.Printf("update token failed: user=%s session=%s target=%s err=%v", c.UserID, sessionID, elementSlug, err)
 				return
@@ -1461,7 +1463,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 				_ = c.SendJSON(map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				})
 				log.Printf("duplicate failed: user=%s session=%s venue=%s target=%s err=%v", c.UserID, sessionID, venueSlug, elementSlug, err)
 				return
@@ -1507,7 +1509,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 				_ = c.SendJSON(map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				})
 				log.Printf("lock store failed: user=%s session=%s err=%v", c.UserID, sessionID, err)
 				return
@@ -1555,7 +1557,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 				_ = c.SendJSON(map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				})
 				log.Printf("nameplate store failed: user=%s session=%s err=%v", c.UserID, sessionID, err)
 				return
@@ -1598,7 +1600,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 				_ = c.SendJSON(map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				})
 				log.Printf("index card create failed: user=%s session=%s err=%v", c.UserID, sessionID, err)
 				return
@@ -1669,7 +1671,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 				_ = c.SendJSON(map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				})
 				log.Printf("index card update failed: user=%s session=%s err=%v", c.UserID, sessionID, err)
 				return
@@ -1710,7 +1712,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 				_ = c.SendJSON(map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				})
 				log.Printf("index card delete failed: user=%s session=%s err=%v", c.UserID, sessionID, err)
 				return
@@ -1751,7 +1753,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 				_ = c.SendJSON(map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				})
 				log.Printf("remove element failed: user=%s session=%s err=%v", c.UserID, sessionID, err)
 				return
@@ -1799,7 +1801,7 @@ func handleVenuePayload(hub *Hub, pool *pgxpool.Pool, c *Client, payload map[str
 
 				_ = c.SendJSON(map[string]any{
 					"type":  "error",
-					"error": err.Error(),
+					"error": clientSafeError(err),
 				})
 				log.Printf("persona action failed: user=%s session=%s action=%s err=%v", c.UserID, sessionID, payload["type"], err)
 				return

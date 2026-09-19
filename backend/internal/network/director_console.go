@@ -161,7 +161,7 @@ func HandleDirectorConsoleAudienceView(hub *Hub, pool *pgxpool.Pool) http.Handle
 
 		updated, err := showings.UpdateAudienceViewByID(ctx, pool, showingID, req.Enabled)
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": clientSafeError(err)})
 			return
 		}
 
@@ -228,7 +228,7 @@ func HandleDirectorConsoleCloseShowing(hub *Hub, pool *pgxpool.Pool) http.Handle
 
 		closed, err := showings.CloseBySession(ctx, pool, sessionID)
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": clientSafeError(err)})
 			return
 		}
 
