@@ -471,6 +471,27 @@ func HandleRespondPermissionRequest(pool *pgxpool.Pool) http.HandlerFunc {
 					writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "membership_create_failed"})
 					return
 				}
+
+				// memberships (above) is production-scoped and drives
+				// character/participation features, but it is not what
+				// account.go's AccountSummary or access.CurrentLocationRole*
+				// read -- those trust location_memberships exclusively.
+				// Without this upsert, an approved Cast/Crew/Director request
+				// left the account's own visible role (and every
+				// location_memberships-gated check) stuck on whatever it was
+				// before, typically "audience" from signup. Same pattern
+				// already used by the auto-approve path in requests.go.
+				_, err = tx.Exec(ctx, `
+					INSERT INTO location_memberships (location_id, user_id, role, granted_by_user_id, active)
+					VALUES ($1::uuid, $2::uuid, $3::location_role, $4::uuid, TRUE)
+					ON CONFLICT (location_id, user_id, role) DO UPDATE
+					SET active = TRUE,
+					    granted_by_user_id = EXCLUDED.granted_by_user_id
+				`, locationID, requestUserID, requestedRole, userID)
+				if err != nil {
+					writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "location_membership_create_failed"})
+					return
+				}
 			case "audience":
 				// Audience is a per-Showing ticket, never a standing venue
 				// grant (unlike cast/crew/director membership above) --
