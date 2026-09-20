@@ -4613,7 +4613,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       // Cartography is a Cast+ tool -- Audience must never see it at all,
       // not just have it dimmed (computeCanDraw's director_only mode only
       // ever gated drawing *permission*, never the toolbar's visibility).
-      if (window.VictoryStageDrawing && currentRole !== "audience" && venueConfigFlag(currentSnapshot?.venue?.config, "cartograph_enabled", false)) {
+      if (window.VictoryStageDrawing && normalizeRole(currentRole) !== "audience" && venueConfigFlag(currentSnapshot?.venue?.config, "cartograph_enabled", false)) {
         try {
           runtimeDrawing = window.VictoryStageDrawing.mount({
             hostElement: stageHost,
