@@ -1039,6 +1039,17 @@ func loadCompositionRows(ctx context.Context, pool *pgxpool.Pool, sceneID, place
 // "Director/Producer/Operator/Crew" backstage tier -- the set of viewers
 // who get a "backstage" TheaterContext instead of "venue_open"/"audience"
 // when they're not a registered Show Run player themselves.
+//
+// Deliberately excludes "cast" -- this function also gates real
+// authority, not just the theater_context Kind: it's the milestone-gate
+// bypass and the stage-object hidden-marker filter a few hundred lines
+// below (search this file for isBackstageRole's other call sites). Adding
+// "cast" here would let any Cast-role account see Director-only hidden
+// stage objects and milestone-gated content for shows they aren't even
+// part of -- confirmed by a real test failure
+// (TestSnapshotWithholdsScopeMetadataFromPlayers) when this was tried.
+// See theaterContextBackstageTier below for the narrower, theater_context-
+// only extension that actually fixes Kernel 101 101-19.
 func isBackstageRole(role string) bool {
 	switch strings.ToLower(strings.TrimSpace(role)) {
 	case "producer", "director", "operator", "crew":
@@ -1046,6 +1057,31 @@ func isBackstageRole(role string) bool {
 	default:
 		return false
 	}
+}
+
+// theaterContextBackstageTier extends isBackstageRole with "cast", for the
+// theater_context Kind decision in resolveTheaterContext only -- do not use
+// this in place of isBackstageRole anywhere else in this file.
+//
+// Kernel 101 101-19 follow-up: the original isBackstageRole list mirrored
+// Crew's "participant-while-playing, backstage-idle otherwise" treatment
+// but never extended it to Cast, so a Cast-approved account with no roster
+// seat in the *currently* live Show Run fell all the way through to plain
+// "audience" -- hiding their Cast+ UI (drawers, top bar) and showing the
+// Audience banner, while account-role-gated Cast+ tools like the
+// Cartography toolbar (which read the session role, not this theater
+// context) kept showing regardless. Confirmed live: Grant's account
+// resolved "cast" from /api/session/catharsis/join but "audience" from
+// resolveTheaterContext, for exactly that reason.
+//
+// This is safe to broaden past isBackstageRole because it only decides
+// which drawer set/banner a viewer sees -- unlike isBackstageRole's other
+// uses, it never touches hidden-object perception or milestone gating.
+func theaterContextBackstageTier(role string) bool {
+	if isBackstageRole(role) {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(role), "cast")
 }
 
 // isShowManagementRole is the subset of isBackstageRole that can actually
@@ -1083,7 +1119,7 @@ func isShowManagementRole(role string) bool {
 // checked first and wins unconditionally; Crew's existing participant-
 // while-playing behavior is unchanged.
 func resolveTheaterContext(ctx context.Context, pool *pgxpool.Pool, viewerUserID, viewerRole, sessionID, showID string) (TheaterContext, error) {
-	backstageTier := isBackstageRole(viewerRole)
+	backstageTier := theaterContextBackstageTier(viewerRole)
 
 	if sessionID == "" || showID == "" {
 		if backstageTier {

@@ -464,6 +464,22 @@ func TestLoadVenueSnapshotTheaterContextParticipantAndAudienceMessages(t *testin
 	if audienceSnap.TheaterContext.Message != "You are part of the Audience." {
 		t.Fatalf("expected the exact required watching message, got %q", audienceSnap.TheaterContext.Message)
 	}
+
+	// A Cast-role viewer not on this Show Run's roster gets "backstage",
+	// same as Crew already did -- not the plain "audience" bucket. Kernel
+	// 101 101-19 follow-up: isBackstageRole omitted "cast" entirely, so a
+	// Cast-approved account with no roster seat in the currently-live Show
+	// Run fell all the way through to "audience", hiding their Cast+ UI
+	// and showing the Audience banner even though session-role-gated Cast+
+	// tools (e.g. Cartography) kept showing regardless of theater_context.
+	castViewer := insertWorldTestUser(t, pool, "wd_tc_cast_no_roster")
+	castSnap, err := LoadVenueSnapshot(context.Background(), pool, "cast", castViewer, f.venueSlug)
+	if err != nil {
+		t.Fatalf("load snapshot for cast viewer: %v", err)
+	}
+	if castSnap.TheaterContext.Kind != "backstage" {
+		t.Fatalf("expected kind = backstage for a cast-role viewer not on this run's roster, got %+v", castSnap.TheaterContext)
+	}
 }
 
 // TestLoadVenueSnapshotTheaterContextTreatsArchivedCharacterAsUnselected is

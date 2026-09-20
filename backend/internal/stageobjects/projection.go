@@ -272,10 +272,22 @@ func isShowCast(ctx context.Context, q Querier, showID, userID string) (bool, er
 	return ok, nil
 }
 
-// IsBackstageRole reports the Kernel 70A backstage tier. Duplicated from
-// world/snapshot.go's isBackstageRole rather than imported because world
-// imports this package, and the set is a three-line closed list rather than
-// logic that could drift meaningfully.
+// IsBackstageRole reports the Kernel 70A backstage tier for STAGE-OBJECT
+// PERCEPTION purposes: Director/Producer/Operator/Crew only, deliberately
+// excluding Cast. A true result here bypasses all hidden-object scoping
+// (see Viewer.Backstage's doc comment and CanPerceive above) -- a Cast-role
+// account must never get that just by holding "cast" as their
+// location-level role, which is exactly the failure mode ResolveViewer's
+// own comment above documents avoiding for Cast-vs-Audience (deriving it
+// from the Show Run roster via isShowCast, not the role string).
+//
+// This LOOKS like world/snapshot.go's isBackstageRole (same historical
+// "duplicated, three-line closed list" rationale) but is deliberately NOT
+// kept identical to it as of 2026-09-20: that function now also includes
+// "cast" for a narrower purpose (Kernel 101 101-19 -- which theater_context
+// banner/drawer set a viewer sees), which is safe there because it only
+// affects UI chrome, not hidden-object authority. Do not copy that change
+// here without re-reading both comments.
 func IsBackstageRole(role string) bool {
 	switch strings.ToLower(strings.TrimSpace(role)) {
 	case "producer", "director", "operator", "crew":
