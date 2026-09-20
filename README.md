@@ -2,7 +2,7 @@
 
 Victory is a live virtual tabletop theater: a real-time stage for running tabletop RPG shows, cast as a theater rather than a generic VTT — Directors and Producers run live Shows, Cast play Characters, Crew handle bounded backstage tasks, and an Audience watches and participates from their own seat. Go backend, no-build-step vanilla JS/Vue frontend, Postgres, optional Discord integration for chat/voice/OAuth.
 
-Live at [victory.amurray.family](https://victory.amurray.family).
+Live and in active production at [victory.amurray.family](https://victory.amurray.family) — this isn't a tech demo, it's the actual house running actual shows.
 
 ## Stack
 
@@ -20,6 +20,15 @@ See **[`Docs/Developer/Setup Guide.md`](Docs/Developer/Setup%20Guide.md)** for p
 - **[`Docs/`](Docs/)** — product, developer, and operator-facing documentation (setup, Discord integration, backups, recovery, glossary, venue index)
 - **[`Construction/`](Construction/)** — build history and living design record: every kernel spec, its proof of what was actually built, and current-state canon (start with `Construction/README.md`)
 
-## License
+## Licensing
 
-No license has been chosen yet; all rights reserved by default.
+Victory is **source-available**, not open source in the OSI sense — you can read it, run it, and build on it, but the terms are Victory's own, not a stock OSS license.
+
+- **Free** for noncommercial use (personal, hobby, community games, classroom/academic use), and for **Small Commercial Use** — running paid shows or a paid service on Victory — up to US $2,600/year in Victory-related revenue, with no signup required.
+- **Paid, published tiers** kick in past that threshold ($49–$999/year depending on revenue band, or a custom agreement above $250k/year) — administered by Discovery Games Interactive LLC on behalf of the owner. No negotiation needed for a standard tier; you just pay it.
+- Modify and distribute freely under copyleft terms (share-alike, source stays available) — see the license for the exact conditions.
+- The **Victory**, **Victory Theater**, and **Victory Theater VTT** names/marks are separately trademark-policed; forks are welcome but rebrand if they drop required packages.
+
+Full terms live in [`licensing/`](licensing/): [`VICTORY_COMMUNITY_LICENSE.md`](licensing/VICTORY_COMMUNITY_LICENSE.md) (the license itself), [`COMMERCIAL_TERMS.md`](licensing/COMMERCIAL_TERMS.md) (paid tiers), [`TRADEMARK_AND_OFFICIAL_BUILD_POLICY.md`](licensing/TRADEMARK_AND_OFFICIAL_BUILD_POLICY.md) (branding/forks), [`CONTRIBUTOR_TERMS.md`](licensing/CONTRIBUTOR_TERMS.md) (if you're submitting a PR), and [`COMPONENT_LICENSES.md`](licensing/COMPONENT_LICENSES.md) (third-party and bundled-content licenses, including Socio and Niava).
+
+Licensing questions: murray.household.grant@gmail.com.
