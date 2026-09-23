@@ -33,6 +33,7 @@ const (
 	ViewerModeProducer ViewerMode = "producer"
 	ViewerModeDirector ViewerMode = "director"
 	ViewerModeCrew     ViewerMode = "crew"
+	ViewerModeCast     ViewerMode = "cast"
 	ViewerModePlayer   ViewerMode = "player"
 	ViewerModeAudience ViewerMode = "audience"
 	ViewerModeNone     ViewerMode = "none"
@@ -120,20 +121,57 @@ func ResolveParticipationContext(ctx context.Context, pool *pgxpool.Pool, userID
 			result.CanEnterVenue = true
 			result.CanParticipate = true
 			result.Reason = "location_membership"
+		case "crew":
+			// Location-level Crew gets the same full-backstage-state
+			// treatment as a show-run-roster Crew row below (Step 3) --
+			// the product model (Docs/Product/Glossary.md) is explicit
+			// that Crew always sees full backstage state, never gated on
+			// a specific show run's roster.
+			result.ViewerMode = ViewerModeCrew
+			result.CanViewBackstage = true
+			result.CanEnterVenue = true
+			result.CanParticipate = true
+			result.Reason = "location_membership"
+		case "cast":
+			// Kernel 101 101-19/101-20/101-22 bug closure: this switch used
+			// to only recognize "producer"/"director", so a location-level
+			// Cast account (approved via Audition Hall, the exact Kernel
+			// 101-17 authority) with no roster seat in the venue's
+			// currently-live Show Run fell through every step below to
+			// Step 4's blanket "any active location_memberships row at all
+			// -> audience" fallback -- misresolving Cast as Audience for
+			// every /api/world/* snapshot (world.LoadVenueSnapshot's
+			// viewerRole, which resolveTheaterContext and its
+			// theaterContextBackstageTier consume), even though the
+			// session-join endpoint correctly reported "cast". Deliberately
+			// NOT granted CanViewBackstage here -- hidden-object perception
+			// stays gated on actual Show Run roster membership
+			// (stageobjects.isShowCast), never on the bare location role.
+			result.ViewerMode = ViewerModeCast
+			result.CanEnterVenue = true
+			result.CanParticipate = true
+			result.Reason = "location_membership"
 		}
 	}
 
 	// Step 3: show_run_roster_members (canonical show-run-scoped role).
 	// Can only elevate a viewer who wasn't already resolved to
-	// producer/director by step 2 -- a Show Run crew/player row never
-	// downgrades a location-level Producer/Director.
+	// producer/director/crew by step 2 -- a Show Run crew/player row never
+	// downgrades a location-level Producer/Director, and (since location
+	// Crew was added to step 2 above) never downgrades a location-level
+	// Crew member to mere "player" just because this specific show run's
+	// roster happens to list them as a player too -- Crew always keeps
+	// full backstage state per the product model. Location-level Cast has
+	// no such protection: a "player"/"crew"/"producer"/"director" roster
+	// role for THIS show run is always a promotion or a lateral,
+	// same-capability move from Cast, never a downgrade.
 	if showRunID != "" {
 		rosterRole, err := activeRosterRole(ctx, pool, userID, showRunID)
 		if err != nil {
 			return Context{}, err
 		}
 		result.ShowRunRole = rosterRole
-		if result.ViewerMode != ViewerModeProducer && result.ViewerMode != ViewerModeDirector {
+		if result.ViewerMode != ViewerModeProducer && result.ViewerMode != ViewerModeDirector && result.ViewerMode != ViewerModeCrew {
 			switch rosterRole {
 			case "producer", "director":
 				result.ViewerMode = ViewerMode(rosterRole)
