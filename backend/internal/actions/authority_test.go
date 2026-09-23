@@ -46,15 +46,17 @@ func (r fakeRow) Scan(dest ...any) error {
 }
 
 type fakeQuerier struct {
-	role           string
-	handle         string
-	venueSlug      string
-	venueEnabled   bool
-	showingStatus  string
-	layoutFound    bool
-	locked         bool
-	chatEnabled    bool
-	talkingEnabled bool
+	role             string
+	handle           string
+	venueSlug        string
+	venueEnabled     bool
+	showingStatus    string
+	layoutFound      bool
+	locked           bool
+	chatEnabled      bool
+	talkingEnabled   bool
+	tokenAssetFound  bool
+	stageElementsOff bool
 }
 
 func (q fakeQuerier) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
@@ -80,9 +82,20 @@ func (q fakeQuerier) QueryRow(ctx context.Context, sql string, args ...any) pgx.
 	case strings.Contains(sql, "stage_elements_enabled"):
 		// Kernel 72A capability flag: the fake models a stage venue that has
 		// the element surface enabled (as the-cave/first-theater/catharsis do).
-		return fakeRow{values: []any{true}}
+		return fakeRow{values: []any{!q.stageElementsOff}}
 	case strings.Contains(sql, "COALESCE((v.config ->> 'index_cards_enabled')::boolean, FALSE)"):
 		return fakeRow{values: []any{q.venueSlug, q.venueEnabled}}
+	case strings.Contains(sql, "FROM assets a"):
+		// canActCreateToken's loadWarehouseTokenAsset lookup. Not found
+		// unless a test explicitly opts in, since most tests here never
+		// exercise token creation at all.
+		if !q.tokenAssetFound {
+			return fakeRow{err: pgx.ErrNoRows}
+		}
+		return fakeRow{values: []any{
+			"asset-1", "Test Token", "circle", 1, 1, false,
+			"token", "active", "location-1", "", "", "", int64(0),
+		}}
 	case strings.Contains(sql, "FROM session_participants sp") && strings.Contains(sql, "SELECT sp.role::text"):
 		return fakeRow{values: []any{q.role}}
 	case strings.Contains(sql, "SELECT EXISTS"):
@@ -181,7 +194,11 @@ func TestCanActPlaceElement(t *testing.T) {
 	}{
 		{name: "producer allowed", role: "producer", venueEnabled: true, want: true},
 		{name: "director allowed", role: "director", venueEnabled: true, want: true},
-		{name: "cast denied", role: "cast", venueEnabled: true, want: false},
+		// Kernel 101 101-24: Cast may place a brand-new index card
+		// (Grant's explicit call: narrow "create only", not general
+		// stage-object management) -- update/delete/index_card go through
+		// canActIndexCardInCave instead and remain producer/director-only.
+		{name: "cast allowed to create", role: "cast", venueEnabled: true, want: true},
 		{name: "crew denied", role: "crew", venueEnabled: true, want: false},
 		{name: "audience denied", role: "audience", venueEnabled: true, want: false},
 		{name: "venue disabled", role: "producer", venueEnabled: false, want: false},
@@ -200,6 +217,51 @@ func TestCanActPlaceElement(t *testing.T) {
 			}
 			if decision.Allowed != tt.want {
 				t.Fatalf("CanAct act/place_element allowed=%v, want %v", decision.Allowed, tt.want)
+			}
+		})
+	}
+}
+
+// TestCanActCreateToken is the Kernel 101 101-24 proof: Cast may create a
+// brand-new token (Grant's explicit call: narrow "create only", not general
+// stage-object management) -- canActUpdateToken is a wholly separate
+// function, deliberately untouched and still producer/director-only, so
+// Cast can place a token but never move, scale, replace its asset, or
+// change its layer afterward.
+func TestCanActCreateToken(t *testing.T) {
+	tests := []struct {
+		name            string
+		role            string
+		tokenAssetFound bool
+		stageOff        bool
+		want            bool
+	}{
+		{name: "producer allowed", role: "producer", tokenAssetFound: true, want: true},
+		{name: "director allowed", role: "director", tokenAssetFound: true, want: true},
+		{name: "cast allowed to create", role: "cast", tokenAssetFound: true, want: true},
+		{name: "crew denied", role: "crew", tokenAssetFound: true, want: false},
+		{name: "audience denied", role: "audience", tokenAssetFound: true, want: false},
+		{name: "unknown token asset denied", role: "producer", tokenAssetFound: false, want: false},
+		{name: "stage elements disabled denied", role: "producer", tokenAssetFound: true, stageOff: true, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			decision, err := CanAct(context.Background(), fakeQuerier{
+				role:             tt.role,
+				venueSlug:        "catharsis",
+				tokenAssetFound:  tt.tokenAssetFound,
+				stageElementsOff: tt.stageOff,
+			}, "user-1", "create/token", "session-1", ActionTarget{
+				Kind:      "token",
+				ElementID: "asset-1",
+				VenueSlug: "catharsis",
+			})
+			if err != nil {
+				t.Fatalf("CanAct create/token returned error: %v", err)
+			}
+			if decision.Allowed != tt.want {
+				t.Fatalf("CanAct create/token allowed=%v, want %v (reason %q)", decision.Allowed, tt.want, decision.Reason)
 			}
 		})
 	}

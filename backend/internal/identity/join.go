@@ -166,16 +166,26 @@ func resolveJoiningUser(ctx context.Context, pool *pgxpool.Pool, req JoinRequest
 }
 
 func resolveRoleForUser(ctx context.Context, pool *pgxpool.Pool, userID string) (string, error) {
-	role, err := access.CurrentDefaultLocationRole(ctx, pool, userID)
-	if err != nil {
+	// Operator checked FIRST and unconditionally -- matching
+	// participation.ResolveParticipationContext's own Step 1 precedence
+	// ("Operator -- full authority", checked before any location role
+	// lookup). The old order only promoted to "producer" when the
+	// underlying location role was specifically "audience", so an Operator
+	// who also happened to hold a real location role elsewhere (Cast,
+	// Crew, anything but "audience") got that lesser role back instead of
+	// their actual Operator authority -- confirmed live: Grant's account
+	// resolved "cast" here (his real location_memberships row) despite
+	// being a genuine Operator, silently masking it for every session join
+	// that goes through this path. "producer" is the deliberate return
+	// value for Operator, not "operator" -- same convention
+	// participation.LegacyLookupVenueRole already uses, so every existing
+	// consumer of this join role keeps working unchanged.
+	if ok, err := access.IsOperatorUser(ctx, pool, userID); err != nil {
 		return "", err
+	} else if ok {
+		return "producer", nil
 	}
-	if strings.EqualFold(strings.TrimSpace(role), "audience") {
-		if ok, opErr := access.IsOperatorUser(ctx, pool, userID); opErr == nil && ok {
-			return "producer", nil
-		}
-	}
-	return role, nil
+	return access.CurrentDefaultLocationRole(ctx, pool, userID)
 }
 
 func normalizeHandle(in string) string {

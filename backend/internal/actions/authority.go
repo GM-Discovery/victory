@@ -511,8 +511,14 @@ func canActPlaceElement(ctx context.Context, q actionQuerier, userID, sessionID 
 		return Decision{Allowed: false, Reason: "locked"}, nil
 	}
 
+	// Cast may place a brand-new index card (Kernel 101 101-24, Grant's
+	// explicit call: narrow "create only", not general stage-object
+	// management). update/index_card and delete/index_card both route to
+	// canActIndexCardInCave instead of here and are deliberately untouched
+	// -- still producer/director only -- so Cast can create a card but not
+	// later move, edit, or delete it (their own or anyone else's).
 	switch normalizeActionRole(participantRole) {
-	case "producer", "director":
+	case "producer", "director", "cast":
 		return Decision{Allowed: true, Reason: "allowed"}, nil
 	default:
 		return Decision{Allowed: false, Reason: "insufficient_role"}, nil
@@ -560,8 +566,14 @@ func canActCreateToken(ctx context.Context, q actionQuerier, userID, sessionID s
 		return Decision{}, err
 	}
 
+	// Cast may place a brand-new token (Kernel 101 101-24, Grant's explicit
+	// call: narrow "create only", not general stage-object management).
+	// canActUpdateToken directly below is deliberately untouched -- still
+	// producer/director only -- so Cast can create a token but not later
+	// move, scale, replace its asset, or change its layer (their own or
+	// anyone else's).
 	switch normalizeActionRole(participantRole) {
-	case "producer", "director":
+	case "producer", "director", "cast":
 		return Decision{Allowed: true, Reason: "allowed"}, nil
 	default:
 		return Decision{Allowed: false, Reason: "insufficient_role"}, nil

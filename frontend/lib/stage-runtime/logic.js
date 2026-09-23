@@ -389,6 +389,11 @@
     const actions = [];
     const canManageIndexCards = Boolean(context.canManageIndexCards);
     const canManageStageTokens = Boolean(context.canManageStageTokens);
+    // Narrower than both of the above: Cast may place a brand-new token or
+    // index card, but the two booleans above (still producer/director/
+    // operator-only) keep gating every other stage-object/map/grid/scene
+    // action, including editing the thing just created.
+    const canCreateStageObjects = Boolean(context.canCreateStageObjects) || canManageIndexCards;
     const canReveal = Boolean(context.canActorRevealHideStageObjects);
     const hasSelection = Boolean(context.hasSelection);
     const cardFace = typeof context.cardFaceForModel === "function"
@@ -482,8 +487,8 @@
     if (kind === "stage") {
       push("set-map", "Add / Replace Map", "create", { disabled: !canManageIndexCards });
       push("configure-grid", "Configure Grid", "create", { disabled: !canManageIndexCards });
-      push("add-token", "Add Token", "create", { disabled: !canManageStageTokens });
-      push("add-index-card", "Create Index Card", "create", { disabled: !canManageIndexCards, requiresPoint: true });
+      push("add-token", "Add Token", "create", { disabled: !canCreateStageObjects });
+      push("add-index-card", "Create Index Card", "create", { disabled: !canCreateStageObjects, requiresPoint: true });
       // Kernel 85: Scene Configuration is a Director+ tool action, not a
       // stage-composition edit -- gated on the same canManageIndexCards
       // (producer/director/operator) authority as everything else in this

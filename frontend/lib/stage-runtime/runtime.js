@@ -545,6 +545,20 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       return canManageIndexCards(role);
     }
 
+    // Deliberately narrower than canManageIndexCards/canManageStageTokens
+    // above: Cast may place a brand-new token or index card on the stage,
+    // but not move/edit/duplicate/lock/remove one afterward (their own or
+    // anyone else's), and not touch the map, grid, or Scene Configuration
+    // -- all of which stay gated on canManageIndexCards/canManageStageTokens
+    // exactly as before. Mirrors the backend split between
+    // canActCreateToken/canActPlaceElement (now Cast+) and
+    // canActUpdateToken/canActIndexCardInCave's update/delete branches
+    // (left producer/director-only) in actions/authority.go.
+    function canCreateStageObjects(role) {
+      const normalized = normalizeRole(role);
+      return normalized === "producer" || normalized === "director" || normalized === "operator" || normalized === "cast";
+    }
+
     // Kernel 85: a narrow read-only bridge so a venue-independent tool
     // module (kernel85-cohort-tools.js) can pull the current show id and
     // Director+ gate without the engine importing anything about cohorts,
@@ -2985,6 +2999,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         role: currentRole,
         canManageIndexCards: canManageIndexCards(currentRole),
         canManageStageTokens: canManageStageTokens(currentRole),
+        canCreateStageObjects: canCreateStageObjects(currentRole),
         canActorRevealHideStageObjects: canActorRevealHideStageObjects(currentRole, currentSnapshot?.venue?.config || {}),
         hasSelection: Boolean(currentSelection),
         isConfiguratorActive: isConfiguratorActive(),
@@ -3249,6 +3264,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         role: currentRole,
         canManageIndexCards: canManageIndexCards(currentRole),
         canManageStageTokens: canManageStageTokens(currentRole),
+        canCreateStageObjects: canCreateStageObjects(currentRole),
         canActorRevealHideStageObjects: canActorRevealHideStageObjects(currentRole, currentSnapshot?.venue?.config || {}),
         hasSelection: Boolean(currentSelection),
         isConfiguratorActive: isConfiguratorActive(),
