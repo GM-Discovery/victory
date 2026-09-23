@@ -18,6 +18,8 @@ Prices are stated in United States dollars. Applicable transaction or sales taxe
 
 The table above contains the Base Amounts. Current published amounts may change only under Section 12, Inflation Adjustments.
 
+**How to pay, for now:** there is no dedicated licensing checkout yet. Send the applicable annual amount through [Buy Me a Coffee](https://buymeacoffee.com/grantamurray), noting your production/organization name and the tier from the table above. This is an interim payment channel, not an automated verification system — Discovery Games Interactive LLC still confirms tier eligibility directly rather than issuing an automatic receipt as a license grant.
+
 ## 2. License Year
 
 For free Small Commercial Use, a “License Year” is the twelve-month period beginning when you first receive Victory-Related Revenue, followed by consecutive twelve-month periods.

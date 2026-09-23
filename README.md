@@ -31,4 +31,6 @@ Victory is **source-available**, not open source in the OSI sense — you can re
 
 Full terms live in [`licensing/`](licensing/): [`VICTORY_COMMUNITY_LICENSE.md`](licensing/VICTORY_COMMUNITY_LICENSE.md) (the license itself), [`COMMERCIAL_TERMS.md`](licensing/COMMERCIAL_TERMS.md) (paid tiers), [`TRADEMARK_AND_OFFICIAL_BUILD_POLICY.md`](licensing/TRADEMARK_AND_OFFICIAL_BUILD_POLICY.md) (branding/forks), [`CONTRIBUTOR_TERMS.md`](licensing/CONTRIBUTOR_TERMS.md) (if you're submitting a PR), and [`COMPONENT_LICENSES.md`](licensing/COMPONENT_LICENSES.md) (third-party and bundled-content licenses, including Socio and Niava).
 
+**Paying for a tier:** [Buy Me a Coffee](https://buymeacoffee.com/grantamurray) — a placeholder payment channel until a dedicated licensing checkout exists. Include your production/organization name and the tier from [`COMMERCIAL_TERMS.md`](licensing/COMMERCIAL_TERMS.md) in a note.
+
 Licensing questions: discord @gm_discovery github @gm-discovery
