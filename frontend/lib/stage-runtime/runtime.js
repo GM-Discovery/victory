@@ -790,12 +790,17 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     }
 
     function renderRehearsalBanner(container, snapshot) {
-      // Backstage viewers only (Director/Producer/Operator/Crew):
-      // theater_context.kind is the server-computed viewer classification
-      // (Kernel 70A) — never re-derive roles client-side. Stage Management
-      // itself is already server-gated; this just stops advertising it to
-      // players and audience.
-      const backstage = String(snapshot?.theater_context?.kind || "") === "backstage";
+      // Stage Management access is Director/Producer/Operator/Crew only
+      // (access.ResolveVisibleVenues's show-runs map-tile gate and
+      // showruns.ListShowRunsVisibleToUser's backend authority check both
+      // exclude Cast). This used to check theater_context.kind === "backstage"
+      // directly, but Kernel 101 101-20 broadened that bucket to also cover
+      // Cast (for a deliberately different, unrelated purpose -- which
+      // drawer/banner experience a Cast viewer gets, not stage-management
+      // authority), so theater_context.kind can no longer stand in for "can
+      // manage a Show Run here." Check the actual role directly instead.
+      const normalizedRole = normalizeRole(currentRole);
+      const backstage = ["producer", "director", "operator", "crew"].includes(normalizedRole);
       const enabled = backstage && Boolean(snapshot?.venue?.config?.scene_rehearsal_enabled);
       let banner = container.querySelector("#kernel70-rehearsal-banner");
       if (!enabled) {
