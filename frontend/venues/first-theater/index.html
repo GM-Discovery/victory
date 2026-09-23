@@ -901,7 +901,7 @@
     .drawer {
       min-height: 0;
       position: fixed;
-      top: 66px;
+      top: calc(var(--header-rendered-height, 58px) + 8px);
       bottom: 60px;
       width: var(--left-drawer-width, 20px);
       overflow: visible;
@@ -1103,7 +1103,7 @@
 
     .drawer-edge-trigger {
       position: fixed;
-      top: 66px;
+      top: calc(var(--header-rendered-height, 58px) + 8px);
       bottom: 60px;
       width: 22px;
       z-index: 85;
@@ -3263,7 +3263,6 @@
                         <select id="left-open-mode">
                           <option value="hover">Hover open</option>
                           <option value="always-open">Always open</option>
-                          <option value="always-closed">Always closed</option>
                         </select>
                       </label>
                       <label for="left-opacity">Window opacity
@@ -3325,7 +3324,6 @@
                         <select id="right-open-mode">
                           <option value="hover">Hover open</option>
                           <option value="always-open">Always open</option>
-                          <option value="always-closed">Always closed</option>
                         </select>
                       </label>
                       <label for="right-opacity">Window opacity

@@ -1063,8 +1063,19 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       updateStageEmptyState();
     }
 
+    function migrateDrawerPrefs(prefs) {
+      // "always-closed" removed from the Open mode select: it hid the
+      // drawer with no code path back except an onboarding-only internal
+      // override never wired to any user control -- a real dead end once
+      // saved. Coerce anyone with that value already saved to "hover" so
+      // loading old prefs never reproduces a stuck-closed drawer.
+      if (prefs?.left?.mode === "always-closed") prefs.left.mode = "hover";
+      if (prefs?.right?.mode === "always-closed") prefs.right.mode = "hover";
+      return prefs;
+    }
+
     function loadUiPreferencesForKey(key) {
-      return window.VictoryVenueShell?.loadPreferences?.(key, {
+      return migrateDrawerPrefs(window.VictoryVenueShell?.loadPreferences?.(key, {
         header: { ...shellDefaults.header },
         chat: { ...shellDefaults.chat },
         left: { ...drawerDefaults.left },
@@ -1074,7 +1085,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         chat: { ...shellDefaults.chat },
         left: { ...drawerDefaults.left },
         right: { ...drawerDefaults.right },
-      };
+      });
     }
 
     function saveUiPreferences() {
@@ -1525,14 +1536,6 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         }
         return;
       }
-      if (prefs.mode === "always-closed") {
-        drawerHoverOpen[side] = false;
-        if (drawerHoverCloseTimers[side]) {
-          window.clearTimeout(drawerHoverCloseTimers[side]);
-          drawerHoverCloseTimers[side] = null;
-        }
-        return;
-      }
       if (open) {
         if (drawerHoverCloseTimers[side]) {
           window.clearTimeout(drawerHoverCloseTimers[side]);
@@ -1552,9 +1555,7 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
         ? true
         : prefs.mode === "always-open"
           ? true
-          : prefs.mode === "always-closed"
-            ? false
-            : (drawerHoverOpen[side] || state.contains(document.activeElement) || isDrawerDetailsVisible(side));
+          : (drawerHoverOpen[side] || state.contains(document.activeElement) || isDrawerDetailsVisible(side));
 
       state.dataset.openMode = prefs.mode;
       state.dataset.open = open ? "true" : "false";
@@ -4703,6 +4704,24 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
       resizeObserver.observe(stageShell);
       runtimeLifecycle.listen(window, "resize", layoutPixiScene);
       layoutPixiScene();
+
+      // Drawers' CSS `top` used to be a static 66px guess at the header's
+      // collapsed height -- correct when the header is collapsed, but the
+      // pinned/expanded header (min-height 58px plus padding/content) can
+      // render taller than that guess, covering the top of the right
+      // drawer's own header/first item. Track the header's REAL rendered
+      // height continuously (fires across its own open/close transition
+      // too, not just at the two endpoints) so `.drawer`'s `top: calc(var(
+      // --header-rendered-height, 58px) + 8px)` rule always clears it
+      // exactly, in every state, without guessing a bigger static number
+      // and wasting space when the header is collapsed.
+      if (topBar) {
+        const headerHeightObserver = new ResizeObserver(() => {
+          document.documentElement.style.setProperty("--header-rendered-height", `${topBar.getBoundingClientRect().height}px`);
+        });
+        runtimeLifecycle.track(() => headerHeightObserver.disconnect());
+        headerHeightObserver.observe(topBar);
+      }
       runtimeLifecycle.timeout(() => {
         void refreshVenueMapState();
         void refreshVenueGridConfig();

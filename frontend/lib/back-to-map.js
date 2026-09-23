@@ -41,7 +41,13 @@
          settings buttons and the header itself. */
       .back-to-map-link--floating {
         position: fixed;
-        top: 12px;
+        /* Falls back to plain 12px (4px + 8px) on venues that don't set
+           --header-rendered-height at all -- only stage-runtime venues
+           (Catharsis, First Theater) track it, where this button used to
+           sit right on top of the header's title/status chips whenever
+           the header was pinned open or simply taller than the old
+           static 12px guess assumed. */
+        top: calc(var(--header-rendered-height, 4px) + 8px);
         left: 12px;
         z-index: 95;
         padding: 8px 14px;
