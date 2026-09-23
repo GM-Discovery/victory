@@ -34,22 +34,36 @@
     if (!drawer) return;
 
     const kind = String(snapshot?.theater_context?.kind || "").trim().toLowerCase();
-    if (kind !== "audience") {
-      // Not (or no longer) resolved as Audience for this venue -- leave the
-      // ordinary Cast/Director drawers alone and keep this overlay hidden.
-      drawer.hidden = true;
-      return;
-    }
-
     const leftDrawer = document.getElementById("left-drawer");
     const rightDrawer = document.getElementById("right-drawer");
     const leftEdge = document.getElementById("left-drawer-edge-trigger");
     const rightEdge = document.getElementById("right-drawer-edge-trigger");
     const chatPanel = document.getElementById("chat-panel");
+    const topBarEl = document.getElementById("top-bar");
+    if (kind !== "audience") {
+      // Not (or no longer) resolved as Audience for this venue. This module
+      // polls independently every 10s (see boot() below), so a viewer whose
+      // role/theater_context genuinely changes mid-session (or who was ever
+      // transiently misresolved as "audience" -- the exact Kernel 101 101-20
+      // bug) must have the Cast/Director drawers explicitly RESTORED here,
+      // not just left alone: this same function is what hid them via
+      // inline style in the first place, and nothing else in this file ever
+      // clears that style. Without this, one bad poll permanently hides a
+      // Cast/Director's own tools for the rest of the browser tab's life,
+      // survivable only by a full page reload.
+      if (leftDrawer) leftDrawer.style.removeProperty("display");
+      if (rightDrawer) rightDrawer.style.removeProperty("display");
+      if (leftEdge) leftEdge.style.removeProperty("display");
+      if (rightEdge) rightEdge.style.removeProperty("display");
+      if (chatPanel) chatPanel.style.removeProperty("display");
+      if (topBarEl) topBarEl.style.removeProperty("display");
+      drawer.hidden = true;
+      return;
+    }
+
     // Kernel 93 §6: Audience gets this simpler overlay INSTEAD of the
     // Cast/Director drawers, never alongside them -- those carry Stage
     // Controls and Character-authoring tools that are not Audience's to see.
-    const topBar = document.getElementById("top-bar");
     // 2026-08-28 live testing: chat also goes away for Audience -- the
     // Note to the Director box + reactions bar are the intended
     // replacement (ledger A19), not a third channel alongside them. Same
@@ -67,7 +81,7 @@
     if (leftEdge) leftEdge.style.display = "none";
     if (rightEdge) rightEdge.style.display = "none";
     if (chatPanel) chatPanel.style.display = "none";
-    if (topBar) topBar.style.display = "none";
+    if (topBarEl) topBarEl.style.display = "none";
     drawer.hidden = false;
     bindDrawerToggle();
     bindNoteSend();
