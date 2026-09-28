@@ -7,6 +7,19 @@
   function createTokenUi(deps) {
     const state = deps.state;
     const canManageStageTokens = deps.canManageStageTokens;
+    // Kernel 101 (101-24) follow-up: Cast may open this picker to place a
+    // BRAND-NEW token, but not to replace an existing token's asset.
+    // canManageStageTokens (producer/director/operator) still governs
+    // replace mode, the token editor, and every other stage tool; this
+    // narrower flag governs create mode only, mirroring logic.js's
+    // canCreateStageObjects gate on the "Add Token" menu entry and the
+    // backend's canActCreateToken-vs-canActUpdateToken split.
+    //
+    // Falls back to canManageStageTokens when a caller doesn't supply it,
+    // so an un-updated host keeps exactly its old behavior.
+    const canCreateStageObjects = typeof deps.canCreateStageObjects === "function"
+      ? deps.canCreateStageObjects
+      : canManageStageTokens;
     const tokenPlacementPointForCreate = deps.tokenPlacementPointForCreate;
     const tokenScaleForModel = deps.tokenScaleForModel;
     const tokenSnapModeForModel = deps.tokenSnapModeForModel;
@@ -36,6 +49,18 @@
     const setTokenAssets = deps.setTokenAssets;
     const getTokenPickerElements = deps.getTokenPickerElements;
     const refreshWarehouseTokenAssetsFn = deps.refreshWarehouseTokenAssets;
+
+    function normalizeTokenPickerMode(mode) {
+      return String(mode || "").trim().toLowerCase() === "replace" ? "replace" : "create";
+    }
+
+    // The single authority question this module asks, so opening the picker
+    // and loading its assets can never disagree about who may do what.
+    function canUseTokenPickerMode(mode) {
+      return normalizeTokenPickerMode(mode) === "replace"
+        ? Boolean(canManageStageTokens())
+        : Boolean(canCreateStageObjects());
+    }
 
     function tokenPickerFilteredAssets() {
       const search = String(state.search || "").trim().toLowerCase();
@@ -151,7 +176,10 @@
     }
 
     async function refreshWarehouseTokenAssets() {
-      if (!canManageStageTokens()) {
+      // Gated on the mode the picker is actually in, not on the broader
+      // manage permission: otherwise a Cast user opens a create-mode picker
+      // successfully and then stares at a permanently empty asset list.
+      if (!canUseTokenPickerMode(state.mode)) {
         setTokenAssets([]);
         renderTokenPickerList();
         return;
@@ -159,11 +187,14 @@
       try {
         if (getTokenPickerElements().status) getTokenPickerElements().status.textContent = "Loading active token assets...";
         const params = new URLSearchParams({
-          asset_type: "token",
-          status: "active",
           search: String(getTokenPickerElements().search?.value || "").trim(),
         });
-        const response = await fetch(`/api/warehouse/assets?${params.toString()}`, { credentials: "include", cache: "no-store" });
+        // /api/stage/token-assets, not /api/warehouse/assets: the Warehouse
+        // listing is producer/director-only (requireWarehouseAccess) and
+        // 403s for Cast. The stage endpoint serves the same rows for active
+        // tokens at Cast+ and grants no authority beyond naming an asset --
+        // the create itself is still decided by canActCreateToken.
+        const response = await fetch(`/api/stage/token-assets?${params.toString()}`, { credentials: "include", cache: "no-store" });
         const payload = await response.json().catch(() => null);
         if (!response.ok || !payload?.ok) throw new Error(payload?.error || `HTTP ${response.status}`);
         setTokenAssets(Array.isArray(payload.data) ? payload.data : []);
@@ -183,8 +214,11 @@
     function openTokenPicker(mode = "create", objectModel = null) {
       const elements = getTokenPickerElements();
       if (!elements.panel) return;
-      if (!canManageStageTokens()) {
-        setStageStatus("Only producers and directors can place tokens.");
+      const requestedMode = normalizeTokenPickerMode(mode);
+      if (!canUseTokenPickerMode(requestedMode)) {
+        setStageStatus(requestedMode === "replace"
+          ? "Only producers and directors can replace a token's asset."
+          : "You do not have permission to place tokens.");
         return;
       }
       closeEditor("card");
@@ -192,7 +226,7 @@
       closeEditor("grid");
       closeEditor("token");
       state.open = true;
-      state.mode = mode === "replace" ? "replace" : "create";
+      state.mode = requestedMode;
       state.selectedAssetID = "";
       state.filterShape = "all";
       state.search = "";

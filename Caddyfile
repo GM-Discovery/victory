@@ -5,6 +5,29 @@ victory.amurray.family {
     reverse_proxy /ws/* backend:8081
     reverse_proxy /auth/* backend:8081
 
+    # Kernel 101: file_server sends only ETag/Last-Modified and no
+    # Cache-Control at all, so browsers fall back to HEURISTIC freshness
+    # (roughly 10% of the age since Last-Modified). Measured against live
+    # before this was added: token-ui.js had a Last-Modified ~71 days old,
+    # giving it about a week of reuse with NO revalidation -- which made the
+    # ?v= tags on the stage scripts unreliable. A returning Cast user could
+    # keep running superseded stage code against current server authority.
+    #
+    # no-cache does NOT mean "don't store": the browser still keeps the file
+    # and still gets a cheap 304 when it hasn't changed. It only means
+    # "revalidate before reuse," which is what makes a ?v= bump land on the
+    # next load instead of whenever heuristic freshness happens to lapse.
+    # This is the live-runtime surface -- a venue page is something people
+    # sit inside during a show, not a document they keep afterward -- so
+    # correctness is worth one conditional request per file.
+    #
+    # Heavy visual content is deliberately NOT covered here: map and token
+    # images come from the backend at /api/assets/*, which sets its own
+    # Cache-Control per asset because only the backend knows who is allowed
+    # to see a given one.
+    @appshell path *.html */ /lib/* /venues/*
+    header @appshell Cache-Control "no-cache"
+
     root * /opt/victory/frontend
     file_server
 }

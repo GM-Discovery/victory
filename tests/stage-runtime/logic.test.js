@@ -154,3 +154,61 @@ test("selection menu generation covers stage and token actions", () => {
   assert.equal(tokenActions.some((item) => item.action === "free-placement"), true);
   assert.equal(tokenActions.some((item) => item.action === "move-public-layer"), true);
 });
+
+// Kernel 101 (101-24) follow-up: the menu half of the Cast create path.
+// "Add Token" must be offered and ENABLED for Cast, while every action that
+// edits an existing token -- including the one Cast just placed -- stays
+// absent. Guards the boundary that canCreateStageObjects exists to draw.
+test("Cast is offered token creation but no token editing", () => {
+  const castContext = {
+    canManageIndexCards: false,
+    canManageStageTokens: false,
+    canCreateStageObjects: true,
+    canActorRevealHideStageObjects: false,
+    hasSelection: true,
+  };
+
+  const stageActions = logic.resolveStageObjectActions(logic.stageContextMenuModel(), castContext);
+  const addToken = stageActions.find((item) => item.action === "add-token");
+  assert.ok(addToken, "Cast must be offered Add Token");
+  assert.notEqual(addToken.disabled, true, "Add Token must be enabled, not a dead entry");
+
+  // Stage-level authoring Cast must not get. These entries are still listed
+  // (this menu shows unavailable tools greyed rather than hiding them), so
+  // what matters is that they stay DISABLED -- the exact state Add Token was
+  // wrongly left in on the picker side before this fix.
+  for (const denied of ["set-map", "configure-grid", "open-scene-configuration"]) {
+    const entry = stageActions.find((item) => item.action === denied);
+    if (entry) {
+      assert.equal(entry.disabled, true, `Cast must not be able to use "${denied}"`);
+    }
+  }
+
+  const tokenActions = logic.resolveStageObjectActions(tokenModel(), {
+    ...castContext,
+    cardFaceForModel: () => "back",
+    cardDisplayMode: () => "world",
+    tokenScaleForModel: () => 150,
+    tokenSnapModeForModel: () => "grid",
+    tokenLayerForModel: () => "director",
+  });
+  for (const denied of [
+    "scale",
+    "replace-asset",
+    "free-placement",
+    "snap-to-grid",
+    "move-public-layer",
+    "move-director-layer",
+    "move-here",
+    "duplicate",
+    "remove",
+    "lock",
+    "unlock",
+  ]) {
+    assert.equal(
+      tokenActions.some((item) => item.action === denied),
+      false,
+      `Cast must not be offered "${denied}" on an existing token`,
+    );
+  }
+});

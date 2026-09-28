@@ -2540,6 +2540,9 @@ const VENUE = globalThis.VictoryStageVenue || { slug: "", name: "Stage" };
     tokenUi = stageEngineTokenUiModule?.createTokenUi?.({
       state: tokenPickerState,
       canManageStageTokens: () => canManageStageTokens(currentRole),
+      // Create mode only -- see token-ui.js. Replace mode, the token editor
+      // and everything else the picker touches stay on canManageStageTokens.
+      canCreateStageObjects: () => canCreateStageObjects(currentRole),
       tokenPlacementPointForCreate: (...args) => tokenPlacementPointForCreate(...args),
       tokenScaleForModel: (...args) => tokenScaleForModel(...args),
       tokenSnapModeForModel: (...args) => tokenSnapModeForModel(...args),

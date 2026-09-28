@@ -1169,6 +1169,7 @@ func main() {
 	mux.HandleFunc("/api/warehouse/storage/settings", assets.HandleWarehouseStorageSettings(pool))
 	mux.HandleFunc("/api/warehouse/assets", ratelimit.Middleware(actionLimiter, assets.HandleWarehouseAssets(pool)))
 	mux.HandleFunc("/api/warehouse/assets/", ratelimit.Middleware(actionLimiter, assets.HandleWarehouseAssetByID(pool, storageRoot)))
+	mux.HandleFunc("GET /api/stage/token-assets", ratelimit.Middleware(actionLimiter, assets.HandleStageTokenAssets(pool)))
 	mux.HandleFunc("GET /api/venues/first-theater/map", venues.HandleVenueMap(hub, pool))
 	mux.HandleFunc("POST /api/venues/first-theater/map", venues.HandleVenueMap(hub, pool))
 	mux.HandleFunc("GET /api/venues/first-theater/grid", venues.HandleVenueGrid(hub, pool))

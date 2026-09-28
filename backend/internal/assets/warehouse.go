@@ -469,110 +469,124 @@ func HandleWarehouseAssets(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		assetType := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("asset_type")))
-		status := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("status")))
-		search := strings.TrimSpace(r.URL.Query().Get("search"))
-
-		query := `
-			SELECT
-				a.id::text,
-				COALESCE(NULLIF(a.name, ''), COALESCE(NULLIF(a.original_filename, ''), a.id::text)) AS name,
-				COALESCE(NULLIF(a.asset_type, ''), 'generic') AS asset_type,
-				COALESCE(NULLIF(a.shape, ''), 'circle') AS shape,
-				COALESCE(NULLIF(a.status, ''), 'active') AS status,
-				COALESCE(a.default_grid_width, 1),
-				COALESCE(a.default_grid_height, 1),
-				COALESCE(a.retain_original, FALSE),
-				COALESCE(NULLIF(a.original_filename, ''), ''),
-				COALESCE(a.source_mime, ''),
-				COALESCE(a.sniffed_mime, ''),
-				COALESCE(a.width, 0),
-				COALESCE(a.height, 0),
-				COALESCE(a.byte_size, 0),
-				COALESCE(a.stored_bytes, 0),
-				COALESCE((SELECT count(*) FROM venue_active_maps vm WHERE vm.asset_id = a.id), 0),
-				a.created_at,
-				a.updated_at,
-				a.last_used_at,
-				a.deleted_at
-			FROM assets a
-			WHERE a.location_id = (SELECT id FROM locations WHERE slug = $1 LIMIT 1)
-		`
-
-		args := []any{access.DefaultLocationSlug()}
-		argN := 2
-		if assetType != "" {
-			query += fmt.Sprintf(" AND COALESCE(NULLIF(a.asset_type, ''), 'generic') = $%d", argN)
-			args = append(args, assetType)
-			argN++
-		}
-		if status != "" {
-			if status == "deleted" || status == "tombstoned" {
-				query += " AND (COALESCE(a.is_deleted, FALSE) = TRUE OR a.deleted_at IS NOT NULL)"
-			} else if status == "active" {
-				query += " AND COALESCE(a.is_deleted, FALSE) = FALSE AND a.deleted_at IS NULL"
-			} else {
-				query += fmt.Sprintf(" AND COALESCE(NULLIF(a.status, ''), 'active') = $%d", argN)
-				args = append(args, status)
-				argN++
-			}
-		}
-		if search != "" {
-			query += fmt.Sprintf(` AND (
-				COALESCE(NULLIF(a.name, ''), '') ILIKE $%d OR
-				COALESCE(NULLIF(a.original_filename, ''), '') ILIKE $%d OR
-				COALESCE(a.tags, '{}'::text[])::text ILIKE $%d
-			)`, argN, argN, argN)
-			args = append(args, "%"+search+"%")
-		}
-		query += " ORDER BY a.created_at DESC"
-
-		rows, err := pool.Query(ctx, query, args...)
+		items, errCode, err := queryWarehouseAssetList(
+			ctx,
+			pool,
+			strings.ToLower(strings.TrimSpace(r.URL.Query().Get("asset_type"))),
+			strings.ToLower(strings.TrimSpace(r.URL.Query().Get("status"))),
+			strings.TrimSpace(r.URL.Query().Get("search")),
+		)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "asset_lookup_failed"})
-			return
-		}
-		defer rows.Close()
-
-		items := make([]warehouseAssetListItem, 0)
-		for rows.Next() {
-			var item warehouseAssetListItem
-			if err := rows.Scan(
-				&item.ID,
-				&item.Name,
-				&item.AssetType,
-				&item.Shape,
-				&item.Status,
-				&item.DefaultGridWidth,
-				&item.DefaultGridHeight,
-				&item.RetainOriginal,
-				&item.OriginalFilename,
-				&item.SourceMime,
-				&item.SniffedMime,
-				&item.Width,
-				&item.Height,
-				&item.ByteSize,
-				&item.StoredBytes,
-				&item.ReferenceCount,
-				&item.CreatedAt,
-				&item.UpdatedAt,
-				&item.LastUsedAt,
-				&item.DeletedAt,
-			); err != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "asset_scan_failed"})
-				return
-			}
-			item.ContentURL = "/api/assets/" + item.ID + "/content"
-			item.ThumbnailURL = "/api/assets/" + item.ID + "/content?variant=thumbnail"
-			items = append(items, item)
-		}
-		if err := rows.Err(); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "asset_lookup_failed"})
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": errCode})
 			return
 		}
 
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": items})
 	}
+}
+
+// queryWarehouseAssetList is the shared listing read behind both the full
+// Warehouse browser (HandleWarehouseAssets, producer/director/operator only)
+// and the narrow stage token-picker feed (HandleStageTokenAssets, Cast+).
+// It performs NO access check of its own -- each caller decides who may call
+// it and with which filters -- and returns a stable error code alongside the
+// error so callers keep emitting the exact payloads they always have.
+func queryWarehouseAssetList(ctx context.Context, pool *pgxpool.Pool, assetType, status, search string) ([]warehouseAssetListItem, string, error) {
+	query := `
+		SELECT
+			a.id::text,
+			COALESCE(NULLIF(a.name, ''), COALESCE(NULLIF(a.original_filename, ''), a.id::text)) AS name,
+			COALESCE(NULLIF(a.asset_type, ''), 'generic') AS asset_type,
+			COALESCE(NULLIF(a.shape, ''), 'circle') AS shape,
+			COALESCE(NULLIF(a.status, ''), 'active') AS status,
+			COALESCE(a.default_grid_width, 1),
+			COALESCE(a.default_grid_height, 1),
+			COALESCE(a.retain_original, FALSE),
+			COALESCE(NULLIF(a.original_filename, ''), ''),
+			COALESCE(a.source_mime, ''),
+			COALESCE(a.sniffed_mime, ''),
+			COALESCE(a.width, 0),
+			COALESCE(a.height, 0),
+			COALESCE(a.byte_size, 0),
+			COALESCE(a.stored_bytes, 0),
+			COALESCE((SELECT count(*) FROM venue_active_maps vm WHERE vm.asset_id = a.id), 0),
+			a.created_at,
+			a.updated_at,
+			a.last_used_at,
+			a.deleted_at
+		FROM assets a
+		WHERE a.location_id = (SELECT id FROM locations WHERE slug = $1 LIMIT 1)
+	`
+
+	args := []any{access.DefaultLocationSlug()}
+	argN := 2
+	if assetType != "" {
+		query += fmt.Sprintf(" AND COALESCE(NULLIF(a.asset_type, ''), 'generic') = $%d", argN)
+		args = append(args, assetType)
+		argN++
+	}
+	if status != "" {
+		if status == "deleted" || status == "tombstoned" {
+			query += " AND (COALESCE(a.is_deleted, FALSE) = TRUE OR a.deleted_at IS NOT NULL)"
+		} else if status == "active" {
+			query += " AND COALESCE(a.is_deleted, FALSE) = FALSE AND a.deleted_at IS NULL"
+		} else {
+			query += fmt.Sprintf(" AND COALESCE(NULLIF(a.status, ''), 'active') = $%d", argN)
+			args = append(args, status)
+			argN++
+		}
+	}
+	if search != "" {
+		query += fmt.Sprintf(` AND (
+			COALESCE(NULLIF(a.name, ''), '') ILIKE $%d OR
+			COALESCE(NULLIF(a.original_filename, ''), '') ILIKE $%d OR
+			COALESCE(a.tags, '{}'::text[])::text ILIKE $%d
+		)`, argN, argN, argN)
+		args = append(args, "%"+search+"%")
+	}
+	query += " ORDER BY a.created_at DESC"
+
+	rows, err := pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, "asset_lookup_failed", err
+	}
+	defer rows.Close()
+
+	items := make([]warehouseAssetListItem, 0)
+	for rows.Next() {
+		var item warehouseAssetListItem
+		if err := rows.Scan(
+			&item.ID,
+			&item.Name,
+			&item.AssetType,
+			&item.Shape,
+			&item.Status,
+			&item.DefaultGridWidth,
+			&item.DefaultGridHeight,
+			&item.RetainOriginal,
+			&item.OriginalFilename,
+			&item.SourceMime,
+			&item.SniffedMime,
+			&item.Width,
+			&item.Height,
+			&item.ByteSize,
+			&item.StoredBytes,
+			&item.ReferenceCount,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+			&item.LastUsedAt,
+			&item.DeletedAt,
+		); err != nil {
+			return nil, "asset_scan_failed", err
+		}
+		item.ContentURL = "/api/assets/" + item.ID + "/content"
+		item.ThumbnailURL = "/api/assets/" + item.ID + "/content?variant=thumbnail"
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "asset_lookup_failed", err
+	}
+	return items, "", nil
 }
 
 func HandleWarehouseAssetByID(pool *pgxpool.Pool, storageRoot string) http.HandlerFunc {
