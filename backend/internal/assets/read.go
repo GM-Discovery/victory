@@ -175,7 +175,11 @@ func HandleGetAssetMeta(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 
 			w.Header().Set("Content-Type", contentType)
-			w.Header().Set("Cache-Control", "private, max-age=0, must-revalidate")
+			w.Header().Set("Cache-Control", assetContentCacheControl(ctx, pool, userID, rec.AssetType))
+			// The decision above depends on who is asking, and who is asking
+			// is carried by the session cookie. Without this a cache could
+			// hand one viewer's entitlement to another.
+			w.Header().Set("Vary", "Cookie")
 			w.WriteHeader(http.StatusOK)
 			if _, err := io.Copy(w, file); err != nil {
 				log.Printf("asset content copy failed: asset=%s path=%s err=%v", assetID, contentPath, err)
@@ -500,6 +504,92 @@ func serveConstructionFallback(w http.ResponseWriter, r *http.Request) {
 // access, matching userCanReadAsset's existing precedent. Assets not
 // referenced by any eWrite publication are completely unaffected --
 // unchanged legacy behavior.
+// assetContentCacheControl decides how long, if at all, a viewer's own
+// browser may reuse an asset it has already been granted.
+//
+// Maps are the one asset type worth caching: they are the largest single
+// thing a stage viewer fetches, they are re-fetched on every navigation and
+// reconnect, and a map is durable scenery rather than a reveal. Everything
+// else -- tokens above all -- stays revalidate-always, because a token
+// image appearing a moment before the Director intends it to is exactly
+// the failure this endpoint exists to prevent.
+//
+// Backstage roles only. An Audience viewer gets no cache window at all,
+// which is deliberate: their access to a map is the most likely to be
+// revoked mid-show, and a revoked viewer must stop seeing it on the next
+// request, not up to maxAge later. Backstage viewers accept that same
+// window in exchange for the bandwidth, which is the trade Grant asked for
+// (2026-09-29).
+//
+// Always "private": this is authorized, per-viewer content and no shared
+// cache may ever store it, regardless of role.
+//
+// A failed role lookup is NOT an error the request should die on -- this
+// function only chooses a header. It falls back to the uncached answer,
+// which is always safe.
+func assetContentCacheControl(ctx context.Context, pool *pgxpool.Pool, userID, assetType string) string {
+	const uncached = "private, max-age=0, must-revalidate"
+	const backstageMaxAge = 300
+
+	if strings.TrimSpace(userID) == "" {
+		return uncached
+	}
+	// Cheap check first: an anonymous or audience viewer never reaches the
+	// role lookup for a non-map asset, which is most of them.
+	if !assetTypeIsCacheable(assetType) {
+		return uncached
+	}
+
+	backstage, err := viewerIsBackstage(ctx, pool, userID)
+	if err != nil {
+		log.Printf("asset cache role lookup failed, serving uncached: user=%s err=%v", userID, err)
+		return uncached
+	}
+	return assetContentCacheControlFor(assetType, backstage, backstageMaxAge, uncached)
+}
+
+// assetTypeIsCacheable is the asset-type half of the decision, separated so
+// both the fast path above and the pure decision below agree by construction.
+func assetTypeIsCacheable(assetType string) bool {
+	return strings.EqualFold(strings.TrimSpace(assetType), "map")
+}
+
+// assetContentCacheControlFor is the whole policy as a pure function, so the
+// matrix it defines can be tested without a database. Both inputs must be
+// true to earn a cache window; either one false falls back to uncached.
+func assetContentCacheControlFor(assetType string, backstage bool, maxAge int, uncached string) string {
+	if !assetTypeIsCacheable(assetType) || !backstage || maxAge <= 0 {
+		return uncached
+	}
+	return fmt.Sprintf("private, max-age=%d", maxAge)
+}
+
+// viewerIsBackstage reports whether this user holds a production role at the
+// default location, as opposed to being an audience member. Crew is included
+// alongside Cast: Crew is a backstage production role that legitimately
+// works from the same maps, and the boundary being drawn here is
+// production-vs-audience, not an authority ladder. This grants nothing --
+// every caller has already passed a real access check -- it only decides
+// whether a browser may reuse bytes it was already allowed to have.
+func viewerIsBackstage(ctx context.Context, pool *pgxpool.Pool, userID string) (bool, error) {
+	if ok, err := access.IsOperatorUser(ctx, pool, userID); err != nil {
+		return false, err
+	} else if ok {
+		return true, nil
+	}
+
+	role, err := access.CurrentDefaultLocationRole(ctx, pool, userID)
+	if err != nil {
+		return false, err
+	}
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "producer", "director", "cast", "crew":
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
 func userCanReadAssetConsideringEwrite(ctx context.Context, pool *pgxpool.Pool, userID string, rec warehouseAssetRecord) (bool, error) {
 	if userID == rec.ProducerUserID || userID == rec.UploaderUserID || userID == rec.OwnerUserID {
 		return true, nil
