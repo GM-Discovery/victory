@@ -19,5 +19,6 @@ This folder is Victory's build history and living design record: every kernel sp
 - **"Where's the current authority model?"** → `Domains/Identity/Canonical Role and Authority Resolution.md`.
 - **"How do I work a new kernel?"** → `Process/kernel-maker-field-guide.md`.
 - **"What actually exists right now?"** → `Canon/current-state.md`.
+- **"Which venues share stage code, and what will my change break?"** → `Domains/Stage/stage-runtime-venue-topology.md`.
 
 User-facing product/operator documentation (install, Discord, backup, glossary, role guides) lives outside this folder, in `Docs/` at the repository root — this folder is construction history and internal design reference, not the consumer-facing manual.
